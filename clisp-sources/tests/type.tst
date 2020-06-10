@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 (TYPEP (QUOTE A) (QUOTE SYMBOL))
 T
@@ -645,6 +645,10 @@ otherwise
 (the (values) 'a) A
 (multiple-value-list (the (values &rest symbol) (values 'a 'b))) (A B)
 
+(handler-case (the fixnum 'a)
+  (type-error (c) (cons (type-error-expected-type c) (type-error-datum c))))
+(FIXNUM A)
+
 (type-of (make-array '(10 3) :element-type nil))
 (SIMPLE-ARRAY NIL (10 3))
 (type-of (make-array 10 :element-type nil))
@@ -784,5 +788,86 @@ NIL
 (check-type-error (UNION NIL "A"))
 NIL
 
-#+clisp (multiple-value-list (subtypep charset:ucs-4 charset:utf-8)) (T T)
-#+clisp (multiple-value-list (subtypep charset:utf-8 charset:ucs-4)) (T T)
+#+(and clisp unicode) (multiple-value-list
+                       (subtypep charset:ucs-4 charset:utf-8))
+#+(and clisp unicode) (T T)
+#+(and clisp unicode) (multiple-value-list
+                       (subtypep charset:utf-8 charset:ucs-4))
+#+(and clisp unicode) (T T)
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1854698&group_id=1355
+(type-of (byte 1 2)) BYTE
+(typep (byte 1 2) 'BYTE) T
+(etypecase (byte 1 2) (integer 'integer) (byte t) (list 'list)) t
+
+;; http://www.lisp.org/HyperSpec/Body/sec_4-2-3.html
+;; for some reason, BYTE is missing from table 4-2.
+(mapcan (lambda (type) (and (typep 0 type) (list type)))
+        '(array atom base-char base-string bignum bit bit-vector
+          broadcast-stream built-in-class cell-error character class
+          compiled-function complex concatenated-stream condition cons
+          control-error division-by-zero double-float echo-stream
+          end-of-file error extended-char file-error file-stream fixnum
+          float floating-point-inexact floating-point-invalid-operation
+          floating-point-overflow floating-point-underflow function
+          generic-function hash-table integer keyword list
+          logical-pathname long-float method method-combination nil null
+          number package package-error parse-error pathname
+          print-not-readable program-error random-state ratio rational
+          reader-error readtable real restart sequence serious-condition
+          short-float signed-byte simple-array simple-base-string
+          simple-bit-vector simple-condition simple-error simple-string
+          simple-type-error simple-vector simple-warning single-float
+          standard-char standard-class standard-generic-function
+          standard-method standard-object storage-condition stream
+          stream-error string string-stream structure-class
+          structure-object style-warning symbol synonym-stream t
+          two-way-stream type-error unbound-slot unbound-variable
+          undefined-function unsigned-byte vector warning))
+(ATOM BIT FIXNUM INTEGER NUMBER RATIONAL REAL SIGNED-BYTE T UNSIGNED-BYTE)
+
+
+;;; http://www.lisp.org/HyperSpec/Body/dec_type.html
+;;;   A symbol cannot be both the name of a type and the name of a
+;;;   declaration. Defining a symbol as the name of a class, structure,
+;;;   condition, or type, when the symbol has been declared as a
+;;;   declaration name, or vice versa, signals an error.
+(let ((sym (gensym)))
+  (proclaim `(declaration ,sym))
+  (eval `(deftype ,sym () t)))
+error
+
+(let ((sym (gensym)))
+  (proclaim `(declaration ,sym))
+  (eval `(defstruct ,sym a b c)))
+error
+
+(let ((sym (gensym)))
+  (proclaim `(declaration ,sym))
+  (eval `(defclass ,sym () (a b c))))
+error
+
+(let ((sym (gensym)))
+  (proclaim `(declaration ,sym))
+  (eval `(define-condition ,sym (condition) (a b c))))
+error
+
+(let ((sym (gensym)))
+  (eval `(deftype ,sym () t))
+  (proclaim `(declaration ,sym)))
+error
+
+(let ((sym (gensym)))
+  (eval `(defstruct ,sym a b c))
+  (proclaim `(declaration ,sym)))
+error
+
+(let ((sym (gensym)))
+  (eval `(defclass ,sym () (a b c)))
+  (proclaim `(declaration ,sym)))
+error
+
+(let ((sym (gensym)))
+  (eval `(define-condition ,sym (condition) (a b c)))
+  (proclaim `(declaration ,sym)))
+error

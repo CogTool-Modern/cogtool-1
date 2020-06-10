@@ -1,4 +1,4 @@
-;;; -*- Lisp -*-
+;;; -*- Lisp -*- vim:filetype=lisp
 ;;; Test "Exceptional situations" as specified by CLHS
 
 ;; NB: CLHS section 1.4.2 implies that we have to verify only those
@@ -36,10 +36,11 @@ error
 #-CLISP
 error
 
-(let ((a (make-array 5 :adjustable t)))
-  (adjust-array a 4 :fill-pointer 1)
-)
-error
+(adjust-array (make-array 5 :adjustable t) 4 :fill-pointer 1)
+type-error
+
+(adjust-array "foo" 10 :fill-pointer t)
+type-error
 
 (adjustable-array-p '(x))
 type-error
@@ -291,14 +292,17 @@ program-error
 (defgeneric if (x))
 program-error
 
+(defun if ())
+program-error
+
 (progn
   (defmacro foo11 (x) x)
   (defgeneric foo11 (x)))
 program-error
 
 ;; redefinition
-(defun ext:! (a b c) (+ a b c))
-PACKAGE-ERROR
+#+CLISP (defun ext:! (a b c) (+ a b c))
+#+CLISP PACKAGE-ERROR
 
 (defun foo11 ((x y 1) z) (list x y z))
 program-error
@@ -329,8 +333,16 @@ program-error
 ; define-method-combination is too complicated
 
 (progn
-  (defvar foo16)
-  (define-symbol-macro foo16 t))
+  (defvar foo16-1)
+  (define-symbol-macro foo16-1 t))
+program-error
+
+(progn
+  (define-symbol-macro foo16-2 t)
+  (defvar foo16-2))
+program-error
+
+(define-symbol-macro :foo16-3 t)
 program-error
 
 (defmethod if (x) nil)
@@ -405,8 +417,9 @@ type-error
 ;; into pathname.d.
 #-BeOS
 (progn
-  (with-open-file (s "./foo35.tmp" :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede))
-  (delete-file "./foo35.tmp/bar"))
+  (with-open-file (s "./excepsit-tst-foo35.tmp" :direction :output
+                     #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede))
+  (delete-file "./excepsit-tst-foo35.tmp/bar"))
 #-BeOS
 file-error
 
@@ -476,19 +489,21 @@ file-error
 (file-length *terminal-io*)
 type-error
 
-(with-open-file (s "./foo35.tmp" :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
+(with-open-file (s "./excepsit-tst-foo35.tmp" :direction :output
+                   #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
   (file-position s 0.0))
 error
 
-(with-open-file (s "./foo35.tmp" :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
+(with-open-file (s "./excepsit-tst-foo35.tmp" :direction :output
+                   #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
   (file-position s -1))
 error
 
-(with-open-file (s "./foo35.tmp" :direction :input)
+(with-open-file (s "./excepsit-tst-foo35.tmp" :direction :input)
   (file-position s (+ (file-length s) 1000)))
 error
 
-(delete-file "./foo35.tmp")
+(delete-file "./excepsit-tst-foo35.tmp")
 null
 
 (file-write-date "*")
@@ -942,35 +957,35 @@ type-error
 (read-byte (make-string-input-stream "abc"))
 error
 
-(let ((filename "./foo51.bin"))
-  (with-open-file (s filename :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
-                              :if-exists :overwrite
-                              :if-does-not-exist :create))
+(let ((filename "./excepsit-tst-foo51.bin"))
+  (with-open-file (s filename :direction :output
+                     #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
+                     :if-exists :overwrite :if-does-not-exist :create))
   (with-open-file (s filename :direction :input
-                              :element-type '(unsigned-byte 8))
+                     :element-type '(unsigned-byte 8))
     (read-byte s t)))
 end-of-file
-(delete-file "./foo51.bin")
+(delete-file "./excepsit-tst-foo51.bin")
 null
 
-(let ((filename "./foo52.txt"))
-  (with-open-file (s filename :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
-                              :if-exists :overwrite
-                              :if-does-not-exist :create))
+(let ((filename "./excepsit-tst-foo52.txt"))
+  (with-open-file (s filename :direction :output
+                     #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
+                     :if-exists :overwrite :if-does-not-exist :create))
   (with-open-file (s filename :direction :input)
     (read-char s t)))
 end-of-file
-(delete-file "./foo52.txt")
+(delete-file "./excepsit-tst-foo52.txt")
 null
 
-(let ((filename "./foo53.txt"))
-  (with-open-file (s filename :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
-                              :if-exists :overwrite
-                              :if-does-not-exist :create))
+(let ((filename "./excepsit-tst-foo53.txt"))
+  (with-open-file (s filename :direction :output
+                     #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
+                     :if-exists :overwrite :if-does-not-exist :create))
   (with-open-file (s filename :direction :input)
     (read-char-no-hang s t)))
 end-of-file
-(delete-file "./foo53.txt")
+(delete-file "./excepsit-tst-foo53.txt")
 null
 
 (read-from-string "((a b))" nil nil :end 6)
@@ -993,6 +1008,11 @@ type-error
 
 (setf (readtable-case *readtable*) ':unknown)
 type-error
+
+;; recursive-p=T on top-level form
+;; http://clisp.cons.org/impnotes/recursive-p.html
+(with-input-from-string (s "#1=(#1#)") (read s nil nil t))
+error
 
 (realpart #\c)
 type-error
@@ -1276,3 +1296,14 @@ undefined-function
 
 (proclaim '(integer . foo))
 type-error
+
+(ash 1 66610000) arithmetic-error ; [ 2015118 ]
+(rational most-positive-long-float) arithmetic-error
+(rational least-positive-long-float) arithmetic-error
+(rational most-negative-long-float) arithmetic-error
+(rational least-negative-long-float) arithmetic-error
+
+(expt 10 10000000) arithmetic-error ; [ 2807311 ]
+
+#+(and clisp unicode) (ext:convert-string-from-bytes #(1) charset:ucs-4)
+#+(and clisp unicode) simple-charset-type-error

@@ -2,7 +2,7 @@
 ;;;; Methods
 ;;;; Part n-2: make/initialize-instance methods, generic functions.
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2004
+;;;; Sam Steingold 1998 - 2004, 2010
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -76,11 +76,11 @@
     (:method ((method method))
       (let ((lambda-list (method-lambda-list method)))
         (method-lambda-list-to-signature lambda-list
-          #'(lambda (detail errorstring &rest arguments)
-              (declare (ignore detail))
-              (error (TEXT "Invalid ~S result for ~S: ~:S: ~A")
-                     'method-lambda-list method lambda-list
-                     (apply #'format nil errorstring arguments))))))
+          #'(lambda (form detail errorstring &rest arguments)
+              (sys::lambda-list-error form detail
+                (TEXT "Invalid ~S result for ~S: ~:S: ~A")
+                'method-lambda-list method lambda-list
+                (apply #'format nil errorstring arguments))))))
     (:method ((method standard-method))
       (std-method-signature method))))
 

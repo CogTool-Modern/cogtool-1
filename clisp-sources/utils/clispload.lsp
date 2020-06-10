@@ -85,10 +85,6 @@
   ;; None of these approaches is perfect: Either you cannot assume that
   ;; conversion from integer to floating-point always works, or you cannot
   ;; assume that conversion from floating-point to integer always works.
-  BIGNUM.FLOAT.COMPARE.1A BIGNUM.FLOAT.COMPARE.1B BIGNUM.FLOAT.COMPARE.2A
-  BIGNUM.FLOAT.COMPARE.2B BIGNUM.FLOAT.COMPARE.3A BIGNUM.FLOAT.COMPARE.3B
-  BIGNUM.FLOAT.COMPARE.4A BIGNUM.FLOAT.COMPARE.4B BIGNUM.FLOAT.COMPARE.5A
-  BIGNUM.FLOAT.COMPARE.5B BIGNUM.FLOAT.COMPARE.6A BIGNUM.FLOAT.COMPARE.6B
   BIGNUM.FLOAT.COMPARE.7 BIGNUM.FLOAT.COMPARE.8
 
   ;; In CLISP (atan 1L0) is more than long-float-epsilon apart from (/ pi 4).
@@ -100,28 +96,7 @@
 
   ;; CLISP supports complex numbers with realpart and imagpart of different
   ;; types.
-  COMPLEX.2 COMPLEX.4 COMPLEX.5 IMAGPART.4
-
-  ;; Paul Dietz assumes that the classes STREAM and CONDITION are disjoint.
-  ;; In CLISP they are not, because the user can create subclasses inheriting
-  ;; from FUNDAMENTAL-STREAM and any other class with metaclass STANDARD-CLASS.
-  ;; ANSI CL 4.2.2.(1) allows such classes.
-  TYPES.7B TYPES.7C
-
-  ;; Paul Dietz assumes that the class STREAM is disjoint from user-defined
-  ;; classes with metaclass STANDARD-CLASS.
-  ;; In CLISP this is not the case, because the user can create subclasses
-  ;; inheriting from FUNDAMENTAL-STREAM and any other class with metaclass
-  ;; STANDARD-CLASS. ANSI CL 4.2.2. allows such classes.
-  USER-CLASS-DISJOINTNESS
-
-  ;; Paul Dietz assumes that two user-defined classes with metaclass
-  ;; STANDARD-CLASS that don't inherit from each other are disjoint.
-  ;; In CLISP this is not the case, because the user can create subclasses
-  ;; inheriting from both classes. ANSI CL 4.2.2.(3) allows such classes.
-  ;; We don't want SUBTYPEP to depend on the existence or absence of
-  ;; subclasses.
-  USER-CLASS-DISJOINTNESS-2 TAC-3.16
+  COMPLEX.2 COMPLEX.4 COMPLEX.5
 
   ;; Paul Dietz assumes that when a WITH-INPUT-FROM-STRING form terminates
   ;; through a transfer of control, the index place is not updated.
@@ -131,14 +106,8 @@
   ;; Paul Dietz assumes that binding *PRINT-READABLY* to T has no effect on
   ;; how integers are printed.
   ;; In CLISP *PRINT-READABLY* = T implies the effects of *PRINT-RADIX* = T.
-  WRITE.2 WRITE.3 WRITE.4 WRITE.5 WRITE.6 WRITE.7 PRINT.2 PRINT.3 PPRINT.2
-  PPRINT.3 PRIN1.2 PRIN1.3 WRITE-TO-STRING.2 WRITE-TO-STRING.3
-  WRITE-TO-STRING.4 PRIN1-TO-STRING.2
-
-  ;; Paul Dietz assumes that structure objects without slots are printed like
-  ;; atoms.
-  ;; CLISP prints them as objects with components, like vectors.
-  PRINT-LEVEL.8 PRINT-LEVEL.9
+  PRINT.2 PRINT.3 PPRINT.2 PPRINT.3 PRIN1.2 PRIN1.3
+  WRITE-TO-STRING.2 WRITE-TO-STRING.3 WRITE-TO-STRING.4 PRIN1-TO-STRING.2
 
   ;; Paul Dietz assumes that FORMAT ~F works like WRITE.
   ;; CLISP prints 23346.8s0 (exact value is 23346.75) with ~F to "23346.7"
@@ -173,17 +142,8 @@
   SYNTAX.SHARP-A.4 SYNTAX.SHARP-A.6 SYNTAX.SHARP-A.7 SYNTAX.SHARP-A.22
   SYNTAX.SHARP-A.23
 
-  ;; Paul Dietz assumes that (ROOM NIL) prints non-empty information.
-  ;; In CLISP, it prints an empty information and returns some values.
-  ROOM.2
-
   ;; The interaction between TRACE and generic functions needs to be fixed.
   TRACE.13 TRACE.14
-
-  ;; The interaction between PROCLAIM DECLARATION and
-  ;; DEFTYPE/DEFSTRUCT/DEFCLASS needs to be fixed.
-  DECLARATION.4 DECLARATION.5 DECLARATION.6 DECLARATION.7 DECLARATION.8
-  DECLARATION.9 DECLARATION.10 DECLARATION.11
 
   ;; Requires a rewrite of parts of the pretty-printer.
   PPRINT-TABULAR.6 PPRINT-TABULAR.7 PPRINT-TABULAR.8 PPRINT-TABULAR.9
@@ -246,16 +206,26 @@
   FORMAT.JUSTIFY.ERROR._.2 FORMAT.JUSTIFY.ERROR._.3 FORMAT.JUSTIFY.ERROR.I.1
   FORMAT.JUSTIFY.ERROR.I.2 FORMAT.JUSTIFY.ERROR.I.3
 
-  ;; <http://www.lisp.org/HyperSpec/Issues/iss065.html>
-  ;; COMPILER-DIAGNOSTICS:USE-HANDLER
-  COMPILE-FILE.2 COMPILE-FILE.2A
-
   ;; CLISP extends DISASSEMBLE to accept STRINGs, METHODs, and forms
   DISASSEMBLE.ERROR.3
+
+  ;; CLISP keeps the deprecated EVAL-WHEN situations EVAL, COMPILE, LOAD
+  ;; at their old cltl2 meanings, different from :EXECUTE, :LOAD-TOPLEVEL,
+  ;; :COMPILE-TOPLEVEL (they ignore the top-level vs non-top-level difference)
+  ;; see http://clisp.cons.org/impnotes/evaluation.html#eval-when
+  ;; [these test fail only on compiled mode]
+  EVAL-WHEN.15 EVAL-WHEN.17
 
   ;; To be revisited:
 
 ))
+
+;; for the pretty-printer
+(setq custom:*pprint-first-newline* nil)
+
+;; for READ-BYTE.ERROR.3 READ-BYTE.ERROR.4 READ-BYTE.ERROR.6
+;;  WRITE-BYTE.ERROR.3 OPEN.66 OPEN.OUTPUT.30
+(setq custom:*reopen-open-file* 'warn)
 
 ;; For ENSURE-DIRECTORIES-EXIST.8
 (when (ext:probe-directory "scratch/")
@@ -272,4 +242,4 @@
 (when (and (= (logand (sys::address-of nil) #xffffff) 0) ; SPVW_PURE_BLOCKS ?
            (<= (integer-length most-positive-fixnum) 26)) ; 32-bit machine ?
   ;; Inhibit the CHAR-INT.2 test.
-  (defun char-int.2.fn () t))
+  (rt:rem-test 'char-int.2))

@@ -1,6 +1,6 @@
 ;;;; Common Lisp Object System for CLISP: Method Combination
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2005
+;;;; Sam Steingold 1998 - 2005, 2007, 2010
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 ;;;; James Anderson 2003
 
@@ -141,8 +141,8 @@
 
 (defun invalid-method-sort-order-error (order-form order-value) ; ABI
   (method-combination-error
-    (TEXT "The value of ~S is ~S, should be :MOST-SPECIFIC-FIRST or :MOST-SPECIFIC-LAST.")
-    order-form order-value))
+    (TEXT "The value of ~S is ~S, should be ~S or ~S.")
+    order-form order-value ':MOST-SPECIFIC-FIRST ':MOST-SPECIFIC-LAST))
 
 (defun call-method-duplicates-error (gf method+groupname)
   (let ((*method-combination-generic-function* gf)
@@ -155,8 +155,8 @@
 
 (defun invalid-sort-order-error (order-form order-value) ; ABI
   (error-of-type 'program-error
-    (TEXT "The value of ~S is ~S, should be :MOST-SPECIFIC-FIRST or :MOST-SPECIFIC-LAST.")
-    order-form order-value))
+    (TEXT "The value of ~S is ~S, should be ~S or ~S.")
+    order-form order-value ':MOST-SPECIFIC-FIRST ':MOST-SPECIFIC-LAST))
 
 (defun any-method-combination-check-options (gf-name combination options checker) ; ABI
   (locally (declare (compile))
@@ -178,11 +178,10 @@
                           keyp keywords keyvars keyinits keysvars allowp
                           auxvars auxinits)
         (sys::analyze-method-combination-lambdalist arguments-lambda-list
-          #'(lambda (detail errorstring &rest arguments)
+          #'(lambda (lalist detail errorstring &rest arguments)
+              (declare (ignore lalist)) ; use WHOLE-FORM instead
               (if (eq caller 'define-method-combination)
-                (error-of-type 'ext:source-program-error
-                  :form whole-form
-                  :detail detail
+                (sys::lambda-list-error whole-form detail
                   #1=(TEXT "~S ~S: invalid ~S lambda-list: ~A")
                   caller name ':arguments
                   (apply #'format nil errorstring arguments))
@@ -206,7 +205,8 @@
         #1=(TEXT "~S ~S: Invalid syntax for ~S option: ~S")
         caller name ':generic-function option)
       (error-of-type 'program-error
-        #1# caller name ':generic-function option)))
+        #1#
+        caller name ':generic-function option)))
   (cadr option))
 
 ; Check the effective-method option (:DUPLICATES ...).
@@ -478,11 +478,11 @@
                                          keyp keywords keyvars keyinits keysvars
                                          allowp auxvars auxinits)
                        (sys::analyze-method-combination-lambdalist combination-arguments-lambda-list
-                         #'(lambda (detail errorstring &rest arguments)
-                             (declare (ignore detail))
-                             (error (TEXT "In ~S ~S lambda list: ~A")
-                                    combination ':arguments
-                                    (apply #'format nil errorstring arguments))))
+                         #'(lambda (lalist detail errorstring &rest arguments)
+                             (sys::lambda-list-error lalist detail
+                               (TEXT "In ~S ~S lambda list: ~A")
+                               combination ':arguments
+                               (apply #'format nil errorstring arguments))))
                      (declare (ignore optinits optsvars
                                       keywords keyvars keyinits keysvars
                                       allowp auxvars auxinits))
@@ -602,7 +602,7 @@
            gf combination (method-combination-options combination) methods))
 
 ;; Preliminary.
-(defun compute-effective-method (gf combination methods)
+(predefun compute-effective-method (gf combination methods)
   (compute-effective-method-<generic-function> gf combination methods))
 
 (defun compute-effective-method-as-function-form (gf combination methods *method-combination-arguments*)
@@ -876,7 +876,7 @@
            (normalize-group (group)
              (unless (and (consp group) (consp (cdr group)))
                (group-error group group
-                            (TEXT "Not a list of at least length 2")))
+                            (TEXT "Not a list of length at least 2")))
              (let ((variable (car group))
                    (groupr (cdr group))
                    (patterns '())
@@ -1104,7 +1104,7 @@ Long-form options are a list of method-group specifiers,
   (sys::check-redefinition
     name 'define-method-combination
     (and (get-method-combination name nil)
-         "method combination"))
+         (TEXT "method combination")))
   (cond ;; "The short form syntax ... is recognized when the second subform is
         ;;  a non-nil symbol or is not present."
         ((or (null options)
@@ -1200,10 +1200,9 @@ Long-form options are a list of method-group specifiers,
                (body (cddr options)))
            ; Check the lambda-list.
            (analyze-lambdalist lambda-list
-             #'(lambda (detail errorstring &rest arguments)
-                 (error-of-type 'ext:source-program-error
-                   :form whole-form
-                   :detail detail
+             #'(lambda (lalist detail errorstring &rest arguments)
+                 (declare (ignore lalist)) ; use WHOLE-FORM instead
+                 (sys::lambda-list-error whole-form detail
                    (TEXT "~S ~S: invalid lambda-list: ~A")
                    'define-method-combination name
                    (apply #'format nil errorstring arguments))))
@@ -1300,5 +1299,5 @@ Long-form options are a list of method-group specifiers,
     (method-combination-with-options (sys::closure-name gf) combination options)))
 
 ;; Preliminary.
-(defun find-method-combination (gf name options)
+(predefun find-method-combination (gf name options)
   (find-method-combination-<generic-function>-<symbol> gf name options))

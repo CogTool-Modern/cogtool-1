@@ -23,12 +23,12 @@
 
 # Liefert zu den Integers a und b mit b>0 den Bruch a/b (Ratio oder Integer).
 # can trigger GC
-  local maygc object I_posI_durch_RA (object a, object b);
+  local maygc object I_posI_div_RA (object a, object b);
 # Methode:
 # d:=ggT(a,b).
 # Falls d=1: I_I_to_RA anwenden,
 # sonst: I_I_to_RA auf a/d und b/d anwenden.
-  local maygc object I_posI_durch_RA (object a, object b)
+  local maygc object I_posI_div_RA (object a, object b)
   {
     pushSTACK(a); pushSTACK(b); # a,b retten
     var object d = I_I_gcd_I(a,b); # ggT(a,b) >0
@@ -47,14 +47,14 @@
   }
 
 # Liefert zu den Integers a und b den Bruch a/b (Ratio oder Integer).
-# I_I_durch_RA(a,b)
+# I_I_div_RA(a,b)
 # can trigger GC
-  local maygc object I_I_durch_RA (object a, object b);
+  local maygc object I_I_div_RA (object a, object b);
 # Methode:
 # Falls b=0: Error.
-# Falls b>0: I_posI_durch_RA anwenden.
-# Falls b<0: I_posI_durch_RA auf (- a) und (- b) anwenden.
-  local maygc object I_I_durch_RA (object a, object b)
+# Falls b>0: I_posI_div_RA anwenden.
+# Falls b<0: I_posI_div_RA auf (- a) und (- b) anwenden.
+  local maygc object I_I_div_RA (object a, object b)
   {
     if (eq(b,Fixnum_0))
       divide_0();
@@ -62,7 +62,7 @@
       pushSTACK(b); a = I_minus_I(a); b = STACK_0; # a := (- a)
       STACK_0 = a; b = I_minus_I(b); a = popSTACK(); # b := (- b)
     }
-    return I_posI_durch_RA(a,b);
+    return I_posI_div_RA(a,b);
   }
 
 # Liefert Zähler und Nenner einer rationalen Zahl.
@@ -70,12 +70,12 @@
 # > r: rationale Zahl
 # < num: (numerator r)
 # < den: (denominator r)
-  #define RA_numden_I_I(r,num_zuweisung,den_zuweisung)  \
+  #define RA_numden_I_I(r,num_assignment,den_assignment)  \
     {                                                                         \
       if (RA_integerp(r)) {                                                   \
-        num_zuweisung r; den_zuweisung Fixnum_1; # Zähler = r, Nenner = 1     \
+        num_assignment r; den_assignment Fixnum_1; # Zähler = r, Nenner = 1  \
       } else {                                                                \
-        num_zuweisung TheRatio(r)->rt_num; den_zuweisung TheRatio(r)->rt_den; \
+        num_assignment TheRatio(r)->rt_num; den_assignment TheRatio(r)->rt_den; \
       }                                                                       \
     }
 
@@ -145,7 +145,7 @@
         # r = a/b, s = c.
         var object x = TheRatio(r)->rt_den; # b
         pushSTACK(x); pushSTACK(TheRatio(r)->rt_num); # b und a retten
-        x = I_I_mal_I(x,s); # b*c
+        x = I_I_mult_I(x,s); # b*c
         x = I_I_plus_I(popSTACK(),x); # a+b*c
         return I_I_to_RT(x,popSTACK()); # Bruch (a+b*c)/b
       }
@@ -158,7 +158,7 @@
         # r = a, s = c/d.
         var object x = TheRatio(s)->rt_den; # d
         pushSTACK(x); pushSTACK(TheRatio(s)->rt_num); # d und c retten
-        x = I_I_mal_I(r,x); # a*d
+        x = I_I_mult_I(r,x); # a*d
         x = I_I_plus_I(x,popSTACK()); # a*d+c
         return I_I_to_RT(x,popSTACK()); # Bruch (a*d+c)/d
       } else {
@@ -177,12 +177,12 @@
         if (eq(g,Fixnum_1)) {
           # g=1 -> Ergebnis (a*d+b*c)/(b*d)
           var object x;
-          STACK_3 = I_I_mal_I(STACK_3,STACK_0); # a*d
+          STACK_3 = I_I_mult_I(STACK_3,STACK_0); # a*d
           # Stackaufbau: a*d, b, c, d.
-          x = I_I_mal_I(STACK_2,STACK_1); # b*c
+          x = I_I_mult_I(STACK_2,STACK_1); # b*c
           STACK_3 = I_I_plus_I(STACK_3,x); # a*d+b*c
           # Stackaufbau: a*d+b*c, b, c, d.
-          x = I_I_mal_I(STACK_2,STACK_0); skipSTACK(3); # b*d
+          x = I_I_mult_I(STACK_2,STACK_0); skipSTACK(3); # b*d
           return I_I_to_RT(popSTACK(),x); # (a*d+b*c)/(b*d)
         } else {
           # g>1
@@ -192,12 +192,12 @@
           STACK_3 = I_I_exquopos_I(STACK_3,g); # b' := b/g (b,g>0)
           # Stackaufbau: a, b', c, d, g.
           x = I_I_exquopos_I(STACK_1,STACK_0); # d' := d/g (d,g>0)
-          STACK_4 = I_I_mal_I(STACK_4,x); # a*d'
+          STACK_4 = I_I_mult_I(STACK_4,x); # a*d'
           # Stackaufbau: a*d', b', c, d, g.
-          x = I_I_mal_I(STACK_3,STACK_2); # b'*c
+          x = I_I_mult_I(STACK_3,STACK_2); # b'*c
           STACK_4 = I_I_plus_I(STACK_4,x); # e := a*d'+b'*c
           # Stackaufbau: e, b', c, d, g.
-          STACK_3 = I_I_mal_I(STACK_3,STACK_1); # f := b'*d
+          STACK_3 = I_I_mult_I(STACK_3,STACK_1); # f := b'*d
           # Stackaufbau: e, f, c, d, g.
           x = I_I_gcd_I(STACK_4,STACK_0); skipSTACK(3); # h := ggT(e,g)
           # Stackaufbau: e, f.
@@ -276,7 +276,7 @@
         # r = a/b, s = c.
         var object x = TheRatio(r)->rt_den; # b
         pushSTACK(x); pushSTACK(TheRatio(r)->rt_num); # b und a retten
-        x = I_I_mal_I(x,s); # b*c
+        x = I_I_mult_I(x,s); # b*c
         x = I_I_minus_I(popSTACK(),x); # a-b*c
         return I_I_to_RT(x,popSTACK()); # Bruch (a-b*c)/b
       }
@@ -293,7 +293,7 @@
         # r = a, s = c/d.
         var object x = TheRatio(s)->rt_den; # d
         pushSTACK(x); pushSTACK(TheRatio(s)->rt_num); # d und c retten
-        x = I_I_mal_I(r,x); # a*d
+        x = I_I_mult_I(r,x); # a*d
         x = I_I_minus_I(x,popSTACK()); # a*d-c
         return I_I_to_RT(x,popSTACK()); # Bruch (a*d-c)/d
       } else {
@@ -312,12 +312,12 @@
         if (eq(g,Fixnum_1)) {
           # g=1 -> Ergebnis (a*d-b*c)/(b*d)
           var object x;
-          STACK_3 = I_I_mal_I(STACK_3,STACK_0); # a*d
+          STACK_3 = I_I_mult_I(STACK_3,STACK_0); # a*d
           # Stackaufbau: a*d, b, c, d.
-          x = I_I_mal_I(STACK_2,STACK_1); # b*c
+          x = I_I_mult_I(STACK_2,STACK_1); # b*c
           STACK_3 = I_I_minus_I(STACK_3,x); # a*d-b*c
           # Stackaufbau: a*d-b*c, b, c, d.
-          x = I_I_mal_I(STACK_2,STACK_0); skipSTACK(3); # b*d
+          x = I_I_mult_I(STACK_2,STACK_0); skipSTACK(3); # b*d
           return I_I_to_RT(popSTACK(),x); # (a*d-b*c)/(b*d)
         } else {
           # g>1
@@ -327,12 +327,12 @@
           STACK_3 = I_I_exquopos_I(STACK_3,g); # b' := b/g (b,g>0)
           # Stackaufbau: a, b', c, d, g.
           x = I_I_exquopos_I(STACK_1,STACK_0); # d' := d/g (d,g>0)
-          STACK_4 = I_I_mal_I(STACK_4,x); # a*d'
+          STACK_4 = I_I_mult_I(STACK_4,x); # a*d'
           # Stackaufbau: a*d', b', c, d, g.
-          x = I_I_mal_I(STACK_3,STACK_2); # b'*c
+          x = I_I_mult_I(STACK_3,STACK_2); # b'*c
           STACK_4 = I_I_minus_I(STACK_4,x); # e := a*d'-b'*c
           # Stackaufbau: e, b', c, d, g.
-          STACK_3 = I_I_mal_I(STACK_3,STACK_1); # f := b'*d
+          STACK_3 = I_I_mult_I(STACK_3,STACK_1); # f := b'*d
           # Stackaufbau: e, f, c, d, g.
           x = I_I_gcd_I(STACK_4,STACK_0); skipSTACK(3); # h := ggT(e,g)
           # Stackaufbau: e, f.
@@ -425,37 +425,37 @@
     if (RA_integerp(r)) {
       # r Integer, s Ratio: r=a, s=b/c. Vergleiche a*c und b.
       pushSTACK(TheRatio(s)->rt_num); # b
-      r = I_I_mal_I(r,TheRatio(s)->rt_den); # a*c
+      r = I_I_mult_I(r,TheRatio(s)->rt_den); # a*c
       return I_I_comp(r,popSTACK()); # mit b vergleichen
-    } elif (RA_integerp(s)) {
+    } else if (RA_integerp(s)) {
       # r Ratio, s Integer: r=a/b, s=c. Vergleiche a und b*c.
       pushSTACK(TheRatio(r)->rt_num); # a
-      s = I_I_mal_I(TheRatio(r)->rt_den,s); # b*c
+      s = I_I_mult_I(TheRatio(r)->rt_den,s); # b*c
       return I_I_comp(popSTACK(),s); # und a damit vergleichen
     } else {
       # r,s Ratios: r=a/b, s=c/d. Vergleiche a*d und b*c.
       pushSTACK(TheRatio(r)->rt_num); # a
       pushSTACK(TheRatio(s)->rt_den); # d
       # Stackaufbau: a, d.
-      var object x = I_I_mal_I(TheRatio(r)->rt_den,TheRatio(s)->rt_num); # b*c
+      var object x = I_I_mult_I(TheRatio(r)->rt_den,TheRatio(s)->rt_num); # b*c
       var object a = STACK_1;
       STACK_1 = x;
       # Stackaufbau: b*c, d.
-      x = I_I_mal_I(a,popSTACK()); # a*d
+      x = I_I_mult_I(a,popSTACK()); # a*d
       return I_I_comp(x,popSTACK()); # a*d und b*c vergleichen
     }
   }
 
 # Kehrwert (/ r), wo r eine rationale Zahl ist.
-# RA_durch_RA(r)
+# RA_div_RA(r)
 # can trigger GC
-  local maygc object RA_durch_RA (object r);
+  local maygc object RA_div_RA (object r);
 # Methode:
 # r=0 -> Error.
 # a:=(numerator r), b:=(denominator r).
 # a>0 -> Ergebnis b/a (mit ggT(b,a)=1).
 # a<0 -> Ergebnis (- b)/(- a) (mit ggT(-b,-a)=1).
-  local maygc object RA_durch_RA (object r)
+  local maygc object RA_div_RA (object r)
   {
     if (eq(r,Fixnum_0)) # Test auf 0
       divide_0();
@@ -498,9 +498,9 @@
   }
 
 # Liefert (* r s), wo r und s rationale Zahlen sind.
-# RA_RA_mal_RA(r,s)
+# RA_RA_mult_RA(r,s)
 # can trigger GC
-  local maygc object RA_RA_mal_RA (object r, object s);
+  local maygc object RA_RA_mult_RA (object r, object s);
 # Methode (vgl. [Buchberger, Collins, Loos: Computer Algebra, S.201])
 # r,s beide Integers -> klar.
 # r=a/b, s=c ->
@@ -514,7 +514,7 @@
 #   a':=a/g, d':=d/g (nur bei g>1 bedeutet das Rechnung).
 #   b':=b/h, c':=c/h (nur bei h>1 bedeutet das Rechnung).
 #   Ergebnis ist = (a'*c')/(b'*d').
-  local maygc object RA_RA_mal_RA (object r, object s)
+  local maygc object RA_RA_mult_RA (object r, object s)
   {
     var object a;
     var object b;
@@ -523,7 +523,7 @@
       # s Integer
       if (RA_integerp(r))
         # beides Integer
-        return I_I_mal_I(r,s);
+        return I_I_mult_I(r,s);
       else {
         # r=a/b, s=c
         a = TheRatio(r)->rt_num; b = TheRatio(r)->rt_den; c = s;
@@ -536,7 +536,7 @@
         if (eq(g,Fixnum_1)) {
           # g=1
           c = popSTACK(); # c
-          c = I_I_mal_I(popSTACK(),c); # a*c
+          c = I_I_mult_I(popSTACK(),c); # a*c
           return I_I_to_RT(c,popSTACK()); # (a*c)/b
         } else {
           # g>1
@@ -546,7 +546,7 @@
           # Stackaufbau: b', a, c, g.
           g = popSTACK();
           c = I_I_exquo_I(popSTACK(),g); # c' := c/g
-          c = I_I_mal_I(popSTACK(),c); # a*c'
+          c = I_I_mult_I(popSTACK(),c); # a*c'
           return I_I_to_RA(c,popSTACK()); # (a*c')/b'
         }
       }
@@ -586,9 +586,9 @@
           }
         }
         # Stackaufbau: a', b', d', c'.
-        c = popSTACK(); STACK_2 = I_I_mal_I(STACK_2,c); # a'*c'
+        c = popSTACK(); STACK_2 = I_I_mult_I(STACK_2,c); # a'*c'
         # Stackaufbau: a'*c', b', d'.
-        d = popSTACK(); d = I_I_mal_I(popSTACK(),d); # b'*d'
+        d = popSTACK(); d = I_I_mult_I(popSTACK(),d); # b'*d'
         # Stackaufbau: a'*c'.
         return I_I_to_RA(popSTACK(),d); # (a'*c')/(b'*d')
       }
@@ -596,18 +596,18 @@
   }
 
 # Liefert (/ r s), wo r und s rationale Zahlen sind.
-# RA_RA_durch_RA(r,s)
+# RA_RA_div_RA(r,s)
 # can trigger GC
-  local maygc object RA_RA_durch_RA (object r, object s);
+  local maygc object RA_RA_div_RA (object r, object s);
 # Methode:
 # (* r (/ s))
-  local maygc object RA_RA_durch_RA (object r, object s)
+  local maygc object RA_RA_div_RA (object r, object s)
   {
     if (RA_integerp(r) && RA_integerp(s)) # r und s Integers?
-      return I_I_durch_RA(r,s); # ja -> schnell abhandeln
+      return I_I_div_RA(r,s); # ja -> schnell abhandeln
     pushSTACK(r);
-    s = RA_durch_RA(s); # (/ s)
-    return RA_RA_mal_RA(popSTACK(),s);
+    s = RA_div_RA(s); # (/ s)
+    return RA_RA_mult_RA(popSTACK(),s);
   }
 
 # Liefert ganzzahligen und gebrochenen Anteil einer rationalen Zahl.
@@ -754,7 +754,7 @@
 # ist.
 # RA_sqrtp(x)
 # > x: eine rationale Zahl >=0
-# < ergebnis: exakte Wurzel (sqrt x) falls x Quadrat, nullobj sonst
+# < result: exakte Wurzel (sqrt x) falls x Quadrat, nullobj sonst
 # can trigger GC
   local maygc object RA_sqrtp (object x);
 # Methode:
@@ -788,7 +788,7 @@
 # RA_rootp(x,n)
 # > x: eine rationale Zahl >=0
 # > n: ein Integer >0
-# < ergebnis: exakte n-te Wurzel (expt x (/ n)) falls eine n-te Potenz, nullobj sonst
+# < result: exakte n-te Wurzel (expt x (/ n)) falls eine n-te Potenz, nullobj sonst
 # can trigger GC
   local maygc object RA_rootp (object x, object n);
 # Methode:

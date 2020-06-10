@@ -1,11 +1,12 @@
 # Multiplikation ganzer Zahlen
 
 # meldet Überlauf bei der Multiplikation:
-  nonreturning_function(local, mal_ueberlauf, (void)) {
-    fehler(arithmetic_error,
-           GETTEXT("overflow during multiplication of large numbers")
-          );
-  }
+nonreturning_function(local, mal_ueberlauf, (void)) {
+  pushSTACK(TheSubr(subr_self)->name); /* slot :OPERATION */
+  pushSTACK(NIL);               /* slot :OPERANDS not available */
+  error(arithmetic_error,
+        GETTEXT("overflow during multiplication of large numbers"));
+}
 
 # karatsuba_threshold = Länge, ab der die Karatsuba-Multiplikation bevorzugt
 # wird. Der Break-Even-Point bestimmt sich aus Zeitmessungen.
@@ -53,7 +54,7 @@
 # Dabei sollte len1>0 sein.
 # Ergebnis ist die UDS MSDptr/len/LSDptr, mit len=2*len1, im Stack.
 # Dabei wird num_stack erniedrigt.
-  #define UDS_square_UDS(len1,LSDptr1, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung)  \
+  #define UDS_square_UDS(len1,LSDptr1, MSDptr_assignment,len_assignment,LSDptr_assignment)    \
     {                                                                                         \
       var uintL len_from_UDSmal = 2*(uintL)(len1);                                            \
       var uintD* LSDptr_from_UDSmal;                                                          \
@@ -61,8 +62,8 @@
         RESTORE_NUM_STACK;                                                                    \
         mal_ueberlauf();                                                                      \
       }                                                                                       \
-      unused (len_zuweisung len_from_UDSmal);                                                 \
-      num_stack_need(len_from_UDSmal,MSDptr_zuweisung,LSDptr_zuweisung LSDptr_from_UDSmal =); \
+      unused (len_assignment len_from_UDSmal);                                                \
+      num_stack_need(len_from_UDSmal,MSDptr_assignment,LSDptr_assignment LSDptr_from_UDSmal =); \
       square_2loop_down((LSDptr1),(len1),LSDptr_from_UDSmal);                                 \
     }
 
@@ -87,7 +88,7 @@
       #else
       muluD(digit,digit, destptr[-2] =, destptr[-1] =);
       #endif
-    } elif (len < karatsuba_threshold) {
+    } else if (len < karatsuba_threshold) {
       # Multiplikation nach Schulmethode
       # Gemischte Produkte:
       # 2*(  x[n-1..1] * x[0] * b^1
@@ -279,7 +280,9 @@
     var uintD* ergLSDptr;
     I_to_NDS_nocopy(x, xMSDptr = , xlen = , xLSDptr = );
     erglen = 2*xlen;
-    if ((intWCsize < 32) && (erglen > (uintL)(bitc(intWCsize)-1)))
+    /* we use intWsize(16) instead of intWCsize(32) to avoid
+       __builtin_alloca running out of stack and causing a segfault */
+    if ((intWsize < 32) && (erglen > (uintL)(bitc(intWsize)-1)))
       mal_ueberlauf();
     {
       SAVE_NUM_STACK # num_stack retten
@@ -305,12 +308,12 @@
   }
 
 # Multipliziert zwei Unsigned-Digit-sequences.
-# UDS_UDS_mal_UDS(len1,LSDptr1, len2,LSDptr2, MSDptr=,len=,LSDptr=);
+# UDS_UDS_mult_UDS(len1,LSDptr1, len2,LSDptr2, MSDptr=,len=,LSDptr=);
 # multipliziert die UDS ../len1/LSDptr1 und ../len2/LSDptr2.
 # Dabei sollte len1>0 und len2>0 sein.
 # Ergebnis ist die UDS MSDptr/len/LSDptr, mit len=len1+len2, im Stack.
 # Dabei wird num_stack erniedrigt.
-  #define UDS_UDS_mal_UDS(len1,LSDptr1,len2,LSDptr2, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung)  \
+  #define UDS_UDS_mult_UDS(len1,LSDptr1,len2,LSDptr2, MSDptr_assignment,len_assignment,LSDptr_assignment)  \
     {                                                                                         \
       var uintL len_from_UDSmal = (uintL)(len1) + (uintL)(len2);                              \
       var uintD* LSDptr_from_UDSmal;                                                          \
@@ -318,8 +321,8 @@
         RESTORE_NUM_STACK;                                                                    \
         mal_ueberlauf();                                                                      \
       }                                                                                       \
-      unused (len_zuweisung len_from_UDSmal);                                                 \
-      num_stack_need(len_from_UDSmal,MSDptr_zuweisung,LSDptr_zuweisung LSDptr_from_UDSmal =); \
+      unused (len_assignment len_from_UDSmal);                                                \
+      num_stack_need(len_from_UDSmal,MSDptr_assignment,LSDptr_assignment LSDptr_from_UDSmal =); \
       mulu_2loop_down((LSDptr1),(len1),(LSDptr2),(len2),LSDptr_from_UDSmal);                  \
     }
 
@@ -354,7 +357,7 @@
     if (len1==1) {
       # nur eine Einfachschleife
       mulu_loop_down(*--sourceptr1,sourceptr2,destptr,len2);
-    } elif (len1 < karatsuba_threshold) {
+    } else if (len1 < karatsuba_threshold) {
       # Multiplikation nach Schulmethode
       # len2 Digits auf 0 setzen:
       var uintD* destptr2 = clear_loop_down(destptr,len2);
@@ -684,7 +687,7 @@
   }
 
 # Multipliziert zwei Digit-sequences.
-# DS_DS_mal_DS(MSDptr1,len1,LSDptr1, MSDptr2,len2,LSDptr2, MSDptr=,len=,LSDptr=);
+# DS_DS_mult_DS(MSDptr1,len1,LSDptr1, MSDptr2,len2,LSDptr2, MSDptr=,len=,LSDptr=);
 # multipliziert die DS MSDptr1/len1/LSDptr1 und MSDptr2/len2/LSDptr2.
 # Dabei sollte len1>0 und len2>0 sein. Alles sollten Variablen sein!
 # Ergebnis ist die DS MSDptr/len/LSDptr, mit len=len1+len2, im Stack.
@@ -699,10 +702,10 @@
   # n>0, m<0: p = n*(m+b^l),       n*m + b^(k+l) = p - b^l * n (mod b^(k+l)).
   # n<0, m<0: p = (n+b^k)*(m+b^l),
   #           n*m = p - b^k * (m+b^l) - b^l * (n+b^k) (mod b^(k+l)).
-  #define DS_DS_mal_DS(MSDptr1,len1,LSDptr1,MSDptr2,len2,LSDptr2, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung)  \
+  #define DS_DS_mult_DS(MSDptr1,len1,LSDptr1,MSDptr2,len2,LSDptr2, MSDptr_assignment,len_assignment,LSDptr_assignment)  \
     {                                                             \
       var uintD* LSDptr0;                                         \
-      UDS_UDS_mal_UDS(len1,LSDptr1,len2,LSDptr2, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung LSDptr0 = ); \
+      UDS_UDS_mult_UDS(len1,LSDptr1,len2,LSDptr2, MSDptr_assignment,len_assignment,LSDptr_assignment LSDptr0 = ); \
       if ((sintD)(MSDptr1[0]) < 0) # n<0 ?                        \
         # muss m bzw. m+b^l subtrahieren, um k Digits verschoben: \
         subfrom_loop_down(LSDptr2,&LSDptr0[-(uintP)len1],len2);   \
@@ -717,7 +720,7 @@
   # x=0 oder y=0 -> Ergebnis 0
   # x und y beide Fixnums -> direkt multiplizieren
   # sonst: zu WS machen, multiplizieren.
-  local maygc object I_I_mal_I (object x, object y)
+  local maygc object I_I_mult_I (object x, object y)
   {
     if (eq(x,Fixnum_0) || eq(y,Fixnum_0))
       return Fixnum_0;
@@ -737,7 +740,7 @@
           if (x_ < 0)
             hi -= (uint32)y_; # dann Korrektur für Vorzeichen
           if (y_ < 0)
-            hi -= (uint32)x_; # (vgl. DS_DS_mal_DS)
+            hi -= (uint32)x_; # (vgl. DS_DS_mult_DS)
           return L2_to_I(hi,lo);
         }
     }
@@ -754,7 +757,7 @@
       var uintD* ergMSDptr;
       var uintC erglen;
       begin_arith_call();
-      DS_DS_mal_DS(xMSDptr,xlen,xLSDptr,yMSDptr,ylen,yLSDptr, ergMSDptr=,erglen=,);
+      DS_DS_mult_DS(xMSDptr,xlen,xLSDptr,yMSDptr,ylen,yLSDptr, ergMSDptr=,erglen=,);
       end_arith_call();
       var object result = DS_to_I(ergMSDptr,erglen);
       RESTORE_NUM_STACK # num_stack zurück
@@ -785,16 +788,16 @@
     #if 0 # unoptimiert
       pushSTACK(x); pushSTACK(Fixnum_1); pushSTACK(y);
       # Stackaufbau: a, c, b.
-      until (eq(STACK_0,Fixnum_1)) { # solange bis b=1
+      while (!eq(STACK_0,Fixnum_1)) { # solange bis b=1
         if (I_oddp(STACK_0)) # b ungerade?
-          STACK_1 = I_I_mal_I(STACK_2,STACK_1); # c:=a*c
+          STACK_1 = I_I_mult_I(STACK_2,STACK_1); # c:=a*c
         STACK_0 = I_I_ash_I(STACK_0,Fixnum_minus1); # b := (ash b -1) = (floor b 2)
         STACK_2 = I_square_I(STACK_2); # a:=a*a
       }
       skipSTACK(1);
       var object c = popSTACK();
       var object a = popSTACK();
-      return I_I_mal_I(a,c); # a*c als Ergebnis
+      return I_I_mult_I(a,c); # a*c als Ergebnis
     #else # optimiert
       pushSTACK(x); pushSTACK(y);
       # Stackaufbau: a, b.
@@ -804,11 +807,11 @@
       }
       pushSTACK(STACK_1); # c:=a
       # Stackaufbau: a, b, c.
-      until (eq(y=STACK_1,Fixnum_1)) { # Solange b/=1
+      while (!eq(y=STACK_1,Fixnum_1)) { # Solange b/=1
         STACK_1 = I_I_ash_I(y,Fixnum_minus1); # b := (ash b -1)
         var object a = STACK_2 = I_square_I(STACK_2); # a:=a*a
         if (I_oddp(STACK_1))
-          STACK_0 = I_I_mal_I(a,STACK_0); # evtl. c:=a*c
+          STACK_0 = I_I_mult_I(a,STACK_0); # evtl. c:=a*c
       }
       var object erg = STACK_0;
       skipSTACK(3);
@@ -844,7 +847,7 @@
         var uintC count;
         dotimesC(count,diff-1, {
           faktor = fixnum_inc(faktor,-2); # nächster Faktor
-          produkt = I_I_mal_I(faktor,produkt); # mit bisherigem Produkt multiplizieren
+          produkt = I_I_mult_I(faktor,produkt); # mit bisherigem Produkt multiplizieren
         });
         return produkt;
       } else {
@@ -853,7 +856,7 @@
         var object teil = prod_ungerade(a,c); # erstes Teilprodukt
         pushSTACK(teil);
         teil = prod_ungerade(c,b); # zweites Teilprodukt
-        return I_I_mal_I(popSTACK(),teil); # und beide multiplizieren
+        return I_I_mult_I(popSTACK(),teil); # und beide multiplizieren
       }
     }
   local maygc object FN_fak_I (object n)
@@ -928,7 +931,7 @@
       pushSTACK(n);        # n
       pushSTACK(Fixnum_1); # k := 1
       pushSTACK(n);        # obere Intervallgrenze floor(n/2^(k-1))
-      loop {
+      while (1) {
         # Stackaufbau: prod, n, k, floor(n/2^(k-1)).
         # 'n' enthält floor(n/2^(k-1)).
         n = I_I_ash_I(n,Fixnum_minus1); # untere Grenze floor(n/2^k)
@@ -944,7 +947,7 @@
           pushSTACK(n);
           var object temp = prod_ungerade(a,b);
           temp = I_I_expt_I(temp,STACK_2); # hoch k nehmen
-          STACK_4 = I_I_mal_I(temp,STACK_4); # und aufmultiplizieren
+          STACK_4 = I_I_mult_I(temp,STACK_4); # und aufmultiplizieren
         }
         STACK_2 = fixnum_inc(STACK_2,1); # k:=k+1
         n = popSTACK(); STACK_0 = n;

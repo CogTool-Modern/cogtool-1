@@ -14,7 +14,7 @@ maintainer.</para>
 &i18n-pac; package, which is &re-export;ed from the &ext-pac;
 package.</para>
 &base-module;
-<simpara>When this module is present, &features-var;
+<simpara>When this module is present, &features-my;
  contains the symbol <constant>:I18N</constant>.</simpara>
 
 <variablelist>
@@ -153,7 +153,7 @@ for the &gettext; function.  An underscore is customary.</para>
 <para>Now the program's maintainer creates a message catalog template
 through the command
 <screen>
-bash$ xgettext -o prog.pot prog.lisp
+&sh-prompt; xgettext -o prog.pot prog.lisp
 </screen>
 <note><title>Note</title>
  <para>xgettext version 0.11 or higher is required here.</para></note></para>
@@ -194,13 +194,13 @@ msgstr[1] "%d morceaux de gateau"
 
 <para>The program's maintainer compiles the catalog as follows:
 <screen>
-bash$ mkdir -p ./fr/LC_MESSAGES
-bash$ msgfmt -o ./fr/LC_MESSAGES/prog.mo prog.fr.po
+&sh-prompt; mkdir -p ./fr/LC_MESSAGES
+&sh-prompt; msgfmt -o ./fr/LC_MESSAGES/prog.mo prog.fr.po
 </screen></para>
 
 <para>When a user in a french &locale; then runs the program
 <screen>
-bash$ clisp prog.lisp 2
+&sh-prompt; clisp prog.lisp 2
 </screen>
 she will get the output
 <screen>

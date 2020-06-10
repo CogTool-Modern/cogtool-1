@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; packages-test
 ;; -------------
 
@@ -39,6 +39,8 @@ T
 (eq (find-package (find-package "CL")) (find-package "CL"))
 t
 
+(defparameter cl-user::*saved-package* *package*) cl-user::*saved-package*
+
 ;nicknames
 (find "SYS" (package-nicknames 'sys) :test #'string=)
 "SYS"
@@ -65,35 +67,29 @@ T
 
   ;package-funktionen mit nutzerdefinierten paketen
 
-;falls test1 bereits existiert
-(and (find-package 'test1)
-     (in-package "TEST1")
-     (rename-package (find-package 'test1) 'test1-old)
-     nil)
-nil
+;; make-package
+(package-name (make-package 'pack11-p1 :nicknames '(t1 tst1)))
+"PACK11-P1"
 
-;make-package
-(package-name (make-package 'test1 :nicknames '(t1 tst1)))
-"TEST1"
-
-(package-name (rename-package (find-package "TEST1") (find-package "TEST1")))
-"TEST1"
+(package-name (rename-package (find-package "PACK11-P1")
+                              (find-package "PACK11-P1")))
+"PACK11-P1"
 
 ;package-use-list
 ;(package-use-list (find-package 'test1))
 ;("LISP")
 
 
-(and (in-package "TEST1") T)
+(and (in-package "PACK11-P1") T)
 T
 
 
-(export '(test1::test1-y test1::test1-z)
-        (find-package '"TEST1"))
+(export '(pack11-p1::test1-y pack11-p1::test1-z)
+        (find-package '"PACK11-P1"))
 T
 
-(export '(test1::test1-a test1::test1-b test1::test1-c)
-        (find-package 'test1))
+(export '(pack11-p1::test1-a pack11-p1::test1-b pack11-p1::test1-c)
+        (find-package 'pack11-p1))
 T
 
 (setf test1-a -2
@@ -104,26 +100,21 @@ T
       test1-z  3)
 3
 
-;falls test2 bereits existiert
-(and
-        (find-package 'test2)
-        (rename-package (find-package 'test2) 'test2-old)
-        nil)
-nil
+(package-name (defpackage pack11-p2
+                (:nicknames "PACK11-T2" "PACK11-TST2")
+                (:use pack11-p1)))
+"PACK11-P2"
 
-(package-name (defpackage test2 (:nicknames "T2" "TST2") (:use test1)))
-"TEST2"
-
-(progn (in-package "TEST2") t)
+(progn (in-package "PACK11-P2") t)
 LISP:T
 
-(cl:package-name (cl:find-package 'test2))
-"TEST2"
+(cl:package-name (cl:find-package 'pack11-p2))
+"PACK11-P2"
 
 (cl:package-name cl:*package*)
-"TEST2"
+"PACK11-P2"
 
-(cl:import '(cl:error) (cl:find-package 'test2))
+(cl:import '(cl:error) (cl:find-package 'pack11-p2))
 CL:T
 
 (cl:and (cl:boundp 'test1-x) test1-x)
@@ -132,10 +123,11 @@ CL:NIL
 (cl:unintern 'test1-x)
 CL:T
 
-(eval (read-from-string "(cl:and (cl:boundp 'test1:test1-x) test1:test1-x)"))
+(eval (read-from-string
+       "(cl:and (cl:boundp 'pack11-p1:test1-x) pack11-p1:test1-x)"))
 #+XCL 1 #-XCL ERROR
 
-(cl:and (cl:boundp 'test1::test1-x) test1::test1-x)
+(cl:and (cl:boundp 'pack11-p1::test1-x) pack11-p1::test1-x)
 1
 
 (cl:and (cl:boundp 'test1-y) test1-y)
@@ -144,37 +136,40 @@ CL:T
 (cl:unintern 'test1-y)
 #+XCL CL:T #-XCL CL:NIL
 
-(cl:and (cl:boundp 'test1:test1-y) test1:test1-y)
+(cl:and (cl:boundp 'pack11-p1:test1-y) pack11-p1:test1-y)
 #+XCL ERROR #-XCL 2
 
-(cl:and (cl:boundp 'test1::test1-y) test1::test1-y)
+(cl:and (cl:boundp 'pack11-p1::test1-y) pack11-p1::test1-y)
 2
 
-(cl:import  '(test1::test1-x test1::test1-y) (cl:find-package 'test2))
+(cl:import '(pack11-p1::test1-x pack11-p1::test1-y)
+           (cl:find-package 'pack11-p2))
 CL:T
 
 (cl:and (cl:boundp 'test1-x) test1-x)
 1
 
-(eval (read-from-string "(cl:and (cl:boundp 'test1:test1-x) test1:test1-x)"))
+(eval (read-from-string
+       "(cl:and (cl:boundp 'pack11-p1:test1-x) pack11-p1:test1-x)"))
 #+XCL 1 #-XCL ERROR
 
-(cl:and (cl:boundp 'test1::test1-x) test1::test1-x)
+(cl:and (cl:boundp 'pack11-p1::test1-x) pack11-p1::test1-x)
 1
 
 (cl:and (cl:boundp 'test1-z) test1-z)
 #+XCL CL:NIL #-XCL 3
 
-(cl:unintern 'test1-z (cl:find-package 'test2))
+(cl:unintern 'test1-z (cl:find-package 'pack11-p2))
 #+XCL CL:T #-XCL CL:NIL
 
-(cl:and (cl:boundp 'test1:test1-z) test1:test1-z)
+(cl:and (cl:boundp 'pack11-p1:test1-z) pack11-p1:test1-z)
 #+XCL ERROR #-XCL 3
 
-test1::test1-z
+pack11-p1::test1-z
 3
 
-(cl:unexport  '(test1::test1-x test1::test1-y) (cl:find-package 'test1))
+(cl:unexport  '(pack11-p1::test1-x pack11-p1::test1-y)
+              (cl:find-package 'pack11-p1))
 CL:T
 
 (cl:and (cl:boundp 'test1-x) test1-x)
@@ -183,65 +178,65 @@ CL:T
 (cl:and (cl:boundp 'test1-y) test1-y)
 #+XCL CL:NIL #-XCL 2
 
-(cl:unintern 'test1-x (cl:find-package 'test2))
+(cl:unintern 'test1-x (cl:find-package 'pack11-p2))
 CL:T
 
-(eval (read-from-string "test1:test1-x"))
+(eval (read-from-string "pack11-p1:test1-x"))
 ERROR
 
-test1::test1-x
+pack11-p1::test1-x
 1
 
 test1-z
 3
 
-(cl:unintern 'test1-z (cl:find-package 'test2))
+(cl:unintern 'test1-z (cl:find-package 'pack11-p2))
 #+XCL CL:T #-XCL CL:NIL
 
-test1:test1-z
+pack11-p1:test1-z
 3
 
-test1::test1-z
+pack11-p1::test1-z
 3
 
-(cl:import 'test1::test1-z (cl:find-package 'test2))
+(cl:import 'pack11-p1::test1-z (cl:find-package 'pack11-p2))
 CL:T
 
 test1-z
 3
 
-test1:test1-z
+pack11-p1:test1-z
 3
 
-test1::test1-z
+pack11-p1::test1-z
 3
 
 test1-c
 #+XCL ERROR #-XCL 0
 
-(cl:unintern 'test-c (cl:find-package 'test2))
+(cl:unintern 'test-c (cl:find-package 'pack11-p2))
 CL:T
 
-test1:test1-c
+pack11-p1:test1-c
 0
 
-test1::test1-c
+pack11-p1::test1-c
 0
 
-(cl:import '(test1::test1-a test1::test1-b test1::test1-c)
-             (cl:find-package 'test2))
+(cl:import '(pack11-p1::test1-a pack11-p1::test1-b pack11-p1::test1-c)
+             (cl:find-package 'pack11-p2))
 CL:T
 
 test1-c
 0
 
-test1:test1-c
+pack11-p1:test1-c
 0
 
-test1::test1-c
+pack11-p1::test1-c
 0
 
-(cl:eq 'test1-c 'test1::test1-c)
+(cl:eq 'test1-c 'pack11-p1::test1-c)
 CL:T
 
   ;Ende nutzerdefinierte Pakete
@@ -250,16 +245,18 @@ CL:T
 
 ; export | import | unintern
 
-(cl:and (cl:in-package "CL-USER") cl:T)
+(cl:packagep (cl:make-package "PACK11")) cl:T
+
+(cl:and (cl:in-package "PACK11") cl:T)
 CL:T
 
 (setf x 1 y 2 z 3)
 3
 
-(and (defpackage "EDITOR") T)
+(and (defpackage "PACK11-EDITOR") T)
 T
 
-(and (in-package "EDITOR") T)
+(and (in-package "PACK11-EDITOR") T)
 T
 
 (unintern 'x)
@@ -271,28 +268,28 @@ T
 (unintern 'z)
 T
 
-cl-user::x
+pack11::x
 1
 
-(eval (read-from-string "cl-user:x"))
+(eval (read-from-string "pack11:x"))
 ERROR
 
 x
 error
 
-(eq 'x 'cl-user::x)
+(eq 'x 'pack11::x)
 NIL
 
 (unintern 'x)
 T
 
-(export '(cl-user::x cl-user::y) (find-package 'cl-user))
+(export '(pack11::x pack11::y) (find-package 'pack11))
 T
 
-cl-user::x
+pack11::x
 1
 
-cl-user:x
+pack11:x
 1
 
 x
@@ -301,43 +298,42 @@ error
 (unintern 'x)
 T
 
-(import 'cl-user:x (find-package 'editor))
+(import 'pack11:x (find-package 'pack11-editor))
 T
 
 x
 1
 
-(eq 'x 'cl-user::x)
+(eq 'x 'pack11::x)
 t
 
-(eq 'x 'cl-user:x)
+(eq 'x 'pack11:x)
 t
 
-(eq 'editor::x 'cl-user::x)
+(eq 'pack11-editor::x 'pack11::x)
 t
 
 ;; unexport
 
-(and (in-package "CL-USER") T)
+(and (in-package "PACK11") T)
 T
 
 (unexport 'y)
 T
 
-(and (in-package "EDITOR") T)
+(and (in-package "PACK11-EDITOR") T)
 T
 
 y
 ERROR
 
-(eval (read-from-string "cl-user:y"))
+(eval (read-from-string "pack11:y"))
 ERROR
 
-cl-user::y
+pack11::y
 2
 
-(and (in-package "CL-USER") (package-name *package*))
-"COMMON-LISP-USER"
+(and (in-package "PACK11") (package-name *package*)) "PACK11"
 
 (ext:appease-cerrors
  (let ((*package* "not a package - just a string"))
@@ -346,116 +342,118 @@ cl-user::y
 
 ;; http://www.lisp.org/HyperSpec/Issues/iss194-writeup.html
 (let ((tmp-sym (make-symbol "FOO"))
-      (old-sym (find-symbol "FOO" "CL-USER")))
-  (when old-sym (unintern old-sym "CL-USER"))
-  (list (import tmp-sym "CL-USER")
+      (old-sym (find-symbol "FOO" "PACK11")))
+  (when old-sym (unintern old-sym "PACK11"))
+  (list (import tmp-sym "PACK11")
         (package-name (symbol-package tmp-sym))
-        (unintern tmp-sym "CL-USER")
-        (find-symbol "FOO" "CL-USER")))
-(T "COMMON-LISP-USER" T NIL)
+        (unintern tmp-sym "PACK11")
+        (find-symbol "FOO" "PACK11")))
+(T "PACK11" T NIL)
 
 ;; shadowing-import -- zunaechst ohne geerbte symbole!!
 
 (setf d 4 e 5 f 6 y 111 x 222)
 222
 
-(export '(cl-user::a cl-user::b cl-user::c cl-user::y cl-user::x)
-        (find-package 'cl-user))
+(export '(pack11::a pack11::b pack11::c pack11::y pack11::x)
+        (find-package 'pack11))
 T
 
-(import '(cl-user::a cl-user::b cl-user::c cl-user::y) (find-package 'editor))
+(import '(pack11::a pack11::b pack11::c pack11::y)
+        (find-package 'pack11-editor))
 ERROR
 
-(and (make-package 'shadow-test) (in-package "SHADOW-TEST") t)
+(and (make-package 'pack11-shadow) (in-package "PACK11-SHADOW") t)
 T
 
-(setf x 'shadow-test)
-shadow-test
+(setf x 'pack11-shadow)
+pack11-shadow
 
-(shadowing-import '(cl-user::d cl-user::e cl-user::f cl-user::x)
-                  (find-package 'shadow-test))
+(shadowing-import '(pack11::d pack11::e pack11::f pack11::x)
+                  (find-package 'pack11-shadow))
 T
 
 x
 222
 
-(eq cl-user::x x)
+(eq pack11::x x)
 T
 
 ; shadow
 
-(shadow '(e #\F) (find-package 'shadow-test))
+(shadow '(e #\F) (find-package 'pack11-shadow))
 t
 
-(setf e 'shadow-test-e)
-shadow-test-e
+(setf e 'pack11-shadow-e)
+pack11-shadow-e
 
-(eq 'e 'cl-user::e)
+(eq 'e 'pack11::e)
 #+XCL nil #-XCL t
 
 e
-shadow-test-e
+pack11-shadow-e
 
-(eval (read-from-string "cl-user:e"))
+(eval (read-from-string "pack11:e"))
 error
 
-cl-user::e
-#+XCL 5 #-XCL shadow-test-e
+pack11::e
+#+XCL 5 #-XCL pack11-shadow-e
 
 ;; unintern a shadowing symbol
 (progn
-  (setq pg3 (make-package "G3") pg1 (make-package "G1" :use (list pg3))
-        pg2 (make-package "G2" :use (list pg3))
-        ph (make-package "H" :use (list pg1 pg2)))
+  (setq pg3 (make-package "PACK11-G3")
+        pg1 (make-package "PACK11-G1" :use (list pg3))
+        pg2 (make-package "PACK11-G2" :use (list pg3))
+        ph (make-package "PACK11-H" :use (list pg1 pg2)))
   (shadow "FOO" ph))
 t
 
-(setq gsym (intern "FOO" pg3))   g3::foo
+(setq gsym (intern "FOO" pg3))   pack11-g3::foo
 
 (export gsym pg3)                t
 (export gsym pg1)                t
 (export gsym pg2)                t
 
 (multiple-value-list (setf (values sym access) (find-symbol "FOO" ph)))
-(h::foo :internal)
+(pack11-h::foo :internal)
 
-(package-shadowing-symbols ph)   (h::foo)
+(package-shadowing-symbols ph)   (pack11-h::foo)
 (eq sym gsym)                    nil
 (equal (symbol-package sym) ph)  t
 
-(unintern sym ph)                t
+(unintern sym ph)             t
 
-(delete-package ph)              t
-(delete-package pg1)             t
-(delete-package pg2)             t
-(delete-package pg3)             t
-(delete-package "TEST2")         t
-(delete-package "TEST1")         t
+(delete-package ph)           t
+(delete-package pg1)          t
+(delete-package pg2)          t
+(delete-package pg3)          t
+(delete-package "PACK11-P2")  t
+(delete-package "PACK11-P1")  t
 
 ; use-package | unuse-package
 
-(and (make-package 'use-test) (in-package "USE-TEST") t)
+(and (make-package 'pack11-use) (in-package "PACK11-USE") t)
 t
 
-(use-package '(cl-user))
+(use-package '(pack11))
 T
 
-cl-user::d
+pack11::d
 4
 
-(eval (read-from-string "cl-user:d"))
+(eval (read-from-string "pack11:d"))
 #+XCL 4 #-XCL ERROR
 
 d
 ERROR
 
-(unuse-package 'cl-user)
+(unuse-package 'pack11)
 T
 
-cl-user::d
+pack11::d
 4
 
-(eval (read-from-string "cl-user:d"))
+(eval (read-from-string "pack11:d"))
 ERROR
 
 d
@@ -463,29 +461,31 @@ ERROR
 
 ;make-package mit beutzung eines paketes, dass geerbte symbole enthaelt
 
-(and (make-package 'inherit :nicknames '(inh i)) (in-package "INHERIT") T)
+(and (make-package 'pack11-inherit :nicknames '(inh i))
+     (in-package "PACK11-INHERIT") T)
 T
 
 (setf a 'inherita b 'inheritb)
 inheritb
 
-(export '(a b) (find-package 'inherit))
+(export '(a b) (find-package 'pack11-inherit))
 T
 
-(and (make-package 'inherit1 :use '(inherit)) (in-package "INHERIT1") T)
+(and (make-package 'pack11-inherit1 :use '(pack11-inherit))
+     (in-package "PACK11-INHERIT1") T)
 T
 
 a
-inherit::inherita
+pack11-inherit::inherita
 
 b
-inherit::inheritb
+pack11-inherit::inheritb
 
 (cl:setf c 'inherit1c)
 inherit1c
 
-(cl:and (cl:make-package 'inherit2 :use '(inherit1))
-        (cl:in-package "INHERIT2") cl:T)
+(cl:and (cl:make-package 'pack11-inherit2 :use '(pack11-inherit1))
+        (cl:in-package "PACK11-INHERIT2") cl:T)
 CL:T
 
 a
@@ -497,44 +497,44 @@ b
 c
 #+XCL inherit1c #-XCL CL:ERROR
 
-(eval (read-from-string "(cl:eq 'c 'inherit1:c)"))
+(eval (read-from-string "(cl:eq 'c 'pack11-inherit1:c)"))
 #+XCL CL:T #-XCL CL:ERROR
 
-(eval (read-from-string "(cl:eq 'a 'inherit:a)"))
+(eval (read-from-string "(cl:eq 'a 'pack11-inherit:a)"))
 #+XCL CL:T #-XCL CL:ERROR
 
-(eval (read-from-string "(cl:eq 'b 'inherit:b)"))
+(eval (read-from-string "(cl:eq 'b 'pack11-inherit:b)"))
 #+XCL CL:T #-XCL CL:ERROR
 
-(cl:eq 'c 'inherit1::c)
+(cl:eq 'c 'pack11-inherit1::c)
 #+XCL CL:T #-XCL CL:NIL
 
-(cl:eq 'a 'inherit::a)
+(cl:eq 'a 'pack11-inherit::a)
 #+XCL CL:T #-XCL CL:NIL
 
-(cl:eq 'b 'inherit::b)
+(cl:eq 'b 'pack11-inherit::b)
 #+XCL CL:T #-XCL CL:NIL
 
 ;find-all-symbols
 
-(cl:and (cl:in-package "CL-USER") cl:T)
+(cl:and (cl:in-package "PACK11") cl:T)
 CL:T
 
-(delete-package "EDITOR")      T
-(delete-package "SHADOW-TEST") T
-(delete-package "USE-TEST")    T
-(delete-package "INHERIT2")    T
-(delete-package "INHERIT1")    T
-(delete-package "INHERIT")     T
+(delete-package "PACK11-EDITOR")   T
+(delete-package "PACK11-SHADOW")   T
+(delete-package "PACK11-USE")      T
+(delete-package "PACK11-INHERIT2") T
+(delete-package "PACK11-INHERIT1") T
+(delete-package "PACK11-INHERIT")  T
 
 ; find-all-symbols fehlerhaft
-(and (member 'cl-user::x (setf s (find-all-symbols 'x)))T)
+(and (member 'pack11::x (setf s (find-all-symbols 'x)))T)
 T
 
-(eval (read-from-string "(and (member 'editor:x s) t)"))
+(eval (read-from-string "(and (member 'pack11-editor:x s) t)"))
 #+XCL T #-XCL ERROR
 
-(and (member 'cl-user::x (setf s1 (find-all-symbols 'x)))T)
+(and (member 'pack11::x (setf s1 (find-all-symbols 'x)))T)
 T
 
 (set-difference s s1)
@@ -548,10 +548,12 @@ nil                              ;Ende Kommentar
 )
 nil
 
-(do-symbols (s (find-package 'cl-user))(push (symbol-name s) sym))
+(do-symbols (s (find-package 'pack11))
+  (push (symbol-name s) sym))
 nil
 
-(do-external-symbols (s (find-package 'cl-user))(push (symbol-name s) esym))
+(do-external-symbols (s (find-package 'pack11))
+  (push (symbol-name s) esym))
 nil
 
 (do-all-symbols (s)(push (symbol-name s) asym))
@@ -728,6 +730,15 @@ T
 (with-package-iterator-inherited (list (find-package "COMMON-LISP"))) t
 (with-package-iterator-all (list (find-package "COMMON-LISP"))) t
 
+(with-package-iterator-internal
+ (list (find-package "COMMON-LISP-USER") (find-package "COMMON-LISP"))) t
+(with-package-iterator-external
+ (list (find-package "COMMON-LISP-USER") (find-package "COMMON-LISP"))) t
+(with-package-iterator-inherited
+ (list (find-package "COMMON-LISP-USER") (find-package "COMMON-LISP"))) t
+(with-package-iterator-all
+ (list (find-package "COMMON-LISP-USER") (find-package "COMMON-LISP"))) t
+
 (map nil #'print (list-all-packages))
 nil
 
@@ -738,36 +749,60 @@ nil
 #+CLISP 123
 
 #+CLISP
-(package-case-sensitive-p
- (make-package "TEST-PACKAGE-CASE" :case-sensitive t :case-inverted t))
+(ext:package-case-sensitive-p
+ (make-package "PACK11-PACKAGE-CASE" :case-sensitive t :case-inverted t))
 #+CLISP
 T
 
 #+CLISP
-(package-case-inverted-p
- (defpackage "TEST-PACKAGE-CASE" (:case-sensitive nil) (:case-inverted nil)))
+(ext:package-case-inverted-p
+ (defpackage "PACK11-PACKAGE-CASE" (:case-sensitive nil) (:case-inverted nil)))
 #+CLISP
 NIL
 
 #+CLISP
-(setf (package-case-inverted-p "TEST-PACKAGE-CASE") t
-      (package-case-sensitive-p "TEST-PACKAGE-CASE") t)
+(setf (ext:package-case-inverted-p "PACK11-PACKAGE-CASE") t
+      (ext:package-case-sensitive-p "PACK11-PACKAGE-CASE") t)
 #+CLISP
 T
 
 #+CLISP
 (let ((*break-on-signals* 'warning))
-  (package-case-sensitive-p
-    (defpackage "TEST-PACKAGE-CASE" (:case-inverted t) (:case-sensitive t))))
+  (ext:package-case-sensitive-p
+    (defpackage "PACK11-PACKAGE-CASE" (:case-inverted t) (:case-sensitive t))))
 #+CLISP
 T
 
 #+CLISP
-(delete-package "TEST-PACKAGE-CASE")
+(delete-package "PACK11-PACKAGE-CASE")
 #+CLISP
 T
 
+(progn (setq *package* cl-user::*saved-package*) (delete-package "PACK11"))
+T
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1612313&group_id=1355
+(let ((f "pack11-tst.lisp"))
+  (unwind-protect
+       (progn
+         (with-open-file (out f :direction :output)
+           (princ ";; test non-top-level defpackage compilation
+\(defmacro my-defpackage (name use)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (let ((pkg (defpackage ,name (:use))))
+       (use-package '(,use) pkg)
+       pkg)))
+\(my-defpackage #:pack11-bar #:cl)
+\(in-package #:pack11-bar)
+\(defun baz (x) x)
+" out))
+         (list (cdr (multiple-value-list (compile-file f)))
+               (equal (package-use-list '#:pack11-bar)
+                      (list (find-package '#:cl)))))
+    (delete-package '#:pack11-bar)
+    (post-compile-file-cleanup f)))
+((NIL NIL) T)
 
 ; Clean up.
-(unintern 'x)
-T
+(symbol-cleanup 'cl-user::*saved-package*)
+NIL

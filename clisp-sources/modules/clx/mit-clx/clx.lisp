@@ -98,6 +98,7 @@
     (:internet . 0)
     (:decnet . 1)
     (:chaos . 2)
+    (:internet6 . 6)
     ;; X11/Xauth.h "not part of X standard"
     (:Local . 256)
     (:Wild . 65535)

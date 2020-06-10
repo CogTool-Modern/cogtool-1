@@ -2,7 +2,7 @@
 ;;;; Class metaobjects
 ;;;; Part n-1: Generic functions specified in the MOP.
 ;;;; Bruno Haible 2004-05-25
-;;;; Sam Steingold 2005
+;;;; Sam Steingold 2005-2008
 
 (in-package "CLOS")
 
@@ -108,6 +108,10 @@
   (:method ((class forward-reference-to-class))
     (list-direct-subclasses class)))
 
+(defun class-not-yet-defined (method class)
+  (clos-warning (TEXT "~S being called on ~S, but class ~S is not yet defined.")
+    method class (class-name class)))
+
 ;; MOP p. 76
 (defgeneric class-direct-superclasses (class)
   (:method ((class defined-class))
@@ -115,8 +119,7 @@
     (sys::%record-ref class *<defined-class>-direct-superclasses-location*))
   (:method ((class forward-reference-to-class))
     ;; Broken MOP. Any use of this method is a bug.
-    (warn (TEXT "~S being called on ~S, but class ~S is not yet defined.")
-          'class-direct-superclasses class (class-name class))
+    (class-not-yet-defined 'class-direct-superclasses class)
     '()))
 (initialize-extended-method-check #'class-direct-superclasses)
 ;; Not in MOP.
@@ -150,8 +153,7 @@
     (sys::%record-ref class *<defined-class>-direct-slots-location*))
   (:method ((class forward-reference-to-class))
     ;; Broken MOP. Any use of this method is a bug.
-    (warn (TEXT "~S being called on ~S, but class ~S is not yet defined.")
-          'class-direct-slots class (class-name class))
+    (class-not-yet-defined 'class-direct-slots class)
     '()))
 (initialize-extended-method-check #'class-direct-slots)
 ;; Not in MOP.
@@ -185,8 +187,7 @@
     (sys::%record-ref class *<defined-class>-direct-default-initargs-location*))
   (:method ((class forward-reference-to-class))
     ;; Broken MOP. Any use of this method is a bug.
-    (warn (TEXT "~S being called on ~S, but class ~S is not yet defined.")
-          'class-direct-default-initargs class (class-name class))
+    (class-not-yet-defined 'class-direct-default-initargs class)
     '()))
 (initialize-extended-method-check #'class-direct-default-initargs)
 ;; Not in MOP.
@@ -259,6 +260,15 @@
   (sys::%record-ref class *<slotted-class>-valid-initargs-from-slots-location*))
 (defun (setf class-valid-initargs-from-slots) (new-value class)
   (accessor-typecheck class 'slotted-class '(setf class-valid-initargs-from-slots))
+  ;; When the valid-initargs-from-slots change, the result of
+  ;; (valid-initarg-keywords class ...) changes, therefore we need to invalidate
+  ;; all the caches that use valid-initarg-keywords:
+  (when (or (eq (sys::%unbound) (sys::%record-ref class *<slotted-class>-valid-initargs-from-slots-location*))
+            (set-exclusive-or (sys::%record-ref class *<slotted-class>-valid-initargs-from-slots-location*) new-value))
+    (remhash class *make-instance-table*)
+    (remhash class *reinitialize-instance-table*)
+    (remhash class *update-instance-for-redefined-class-table*)
+    (remhash class *update-instance-for-different-class-table*))
   (setf (sys::%record-ref class *<slotted-class>-valid-initargs-from-slots-location*) new-value))
 
 ;; Not in MOP.
@@ -374,7 +384,7 @@
                   (setf (class-instantiated class) old-instantiated))))))
   (:method ((class built-in-class))
     (let ((prototype (sys::%record-ref class *<built-in-class>-prototype-location*)))
-      (if (eq prototype (sys::%unbound))
+      (if (eq (sys::%unbound) prototype)
         (error (TEXT "~S: ~S is an abstract class and therefore does not have a direct instance")
                'class-prototype class)
         prototype)))

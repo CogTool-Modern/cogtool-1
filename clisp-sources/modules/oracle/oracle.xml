@@ -11,7 +11,7 @@ retry, concurrent connections to multiple databases, proper handling
 of &oracle-link; errors, and more.</para>
 <para>The module can be used to build sophisticated &oracle-link; database
 applications in &cl;.</para>
-<simpara>When this module is present, &features-var; contains the
+<simpara>When this module is present, &features-my; contains the
  symbol <constant>:ORACLE</constant>.</simpara>
 
 <section id="ora-functionality"><title>Functions and Macros in
@@ -30,8 +30,7 @@ SQL query).</para>
 		<!-- CONNECT -->
 
 <varlistentry id="ora-connect"><term><code>(ORACLE:CONNECT
-<replaceable>user</replaceable>
-<replaceable>password</replaceable>
+&user-r; &pass-r;
 <replaceable>server</replaceable>
 &optional-amp;
 <replaceable>schema</replaceable>
@@ -47,7 +46,7 @@ this database until the next call to &ora-connect;.  A
 single program can access different &oracle-link; schemas concurrently by
 repeated calls to &ora-connect;.  Database connections
 are cached and re-used: if you call &ora-connect; again
-with the same <replaceable>user</replaceable>,
+with the same &user-r;,
 <replaceable>schema</replaceable>, and
 <replaceable>server</replaceable>, the previous &oracle-link; connection will
 be re-used.  &ora-connect; may not be called inside
@@ -59,11 +58,11 @@ connection was created (and cached).
 The meaning of the arguments is as follows:
 </simpara>
 <variablelist><title>Arguments for &ora-connect;</title>
-<varlistentry><term><replaceable>user</replaceable></term>
+<varlistentry><term>&user-r;</term>
  <listitem><simpara>&oracle-link; user ID</simpara></listitem></varlistentry>
-<varlistentry><term><replaceable>password</replaceable></term>
+<varlistentry><term>&pass-r;</term>
  <listitem><simpara>Password for user, or &nil; if
-   <replaceable>user</replaceable> has no password (!).
+   &user-r; has no password (!).
 </simpara></listitem></varlistentry>
 <varlistentry><term><replaceable>server</replaceable></term>
  <listitem><simpara>&oracle-link; server ID (SID).
@@ -105,7 +104,7 @@ The meaning of the arguments is as follows:
 
 		<!-- DISCONNECT -->
 
-<varlistentry><term><code>(ORACLE:DISCONNECT)</code></term>
+<varlistentry id="ora-disconnect"><term><code>(ORACLE:DISCONNECT)</code></term>
 <listitem>
 <simpara>
 Disconnect from the database currently connected.  No more calls can
@@ -119,7 +118,7 @@ Returns &nil;.
 
 		<!-- RUN-SQL -->
 
-<varlistentry><term><code>(ORACLE:RUN-SQL
+<varlistentry id="ora-run-sql"><term><code>(ORACLE:RUN-SQL
 <replaceable>sql</replaceable>
 &optional-amp;
 <replaceable>params</replaceable>
@@ -159,7 +158,7 @@ arguments is as follows: </simpara>
 
 		<!-- DO-ROWS -->
 
-<varlistentry><term><code>(ORACLE:DO-ROWS
+<varlistentry id="ora-do-rows"><term><code>(ORACLE:DO-ROWS
 <replaceable>vars</replaceable> &body-amp; &body-r;)</code></term>
  <listitem><simpara> Macro which loops over a SQL SELECT result,
    evaluating, for each row in the result, the forms in &body-r;,
@@ -192,12 +191,12 @@ arguments is as follows: </simpara>
 </simpara></listitem></varlistentry>
 
 		<!-- FETCH -->
-<varlistentry><term><code>(ORACLE:FETCH
-   &optional-amp; <replaceable>result-type</replaceable>)</code></term>
+<varlistentry id="ora-fetch"><term><code>(ORACLE:FETCH
+   &optional-amp; &res-type-r;)</code></term>
  <listitem><para>Fetch a single row of data.  Returns a row of values
    corresponding to the columns of an active SELECT statment.  The row
    data is returned in one of three different forms, depending on the
-   value of the symbol <replaceable>result-type</replaceable>:
+   value of the symbol &res-type-r;:
 <variablelist><title>Return values for <function>FETCH</function></title>
  <varlistentry><term><classname>ARRAY</classname></term>
   <listitem><simpara>Values will be returned in an &array-t; with the
@@ -218,7 +217,7 @@ arguments is as follows: </simpara>
 </variablelist></para>
 <para>The following data type conversions are done between &oracle-link;
  datatypes and &cl; data types:
- <informaltable frame="all"><tgroup cols="2">
+ <informaltable id="ora-fetch-data-types-tab" frame="all"><tgroup cols="2">
    <thead><row><entry>&oracle-link; type</entry>
      <entry>Converts to/from &cl; type</entry></row></thead>
    <tbody><row><entry>Numeric (NUMBER, INTEGER, FLOAT)</entry>
@@ -253,16 +252,16 @@ arguments is as follows: </simpara>
 
 		<!-- FETCH-ALL -->
 
-<varlistentry><term><code>(ORACLE:FETCH-ALL
+<varlistentry id="ora-fetch-all"><term><code>(ORACLE:FETCH-ALL
 &optional-amp;
 <replaceable>max-rows</replaceable>
-<replaceable>result-type</replaceable>
+&res-type-r;
 <replaceable>item-type</replaceable>)</code></term>
 <listitem><simpara>Fetch some or all the rows from a query and return
 result as a sequence of sequences.  Arguments are all optional:
 <replaceable>max-rows</replaceable> limits the result to
 that numbers of rows;
-<replaceable>result-type</replaceable> is the type of
+&res-type-r; is the type of
 sequence of the rows, either
 '<classname>ARRAY</classname> (the default) or
 '<classname>LIST</classname>;
@@ -283,10 +282,8 @@ over an entire SELECT result to construct a single Lisp value.
 
 		<!-- PEEK-->
 
-<varlistentry><term><code>(ORACLE:PEEK
-&optional-amp;
-<replaceable>result-type</replaceable>)</code></term>
-<listitem>
+<varlistentry id="ora-peek"><term><code>(ORACLE:PEEK &optional-amp;
+   &res-type-r;)</code></term><listitem>
 <simpara>
 
 Peek at next row of data (without fetching it).  Returns a row a la
@@ -295,7 +292,7 @@ Repeated calls to <function>PEEK</function> will thus return the same
 row of data.  Returns &nil; if at EOF.  If data is available, returns
 row data just as <function>FETCH</function> (see
 <function>FETCH</function> for data format and conversions done).
-Optional argument <replaceable>result-type</replaceable> is the type
+Optional argument &res-type-r; is the type
 of sequence of the column values for the returned row, either
 &array-t; (the default) or &list-t;.
 <function>PEEK</function> is a useful look-ahead
@@ -305,7 +302,7 @@ data to print headers, summaries, etc.
 
 		<!-- COLUMNS -->
 
-<varlistentry><term><code>(ORACLE:COLUMNS)</code></term>
+<varlistentry id="ora-columns"><term><code>(ORACLE:COLUMNS)</code></term>
 <listitem><para>Returns information on the columns of a SELECT
   result, in the form of an array of SQLCOL structures, one for each
   result column in the most recent SELECT statement.  It is not
@@ -343,7 +340,7 @@ data to print headers, summaries, etc.
 
 		<!-- EOF -->
 
-<varlistentry><term><code>(ORACLE:EOF)</code></term>
+<varlistentry id="ora-eof"><term><code>(ORACLE:EOF)</code></term>
 <listitem>
 <simpara>
 Returns EOF status.  A SELECT query cursor is considered at EOF if the next
@@ -352,7 +349,7 @@ an active SELECT statement.
 </simpara></listitem></varlistentry>
 
 		<!-- INSERT-ROW -->
-<varlistentry><term><code>(ORACLE:INSERT-ROW
+<varlistentry id="ora-insert-row"><term><code>(ORACLE:INSERT-ROW
 <replaceable>table</replaceable>
 <replaceable>values</replaceable>)</code></term>
 <listitem>
@@ -366,7 +363,7 @@ Returns the number of rows inserted (i.e., always 1).
 </simpara></listitem></varlistentry>
 
 		<!-- UPDATE-ROW -->
-<varlistentry><term><code>(ORACLE:UPDATE-ROW
+<varlistentry id="ora-update-row"><term><code>(ORACLE:UPDATE-ROW
 <replaceable>table</replaceable>
 <replaceable>condition</replaceable>
 <replaceable>vals</replaceable>
@@ -388,7 +385,7 @@ e.g., when the condition is a match on a primary key, e.g.: <literal>"pk_column
 
 		<!-- ROW-COUNT -->
 
-<varlistentry><term><code>(ORACLE:ROW-COUNT)</code></term>
+<varlistentry id="ora-row-count"><term><code>(ORACLE:ROW-COUNT)</code></term>
 <listitem>
 <simpara>
 For SELECT statements, returns the number of rows
@@ -401,7 +398,7 @@ to a database and have an active SQL statement.
 
 		<!-- WITH-TRANSACTION -->
 
-<varlistentry><term><code>(ORACLE:WITH-TRANSACTION
+<varlistentry id="ora-with-transaction"><term><code>(ORACLE:WITH-TRANSACTION
 &body-amp;
 &body-r;)</code></term>
 <listitem>
@@ -424,7 +421,7 @@ expression is that of the last form in &body-r;.
 
 		<!-- COMMIT -->
 
-<varlistentry><term><code>(ORACLE:COMMIT)</code></term>
+<varlistentry id="ora-commit"><term><code>(ORACLE:COMMIT)</code></term>
 <listitem>
 <simpara>
 Commits (makes permanent) any pending changes to the database.  The
@@ -436,7 +433,7 @@ function, nor can it be called inside a
 
 		<!-- ROLLBACK -->
 
-<varlistentry><term><code>(ORACLE:ROLLBACK)</code></term>
+<varlistentry id="ora-rollback"><term><code>(ORACLE:ROLLBACK)</code></term>
 <listitem>
 <simpara>
 Rolls back (undoes and abandons) any pending changes to the database.
@@ -448,7 +445,7 @@ function, nor can it be called inside a
 
 		<!-- AUTO-COMMIT -->
 
-<varlistentry><term><code>(ORACLE:AUTO-COMMIT)</code></term>
+<varlistentry id="ora-auto-commit"><term><code>(ORACLE:AUTO-COMMIT)</code></term>
 <listitem>
 <simpara>
 Toggles the state of <replaceable>auto-commit</replaceable> initially
@@ -512,8 +509,7 @@ schema, <literal>SCOTT</literal>.
 <para>Obviously, a working &oracle-link; environment is required.  It is
 recommended that you first be able to log on and use the &oracle-link;
 SQL*Plus application to test your environment
-<emphasis>before</emphasis> attempting &oracle-link; access via the
-&clisp; module.
+&before-e; attempting &oracle-link; access via the &clisp; module.
 At a minimum you will need to set environment variables
 <envar>ORACLE_HOME</envar> to the &oracle-link; base directory and
 <envar>LD_LIBRARY_PATH</envar> to include

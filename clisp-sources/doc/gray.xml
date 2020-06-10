@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<section id="gray"><title>Gray streams</title>
+<chapter id="gray"><title>Gray streams</title>
 
+<section id="gray-overview"><title>Overview</title>
 <para>This interface permits the definition of new classes of streams,
 and programming their behavior by defining methods for the elementary
 stream operations.
@@ -12,7 +13,9 @@ and is supported by most &cl; implementations currently in use.</para>
  <literal>FUNDAMENTAL-</literal> or <literal>STREAM-</literal>,
  are exported from the package &gray-pac;
  and &re-export;ed from &ext-pac;.</para>
+</section>
 
+<section id="gray-classes"><title>Defined classes</title>
 <variablelist><title>Defined classes</title>
  <varlistentry id="fu-st"><term>&fu-st;</term>
   <listitem><simpara>This is a superclass of all user-defined streams.
@@ -57,8 +60,9 @@ and is supported by most &cl; implementations currently in use.</para>
     <term><classname>GRAY:FUNDAMENTAL-BINARY-OUTPUT-STREAM</classname></term>
   <listitem><simpara>This is a convenience class inheriting from both
    &fu-st-bin; and &fu-st-out;.</simpara></listitem></varlistentry>
-</variablelist>
+</variablelist></section>
 
+<section id="gray-gf-general"><title>General generic functions</title>
 <variablelist><title>General generic functions defined on streams</title>
  <varlistentry><term><code>(&stream-element-type; &stream-r;)</code></term>
   <listitem><simpara>Returns the stream's element type, normally a
@@ -83,14 +87,28 @@ and is supported by most &cl; implementations currently in use.</para>
     &nil; after the stream has been closed.</simpara>
    <simpara>You do not need to add methods to this function.</simpara>
    </listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-POSITION</function>
+ <varlistentry id="st-position"><term><code>(&st-position;
     &stream-r; <replaceable>position</replaceable>)</code></term>
   <listitem><simpara>Just like &file-position;, but &nil;
     <replaceable>position</replaceable> means inquire.</simpara>
    &need-defmethod;</listitem></varlistentry>
-</variablelist>
+ <varlistentry id="st-rd-seq"><term><code>(GRAY:STREAM-READ-SEQUENCE
+   &sequence-r; &stream-r; &key-amp; &start-k; &end-k;)</code></term>
+  <listitem><simpara>Used by &read-sequence;. <emphasis>Deprecated</emphasis>.
+    Define &st-rd-cs; or &st-rd-bs; and call &rd-ch-seq;/&rd-by-seq; instead.
+   </simpara><simpara>The default method calls &st-rd-cs; or &st-rd-bs;.
+ </simpara></listitem></varlistentry>
+ <varlistentry id="st-wr-seq"><term><code>(GRAY:STREAM-WRITE-SEQUENCE
+   &sequence-r; &stream-r; &key-amp; &start-k; &end-k;)</code></term>
+  <listitem><simpara>Used by &write-sequence;. <emphasis>Deprecated</emphasis>.
+    Define &st-wr-cs; or &st-wr-bs; and call &wr-ch-seq;/&wr-by-seq; instead.
+   </simpara><simpara>The default method calls &st-wr-cs; or &st-wr-bs;.
+ </simpara></listitem></varlistentry>
+</variablelist></section>
 
-<variablelist><title>generic functions for character input</title>
+<section id="gray-gf-char-in">
+ <title>Generic functions for character input</title>
+<variablelist><title>Generic functions for character input</title>
  <varlistentry id="st-rc"><term><code>(&st-rc; &stream-r;)</code></term>
   <listitem><simpara>If a character was pushed back using &st-uc;,
    returns and consumes it.  Otherwise returns and consumes the next
@@ -106,8 +124,7 @@ and is supported by most &cl; implementations currently in use.</para>
    immediately, returns &nil; instead of waiting.</simpara><simpara>
    The default method simply calls &st-rc;; this is sufficient for streams
    whose &st-rc; method never blocks.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-PEEK-CHAR</function>
-    &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-PEEK-CHAR &stream-r;)</code></term>
   <listitem><simpara>If a character was pushed back using &st-uc;,
    returns it.  Otherwise returns the next character from the stream,
    avoiding any side effects &st-rc; would do.  Returns &eof-k; if the
@@ -115,8 +132,7 @@ and is supported by most &cl; implementations currently in use.</para>
   <simpara>The default method calls &st-rc; and &st-uc;; this is
    sufficient for streams whose &st-rc; method has no
    side-effects.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-LISTEN</function>
-    &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-LISTEN &stream-r;)</code></term>
   <listitem><simpara>If a character was pushed back using &st-uc;,
    returns it.  Otherwise returns the next character from the stream, if
    already available.  If no character is available immediately, or if
@@ -124,7 +140,7 @@ and is supported by most &cl; implementations currently in use.</para>
   <simpara>The default method calls &st-rcnh; and &st-uc;; this is
    sufficient for streams whose &st-rc; method has no
    side-effects.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-READ-CHAR-WILL-HANG-P</function>
+ <varlistentry><term><code>(GRAY:STREAM-READ-CHAR-WILL-HANG-P
     &stream-r;)</code></term>
   <listitem><simpara>Returns &nil; if &st-rc; will return immediately.
    Otherwise it returns true.</simpara>
@@ -132,8 +148,8 @@ and is supported by most &cl; implementations currently in use.</para>
    sufficient for streams whose &st-rc; method has no side-effects.</simpara>
   <simpara>This function is a &clisp; extension (see &rcwhp;).</simpara>
   </listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-READ-CHAR-SEQUENCE</function> &stream-r;
-   &sequence-r; &optional-amp; [&start-r; [&end-r;]])</code></term>
+ <varlistentry id="st-rd-cs"><term><code>(&st-rd-cs;
+   &stream-r; &sequence-r; &optional-amp; [&start-r; [&end-r;]])</code></term>
   <listitem><simpara>Fills the subsequence of &sequence-r; specified by
    &start-k; and &end-k; with characters consecutively read from &stream-r;.
    Returns the index of the first element of &sequence-r; that was not
@@ -147,23 +163,23 @@ and is supported by most &cl; implementations currently in use.</para>
    is always sufficient if speed does not matter.</simpara>
   <simpara>This function is a &clisp; extension (see
    &rd-ch-seq;).</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-READ-LINE</function>
-    &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-READ-LINE &stream-r;)</code></term>
   <listitem><simpara>Reads a line of characters, and return two values:
    the line (a &string-t;, without the terminating &nl-s; character),
    and a &boolean-t; value which is true if the line was terminated by
    &eos; instead of &nl-s;.</simpara>
   <simpara>The default method repeatedly calls &st-rc;; this
    is always sufficient.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-CLEAR-INPUT</function>
-    &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-CLEAR-INPUT &stream-r;)</code></term>
   <listitem><simpara>Clears all pending interactive input from the
    &stream-r;, and returns true if some pending input was removed.</simpara>
   <simpara>The default method does nothing and returns &nil;; this is
    sufficient for non-interactive streams.</simpara></listitem></varlistentry>
-</variablelist>
+</variablelist></section>
 
-<variablelist><title>generic functions for character output</title>
+<section id="gray-gf-char-out">
+ <title>Generic functions for character output</title>
+<variablelist><title>Generic functions for character output</title>
  <varlistentry id="st-wc"><term><code>(&st-wc; &stream-r; &ch-r;)</code></term>
   <listitem><simpara>Writes &ch-r;.
    </simpara>&need-defmethod;</listitem></varlistentry>
@@ -172,14 +188,13 @@ and is supported by most &cl; implementations currently in use.</para>
    would be written (&zero; stands for the first column),
     or &nil; if that is not meaningful for this stream.
    </simpara>&need-defmethod;</listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-START-LINE-P</function>
-                 &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-START-LINE-P &stream-r;)</code></term>
   <listitem><simpara>Returns true if the next character would be
    written at the start of a new line.</simpara>
   <simpara>The default method calls &st-lc; and compares its result with
    0; this is sufficient for streams whose &st-lc; never returns &nil;.
   </simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-WRITE-CHAR-SEQUENCE</function>
+ <varlistentry id="st-wr-cs"><term><code>(&st-wr-cs;
     &stream-r; &sequence-r; &optional-amp; [&start-r; [&end-r;]])</code></term>
   <listitem><simpara>Outputs the subsequence of &sequence-r; specified
    by &start-k; and &end-k; to &stream-r;.</simpara>
@@ -191,23 +206,20 @@ and is supported by most &cl; implementations currently in use.</para>
    is always sufficient if speed does not matter.
   </simpara><simpara>This function is a &clisp; extension
    (see &wr-ch-seq;).</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-WRITE-STRING</function>
+ <varlistentry><term><code>(GRAY:STREAM-WRITE-STRING
     &stream-r; &string-r; &optional-amp; [&start-r; [&end-r;]])</code></term>
   <listitem><simpara>Outputs the subsequence of &string-r; specified by
    &start-k; and &end-k; to &stream-r;.  Returns &string-r;.</simpara>
    <simpara>&string-r; is a string.  &start-r; is a nonnegative integer
    and default to 0.  &end-r; is a nonnegative integer or &nil; and
    defaults to &nil;, which stands for <code>(&length; &string-r;)</code>.
-   </simpara><simpara>The default method calls
-   <function>GRAY:STREAM-WRITE-CHAR-SEQUENCE</function>;
+   </simpara><simpara>The default method calls &st-wr-cs;;
    this is always sufficient.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-TERPRI</function>
-                 &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-TERPRI &stream-r;)</code></term>
   <listitem><simpara>Outputs a &nl-s; character.</simpara>
   <simpara>The default method calls &st-wc;; this is always
    sufficient.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-FRESH-LINE</function>
-                 &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-FRESH-LINE &stream-r;)</code></term>
   <listitem><simpara>Possibly outputs a &nl-s; character, so as to ensure
    that the next character would be written at the start of a new line.
    Returns true if it did output a &nl-s; character.</simpara>
@@ -215,32 +227,31 @@ and is supported by most &cl; implementations currently in use.</para>
    <function>GRAY:STREAM-START-LINE-P</function> and then
    <function>GRAY:STREAM-TERPRI</function> if necessary; this is always
    sufficient.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-FINISH-OUTPUT</function>
-                 &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-FINISH-OUTPUT &stream-r;)</code></term>
   <listitem><simpara>Ensures that any buffered output has reached its
    destination, and then returns.</simpara>
   <simpara>The default method does nothing.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-FORCE-OUTPUT</function>
-                 &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-FORCE-OUTPUT &stream-r;)</code></term>
   <listitem><simpara>Brings any buffered output on its way towards its
    destination, and returns without waiting until it has reached its
    destination.</simpara>
   <simpara>The default method does nothing.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-CLEAR-OUTPUT</function>
-                 &stream-r;)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-CLEAR-OUTPUT &stream-r;)</code></term>
   <listitem><simpara>Attempts to discard any buffered output which has
    not yet reached its destination.</simpara>
   <simpara>The default method does nothing.</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-ADVANCE-TO-COLUMN</function>
-                 &stream-r; <replaceable>column</replaceable>)</code></term>
+ <varlistentry><term><code>(GRAY:STREAM-ADVANCE-TO-COLUMN
+    &stream-r; &col-r;)</code></term>
   <listitem><simpara>Ensures that the next character will be written at
-   <replaceable>column</replaceable> at least.</simpara>
+    least at &col-r;.</simpara>
   <simpara>The default method outputs an appropriate amount of space
    characters; this is sufficient for non-proportional output.</simpara>
-  </listitem></varlistentry>
-</variablelist>
+ </listitem></varlistentry>
+</variablelist></section>
 
-<variablelist><title>generic functions for binary input</title>
+<section id="gray-gf-byte-in">
+ <title>Generic functions for binary input</title>
+<variablelist><title>Generic functions for binary input</title>
  <varlistentry id="st-rb"><term><code>(&st-rb; &stream-r;)</code></term>
   <listitem><simpara>Returns and consumes the next integer from the
    stream. Returns &eof-k; if the &eos; is reached.</simpara>
@@ -254,8 +265,7 @@ and is supported by most &cl; implementations currently in use.</para>
    immediately, returns &nil; instead of waiting.</simpara>
    &need-defmethod;<simpara>This function is a &clisp; extension (see
    &rbla;).</simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-READ-BYTE-WILL-HANG-P</function>
-                 &stream-r;)</code></term>
+ <varlistentry id="st-rbwhp"><term><code>(&st-rbwhp; &stream-r;)</code></term>
   <listitem><simpara>To be called only if &stream-r;'s
    &stream-element-type; is &ubyte-8; or &sbyte-8;.
    Returns &nil; if &st-rb; will return immediately.
@@ -263,8 +273,7 @@ and is supported by most &cl; implementations currently in use.</para>
    <simpara>The default method calls &st-rbla;; this is always sufficient.
    </simpara><simpara>This function is a &clisp; extension (see &rbwhp;).
  </simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-READ-BYTE-NO-HANG</function>
-                 &stream-r;)</code></term>
+ <varlistentry id="st-rbnh"><term><code>(&st-rbnh; &stream-r;)</code></term>
   <listitem><simpara>To be called only if &stream-r;'s
    &stream-element-type; is &ubyte-8; or &sbyte-8;.
    Returns an &integer-t; or &eof-k;, like &st-rb;, if that would
@@ -274,9 +283,9 @@ and is supported by most &cl; implementations currently in use.</para>
     this is always sufficient.</simpara>
    <simpara>This function is a &clisp; extension (see &rbnh;).
  </simpara></listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-READ-BYTE-SEQUENCE</function>
-     &stream-r; &sequence-r; &optional-amp;
-      [&start-r; [&end-r; [&no-hang; [&interactive-r;]]]])</code></term>
+ <varlistentry id="st-rd-bs"><term><code>(&st-rd-bs;
+    &stream-r; &sequence-r; &optional-amp;
+    [&start-r; [&end-r; [&no-hang; [&interactive-r;]]]])</code></term>
   <listitem><simpara>Fills the subsequence of &sequence-r; specified by
     &start-k; and &end-k; with integers consecutively read from &stream-r;.
     Returns the index of the first element of &sequence-r; that was not
@@ -293,16 +302,18 @@ and is supported by most &cl; implementations currently in use.</para>
     is always sufficient if speed does not matter.</simpara>
    <simpara>This function is a &clisp; extension (see
     &rd-by-seq;).</simpara></listitem></varlistentry>
-</variablelist>
+</variablelist></section>
 
-<variablelist><title>generic functions for binary output</title>
- <varlistentry><term><code>(<function>GRAY:STREAM-WRITE-BYTE</function>
-                 &stream-r; &int-r;)</code></term>
+<section id="gray-gf-byte-out">
+ <title>Generic functions for binary output</title>
+<variablelist><title>Generic functions for binary output</title>
+ <varlistentry><term><code>(GRAY:STREAM-WRITE-BYTE
+    &stream-r; &int-r;)</code></term>
   <listitem><simpara>Writes &int-r;.</simpara>
    &need-defmethod;</listitem></varlistentry>
- <varlistentry><term><code>(<function>GRAY:STREAM-WRITE-BYTE-SEQUENCE</function>
-     &stream-r; &sequence-r; &optional-amp;
-      [&start-r; [&end-r; [&no-hang;]]])</code></term>
+ <varlistentry id="st-wr-bs"><term><code>(&st-wr-bs;
+    &stream-r; &sequence-r; &optional-amp;
+    [&start-r; [&end-r; [&no-hang; [&interactive-r;]]]])</code></term>
   <listitem><simpara>Outputs the subsequence of &sequence-r; specified
     by &start-k; and &end-k; to &stream-r;</simpara>
    <simpara>&sequence-r; is an &array-t; of &integer-t;s.
@@ -318,7 +329,7 @@ and is supported by most &cl; implementations currently in use.</para>
     sufficient if speed does not matter.</simpara>
    <simpara>This function is a &clisp; extension (see
     &wr-by-seq;).</simpara></listitem></varlistentry>
-</variablelist>
+</variablelist></section>
 
 <section id="fill-stream"><title>Class &fill-stream;</title>
 <para>As an example of the use of &gray-pac; &stream-t;s, &clisp;
@@ -381,7 +392,8 @@ and is supported by most &cl; implementations currently in use.</para>
       (force-output fill)
       (let ((*my-indent-level* 5))
         (format fill "~%and    properly indented to the level specified by the ~S argument which can be a ~S or an ~S - cool!"
-                :TEXT-INDENT 'symbol 'integer))
+                :TEXT-INDENT 'symbol 'integer)
+        (force-output fill))
       (format fill "~%Don't forget  to call ~S on it, and/or use ~S   Pretty formatting of the  S-expressions    printed with ~~S is  preserved: ~S"
               'force-output 'with-fill-stream '(defun foo (x y z) (if x (+ y z) (* y z)))))))
 <computeroutput>"
@@ -393,26 +405,28 @@ and is supported by most &cl; implementations currently in use.</para>
      indented to
      the level
      specified by
-     the :TEXT-INDENT
+     the
+     :TEXT-INDENT
      argument which
      can be a
-SYMBOL
-     or an INTEGER
-     - cool!
+     SYMBOL or an
+     INTEGER -
+     cool!
   Don't forget to
   call FORCE-OUTPUT
   on it, and/or use
-WITH-FILL-STREAM
+  WITH-FILL-STREAM
   Pretty formatting
   of the
   S-expressions
   printed with ~S
   is preserved:
-(DEFUN FOO (X Y Z)
- (IF X (+ Y Z)
-  (* Y Z)))
+   (DEFUN FOO
+    (X Y Z)
+    (IF X (+ Y Z)
+     (* Y Z)))
 "</computeroutput></programlisting>
 </example>
 </section>
 
-</section>
+</chapter>

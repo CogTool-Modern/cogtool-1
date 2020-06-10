@@ -4,10 +4,10 @@
 (in-package "SYSTEM")
 
 ;;;----------------------------------------------------------------------------
-;;; Funktionen zur Definition und zum Ausnutzen von places:
+;;; Functions to define and deal with places
 ;;;----------------------------------------------------------------------------
-;; Return a symbol for SYSTEM::SETF-FUNCTION
-;; the returned symbol will be interned iff the argument is.
+;;; Return a symbol for SYSTEM::SETF-FUNCTION
+;;; the returned symbol will be interned iff the argument is.
 (defun setf-symbol (symbol)
   (let* ((pack (symbol-package symbol))
          (name (string-concat "(SETF " (if pack (package-name pack) "#") ":"
@@ -16,7 +16,7 @@
         (intern name pack)
         (make-symbol name))))
 ;;;----------------------------------------------------------------------------
-;; Returns the symbol which is on the property list at SYSTEM::SETF-FUNCTION
+;;; Returns the symbol which is on the property list at SYSTEM::SETF-FUNCTION
 (defun get-setf-symbol (symbol) ; ABI
   (or (get symbol 'SYSTEM::SETF-FUNCTION)
       (progn
@@ -25,26 +25,26 @@
                 'setf symbol))
         (setf (get symbol 'SYSTEM::SETF-FUNCTION) (setf-symbol symbol)))))
 ;;;----------------------------------------------------------------------------
-;; Returns 5 values:
-;;   SM1  temps       variables to bind
-;;   SM2  subforms    values to bind to
-;;   SM3  stores      variables whose values are used by the setter form
-;;   SM4  setterform  setter form
-;;   SM5  getterform  getter form
+;;; Returns 5 values:
+;;;   SM1  temps       variables to bind
+;;;   SM2  subforms    values to bind to
+;;;   SM3  stores      variables whose values are used by the setter form
+;;;   SM4  setterform  setter form
+;;;   SM5  getterform  getter form
 (defun get-setf-expansion (form &optional env)
   (unless env ; user may pass env=NIL to mean "null lexical environment"
     (setq env (vector nil nil)))
   (loop
-    ; 1. Schritt: nach globalen SETF-Definitionen suchen:
+    ;; 1st step: search for global SETF definitions:
     (when (and (consp form) (symbolp (car form)))
       (when (global-in-fenv-p (car form) (svref env 1))
-        ; Operator nicht lokal definiert
+        ;; Operator not defined locally
         (let ((plist-info (get (first form) 'SYSTEM::SETF-EXPANDER)))
           (when plist-info
             (return-from get-setf-expansion
-              (if (symbolp plist-info) ; Symbol kommt von kurzem DEFSETF
-                (do* ((storevar (gensym))
-                      (tempvars nil (cons (gensym) tempvars))
+              (if (symbolp plist-info) ; Symbol comes from a short DEFSETF
+                (do* ((storevar (gensym "NEW-"))
+                      (tempvars nil (cons (gensym "TEMP-") tempvars))
                       (tempforms nil (cons (car formr) tempforms))
                       (formr (cdr form) (cdr formr)))
                      ((endp formr)
@@ -53,22 +53,20 @@
                               tempforms
                               `(,storevar)
                               `(,plist-info ,@tempvars ,storevar)
-                              `(,(first form) ,@tempvars)
-                     ))
-                )
+                              `(,(first form) ,@tempvars))))
                 (let ((argcount (car plist-info)))
                   (if (eql argcount -5)
-                    ; (-5 . fun) kommt von DEFINE-SETF-METHOD
+                    ;; (-5 . fun) comes from DEFINE-SETF-METHOD
                     (funcall (cdr plist-info) form env)
-                    ; (argcount storevarcount . fun) kommt von langem DEFSETF
+                    ;; (argcount storevarcount . fun) comes from a long DEFSETF
                     (let ((access-form form)
                           (tempvars '())
                           (tempforms '())
                           (new-access-form '()))
-                      (let ((i 0)) ; Argumente-Zähler
-                        ; argcount = -1 falls keine Keyword-Argumente existieren
-                        ; bzw.     = Anzahl der einzelnen Argumente vor &KEY,
-                        ;          = nil nachdem diese abgearbeitet sind.
+                      (let ((i 0)) ; argument counter
+                        ;; argcount = -1 if no keyword arguments exist
+                        ;; resp.    = number of the arguments before &KEY,
+                        ;;          = nil after these are processed.
                         (dolist (argform (cdr access-form))
                           (when (eql i argcount) (setq argcount nil i 0))
                           (if (and (null argcount) (evenp i))
@@ -78,44 +76,37 @@
                                 :form form
                                 :detail argform
                                 (TEXT "The argument ~S to ~S should be a keyword.")
-                                argform (car access-form)
-                            ) )
+                                argform (car access-form)))
                             (let ((tempvar (gensym)))
                               (push tempvar tempvars)
                               (push argform tempforms)
-                              (push tempvar new-access-form)
-                          ) )
-                          (incf i)
-                      ) )
+                              (push tempvar new-access-form)))
+                          (incf i)))
                       (setq new-access-form (nreverse new-access-form))
                       (let ((newval-vars (gensym-list (cadr plist-info))))
                         (values
                           (nreverse tempvars)
                           (nreverse tempforms)
                           newval-vars
-                          (apply (cddr plist-info) env (append newval-vars new-access-form))
-                          (cons (car access-form) new-access-form)
-                ) ) ) ) )
-            ) )
-    ) ) ) )
-    ; 2. Schritt: macroexpandieren
+                          (apply (cddr plist-info) env
+                                 (append newval-vars new-access-form))
+                          (cons (car access-form) new-access-form))))))))))))
+    ;; 2nd step: macroexpand
     (when (eq form (setq form (macroexpand-1 form env)))
-      (return)
-  ) )
-  ; 3. Schritt: Default-SETF-Methoden
+      (return)))
+  ;; 3rd step: default SETF methods
   (cond ((symbolp form)
          (return-from get-setf-expansion
-           (let ((storevar (gensym)))
+           (let ((storevar (gensym "NEW-")))
              (values nil
                      nil
                      `(,storevar)
                      `(SETQ ,form ,storevar)
-                     `,form
-        )) ) )
+                     `,form))))
         ((and (consp form) (symbolp (car form)))
          (return-from get-setf-expansion
-           (do* ((storevar (gensym))
-                 (tempvars nil (cons (gensym) tempvars))
+           (do* ((storevar (gensym "NEW-"))
+                 (tempvars nil (cons (gensym "TEMP-") tempvars))
                  (tempforms nil (cons (car formr) tempforms))
                  (formr (cdr form) (cdr formr)))
                 ((endp formr)
@@ -128,9 +119,7 @@
                          ;; but the we will return the form
                          ;; that will not confuse 3rd party code walkers
                          `(FUNCALL #'(SETF ,(first form)) ,storevar ,@tempvars)
-                         `(,(first form) ,@tempvars)
-                ))
-        )) )
+                         `(,(first form) ,@tempvars))))))
         (t (error-of-type 'source-program-error
              :form form
              :detail form
@@ -142,22 +131,19 @@
       (get-setf-expansion form env)
     (unless (and (consp stores) (null (cdr stores)))
       (error-of-type 'source-program-error
-        :form form
-        :detail form
+        :form form :detail form
         (TEXT "SETF place ~S should produce exactly one store variable.")
-        form
-    ) )
-    (values temps subforms stores setterform getterform)
-) )
+        form))
+    (values temps subforms stores setterform getterform)))
 ;;;----------------------------------------------------------------------------
-;; Auxiliary functions for simplifying bindings and setterforms.
+;;; Auxiliary functions for simplifying bindings and setterforms.
 
-; Like (subst newitem olditem form), except that it works on forms and
-; doesn't look inside quoted literals.
-; FIXME: This is still not correct: The form can contain macros or THE.
+;;; Like (subst newitem olditem form), except that it works on forms and
+;;; doesn't look inside quoted literals.
+;;; FIXME: This is still not correct: The form can contain macros or THE.
 (defun subst-in-form (newitem olditem form)
-  ; Don't use subst here, since a form can contain circular lists hidden behind
-  ; QUOTE.
+  ;; Don't use subst here, since a form can contain circular lists
+  ;; hidden behind QUOTE.
   (if (atom form)
     (if (eql form olditem) newitem form)
     (if (eq (car form) 'QUOTE)
@@ -166,7 +152,8 @@
             (new-form-reversed '()))
         (do ((formr form (cdr formr)))
             ((atom formr)
-             (unless (eql formr (setq formr (subst-in-form newitem olditem formr)))
+             (unless (eql formr (setq formr (subst-in-form newitem olditem
+                                                           formr)))
                (setq modified t))
              (if modified (nreconc new-form-reversed formr) form))
           (let ((new-subform (subst-in-form newitem olditem (car formr))))
@@ -174,12 +161,12 @@
               (setq modified t))
             (setq new-form-reversed (cons new-subform new-form-reversed))))))))
 
-; Like (sublis alist form), except that it works on forms and
-; doesn't look inside quoted literals.
-; FIXME: This is still not correct: The form can contain macros or THE.
+;;; Like (sublis alist form), except that it works on forms and
+;;; doesn't look inside quoted literals.
+;;; FIXME: This is still not correct: The form can contain macros or THE.
 (defun sublis-in-form (alist form)
-  ; Don't use sublis here, since a form can contain circular lists hidden behind
-  ; QUOTE.
+  ;; Don't use sublis here, since a form can contain circular lists
+  ;; hidden behind QUOTE.
   (if (atom form)
     (let ((h (assoc form alist))) (if h (cdr h) form))
     (if (eq (car form) 'QUOTE)
@@ -196,18 +183,19 @@
               (setq modified t))
             (setq new-form-reversed (cons new-subform new-form-reversed))))))))
 
-; An empty binding list can be optimized away.
+;;; An empty binding list can be optimized away.
 (defun wrap-let* (bindlist form)
   (if (and (null bindlist)
-           ; But don't optimize the LET* away if the form is a PROGN form,
-           ; because when it occurs as a top-level form in a file and refers
-           ; to uninterned symbols, compiling the elements of the PROGN
-           ; separately leads to problems.
+           ;; But don't optimize the LET* away if the form is a PROGN form,
+           ;; because when it occurs as a top-level form in a file and refers
+           ;; to uninterned symbols, compiling the elements of the PROGN
+           ;; separately leads to problems.
            (not (and (consp form) (eq (first form) 'PROGN))))
     form
     `(LET* ,bindlist ,form)))
 
-; In simple assignments like (SETQ foo #:G0) the #:G0 can be replaced directly.
+;;; In simple assignments like (SETQ foo #:G0) the #:G0 can be replaced
+;;; directly.
 (defun simple-assignment-p (env store-form stores)
   (and (= (length stores) 1)
        (consp store-form)
@@ -215,19 +203,17 @@
        (= (length store-form) 3)
        (symbolp (second store-form))
        (not (nth-value 1 (macroexpand-1 (second store-form) env)))
-       (simple-use-p (third store-form) (first stores))
-) )
+       (simple-use-p (third store-form) (first stores))))
 (defun simple-use-p (form var)
   (or (eq form var)
       (and (consp form) (eq (first form) 'THE) (= (length form) 3)
-           (simple-use-p (third form) var)
-) )   )
+           (simple-use-p (third form) var))))
 
-; Tests whether a variable (a gensym) occurs in the given form.
-; FIXME: This is still not correct: The form can contain macros or THE.
+;;; Tests whether a variable (a gensym) occurs in the given form.
+;;; FIXME: This is still not correct: The form can contain macros or THE.
 (defun occurs-in-p (form var)
-  ; Don't use (tree-equal form form ...) here, since a form can contain
-  ; circular lists hidden behind QUOTE.
+  ;; Don't use (tree-equal form form ...) here, since a form can contain
+  ;; circular lists hidden behind QUOTE.
   (if (atom form)
     (eq form var)
     (if (eq (car form) 'QUOTE)
@@ -236,8 +222,8 @@
           ((atom formr) (eq formr var))
         (when (occurs-in-p (car formr) var) (return t))))))
 
-; Tests whether two forms are guaranteed to commute. The first is assumed to
-; be a symbol, the second one can be more complex.
+;;; Tests whether two forms are guaranteed to commute. The first is assumed to
+;;; be a symbol, the second one can be more complex.
 (defun commuting-forms-p (var form env)
   (and (symbolp var)
        (not (nth-value 1 (macroexpand-1 var env)))
@@ -251,17 +237,17 @@
                   (and (not (special-operator-p funname))
                        (null (macro-function funname env)))
                   t)
-                (not (compiler::fenv-search funname (and env (svref env 1))))
+                (not (sys::fenv-search funname (and env (svref env 1))))
                 (every #'(lambda (argform) (commuting-forms-p var argform env))
                        argforms))))))
-; For bootstrapping.
-(predefun compiler::fenv-search (funname fenv)
+;;; For bootstrapping.
+(predefun sys::fenv-search (funname fenv)
   (declare (ignore funname fenv))
   nil)
 
-; In simple function calls like (SYSTEM::%RPLACA foo #:G0) the #:G0 can be
-; replaced directly if it occurs only once, as an argument, and the earlier
-; arguments commute with the value.
+;;; In simple function calls like (SYSTEM::%RPLACA foo #:G0) the #:G0 can be
+;;; replaced directly if it occurs only once, as an argument, and the earlier
+;;; arguments commute with the value.
 (defun simple-occurrence-in-basic-block-p (env form var valform)
   (if (atom form)
     (eq form var)
@@ -283,21 +269,26 @@
                  (and (not (special-operator-p funname))
                       (null (macro-function funname env)))
                  t)
-               ; At this point we know it's a function call.
-               ; We assume the value to be put in for var does not change
-               ; funname's function definition,
-               (do ((earlier-argforms (reverse argforms) (cdr earlier-argforms)))
+               ;; At this point we know it's a function call.
+               ;; We assume the value to be put in for var does not change
+               ;; funname's function definition,
+               (do ((earlier-argforms (reverse argforms)
+                                      (cdr earlier-argforms)))
                    ((null earlier-argforms) nil)
                  (when (occurs-in-p (car earlier-argforms) var)
-                   ; Found the last argument form that refers to var.
+                   ;; Found the last argument form that refers to var.
                    (return
-                     (and (simple-occurrence-in-basic-block-p env (car earlier-argforms) var valform)
+                     (and (simple-occurrence-in-basic-block-p
+                           env (car earlier-argforms) var valform)
                           (every #'(lambda (argform)
                                      (and (symbolp argform)
-                                          (not (nth-value 1 (macroexpand-1 argform env)))
-                                          (not (ext:special-variable-p argform env))
+                                          (not (nth-value 1 (macroexpand-1
+                                                             argform env)))
+                                          (not (ext:special-variable-p
+                                                argform env))
                                           (not (eq argform var))
-                                          (commuting-forms-p argform valform env)))
+                                          (commuting-forms-p argform valform
+                                                             env)))
                                  (cdr earlier-argforms))))))))))))
 
 (defun optimized-wrap-let* (env bindlist form) ; ABI
@@ -358,7 +349,8 @@
       (system::parse-body body t)
     (if (null body-rest) (setq body-rest '(NIL)))
     (let ((name (make-symbol (string-concat "SETF-" (symbol-name accessfn))))
-          (SYSTEM::%WHOLE-FORM whole-form))
+          (SYSTEM::%WHOLE-FORM whole-form)
+          (SYSTEM::%PROPER-LIST-P t))
       (multiple-value-bind (newlambdalist envvar)
           (remove-env-arg lambdalist name)
         (let ((SYSTEM::%ARG-COUNT 0)
@@ -367,51 +359,39 @@
               (SYSTEM::%NULL-TESTS nil)
               (SYSTEM::%LET-LIST nil)
               (SYSTEM::%KEYWORD-TESTS nil)
-              (SYSTEM::%DEFAULT-FORM nil)
-             )
+              (SYSTEM::%DEFAULT-FORM nil))
           (SYSTEM::ANALYZE1 newlambdalist '(CDR SYSTEM::%LAMBDA-LIST)
-                            name 'SYSTEM::%LAMBDA-LIST
-          )
+                            name 'SYSTEM::%LAMBDA-LIST)
           (if (null newlambdalist)
-            (push `(IGNORE SYSTEM::%LAMBDA-LIST) declarations)
-          )
-          (let ((lengthtest (sys::make-length-test 'SYSTEM::%LAMBDA-LIST 1 nil))
+            (push `(IGNORE SYSTEM::%LAMBDA-LIST) declarations))
+          (let ((lengthtest (sys::make-length-test 'SYSTEM::%LAMBDA-LIST 1))
                 (mainform
                   `(LET* ,(nreverse SYSTEM::%LET-LIST)
                      ,@(if declarations `(,(cons 'DECLARE declarations)))
                      ,@(nreverse SYSTEM::%NULL-TESTS)
                      ,@(nreverse SYSTEM::%KEYWORD-TESTS)
-                     (BLOCK ,accessfn ,@body-rest)
-                   )
-               ))
+                     (BLOCK ,accessfn ,@body-rest))))
             (if lengthtest
               (setq mainform
                 `(IF ,lengthtest
                    (ERROR-OF-TYPE 'PROGRAM-ERROR
                      (TEXT "The SETF expander for ~S may not be called with ~S arguments.")
-                     (QUOTE ,accessfn) (1- (LENGTH SYSTEM::%LAMBDA-LIST))
-                   )
-                   ,mainform
-              )  )
-            )
+                     (QUOTE ,accessfn) (1- (LENGTH SYSTEM::%LAMBDA-LIST)))
+                   ,mainform)))
             `(EVAL-WHEN (LOAD COMPILE EVAL)
                (LET ()
                  (REMPROP ',accessfn 'SYSTEM::DEFSTRUCT-WRITER)
                  (DEFUN ,name (SYSTEM::%LAMBDA-LIST ,(or envvar 'SYSTEM::ENV))
                    ,@(if envvar '() '((DECLARE (IGNORE SYSTEM::ENV))))
-                   ,mainform
-                 )
+                   ,mainform)
                  (sys::check-redefinition
                   ',accessfn 'define-setf-expander
                   (and (get ',accessfn 'SYSTEM::SETF-EXPANDER)
-                       'SYSTEM::SETF-EXPANDER))
+                       (TEXT "SETF expander")))
                  (SYSTEM::%PUT ',accessfn 'SYSTEM::SETF-EXPANDER
-                   (CONS -5 (FUNCTION ,name))
-                 )
+                   (CONS -5 (FUNCTION ,name)))
                  (SYSTEM::%SET-DOCUMENTATION ',accessfn 'SETF ',docstring)
-                 ',accessfn
-             ) )
-) ) ) ) ) )
+                 ',accessfn))))))))
 ;;;----------------------------------------------------------------------------
 (defmacro defsetf (&whole whole-form
                    accessfn &rest args)
@@ -423,12 +403,11 @@
               (SYS::CHECK-REDEFINITION
                ',accessfn 'DEFSETF
                (and (get ',accessfn 'SYSTEM::SETF-EXPANDER)
-                    'SYSTEM::SETF-EXPANDER))
+                    (TEXT "SETF expander")))
               (SYSTEM::%PUT ',accessfn 'SYSTEM::SETF-EXPANDER ',(first args))
               (SYSTEM::%SET-DOCUMENTATION ',accessfn 'SETF
                 ,(if (and (null (cddr args))
-                          (or (null (second args)) (stringp (second args)))
-                     )
+                          (or (null (second args)) (stringp (second args))))
                    (second args)
                    (if (cddr args)
                      (error-of-type 'source-program-error
@@ -440,66 +419,61 @@
                        :form whole-form
                        :detail (second args)
                        (TEXT "~S: The documentation string must be a string: ~S")
-                       'defsetf (second args))))
-              )
-              ',accessfn
-          ) )
-        )
-        ((and (consp args) (listp (first args)) (consp (cdr args)) (listp (second args)))
+                       'defsetf (second args)))))
+              ',accessfn)))
+        ((and (consp args) (listp (first args)) (consp (cdr args))
+              (listp (second args)))
          (multiple-value-bind (body-rest declarations docstring)
              (system::parse-body (cddr args) t)
            (let* ((storevars (second args))
                   arg-count
                   (setter
                     (let ((lambdalist (first args)))
-                      (multiple-value-bind (reqvars optvars optinits optsvars rest
-                                            keyp keywords keyvars keyinits keysvars
-                                            allowp env)
+                      (multiple-value-bind (reqvars optvars optinits optsvars
+                                            rest keyp keywords keyvars keyinits
+                                            keysvars allowp env)
                           (analyze-defsetf-lambdalist lambdalist
-                            #'(lambda (detail errorstring &rest arguments)
-                                (error-of-type 'source-program-error
-                                  :form whole-form
-                                  :detail detail
+                            #'(lambda (lalist detail errorstring &rest arguments)
+                                (declare (ignore lalist));use WHOLE-FORM instead
+                                (lambda-list-error whole-form detail
                                   (TEXT "~S ~S: invalid ~S lambda-list: ~A")
                                   'defsetf accessfn 'defsetf
                                   (apply #'format nil errorstring arguments))))
                         (declare (ignore optinits optsvars rest keywords keyvars
                                          keyinits keysvars allowp))
-                        (setq arg-count (if keyp (+ (length reqvars) (length optvars)) -1))
+                        (setq arg-count (if keyp (+ (length reqvars)
+                                                    (length optvars)) -1))
                         (if (eql env 0)
-                          (setq env (gensym)
+                          (setq env (gensym "IG")
                                 declarations (cons `(IGNORE ,env) declarations))
                           (setq lambdalist
                                 (let ((lr (memq '&ENVIRONMENT lambdalist)))
                                   (append (ldiff lambdalist lr) (cddr lr)))))
-                        (when declarations (setq declarations `((DECLARE ,@declarations))))
+                        (when declarations
+                          (setq declarations `((DECLARE ,@declarations))))
                         `(LAMBDA (,env ,@storevars ,@lambdalist)
                            ,@declarations
-                           (BLOCK ,accessfn ,@body-rest)
-                         )
-                 )) ) )
+                           (BLOCK ,accessfn ,@body-rest))))))
              `(EVAL-WHEN (LOAD COMPILE EVAL)
                 (LET ()
                   (REMPROP ',accessfn 'SYSTEM::DEFSTRUCT-WRITER)
                   (SYS::CHECK-REDEFINITION
                     ',accessfn 'DEFSETF
                     (AND (GET ',accessfn 'SYSTEM::SETF-EXPANDER)
-                         'SYSTEM::SETF-EXPANDER))
+                         (TEXT "SETF expander")))
                   (SYSTEM::%PUT ',accessfn 'SYSTEM::SETF-EXPANDER
                     (LIST* ,arg-count ,(length storevars)
-                           (FUNCTION ,(concat-pnames "SETF-" accessfn) ,setter)
-                  ) )
+                           (FUNCTION ,(concat-pnames "SETF-" accessfn)
+                                     ,setter)))
                   (SYSTEM::%SET-DOCUMENTATION ',accessfn 'SETF ,docstring)
-                  ',accessfn
-              ) )
-        )) )
+                  ',accessfn)))))
         (t (error-of-type 'source-program-error
              :form whole-form
              :detail args
              (TEXT "(~S ~S): Illegal syntax.")
              'defsetf accessfn))))
 ;;;----------------------------------------------------------------------------
-;; Redirects #'(SETF accessfn) to be the same as setterfn.
+;;; Redirects #'(SETF accessfn) to be the same as setterfn.
 (defmacro def-setf-alias (accessfn setterfn)
   `(SYSTEM::%PUT ',accessfn 'SYSTEM::SETF-FUNCTION ',setterfn))
 ;;;----------------------------------------------------------------------------
@@ -528,10 +502,8 @@
       (error-of-type 'error
         (TEXT "~S: index ~S is too large for ~S")
         '(setf nth) index list)
-      (rplaca pointer value)
-    )
-    value
-) )
+      (rplaca pointer value))
+    value))
 (defsetf nth SYSTEM::%SETNTH)
 ;;;----------------------------------------------------------------------------
 (def-setf-alias elt SYSTEM::|(SETF ELT)|)
@@ -582,13 +554,12 @@
 (defsetf svref SYSTEM::SVSTORE)
 (defsetf row-major-aref system::row-major-store)
 ;;;----------------------------------------------------------------------------
-;; Simplify a form, when its values are not needed, only its side effects.
-;; Returns a list of subforms.
-;;   (values x y z) --> (x y z)
-;;   x --> (x)
+;;; Simplify a form, when its values are not needed, only its side effects.
+;;; Returns a list of subforms.
+;;;   (values x y z) --> (x y z)
+;;;   x --> (x)
 (defun devalue-form (form)
-  (if (eq (car form) 'VALUES) (cdr form) (list form))
-)
+  (if (eq (car form) 'VALUES) (cdr form) (list form)))
 ;;;----------------------------------------------------------------------------
 (defmacro pop (place &environment env)
   (multiple-value-bind (temps subforms stores setterform getterform)
@@ -620,14 +591,15 @@
                    (not (nth-value 1 (macroexpand-1 getterform env)))
                    (simple-occurrence-in-basic-block-p env advance-and-set-form
                      (car oldtemps) getterform))
-            ;; getterform can be evaluated multiple times instead of once, and
-            ;; nothing in the setterform interferes with its value. => Optimize
-            ;; away the binding of the oldtemps.
+            ;; getterform can be evaluated multiple times instead of once,
+            ;; and nothing in the setterform interferes with its value.
+            ;; => Optimize away the binding of the oldtemps.
             (optimized-wrap-let* env bindlist
               (subst-in-form getterform (car oldtemps)
                 prog1-form))
-            (optimized-wrap-let* env (nconc bindlist (list (list (car oldtemps) getterform)))
-              prog1-form)))
+            (optimized-wrap-let*
+             env (nconc bindlist (list (list (car oldtemps) getterform)))
+             prog1-form)))
         (optimized-wrap-let* env bindlist
           (optimized-wrap-multiple-value-bind env oldtemps getterform
             `(MULTIPLE-VALUE-PROG1
@@ -679,7 +651,7 @@
 (defmacro remf (place indicator &environment env)
   (multiple-value-bind (temps subforms stores setterform getterform)
       (get-setf-method place env)
-    (let* ((indicatorvar (gensym))
+    (let* ((indicatorvar (gensym "INDICATOR-"))
            (oldtemps (gensym-list (length stores)))
            (bindlist
              ;; The order of the bindings is a not strictly left-to-right here,
@@ -696,8 +668,8 @@
            ,removed-p)))))
 ;;;----------------------------------------------------------------------------
 (export 'ext::remove-plist "EXT")
-;; Remove the keys from the plist.
-;; Useful for re-using the &REST arg after removing some options.
+;;; Remove the keys from the plist.
+;;; Useful for re-using the &REST arg after removing some options.
 (defun remove-plist (plist &rest keys)
   ;; This implementation is
   ;; 1. minimal-consing, non-consing if possible,
@@ -727,7 +699,8 @@
        ((null arglist)
         (setf (second res) (nreverse bindlist)
               (second (third res)) last-stores
-              (cdr tail) (nconc (nreverse all-stores) (devalue-form last-setterform))
+              (cdr tail) (nconc (nreverse all-stores)
+                                (devalue-form last-setterform))
               (cdr (last res)) (list nil))
         res)
     (multiple-value-bind (temps subforms stores setterform getterform)
@@ -737,18 +710,16 @@
       (setq tail (cddadr tail))
       (if (null first-stores)
         (setq first-stores stores)
-        (setq all-stores (revappend (devalue-form last-setterform) all-stores))
-      )
+        (setq all-stores (revappend (devalue-form last-setterform) all-stores)))
       (setq last-stores stores last-setterform setterform))))
 ;;;----------------------------------------------------------------------------
 (defmacro define-modify-macro (&whole whole-form
                                name lambdalist function &optional docstring)
   (multiple-value-bind (reqvars optvars optinits optsvars rest)
       (analyze-modify-macro-lambdalist lambdalist
-        #'(lambda (detail errorstring &rest arguments)
-            (error-of-type 'source-program-error
-              :form whole-form
-              :detail detail
+        #'(lambda (lalist detail errorstring &rest arguments)
+            (declare (ignore lalist)) ; use WHOLE-FORM instead
+            (lambda-list-error whole-form detail
               (TEXT "~S ~S: invalid ~S lambda-list: ~A")
               'define-modify-macro name 'define-modify-macro
               (apply #'format nil errorstring arguments))))
@@ -783,9 +754,7 @@
                    (NCONC LET-LIST
                           (MAPCAR #'LIST ARGVARS (LIST* ,@varlist ,restvar))
                           (LIST (LIST (CAR STORES) FUNCTION-APPLICATION)))
-                   SETTERFORM))
-       ) ) ) )
-) ) )
+                   SETTERFORM)))))))))
 ;;;----------------------------------------------------------------------------
 (define-modify-macro decf (&optional (delta 1)) -)
 ;;;----------------------------------------------------------------------------
@@ -798,25 +767,21 @@
            (let* ((place (first args))
                   (value (second args)))
              (loop
-               ;; 1. Schritt: nach globalen SETF-Definitionen suchen:
+               ;; 1st step: search for global SETF definitions:
                (when (and (consp place) (symbolp (car place)))
                  (when (global-in-fenv-p (car place) (svref env 1))
-                   ; Operator nicht lokal definiert
+                   ;; operator not locally defined
                    (if (and (eq (first place) 'VALUES-LIST) (eql (length place) 2))
                      (return-from setf
                        `(VALUES-LIST
-                          (SETF ,(second place) (MULTIPLE-VALUE-LIST ,value))
-                        )
-                     )
+                          (SETF ,(second place) (MULTIPLE-VALUE-LIST ,value))))
                      (let ((plist-info (get (first place) 'SYSTEM::SETF-EXPANDER)))
                        (when plist-info
                          (return-from setf
-                           (cond ((symbolp plist-info) ; Symbol kommt von kurzem DEFSETF
-                                  `(,plist-info ,@(cdr place) ,value)
-                                 )
+                           (cond ((symbolp plist-info) ; Symbol comes from a short DEFSETF
+                                  `(,plist-info ,@(cdr place) ,value))
                                  ((and (eq (first place) 'THE) (eql (length place) 3))
-                                  `(SETF ,(third place) (THE ,(second place) ,value))
-                                 )
+                                  `(SETF ,(third place) (THE ,(second place) ,value)))
                                  (t
                                   (multiple-value-bind (temps subforms stores setterform getterform)
                                       (get-setf-expansion place env)
@@ -825,12 +790,10 @@
                                       (if (= (length stores) 1)
                                         ;; 1 store variable
                                         (wrap-let* (nconc bindlist
-                                                     (list `(,(first stores) ,value))
-                                                   )
-                                          setterform
-                                        )
-                                        ;; mehrere Store-Variable
-                                        (if ;; Hat setterform die Gestalt
+                                                     (list `(,(first stores) ,value)))
+                                          setterform)
+                                        ;; multiple store variables
+                                        (if ;; is setterform like
                                             ;; (VALUES (SETQ v1 store1) ...) ?
                                           (and (consp setterform)
                                                (eq (car setterform) 'VALUES)
@@ -839,41 +802,31 @@
                                                    ((or (null str) (null sqr))
                                                     (and (null str) (null sqr)))
                                                  (unless (simple-assignment-p env (car sqr) (list (car str)))
-                                                   (return nil)
-                                          )    ) )
+                                                   (return nil))))
                                           (let ((vlist (mapcar #'second (rest setterform))))
                                             `(LET* ,bindlist
                                                (MULTIPLE-VALUE-SETQ ,vlist ,value)
-                                               (VALUES ,@vlist)
-                                             )
-                                          )
+                                               (VALUES ,@vlist)))
                                           (wrap-let* bindlist
                                             `(MULTIPLE-VALUE-BIND ,stores ,value
-                                               ,setterform
-                                          )  )
-                                 )) ) ) )
-               ) ) ) ) ) ) )
-               ;; 2. Schritt: macroexpandieren
+                                               ,setterform))))))))))))))
+               ;; 2nd step: macroexpand
                (when (eq place (setq place (macroexpand-1 place env)))
-                 (return)
-             ) )
-             ;; 3. Schritt: Default-SETF-Methoden
+                 (return)))
+             ;; 3rd step: default SETF methods
              (cond ((symbolp place)
-                    `(SETQ ,place ,value)
-                   )
+                    `(SETQ ,place ,value))
                    ((and (consp place) (symbolp (car place)))
                     (multiple-value-bind (temps subforms stores setterform getterform)
                         (get-setf-expansion place env)
                       (declare (ignore getterform))
-                      ; setterform probably looks like
-                      ;   `((SETF ,(first place)) ,@stores ,@temps).
-                      ; stores are probably superfluous and get optimized away.
+                      ;; setterform probably looks like
+                      ;;   `((SETF ,(first place)) ,@stores ,@temps).
+                      ;; stores are probably superfluous and get optimized away.
                       (optimized-wrap-let* env
                         (nconc (mapcar #'list temps subforms)
                                (list (list (first stores) value)))
-                        setterform
-                      )
-                   ))
+                        setterform)))
                    (t (error-of-type 'source-program-error
                         :form whole-form
                         :detail (first args)
@@ -888,9 +841,7 @@
           (t (do* ((arglist args (cddr arglist))
                    (L nil))
                   ((null arglist) `(LET () (PROGN ,@(nreverse L))))
-               (push `(SETF ,(first arglist) ,(second arglist)) L)
-          )  )
-) ) )
+               (push `(SETF ,(first arglist) ,(second arglist)) L))))))
 ;;;----------------------------------------------------------------------------
 (defmacro shiftf (&whole whole-form
                   &rest args &environment env)
@@ -911,10 +862,13 @@
         first-stores)
        ((null (cdr arglist))
         (setf (second res) (nreverse bindlist)
-              (cadr tail) (list 'MULTIPLE-VALUE-BIND last-stores (car (last args)) nil)
+              (cadr tail) (list 'MULTIPLE-VALUE-BIND last-stores
+                                (car (last args)) nil)
               tail (cddadr tail)
-              (cdr tail) (nconc (nreverse all-stores) (devalue-form last-setterform))
-              (third res) (list 'MULTIPLE-VALUE-BIND first-stores first-getterform (third res)
+              (cdr tail) (nconc (nreverse all-stores)
+                                (devalue-form last-setterform))
+              (third res) (list 'MULTIPLE-VALUE-BIND first-stores
+                                first-getterform (third res)
                                 (cons 'values first-stores)))
         res)
     (multiple-value-bind (temps subforms stores setterform getterform)
@@ -932,38 +886,33 @@
 (defsetf GET (symbol indicator &optional default) (value)
   (let ((storeform `(SYSTEM::%PUT ,symbol ,indicator ,value)))
     (if default
-      `(PROGN ,default ,storeform) ; default wird nur zum Schein ausgewertet
-      `,storeform
-) ) )
+      `(PROGN ,default ,storeform) ; quasi-evaluate default, only feignedly
+      `,storeform)))
 ;;;----------------------------------------------------------------------------
-;;; Schreibt zu einem bestimmten Indicator einen Wert in eine gegebene
-;;; Propertyliste. Wert ist NIL falls erfolgreich getan oder die neue
-;;; (erweiterte) Propertyliste.
+;;; Sets to a certain indicator a value into a given property list.
+;;; Return NIL if successful, or the new (enhanced) property list.
 (define-setf-expander getf (place indicator &optional default &environment env)
   (multiple-value-bind (temps subforms stores setterform getterform)
       (get-setf-method place env)
-    (let* ((storevar (gensym))
-           (indicatorvar (gensym))
-           (defaultvar-list (if default (list (gensym)) `()))
-          )
+    (let* ((storevar (gensym "NEW-"))
+           (indicatorvar (gensym "INDICATOR-"))
+           (defaultvar-list (if default (list (gensym "IG")) `())))
       (values
         `(,@temps    ,indicatorvar ,@defaultvar-list)
         `(,@subforms ,indicator    ,@(if default `(,default) `()))
         `(,storevar)
-        `(LET ((,(first stores) (SYS::%PUTF ,getterform ,indicatorvar ,storevar)))
-           ,@defaultvar-list ; defaultvar zum Schein auswerten
+        `(LET ((,(first stores)
+                (SYS::%PUTF ,getterform ,indicatorvar ,storevar)))
+           ,@defaultvar-list ; quasi-evalute defaultvar
            (WHEN ,(first stores) ,setterform)
-           ,storevar
-         )
-        `(GETF ,getterform ,indicatorvar ,@defaultvar-list)
-) ) ) )
+           ,storevar)
+        `(GETF ,getterform ,indicatorvar ,@defaultvar-list)))))
 ;;;----------------------------------------------------------------------------
 (defsetf GETHASH (key hashtable &optional default) (value)
   (let ((storeform `(SYSTEM::PUTHASH ,key ,hashtable ,value)))
     (if default
-      `(PROGN ,default ,storeform) ; default wird nur zum Schein ausgewertet
-      `,storeform
-) ) )
+      `(PROGN ,default ,storeform) ; quasi-evalute default
+      `,storeform)))
 ;;;----------------------------------------------------------------------------
 (defsetf fill-pointer SYSTEM::SET-FILL-POINTER)
 ;;;----------------------------------------------------------------------------
@@ -977,96 +926,84 @@
 (defsetf SYMBOL-PLIST SYSTEM::%PUTPLIST)
 ;;;----------------------------------------------------------------------------
 (defun SYSTEM::SET-FDEFINITION (name value) ; ABI
-  (setf (symbol-function (get-funname-symbol name)) value)
-)
+  (setf (symbol-function (get-funname-symbol name)) value))
 (defsetf FDEFINITION SYSTEM::SET-FDEFINITION)
 ;;;----------------------------------------------------------------------------
 (defsetf MACRO-FUNCTION (symbol &optional env) (value)
   (declare (ignore env))
   `(PROGN
-     (SETF (SYMBOL-FUNCTION ,symbol) (SYSTEM::MAKE-MACRO ,value))
+     (SETF (SYMBOL-FUNCTION ,symbol) (SYSTEM::MAKE-MACRO ,value 0))
      (REMPROP ,symbol 'SYSTEM::MACRO)
-     ,value
-   )
-)
+     ,value))
 ;;;----------------------------------------------------------------------------
 (defsetf CHAR SYSTEM::STORE-CHAR)
 (defsetf SCHAR SYSTEM::STORE-SCHAR)
 (defsetf BIT SYSTEM::STORE)
 (defsetf SBIT SYSTEM::STORE)
 (defsetf SUBSEQ (sequence start &optional end) (value)
-  `(PROGN (REPLACE ,sequence ,value :START1 ,start :END1 ,end) ,value)
-)
+  `(PROGN (REPLACE ,sequence ,value :START1 ,start :END1 ,end) ,value))
 ;;;----------------------------------------------------------------------------
 (define-setf-expander char-bit (char name &environment env)
   (multiple-value-bind (temps subforms stores setterform getterform)
       (get-setf-method char env)
     (let* ((namevar (gensym))
-           (storevar (gensym)))
+           (storevar (gensym "NEW-")))
       (values `(,@temps    ,namevar)
               `(,@subforms ,name)
               `(,storevar)
-              `(LET ((,(first stores) (SET-CHAR-BIT ,getterform ,namevar ,storevar)))
+              `(LET ((,(first stores)
+                      (SET-CHAR-BIT ,getterform ,namevar ,storevar)))
                  ,setterform
-                 ,storevar
-               )
-              `(CHAR-BIT ,getterform ,namevar)
-) ) ) )
+                 ,storevar)
+              `(CHAR-BIT ,getterform ,namevar)))))
 ;;;----------------------------------------------------------------------------
 (define-setf-expander LDB (bytespec integer &environment env)
   (multiple-value-bind (temps subforms stores setterform getterform)
       (get-setf-method integer env)
-    (let* ((bytespecvar (gensym))
-           (storevar (gensym)))
+    (let* ((bytespecvar (gensym "BYTESPEC-"))
+           (storevar (gensym "NEW-")))
       (values (cons bytespecvar temps)
               (cons bytespec subforms)
               `(,storevar)
               `(LET ((,(first stores) (DPB ,storevar ,bytespecvar ,getterform)))
                  ,setterform
-                 ,storevar
-               )
-              `(LDB ,bytespecvar ,getterform)
-) ) ) )
+                 ,storevar)
+              `(LDB ,bytespecvar ,getterform)))))
 ;;;----------------------------------------------------------------------------
 (define-setf-expander MASK-FIELD (bytespec integer &environment env)
   (multiple-value-bind (temps subforms stores setterform getterform)
       (get-setf-method integer env)
-    (let* ((bytespecvar (gensym))
-           (storevar (gensym)))
+    (let* ((bytespecvar (gensym "BYTESPEC-"))
+           (storevar (gensym "NEW-")))
       (values (cons bytespecvar temps)
               (cons bytespec subforms)
               `(,storevar)
               `(LET ((,(first stores) (DEPOSIT-FIELD ,storevar ,bytespecvar ,getterform)))
                  ,setterform
-                 ,storevar
-               )
-              `(MASK-FIELD ,bytespecvar ,getterform)
-) ) ) )
+                 ,storevar)
+              `(MASK-FIELD ,bytespecvar ,getterform)))))
 ;;;----------------------------------------------------------------------------
 (define-setf-expander THE (type place &environment env)
-  (multiple-value-bind (temps subforms stores setterform getterform) (get-setf-expansion place env)
+  (multiple-value-bind (temps subforms stores setterform getterform)
+      (get-setf-expansion place env)
     (values temps subforms stores
             (sublis-in-form (mapcar #'(lambda (storevar simpletype)
-                                        (cons storevar `(THE ,simpletype ,storevar))
-                                      )
+                                        (cons storevar
+                                              `(THE ,simpletype ,storevar)))
                                     stores
-                                    (if (and (consp type) (eq (car type) 'VALUES))
+                                    (if (and (consp type)
+                                             (eq (car type) 'VALUES))
                                       (cdr type)
-                                      (list type)
-                                    )
-                            )
-                            setterform
-            )
-            `(THE ,type ,getterform)
-) ) )
+                                      (list type)))
+                            setterform)
+            `(THE ,type ,getterform))))
 ;;;----------------------------------------------------------------------------
 (define-setf-expander APPLY (&whole whole-form
                              fun &rest args &environment env)
   (if (and (listp fun)
            (eq (list-length fun) 2)
            (eq (first fun) 'FUNCTION)
-           (symbolp (second fun))
-      )
+           (symbolp (second fun)))
     (setq fun (second fun))
     (error-of-type 'source-program-error
       :form whole-form
@@ -1081,67 +1018,61 @@
         :detail (cons fun args)
         (TEXT "~S on ~S is not a SETF place.")
         'apply fun))
-    (let ((item (car (last temps)))) ; 'item' steht für eine Argumentliste!
+    (let ((item (car (last temps)))) ; 'item' stands for an argument list!
       (labels ((splice (arglist)
-                 ; Würde man in (LIST . arglist) das 'item' nicht als 1 Element,
-                 ; sondern gespliced, sozusagen als ',@item', haben wollen, so
-                 ; bräuchte man die Form, die (splice arglist) liefert.
+                 ;; If we would want in (LIST . arglist) the 'item' not
+                 ;; as one element, but spliced, as ',@item', so we
+                 ;; would need the form, which returns (splice arglist).
                  (if (endp arglist)
                    'NIL
                    (let ((rest (splice (cdr arglist))))
                      (if (eql (car arglist) item)
-                       ; ein (APPEND item ...) davorhängen, wie bei Backquote
+                       ;; push an (APPEND item ...) to the front, as
+                       ;; with backquote
                        (backquote-append item rest)
-                       ; ein (CONS (car arglist) ...) davorhängen, wie bei Backquote
-                       (backquote-cons (car arglist) rest)
-              )) ) ) )
+                       ;; push a (CONS (car arglist) ...) to the front,
+                       ;; as with backquote
+                       (backquote-cons (car arglist) rest))))))
         (flet ((call-splicing (form)
-                 ; ersetzt einen Funktionsaufruf form durch einen, bei dem
-                 ; 'item' nicht 1 Argument, sondern eine Argumentliste liefert
+                 ;; replaces the function call form with one, where 'item'
+                 ;; does not return one argument, but an argument list.
                  (let ((fun (first form))
                        (argform (splice (rest form))))
-                   ; (APPLY #'fun argform) vereinfachen:
-                   ; (APPLY #'fun NIL) --> (fun)
-                   ; (APPLY #'fun (LIST ...)) --> (fun ...)
-                   ; (APPLY #'fun (CONS x y)) --> (APPLY #'fun x y)
-                   ; (APPLY #'fun (LIST* ... z)) --> (APPLY #'fun ... z)
+                   ;; (APPLY #'fun argform) simplified:
+                   ;; (APPLY #'fun NIL) --> (fun)
+                   ;; (APPLY #'fun (LIST ...)) --> (fun ...)
+                   ;; (APPLY #'fun (CONS x y)) --> (APPLY #'fun x y)
+                   ;; (APPLY #'fun (LIST* ... z)) --> (APPLY #'fun ... z)
                    (if (or (null argform)
-                           (and (consp argform) (eq (car argform) 'LIST))
-                       )
+                           (and (consp argform) (eq (car argform) 'LIST)))
                      (cons fun (cdr argform))
                      (list* 'APPLY
                             (list 'FUNCTION fun)
                             (if (and (consp argform)
                                      (or (eq (car argform) 'LIST*)
-                                         (eq (car argform) 'CONS)
-                                )    )
+                                         (eq (car argform) 'CONS)))
                               (cdr argform)
-                              (list argform)
-              )) ) ) )      )
+                              (list argform)))))))
           (values temps subforms stores
                   (call-splicing setterform)
-                  (call-splicing getterform)
-) ) ) ) ) )
+                  (call-splicing getterform)))))))
 ;;;----------------------------------------------------------------------------
-;;; Zusätzliche Definitionen von places
+;;; More places definitions
 ;;;----------------------------------------------------------------------------
 (define-setf-expander funcall (&whole whole-form
                                fun &rest args &environment env)
   (unless (and (listp fun)
                (eq (list-length fun) 2)
                (let ((fun1 (first fun)))
-                 (or (eq fun1 'FUNCTION) (eq fun1 'QUOTE))
-               )
+                 (or (eq fun1 'FUNCTION) (eq fun1 'QUOTE)))
                (symbolp (second fun))
-               (setq fun (second fun))
-          )
+               (setq fun (second fun)))
     (error-of-type 'source-program-error
       :form whole-form
       :detail (cons fun args)
       (TEXT "~S is only defined for functions of the form #'symbol.")
       '(setf funcall)))
-  (get-setf-expansion (cons fun args) env)
-)
+  (get-setf-expansion (cons fun args) env))
 ;;;----------------------------------------------------------------------------
 (define-setf-expander PROGN (&rest forms &environment env)
   (let ((last (last forms)))
@@ -1149,17 +1080,15 @@
         (get-setf-expansion (car last) env)
       (if (eq forms last)
         (values temps subforms stores setterform getterform)
-        (let ((dummyvar (gensym)))
+        (let ((dummyvar (gensym "IG")))
           (values
             `(,dummyvar                    ,@temps)
             `((PROGN ,@(ldiff forms last)) ,@subforms)
             stores
             `(PROGN
                ,dummyvar ; avoid warning about unused temporary variable
-               ,setterform
-             )
-            getterform
-) ) ) ) ) )
+               ,setterform)
+            getterform))))))
 ;;;----------------------------------------------------------------------------
 (define-setf-expander LOCALLY (&rest body &environment env)
   (multiple-value-bind (body-rest declspecs) (system::parse-body body)
@@ -1172,14 +1101,12 @@
             (mapcar #'(lambda (x) `(LOCALLY ,declarations ,x)) subforms)
             stores
            `(LOCALLY ,declarations ,setterform)
-           `(LOCALLY ,declarations ,getterform)
-        ) )
-        (values temps subforms stores setterform getterform)
-) ) ) )
+           `(LOCALLY ,declarations ,getterform)))
+        (values temps subforms stores setterform getterform)))))
 ;;;----------------------------------------------------------------------------
 (define-setf-expander IF (&whole whole-form
                           condition t-form f-form &environment env)
-  (let ((conditionvar (gensym)))
+  (let ((conditionvar (gensym "COND-")))
     (multiple-value-bind (T-temps T-subforms T-stores T-setterform T-getterform)
         (get-setf-expansion t-form env)
       (multiple-value-bind (F-temps F-subforms F-stores F-setterform F-getterform)
@@ -1189,31 +1116,30 @@
             :form whole-form
             :detail whole-form
             (TEXT "SETF place ~S expects different numbers of values in the true and false branches (~D vs. ~D values).")
-            (list 'IF condition t-form f-form) (length T-stores) (length F-stores)))
+            (list 'IF condition t-form f-form) (length T-stores)
+            (length F-stores)))
         (values
           `(,conditionvar
             ,@T-temps
-            ,@F-temps
-           )
+            ,@F-temps)
           `(,condition
             ,@(mapcar #'(lambda (x) `(IF ,conditionvar ,x)) T-subforms)
-            ,@(mapcar #'(lambda (x) `(IF (NOT ,conditionvar) ,x)) F-subforms)
-           )
+            ,@(mapcar #'(lambda (x) `(IF (NOT ,conditionvar) ,x)) F-subforms))
           T-stores
-          `(IF ,conditionvar ,T-setterform ,(sublis-in-form (mapcar #'cons F-stores T-stores) F-setterform))
-          `(IF ,conditionvar ,T-getterform ,F-getterform)
-) ) ) ) )
+          `(IF ,conditionvar ,T-setterform
+               ,(sublis-in-form (mapcar #'cons F-stores T-stores) F-setterform))
+          `(IF ,conditionvar ,T-getterform ,F-getterform))))))
 ;;;----------------------------------------------------------------------------
 (defsetf GET-DISPATCH-MACRO-CHARACTER
          (disp-char sub-char &optional (readtable '*READTABLE*)) (value)
-  `(PROGN (SET-DISPATCH-MACRO-CHARACTER ,disp-char ,sub-char ,value ,readtable) ,value)
-)
+  `(PROGN (SET-DISPATCH-MACRO-CHARACTER ,disp-char ,sub-char ,value ,readtable) ,value))
 ;;;----------------------------------------------------------------------------
 (def-setf-alias long-float-digits SYSTEM::|(SETF LONG-FLOAT-DIGITS)|)
 ;;;----------------------------------------------------------------------------
 (defsetf system::%record-ref system::%record-store)
-;;;----------------------------------------------------------------------------
 (defsetf system::%structure-ref system::%structure-store)
+(defsetf system::closure-const (closure n) (value)
+  `(system::set-closure-const ,value ,closure ,n))
 ;;;----------------------------------------------------------------------------
 (def-setf-alias clos::standard-instance-access CLOS::|(SETF STANDARD-INSTANCE-ACCESS)|)
 ;;;----------------------------------------------------------------------------
@@ -1222,13 +1148,14 @@
 #+LOGICAL-PATHNAMES
 (defsetf logical-pathname-translations set-logical-pathname-translations)
 ;;;----------------------------------------------------------------------------
-(defsetf stream-external-format system::set-stream-external-format)
+(defsetf stream-external-format (stream &optional direction) (encoding)
+  `(system::set-stream-external-format ,stream ,encoding ,direction))
 ;;;----------------------------------------------------------------------------
-;;; Handhabung von (SETF (VALUES place1 ... placek) form)
+;;; How to handle (SETF (VALUES place1 ... placek) form)
 ;;; --> (MULTIPLE-VALUE-BIND (dummy1 ... dummyk) form
 ;;;       (SETF place1 dummy1 ... placek dummyk)
 ;;;       (VALUES dummy1 ... dummyk)
-;;;     )
+;;;)
 (define-setf-expander values (&rest subplaces &environment env)
   (multiple-value-bind (temps subforms stores setterforms getterforms)
       (setf-VALUES-aux subplaces env)
@@ -1236,8 +1163,7 @@
             subforms
             stores
             `(VALUES ,@setterforms)
-            `(VALUES ,@getterforms)
-) ) )
+            `(VALUES ,@getterforms))))
 (defun setf-VALUES-aux (places env)
   (do ((temps nil)
        (subforms nil)
@@ -1251,9 +1177,9 @@
        (setq stores (nreverse stores))
        (setq setterforms (nreverse setterforms))
        (setq getterforms (nreverse getterforms))
-       (values temps subforms stores setterforms getterforms)
-      )
-    (multiple-value-bind (SM-temps SM-subforms SM-stores SM-setterform SM-getterform)
+       (values temps subforms stores setterforms getterforms))
+    (multiple-value-bind (SM-temps SM-subforms SM-stores SM-setterform
+                          SM-getterform)
         (get-setf-expansion (pop placesr) env)
       (setq temps (revappend SM-temps temps))
       (setq subforms (revappend SM-subforms subforms))
@@ -1264,16 +1190,15 @@
           (push 'NIL subforms))
         (push (first SM-stores) stores))
       (setq setterforms (cons SM-setterform setterforms))
-      (setq getterforms (cons SM-getterform getterforms))
-) ) )
+      (setq getterforms (cons SM-getterform getterforms)))))
 ;;;----------------------------------------------------------------------------
-;;; Analog zu (MULTIPLE-VALUE-SETQ (var1 ... vark) form) :
+;;; Analog to (MULTIPLE-VALUE-SETQ (var1 ... vark) form) :
 ;;; (MULTIPLE-VALUE-SETF (place1 ... placek) form)
 ;;; --> (VALUES (SETF (VALUES place1 ... placek) form))
 ;;; --> (MULTIPLE-VALUE-BIND (dummy1 ... dummyk) form
 ;;;       (SETF place1 dummy1 ... placek dummyk)
 ;;;       dummy1
-;;;     )
+;;;)
 (defmacro multiple-value-setf (places form &environment env)
   (multiple-value-bind (temps subforms stores setterforms getterforms)
       (setf-VALUES-aux places env)
@@ -1281,9 +1206,7 @@
     (wrap-let* (mapcar #'list temps subforms)
       `(MULTIPLE-VALUE-BIND ,stores ,form
          ,@setterforms
-         ,(first stores) ; (null stores) -> NIL -> Wert NIL
-    )  )
-) )
+         ,(first stores))))) ; (null stores) -> NIL -> Return value NIL
 ;;;----------------------------------------------------------------------------
 ;;;                              Symbol-macros
 (define-symbol-macro *ansi* (sys::ansi))
@@ -1320,7 +1243,6 @@ Invoking CLISP with `-traditional' sets this to NIL.")
   (define-symbol-macro *terminal-encoding* (system::terminal-encoding))
   (defsetf system::terminal-encoding system::set-terminal-encoding)
   (define-symbol-macro *misc-encoding* (system::misc-encoding))
-  (defsetf system::misc-encoding system::set-misc-encoding)
-)
+  (defsetf system::misc-encoding system::set-misc-encoding))
 (when (fboundp 'sys::setenv)
   (defsetf ext:getenv sys::setenv))

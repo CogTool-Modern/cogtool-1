@@ -1,4 +1,4 @@
-;;; -*- Lisp -*-
+;;; -*- Lisp -*- vim:filetype=lisp
 ;;; tests for backquote
 
 (setf x '(a b c))
@@ -298,6 +298,13 @@ X
           (declare (special a b))
           ``(,o ,@',(mapcar #'symbol-value '(a b))))))
 (1 2 3)
+
+(let ((o 1))
+  (declare (special o))
+  (eval (let ((a 2) (b 3))
+          (declare (special a b))
+          ``(,o ,@',(mapcar #'symbol-value '(a b)) four))))
+(1 2 3 FOUR)
 
 (let ((env 1))
   (eval

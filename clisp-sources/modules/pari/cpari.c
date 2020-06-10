@@ -1,13 +1,15 @@
 /*
  * CLISP interface to PARI <http://pari.math.u-bordeaux.fr/>
  * Copyright (C) 1995 Michael Stoll
- * Copyright (C) 2004-2005 Sam Steingold
+ * Copyright (C) 2004-2007, 2010 Sam Steingold
  * This is free software, distributed under the GNU GPL
  */
 
 #include "clisp.h"
+#include "config.h"
 #undef T
 #include <pari/pari.h>
+#include <pari/paripriv.h>      /* for GP_DATA */
 #include "cpari.h"
 
 /* we could also use DEF-CALL-OUT, but this is faster, smaller,
@@ -48,33 +50,22 @@ void clispErrFlush(void) {
 }
 void clispErrDie(void);
 void clispErrDie(void) {
-  fehler(error,GETTEXT("Internal PARI error."));
+  error(error_condition,GETTEXT("PARI error"));
 }
 
 PariOUT clispOut = {clispPutc, clispPuts, clispFlush, NULL};
 PariOUT clispErr = {clispErrPutc, clispErrPuts, clispErrFlush, clispErrDie};
 
-void *clispTemp; /* a foreign place to use for casts and accesses from CLISP */
-
 void init_for_clisp (long parisize, long maxprime)
 {
-  long v, n, *e;
-  char *p;
-  GEN p1;
-
-  extern ulong init_opts;
-  init_opts = 0;
-
+#if defined(HAVE_PARI_INIT_OPTS)
+  pari_init_opts(parisize,maxprime,INIT_DFTm);
+#elif defined(HAVE_PARI_INIT)
   pari_init(parisize,maxprime);
-  /*init_graph();*/
-
-  pari_outfile = stdout;errfile = stderr;logfile = NULL;infile = stdin;
+#else
+  #error no pari_init_opts, no pari_init: cannot initialize PARI
+#endif
+  pari_outfile = stdout; errfile = stderr; logfile = NULL; infile = stdin;
   pariOut = &clispOut; pariErr = &clispErr;
 }
 
-void fini_for_clisp (int leaving)
-{
-  /*free_graph();*/
-  freeall();
-  killallfiles(leaving);
-}

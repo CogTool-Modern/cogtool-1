@@ -41,7 +41,7 @@
 ;;   - poss. better Optimization by data-flow-analysis
 ;;   - Inline-Compilation of calls of local functions
 
-;; Sam Steingold 1999-2005
+;; Sam Steingold 1999-2010
 ;; German comments translated into English: Stefan Kain 2001-12-18
 ;; "z" at the end of a variable name stands for "zustand" (German for "state")
 
@@ -52,29 +52,7 @@
 (export '(compile compile-file disassemble))
 (pushnew ':compiler *features*)
 
-(in-package "COMPILER")
-;; Convention: Write SYSTEM::PNAME for a Symbol, that is "accidentally" in
-;; #<PACKAGE SYSTEM>, but which we don't use any further.
-;; Write SYS::PNAME, if we assume any properties for the Symbol.
-;; Write COMPILER::PNAME, if the Compiler declares the Symbol
-;; and it is used by other program parts.
-(import '(sys::function-name-p sys::parse-body sys::add-implicit-block
-          sys::make-load-time-eval sys::make-macro-expander
-          sys::make-funmacro-expander
-          sys::analyze-lambdalist sys::specialized-lambda-list-to-ordinary
-          sys::closure-name sys::closure-codevec sys::closure-consts
-          sys::fixnump sys::short-float-p sys::single-float-p
-          sys::double-float-p sys::long-float-p
-          sys::search-file sys::date-format sys::line-number
-          sys::%funtabref sys::inlinable sys::constant-inlinable
-          sys::module-name
-          sys::*compiling* sys::*compiling-from-file* sys::*inline-functions*
-          sys::*venv* sys::*fenv* sys::*benv* sys::*genv* sys::*denv*
-          sys::*toplevel-environment* sys::*toplevel-denv*
-          sys::*current-source-file*
-          COMPILER::C-PROCLAIM COMPILER::C-PROCLAIM-CONSTANT
-          COMPILER::EVAL-WHEN-COMPILE
-          COMPILER::C-DEFUN COMPILER::C-PROVIDE COMPILER::C-REQUIRE))
+(in-package "SYS")
 
 ;; some auxilliary functions
 (proclaim '(inline env mac-exp))
@@ -91,9 +69,9 @@
 
 ;; variables for top-level-call:
 (defvar *compiling* nil) ; specifies, if inside the process of compilation
-;; (defvar *error-count*) ; number of errors
-;; (defvar *warning-count*) ; number of warnings
-;; (defvar *style-warning-count*) ; number of style-warnings
+(defvar *error-count*) ; number of errors
+(defvar *warning-count*) ; number of warnings
+(defvar *style-warning-count*) ; number of style-warnings
 (defvar *compile-warnings* t) ; if compiler-warnings are reported
 (defvar *compile-verbose* t) ; if compiler-comments are reported
 (defvar *compile-print* nil) ; if compiler reports, where he currently is
@@ -116,6 +94,8 @@
 (defvar *known-special-vars* nil)
 ;; The names and values of constants
 (defvar *constant-special-vars* nil)
+;; The fnode objects created in this lambda compilation unit
+(defvar *fnode-list*)
 
 ;; T if called by COMPILE-FILE or LOAD :COMPILE
 (defvar *compiling-from-file*)
@@ -180,7 +160,7 @@
 
 #|
 The compiler's target is the virtual machine described in <doc/impbyte.xml>
-and <http://clisp.cons.org/impnotes.html#bytecode>.
+and <http://clisp.cons.org/impnotes/bytecode.html>.
 
 1. Pass of the Compiler:
    macro-expansion,
@@ -202,9 +182,6 @@ and <http://clisp.cons.org/impnotes.html#bytecode>.
     #lengthY(Byte in Hex ... Byte in Hex)
     further constants)
 |#
-
-(defun make-closure (&key name codevec consts seclass)
-  (sys::%make-closure name (sys::make-code-vector codevec) consts seclass))
 
 ;; The instruction list is in <doc/impbyte.xml>.
 
@@ -1391,9 +1368,9 @@ for-value   NIL or T
 ;; DEBUG >= 3 =>
 ;;       >= 2 => every function has an exit restart [not implemented yet]
 ;;       >= 1 =>
-;; SPACE >= 3 =>
-;;       >= 2 =>
-;;       >= 1 =>
+;; SPACE >= 3 => discard arglist
+;;       >= 2 => discard doc string
+;;       >= 1 => never JIT compile
 ;; SPEED >= 3 =>
 ;;       >= 2 =>
 ;;       >= 1 =>
@@ -1406,20 +1383,22 @@ for-value   NIL or T
       (return-from declared-optimize (gethash quality *optimize* 1)))
     (let ((declspec (car denv)))
       (when (eq (car declspec) 'OPTIMIZE)
-        ;; We can use ASSOC here, because PROCESS-DECLARATIONS has
-        ;; canonicalized the syntax to (quality value).
-        (let ((spec (assoc quality (cdr declspec) :test #'eq)))
-          (when spec
-            (return-from declared-optimize (second spec))))))
+        ;; We cannot use ASSOC here (even though PROCESS-DECLARATIONS has
+        ;; canonicalized the syntax to (quality value) in compiled code)
+        ;; because a combination of interpreted and compiled code - e.g., via
+        ;; the (COMPILE) declaration - will break.
+        (dolist (spec (cdr declspec))
+          (if (consp spec)
+              (when (eq (first spec) quality)
+                (return-from declared-optimize (second spec)))
+              (when (eq spec quality)
+                (return-from declared-optimize 3))))))
     (setq denv (cdr denv))))
 
 ;; return 2 values: the quality and the value
 ;; or issue a warning and return NIL
 (defun parse-optimize-quality (spec)
-  (macrolet ((broken (&rest args)
-               `(progn
-                  (funcall (if (boundp '*warning-count*) #'c-warn 'warn) ,@args)
-                  (values))))
+  (let ((broken (if *compiling* #'c-warn 'warn))) ; WARN is not defined yet
     (let ((quality spec) (value 3))
       (if (or (symbolp spec)
               (and (consp spec) (symbolp (setq quality (car spec)))
@@ -1428,10 +1407,18 @@ for-value   NIL or T
         (if (memq quality '(COMPILATION-SPEED DEBUG SAFETY SPACE SPEED))
           (if (typep value '(INTEGER 0 3))
             (values quality value)
-            (broken (TEXT "Not a valid optimization level for ~S, should be one of 0, 1, 2, 3: ~S")
-                    quality value))
-          (broken (TEXT "~S is not a valid ~S quality.") 'optimize quality))
-        (broken (TEXT "Not a valid ~S specifier: ~S") 'optimize spec)))))
+            (funcall broken (TEXT "Not a valid optimization level for ~S, should be one of 0, 1, 2, 3: ~S")
+                     quality value))
+          (funcall broken (TEXT "~S is not a valid ~S quality.") quality 'optimize))
+        (funcall broken (TEXT "Not a valid ~S specifier: ~S") 'optimize spec)))))
+
+;; check that X is either a SYMBOL or a (FUNCTION FUNCTION-NAME)
+(defun symbol-or-function-p (x)
+  (or (symbolp x)
+      (and (consp x) (eq (car x) 'FUNCTION)
+           (consp (cdr x))
+           (function-name-p (cadr x))
+           (null (cddr x)))))
 
 ;; (process-declarations declspeclist) analyzes the declarations (as they come
 ;; from PARSE-BODY) and returns:
@@ -1462,26 +1449,26 @@ for-value   NIL or T
                (dolist (x (cdr declspec))
                  (if (symbolp x)
                    (push x specials)
-                   (c-warn (TEXT "Non-symbol ~S may not be declared SPECIAL.")
-                           x))))
+                   (c-warn (TEXT "Non-symbol ~S may not be declared ~S.")
+                           x 'SPECIAL))))
               ((IGNORE)
                (dolist (x (cdr declspec))
-                 (if (symbolp x)
+                 (if (symbol-or-function-p x)
                    (push x ignores)
-                   (c-warn (TEXT "Non-symbol ~S may not be declared IGNORE.")
-                           x))))
+                   (c-warn (TEXT "Non-symbol ~S may not be declared ~S.")
+                           x 'IGNORE))))
               ((IGNORABLE)
                (dolist (x (cdr declspec))
-                 (if (symbolp x)
+                 (if (symbol-or-function-p x)
                    (push x ignorables)
-                   (c-warn (TEXT "Non-symbol ~S may not be declared IGNORABLE.")
-                           x))))
+                   (c-warn (TEXT "Non-symbol ~S may not be declared ~S.")
+                           x 'IGNORABLE))))
               ((SYS::READ-ONLY)
                (dolist (x (cdr declspec))
                  (if (symbolp x)
                    (push x readonlys)
-                   (c-warn (TEXT "Non-symbol ~S may not be declared READ-ONLY.")
-                           x))))
+                   (c-warn (TEXT "Non-symbol ~S may not be declared ~S.")
+                           x 'READ-ONLY))))
               (t
                ;; Syntax check.
                (case declspectype
@@ -1531,15 +1518,11 @@ for-value   NIL or T
                   (setq declspec
                         (cons declspectype
                               (mapcan #'(lambda (x)
-                                          (if (or (symbolp x)
-                                                  (and (consp x) (eq (car x) 'FUNCTION)
-                                                       (consp (cdr x))
-                                                       (function-name-p (cadr x))
-                                                       (null (cddr x))))
+                                          (if (symbol-or-function-p x)
                                             (list x)
                                             (progn
-                                              (c-warn (TEXT "Not a valid DYNAMIC-EXTENT specifier: ~S")
-                                                      x)
+                                              (c-warn (TEXT "Not a valid ~S specifier: ~S")
+                                                      'DYNAMIC-EXTENT x)
                                               '())))
                                       (cdr declspec)))))
                  (DECLARATION
@@ -1554,8 +1537,11 @@ for-value   NIL or T
                                                '())))
                                        (cddr declspec)))))
                  (COMPILE
-                  (when (cdr declspec)
-                    (c-warn (TEXT "The arguments of a COMPILE declaration are ignored: ~S")
+                  (when (and (cdr declspec)
+                             (not (and (consp (cdr declspec))
+                                       (function-name-p (second declspec))
+                                       (null (cddr declspec)))))
+                    (c-warn (TEXT "The argument of a COMPILE declaration must be a function name: ~S")
                             declspec)
                     (setq declspec '(COMPILE)))))
                (push declspec other)))
@@ -1567,7 +1553,6 @@ for-value   NIL or T
 ;; declspecs must be a freshly consed list.
 (defun push-*denv* (declspecs)
   (setq *denv* (nreconc declspecs *denv*)))
-
 
 ;;;;****             FUNCTION   MANAGEMENT
 
@@ -1593,12 +1578,15 @@ for-value   NIL or T
   Keyword-Offset  ; number of local constants so far
                   ; = start offset of the Keywords in FUNC
                   ; (equal to=0 if and only if the function is autonomously)
-  (req-anz 0)     ; number of required parameters
-  (opt-anz 0)     ; number of optional parameters
+  (req-num 0)     ; number of required parameters
+  (opt-num 0)     ; number of optional parameters
   (rest-flag nil) ; Flag, if &REST - Parameter is specified.
   (keyword-flag nil) ; Flag, if &KEY - Parameter is specified.
   (keywords nil)  ; List of Keyword-Constants (in the right order)
-  allow-other-keys-flag ; &ALLOW-OTHER-KEYS-Flag
+  allow-other-keys-flag         ; &ALLOW-OTHER-KEYS-Flag
+  lambda-list     ; as passed to defun, discarded if SPACE >= 3
+  documentation   ; discarded if SPACE >= 2
+  (denv *denv*)   ; declaration environment at compilation time
   Consts-Offset   ; number of local constants so far
   (consts nil)    ; List of other constants of this function
                   ; this list is built up foremost in the second pass.
@@ -1617,6 +1605,10 @@ for-value   NIL or T
                     ; used by this function
   far-used-tagbodys ; list of (tagbody . tag) defined in enclosing
                     ; functions but used by this function
+  ;; ignore declarations
+  ignore                        ; declared (ignore #'name)
+  ignorable                     ; declared (ignorable #'name)
+  used                          ; actually used (not discarded)
 )
 
 ;; the current function, an FNODE:
@@ -1865,7 +1857,13 @@ for-value   NIL or T
         (multiple-value-bind (name pack) (get-funname-string+pack funname)
           ;; build new symbol:
           (let ((new-name (string-concat name "-" suffix)))
-            (if pack (intern new-name pack) (make-symbol new-name))))
+            (if pack
+                (let ((lockp (package-lock pack)) sym)
+                  (setf (package-lock pack) nil)
+                  (setq sym (intern new-name pack))
+                  (setf (package-lock pack) lockp)
+                  sym)
+                (make-symbol new-name))))
         (make-symbol suffix)))))
 
 ;; (C-COMMENT controlstring . args)
@@ -1896,10 +1894,10 @@ for-value   NIL or T
       (format nil (if (and *compile-file-pathname*
                            (equalp file *compile-file-truename*))
                     #1=""
-                    (format nil (TEXT " in file ~S") file)))
+                    (format nil (TEXT "in file ~S ") file)))
       (format nil (if (= lineno1 lineno2)
-                    (TEXT " in line ~D")
-                    (TEXT " in lines ~D..~D"))
+                    (TEXT "in line ~D ")
+                    (TEXT "in lines ~D..~D "))
               lineno1 lineno2))
     #1#))
 
@@ -1917,38 +1915,47 @@ for-value   NIL or T
 (defun in-defun-p (fun)
   (and (equal fun (current-function)) (defining-p fun)))
 
-(defvar *warning-count*)
+(defun c-current-location (&optional (in-function (current-function)))
+  (let ((f (if in-function (format nil (TEXT "in ~S ") in-function) #1=""))
+        (l (c-source-location)))
+    (if (and (string= f #1#) (string= l #1#))
+      #1#
+      (string-concat f l ": "))))
+
+(predefun c-warning (type cstring &rest args)
+  (declare (ignore type))
+  (apply #'c-comment
+         (string-concat (TEXT "WARNING: ~A") "~%" cstring)
+         (c-current-location) args))
+
 ;;; (C-WARN format-control-string . args)
 ;;; issue a compilation warning using FORMAT.
 (defun c-warn (cstring &rest args)
-  (incf *warning-count*)
-  (apply #'c-comment
-         (string-concat (TEXT "WARNING~@[ in ~A~]~A :") "~%" cstring)
-         (current-function) (c-source-location)
-         args))
+  (apply 'c-warning 'sys::simple-warning cstring args))
 
-(defvar *style-warning-count*)
 ; (C-STYLE-WARN controlstring . args)
 ; issue a style-warning (via FORMAT).
 (defun c-style-warn (cstring &rest args)
-  (incf *style-warning-count*)
-  (apply #'c-warn cstring args))
+  (apply 'c-warning 'sys::simple-style-warning cstring args))
 
-(defvar *error-count*)
+;; continuable compiler error
+(predefun c-cerror (location detail cstring &rest args)
+  (declare (ignore detail))
+  (fresh-line *c-error-output*)
+  (format *c-error-output* (TEXT "ERROR: ~A") location)
+  (terpri *c-error-output*)
+  (apply #'format *c-error-output* cstring args)
+  (elastic-newline *c-error-output*))
+
 ;; (C-ERROR controlstring . args)
 ;; issue a compiler error (via FORMAT) and terminate the current C-FORM.
-(defun c-error (cstring &rest args)
+(defun c-error (detail cstring &rest args)
   (incf *error-count*)
   (let ((in-function (current-function)))
     (when in-function
       (when *compiling-from-file*
         (pushnew in-function *functions-with-errors*)))
-    (fresh-line *c-error-output*)
-    (format *c-error-output* (TEXT "ERROR~@[ in ~S~]~A :")
-            in-function (c-source-location))
-    (terpri *c-error-output*)
-    (apply #'format *c-error-output* cstring args)
-    (elastic-newline *c-error-output*))
+    (apply 'c-cerror (c-current-location in-function) detail cstring args))
   (throw 'c-error
     (make-anode :source NIL
                 :type 'ERROR
@@ -1995,7 +2002,7 @@ for-value   NIL or T
 ;; as load-time-constant.
 (defun l-constantp (form)
   (if (atom form)
-    (or (numberp form) (characterp form) (arrayp form)
+    (or (numberp form) (characterp form) (arrayp form) (hash-table-p form)
         (and (symbolp form)
              (cond ((keywordp form) t)
                    ((eq (symbol-package form) *lisp-package*)
@@ -2009,7 +2016,7 @@ for-value   NIL or T
 ;; When *compiling-from-file* = nil , this is identical to (l-constantp form) .
 (defun c-constantp (form)
   (if (atom form)
-    (or (numberp form) (characterp form) (arrayp form)
+    (or (numberp form) (characterp form) (arrayp form) (hash-table-p form)
         (and (symbolp form)
              (cond ((keywordp form) t)
                    ((and *compiling-from-file*
@@ -2027,11 +2034,13 @@ for-value   NIL or T
     (cond ((numberp form) form)
           ((characterp form) form)
           ((arrayp form) form)
+          ((hash-table-p form) form)
           ((symbolp form)
            (cond ((keywordp form) form)
                  ((eq (symbol-package form) *lisp-package*)
                   (symbol-value form))
-                 (t (cdr (assoc form *constant-special-vars*))))))
+                 (t (cdr (assoc form *constant-special-vars*)))))
+          (t (compiler-error 'c-constant-value form)))
     (second form)))
 
 ;; (anode-constantp anode) determines, if the Anode returns a constant
@@ -2086,12 +2095,12 @@ for-value   NIL or T
 ;; and has at least l1, but at most l2 elements. Else: Error.
 (defun test-list (L &optional (l1 0) (l2 nil))
   (unless (and (listp L) (null (cdr (last L))))
-    (c-error (TEXT "Code contains dotted list ~S") L))
+    (c-error L (TEXT "Code contains dotted list ~S") L))
   (unless (>= (length L) l1)
-    (c-error (TEXT "Form too short, too few arguments: ~S") L))
+    (c-error L (TEXT "Form too short, too few arguments: ~S") L))
   (when l2
     (unless (<= (length L) l2)
-      (c-error (TEXT "Form too long, too many arguments: ~S") L))))
+      (c-error L (TEXT "Form too long, too many arguments: ~S") L))))
 
 ;; c-form-table contains the handler function (to be called without arguments)
 ;; for all functions/specialforms/macros, that have to be treated specially.
@@ -2141,6 +2150,7 @@ for-value   NIL or T
        (EVAL-WHEN . c-EVAL-WHEN)
        (DECLARE . c-DECLARE)
        (LOAD-TIME-VALUE . c-LOAD-TIME-VALUE)
+       (COMPILE-TIME-VALUE . c-COMPILE-TIME-VALUE)
        (LOCALLY . c-LOCALLY)
        ;; Macros:
        (%GENERIC-FUNCTION-LAMBDA . c-%GENERIC-FUNCTION-LAMBDA)
@@ -2177,6 +2187,8 @@ for-value   NIL or T
        (MAPLAP . c-MAPLAP)
        (TYPEP . c-TYPEP)
        (FORMAT . c-FORMAT)
+       (SORT . c-SORT)
+       (STABLE-SORT . c-SORT)   ; => never occurs in compiled code!
        (NTH . c-NTH)
        (SYSTEM::%SETNTH . c-SETNTH)
        ;; Special case for LIST
@@ -2242,6 +2254,7 @@ for-value   NIL or T
        (NINTERSECTION . c-TEST/TEST-NOT)
        (REMOVE-DUPLICATES . c-TEST/TEST-NOT)
        ;;
+       (CONCATENATE . c-CONCATENATE)
        (LDB . c-LDB)
        (LDB-TEST . c-LDB-TEST)
        (MASK-FIELD . c-MASK-FIELD)
@@ -2253,19 +2266,26 @@ for-value   NIL or T
   (when (and (special-operator-p sym) (not (gethash sym c-form-table)))
     (compiler-error 'c-form-table sym)))
 
-;; expand (recursively) the compiler macro form
+;; Expand compiler macros at the outermost level of the given form.
+;; Return the replacement form, and as second value a boolean indicating
+;; whether some expansion was made.
 (defun expand-compiler-macro (form)
-  (let ((expanded-p nil) fun)
+  (let ((expanded-p nil))
     (tagbody
      reexpand
-       (when (and (consp form) (function-name-p (setq fun (car form))))
-         (let* ((env (env)) (cmf (compiler-macro-function fun env)))
-           (when (and cmf (not (declared-notinline fun)))
-             (let ((exp (mac-exp cmf form env)))
-               (unless (eq form exp)
-                 (setq form exp
-                       expanded-p t)
-                 (go reexpand)))))))
+       (when (consp form)
+         (let ((fun (car form)))
+           (when (and (function-name-p fun) (not (declared-notinline fun)))
+             (let* ((env (env))
+                    (cmf (compiler-macro-function fun env)))
+               (when cmf
+                 (let ((cmf-result (funcall cmf form env)))
+                   ;; ANSI CL, glossary of "compiler macro function", says
+                   ;; that a result of NIL means no replacement.
+                   (unless (or (eq cmf-result 'nil) (eq cmf-result form))
+                     (setq form cmf-result
+                           expanded-p t)
+                     (go reexpand)))))))))
     (values form expanded-p)))
 
 ;; check whether the form is a '(LAMBDA ...)
@@ -2293,37 +2313,36 @@ for-value   NIL or T
             (multiple-value-bind (a m f1 f2 f3 f4) (fenv-search fun)
               (declare (ignore f2 f4))
               (if (null a)
-                ;; no local definition --> expand-compiler-macro
-                (let ((handler
-                        (gethash (setq *form* (expand-compiler-macro *form*)
-                                       fun (and (consp *form*) (car *form*)))
-                                 c-form-table)))
-                  (if handler ; found handler function?
-                    ;; ==> (symbolp fun) = T
-                    (if (or (and (special-operator-p fun)
-                                 (not (macro-function fun)))
-                            (not (declared-notinline fun)))
-                      (funcall handler) ; yes -> call
-                      (if (macro-function fun)
-                        (c-form (mac-exp (macro-function fun) *form*))
-                        ;; normal global function call
-                        (c-GLOBAL-FUNCTION-CALL fun)))
-                    ;; no -> not a special-form anyway
-                    ;; (all those are in the `c-form-table')
-                    (if (atom *form*)
-                      (c-form *form*)
-                      (if (and (symbolp (setq fun (first *form*)))
-                               (macro-function fun))
-                        ;; global macro
-                        (c-form (mac-exp (macro-function fun) *form*))
-                        ;; global function
-                        (if (and (in-defun-p fun)
-                                 (not (declared-notinline fun)))
-                          ;; recursive call of the current global function
-                          (c-LOCAL-FUNCTION-CALL fun (cons *func* nil)
-                                                 (cdr *form*))
-                          ;; normal call of the global function
-                          (c-GLOBAL-FUNCTION-CALL fun))))))
+                ;; no local definition
+                (multiple-value-bind (expansion expanded-p)
+                    (expand-compiler-macro *form*)
+                  (if expanded-p
+                    (c-form expansion) ; -> expand
+                    (let ((handler
+                            (and (symbolp fun) (gethash fun c-form-table))))
+                      (if handler ; found handler function?
+                        ;; ==> (symbolp fun) = T
+                        (if (or (and (special-operator-p fun)
+                                     (not (macro-function fun)))
+                                (not (declared-notinline fun)))
+                          (funcall handler) ; yes -> call
+                          (if (macro-function fun)
+                            (c-form (mac-exp (macro-function fun) *form*))
+                            ;; normal global function call
+                            (c-GLOBAL-FUNCTION-CALL fun)))
+                        ;; no -> not a special-form anyway
+                        ;; (all those are in the c-form-table)
+                        (if (and (symbolp fun) (macro-function fun))
+                          ;; global macro
+                          (c-form (mac-exp (macro-function fun) *form*))
+                          ;; global function
+                          (if (and (in-defun-p fun)
+                                   (not (declared-notinline fun)))
+                            ;; recursive call of the current global function
+                            (c-LOCAL-FUNCTION-CALL fun (cons *func* nil)
+                                                   (cdr *form*))
+                            ;; normal call of the global function
+                            (c-GLOBAL-FUNCTION-CALL fun)))))))
                 (if (and m (not (and f1 (declared-notinline fun))))
                   (c-form (mac-exp m *form*))
                   (case f1
@@ -2337,7 +2356,7 @@ for-value   NIL or T
             (if (lambda-form-p fun)
               (c-form `(FUNCALL (FUNCTION ,fun) ,@(cdr *form*)))
               #| not: (c-LAMBDA-FUNCTION-CALL fun (cdr *form*)) |#
-              (c-error (TEXT "Not the name of a function: ~S") fun))))))))
+              (c-error fun (TEXT "Not the name of a function: ~S") fun))))))))
   #+CLISP-DEBUG (setf (anode-source anode) *form*)
   ;; If no values are needed and no side effects are produced,
   ;; the appendant code can be discarded completely:
@@ -2414,10 +2433,9 @@ for-value   NIL or T
           (make-anode
             :type 'VAR
             :sub-anodes '()
-            :seclass (make-seclass
-                      :uses (if (and *for-value* (not (var-constantp var)))
-                              (list symbol)
-                              'NIL))
+            :seclass (if (var-constantp var) *seclass-foldable*
+                         (make-seclass :uses (if *for-value*
+                                                 (list symbol) 'NIL)))
             :code (if *for-value*
                     (if (var-constantp var)
                       `((CONST ,(make-const
@@ -2568,35 +2586,51 @@ for-value   NIL or T
                 seclass
                 *seclass-dirty*))))))))
 
+;; Constant-Folding: if fun is foldable (i.e.: subr-flag = T and
+;; key-flag = NIL) and if codelist consists besides the (PUSH)s and the
+;; Call-Code at the end only of Anodes with code = ((CONST ...)) ?
+(defmacro return-if-foldable (seclass fun codelist caller)
+  (let ((const-form (gensym "RETURN-IF-FOLDABLE-")))
+    `(when (seclass-foldable-p ,seclass)
+       (let ((,const-form (try-constant-fold ,codelist ,fun)))
+         (when ,const-form
+           (return-from ,caller (c-GLOBAL-FUNCTION-CALL-form ,const-form)))))))
+
+;; compile arg and augment SECLASS, CODELIST, and *STACKZ*
+;; NB: codelist should be a symbol, it is multiply evaluated
+(defmacro collect-arg (seclass codelist arg)
+  (let ((anode (gensym "COLLECT-ARG-")))
+    `(let ((,anode (c-form ,arg 'ONE)))
+       (seclass-or-f ,seclass ,anode)
+       (push ,anode ,codelist)
+       (push '(PUSH) ,codelist)
+       (push 1 *stackz*))))
+
+;; compile each argument in ARGS and return seclass and codelist
+;; modifies *stackz*
+(defun collect-args (seclass args &optional codelist)
+  (dolist (arg args (values seclass codelist))
+    (collect-arg seclass codelist arg)))
+
 ;; global function call, normal (notinline): (fun {form}*)
 (defun c-NORMAL-FUNCTION-CALL (fun) ; fun is a symbol or (SETF symbol)
   (test-list *form* 1)
   (let* ((n (length (cdr *form*)))
          #+CLISP-DEBUG (oldstackz *stackz*)
          (*stackz* *stackz*))
-    (do ((formlist (cdr *form*))
-         (seclass (f-side-effect fun))
-         #+CLISP-DEBUG (anodelist '())
-         (codelist (list '(CALLP))))
-        ((null formlist)
-         (push
-           `(,@(case n
-                 (0 `(CALL0)) (1 `(CALL1)) (2 `(CALL2)) (t `(CALL ,n)))
-             ,(make-funname-const fun))
-           codelist)
-         (make-anode
-           :type 'CALL
-           :sub-anodes (nreverse anodelist)
-           :seclass seclass
-           :code (nreverse codelist)
-           :stackz oldstackz))
-      (let* ((formi (pop formlist))
-             (anodei (c-form formi 'ONE)))
-        #+CLISP-DEBUG (push anodei anodelist)
-        (seclass-or-f seclass anodei)
-        (push anodei codelist)
-        (push '(PUSH) codelist)
-        (push 1 *stackz*)))))
+    (multiple-value-bind (seclass codelist)
+        (collect-args (f-side-effect fun) (cdr *form*) (list '(CALLP)))
+      (setq codelist (nreconc codelist
+                              `((,@(case n (0 `(CALL0)) (1 `(CALL1))
+                                           (2 `(CALL2)) (t `(CALL ,n)))
+                                 ,(make-funname-const fun)))))
+      (return-if-foldable seclass fun codelist c-NORMAL-FUNCTION-CALL)
+      (make-anode
+       :type 'CALL
+       :sub-anodes codelist
+       :seclass seclass
+       :code codelist
+       :stackz oldstackz))))
 
 ;; Compute the signature of a function object:
 ;; 1. name
@@ -2697,7 +2731,7 @@ for-value   NIL or T
       (values-list (cddr fdescr)))
     ;; defined with FLET or IN-DEFUN: from the fnode
     (let ((fnode (car fdescr)))
-      (values (fnode-req-anz fnode) (fnode-opt-anz fnode)
+      (values (fnode-req-num fnode) (fnode-opt-num fnode)
               (fnode-rest-flag fnode) (fnode-keyword-flag fnode)
               (fnode-keywords fnode) (fnode-allow-other-keys-flag fnode)))))
 
@@ -2720,7 +2754,7 @@ for-value   NIL or T
 (defun test-argument-syntax (args applyargs fun req opt rest-p key-p keylist
                              allow-p)
   (unless (and (listp args) (null (cdr (last args))))
-    (c-error (TEXT "argument list to function ~S is dotted: ~S")
+    (c-error args (TEXT "argument list to function ~S is dotted: ~S")
              fun args))
   (let ((n (length args))
         (reqopt (+ req opt)))
@@ -2783,6 +2817,20 @@ for-value   NIL or T
        ,@forms)
      t))
 
+(defun try-constant-fold (codelist fun)
+  (when (every (lambda (code) (or (not (anode-p code)) (anode-constantp code)))
+               codelist)
+    ;; try to call function:
+    (let ((args (let ((L '())) ; list of (constant) arguments
+                  (dolist (code codelist (nreverse L))
+                    (when (anode-p code)
+                      (push (anode-constant-value code) L)))))
+          resulting-values)
+      (when (try-eval (setq resulting-values
+                            (multiple-value-list (apply fun args))))
+        ;; function called successfully, perform constant folding:
+        `(VALUES ,@(mapcar #'(lambda (x) `(QUOTE ,x)) resulting-values))))))
+
 ;; (c-DIRECT-FUNCTION-CALL args applyargs fun req opt rest-p key-p keylist
 ;;                         subr-flag call-code-producer)
 ;; compiles the processing of the arguments for the direct call of a
@@ -2813,12 +2861,7 @@ for-value   NIL or T
         (let ((*stackz* *stackz*))
           ;; required and given optional parameters:
           (dotimes (i (min n reqopt))
-            (let* ((formi (pop args))
-                   (anodei (c-form formi 'ONE)))
-              (seclass-or-f seclass anodei)
-              (push anodei codelist))
-            (push '(PUSH) codelist)
-            (push 1 *stackz*))
+            (collect-arg seclass codelist (pop args)))
           (if applyargs
             (progn
               (when subr-flag
@@ -2840,15 +2883,9 @@ for-value   NIL or T
                 ;; as list.
                 ;; List consisting of all additional arguments:
                 (progn
-                  (let ((*stackz* *stackz*)
-                        (rest-args args))
-                    (loop
-                      (when (null rest-args) (return))
-                      (let ((anode (c-form (pop rest-args) 'ONE)))
-                        (seclass-or-f seclass anode)
-                        (push anode codelist))
-                      (push '(PUSH) codelist)
-                      (push 1 *stackz*))
+                  (let ((*stackz* *stackz*))
+                    (multiple-value-setq (seclass codelist)
+                      (collect-args seclass args codelist))
                     (let ((anode (c-form (first applyargs) 'ONE)))
                       (seclass-or-f seclass anode)
                       (push anode codelist))
@@ -2865,13 +2902,8 @@ for-value   NIL or T
               (when rest-p
                 (if subr-flag
                   ;; Passing of remaining arguments to a SUBR: one by one
-                  (loop
-                    (when (null args) (return))
-                    (let ((anode (c-form (pop args) 'ONE)))
-                      (seclass-or-f seclass anode)
-                      (push anode codelist))
-                    (push '(PUSH) codelist)
-                    (push 1 *stackz*))
+                  (multiple-value-setq (seclass codelist)
+                    (collect-args seclass args codelist))
                   ;; passing of remaining arguments to a compiled closure:
                   ;; as list
                   (if (null args)
@@ -2882,15 +2914,9 @@ for-value   NIL or T
                       (push 1 *stackz*))
                     ;; list of all further arguments:
                     (progn
-                      (let ((*stackz* *stackz*)
-                            (rest-args args))
-                        (loop
-                          (when (null rest-args) (return))
-                          (let ((anode (c-form (pop rest-args) 'ONE)))
-                            (seclass-or-f seclass anode)
-                            (push anode codelist))
-                          (push '(PUSH) codelist)
-                          (push 1 *stackz*))
+                      (let ((*stackz* *stackz*))
+                        (multiple-value-setq (seclass codelist)
+                          (collect-args seclass args codelist))
                         (push `(LIST ,(- n reqopt)) codelist))
                       (push '(PUSH) codelist)
                       (push 1 *stackz*)))))))
@@ -3032,28 +3058,7 @@ for-value   NIL or T
               ;; now all key argument are on the Stack.
               (push keyanz *stackz*)))
           (setq codelist (nreconc codelist (funcall call-code-producer))))
-        ;; Constant-Folding: if fun is foldable (i.e.: subr-flag = T and
-        ;; key-flag = NIL) and if codelist consists besides the (PUSH)s and the
-        ;; Call-Code at the end only of Anodes with code = ((CONST ...)) ?
-        (when (and (seclass-foldable-p seclass)
-                   (every #'(lambda (code)
-                              (or (not (anode-p code)) (anode-constantp code)))
-                          codelist))
-          ;; try to call function:
-          (let ((args (let ((L '())) ; list of (constant) arguments
-                        (dolist (code codelist)
-                          (when (anode-p code)
-                            (push (anode-constant-value code) L)))
-                        (nreverse L)))
-                resulting-values)
-            (when (try-eval
-                   (setq resulting-values
-                         (multiple-value-list (apply fun args))))
-              ;; function called successfully, perform constant folding:
-              (return-from c-DIRECT-FUNCTION-CALL
-                (c-GLOBAL-FUNCTION-CALL-form
-                  `(VALUES ,@(mapcar #'(lambda (x) `(QUOTE ,x))
-                                     resulting-values)))))))
+        (return-if-foldable seclass fun codelist c-DIRECT-FUNCTION-CALL)
         (make-anode
           :type `(DIRECT-CALL ,fun)
           :sub-anodes (remove-if-not #'anode-p codelist)
@@ -3086,6 +3091,61 @@ for-value   NIL or T
         (list
           (c-form `(FUNCTION ,fun) 'ONE)
           (if key-flag '(CALLCKEY) '(CALLC))))))
+
+(defun function-code-list (fun arg-count)
+  (case fun
+    ((CAR FIRST) `((CAR ,*denv*)))
+    ((CDR REST) `((CDR ,*denv*)))
+    (CAAR `((CAR ,*denv*) (CAR ,*denv*)))
+    ((CADR SECOND) `((CDR ,*denv*) (CAR ,*denv*)))
+    (CDAR `((CAR ,*denv*) (CDR ,*denv*)))
+    (CDDR `((CDR ,*denv*) (CDR ,*denv*)))
+    (CAAAR `((CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
+    (CAADR `((CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
+    (CADAR `((CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
+    ((CADDR THIRD) `((CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
+    (CDAAR `((CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
+    (CDADR `((CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
+    (CDDAR `((CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
+    (CDDDR `((CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
+    (CAAAAR `((CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
+    (CAAADR `((CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
+    (CAADAR `((CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
+    (CAADDR `((CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
+    (CADAAR `((CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
+    (CADADR `((CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
+    (CADDAR `((CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
+    ((CADDDR FOURTH) `((CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
+    (CDAAAR `((CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
+    (CDAADR `((CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
+    (CDADAR `((CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
+    (CDADDR `((CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
+    (CDDAAR `((CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
+    (CDDADR `((CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
+    (CDDDAR `((CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
+    (CDDDDR `((CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
+    (ATOM '((ATOM)))
+    (CONSP '((CONSP)))
+    (SYS::%UNBOUND '((PUSH-UNBOUND 1) (POP)))
+    ((NOT NULL) '((NOT)))
+    (CONS '((CONS)))
+    (SVREF `((SVREF ,*denv*)))
+    (SYS::%SVSTORE '((SVSET)))
+    (EQ '((EQ)))
+    (VALUES (case arg-count
+              (0 '((VALUES0)) )
+              (1 '((VALUES1)) )
+              (t `((PUSH) ; also push last argument to the Stack
+                   (STACK-TO-MV ,arg-count)))))
+    (VALUES-LIST '((LIST-TO-MV)))
+    (SYMBOL-FUNCTION `((SYMBOL-FUNCTION ,*denv*)))
+    (LIST (if (plusp arg-count)
+              `((PUSH) (LIST ,arg-count))
+              '((NIL))))
+    (LIST* (case arg-count
+             (1 '((VALUES1)) )
+             (t `((LIST* ,(1- arg-count))) )))
+    (t (compiler-error 'c-GLOBAL-FUNCTION-CALL fun))))
 
 ;; global function call: (fun {form}*)
 (defun c-GLOBAL-FUNCTION-CALL-form (*form*)
@@ -3136,16 +3196,15 @@ for-value   NIL or T
       (c-NORMAL-FUNCTION-CALL fun)
       (multiple-value-bind (name req opt rest-p key-p keylist allow-p check)
           (function-signature fun t)
-        (setq check (and name
-                         (test-argument-syntax args nil fun req opt rest-p
-                                               key-p keylist allow-p)))
+        (setq check (and name (test-argument-syntax args nil fun req opt rest-p
+                                                    key-p keylist allow-p)))
         (if (and name (equal fun name)) ; function is valid
           (case fun
             ((CAR CDR FIRST REST NOT NULL CONS SVREF VALUES
               CAAR CADR CDAR CDDR CAAAR CAADR CADAR CADDR CDAAR CDADR
               CDDAR CDDDR SECOND THIRD FOURTH CAAAAR CAAADR CAADAR CAADDR
               CADAAR CADADR CADDAR CADDDR CDAAAR CDAADR CDADAR CDADDR
-              CDDAAR CDDADR CDDDAR CDDDDR ATOM CONSP
+              CDDAAR CDDADR CDDDAR CDDDDR ATOM CONSP SYS::%UNBOUND
               VALUES-LIST SYS::%SVSTORE EQ SYMBOL-FUNCTION LIST LIST*)
              ;; these here have keylist=NIL, allow-p=NIL and
              ;; (which is not used) opt=0.
@@ -3155,86 +3214,38 @@ for-value   NIL or T
                        (if (>= (declared-optimize 'SAFETY) 3)
                          *seclass-dirty* ; see comment in F-SIDE-EFFECT
                          (function-side-effect fun)))) ; no need for a check
-                 (if (and (null *for-value*) (null (seclass-modifies sideeffects)))
-                   ;; don't have to call the function,
-                   ;; only evaluate the arguments
-                   (c-form `(PROGN ,@args))
-                   (if (and (eq fun 'VALUES) (eq *for-value* 'ONE))
-                     (if (= n 0) (c-NIL) (c-form `(PROG1 ,@args)))
-                     (let ((seclass sideeffects)
-                           (codelist '()))
-                       (let ((*stackz* *stackz*))
-                         ;; evaluate the arguments and push all to the
-                         ;; stack except for the last (because the last
-                         ;; one is expected in A0):
-                         (loop
-                           (when (null args) (return))
-                           (let ((anode (c-form (pop args) 'ONE)))
-                             (seclass-or-f seclass anode)
-                             (push anode codelist))
-                           (when args ; not at the end
-                             (push '(PUSH) codelist)
-                             (push 1 *stackz*)))
-                         (setq codelist
-                           (nreconc codelist
-                             (case fun
-                               ((CAR FIRST) `((CAR ,*denv*)))
-                               ((CDR REST) `((CDR ,*denv*)))
-                               (CAAR `((CAR ,*denv*) (CAR ,*denv*)))
-                               ((CADR SECOND) `((CDR ,*denv*) (CAR ,*denv*)))
-                               (CDAR `((CAR ,*denv*) (CDR ,*denv*)))
-                               (CDDR `((CDR ,*denv*) (CDR ,*denv*)))
-                               (CAAAR `((CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
-                               (CAADR `((CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
-                               (CADAR `((CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
-                               ((CADDR THIRD) `((CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
-                               (CDAAR `((CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
-                               (CDADR `((CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
-                               (CDDAR `((CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
-                               (CDDDR `((CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
-                               (CAAAAR `((CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
-                               (CAAADR `((CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
-                               (CAADAR `((CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
-                               (CAADDR `((CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*)))
-                               (CADAAR `((CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
-                               (CADADR `((CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
-                               (CADDAR `((CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
-                               ((CADDDR FOURTH) `((CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*)))
-                               (CDAAAR `((CAR ,*denv*) (CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
-                               (CDAADR `((CDR ,*denv*) (CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
-                               (CDADAR `((CAR ,*denv*) (CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
-                               (CDADDR `((CDR ,*denv*) (CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*)))
-                               (CDDAAR `((CAR ,*denv*) (CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
-                               (CDDADR `((CDR ,*denv*) (CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
-                               (CDDDAR `((CAR ,*denv*) (CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
-                               (CDDDDR `((CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*) (CDR ,*denv*)))
-                               (ATOM '((ATOM)))
-                               (CONSP '((CONSP)))
-                               ((NOT NULL) '((NOT)))
-                               (CONS '((CONS)))
-                               (SVREF `((SVREF ,*denv*)))
-                               (SYS::%SVSTORE '((SVSET)))
-                               (EQ '((EQ)))
-                               (VALUES (case n
-                                         (0 '((VALUES0)) )
-                                         (1 '((VALUES1)) )
-                                         (t `((PUSH) ; also push last argument to the Stack
-                                              (STACK-TO-MV ,n)))))
-                               (VALUES-LIST '((LIST-TO-MV)))
-                               (SYMBOL-FUNCTION `((SYMBOL-FUNCTION ,*denv*)))
-                               (LIST (if (plusp n)
-                                       `((PUSH) (LIST ,n))
-                                       '((NIL))))
-                               (LIST* (case n
-                                        (1 '((VALUES1)) )
-                                        (t `((LIST* ,(1- n))) )))
-                               (t (compiler-error 'c-GLOBAL-FUNCTION-CALL
-                                                  fun))))))
-                       (make-anode
-                         :type `(PRIMOP ,fun)
-                         :sub-anodes (remove-if-not #'anode-p codelist)
-                         :seclass seclass
-                         :code codelist)))))
+                 (cond ((and (null *for-value*)
+                             (null (seclass-modifies sideeffects)))
+                        ;; don't have to call the function,
+                        ;; only evaluate the arguments
+                        (c-form `(PROGN ,@args)))
+                       ((and (seclass-foldable-p sideeffects)
+                             (every #'c-constantp args))
+                        ;; call the function at compile time
+                        (let ((*stackz* *stackz*))
+                          (multiple-value-bind (seclass codelist)
+                              (collect-args sideeffects args)
+                            (return-if-foldable seclass fun codelist
+                                                c-GLOBAL-FUNCTION-CALL)
+                            (compiler-error 'c-GLOBAL-FUNCTION-CALL
+                                            (list fun args seclass codelist)))))
+                       ((and (eq fun 'VALUES) (eq *for-value* 'ONE))
+                        (if (= n 0) (c-NIL) (c-form `(PROG1 ,@args))))
+                       (t (let ((*stackz* *stackz*))
+			    (multiple-value-bind (seclass codelist)
+			        (collect-args sideeffects args)
+                              ;; evaluate the arguments and push all to the
+                              ;; stack except for the last (because the last
+                              ;; one is expected in A0):
+			      (pop codelist) (pop *stackz*)
+                              (setq codelist
+                                    (nreconc codelist
+                                             (function-code-list fun n)))
+                              (make-anode
+                               :type `(PRIMOP ,fun)
+                               :sub-anodes (remove-if-not #'anode-p codelist)
+                               :seclass seclass
+                               :code codelist))))))
                ;; check failed (wrong argument count) => not INLINE:
                (c-NORMAL-FUNCTION-CALL fun)))
             (t ; is the SUBR fun contained in the FUNTAB?
@@ -3303,9 +3314,10 @@ for-value   NIL or T
     (when deprecation-info
       (if *compiling-from-file*
         (pushnew name *deprecated-functions* :test #'eq)
-        (apply #'c-warn (string-concat
-                         (TEXT "Function ~S is deprecated.") " ~@?")
-                        deprecation-info)))))
+        ;; WARNING implies non-NIL 3rd return value (failure-p) from COMPILE
+        (apply #'c-style-warn (string-concat
+                               (TEXT "Function ~S is deprecated.") " ~@?")
+               deprecation-info)))))
 
 ;; note global OPTIMIZE proclamations
 ;; used by c-PROCLAIM and PROCLAIM in control.d
@@ -3350,8 +3362,8 @@ for-value   NIL or T
       (OPTIMIZE (note-optimize (cdr declspec)))
       (DECLARATION
         (dolist (var (cdr declspec))
-          (when (symbolp var) (pushnew var *user-declaration-types*
-                                       :test #'eq)))))))
+          (pushnew (sys::check-not-type var 'proclaim)
+                   *user-declaration-types* :test #'eq))))))
 
 ;; DEFCONSTANT when compiling
 (defun c-PROCLAIM-CONSTANT (symbol initial-value-form) ; ABI
@@ -3396,41 +3408,56 @@ for-value   NIL or T
 (defun c-PROVIDE (module-name)
   (pushnew (module-name module-name) *compiled-modules* :test #'string=))
 
+;; load or compile
+(defun load-or-compile (module-name file may-require)
+  (with-augmented-load-path ((make-pathname :name nil :type nil
+                                            :defaults *compile-file-pathname*))
+    (let* ((present-files
+            (search-file file (append *source-file-types* '("lib")) nil))
+           (newest-file (first present-files)))
+      ;; if the libfile occurs among the found Files
+      ;; and if it is the newest:
+      (if (and (consp present-files)
+               (string= (pathname-type newest-file) "lib"))
+        (load newest-file ; load libfile
+              :verbose (and *load-verbose* *compile-verbose*)
+              :print (and *load-print* *compile-print*))
+        (if newest-file
+            ;; found file in *load-paths*+*compile-file-pathname*
+            (if *compile-file-directory*
+              ;; `compile-file' was given :output-file,
+              ;; so put the compiled file there
+              (compile-file newest-file :output-file
+                            (merge-pathnames *compile-file-directory*
+                                             newest-file))
+              ;; `compile-file' was called without an explicit
+              ;; :output-file arg, so compile `in place'
+              (compile-file newest-file))
+            ;; file not found - call require
+            (if may-require
+              (require module-name)
+              (c-error *form*
+                       (TEXT "Cannot find file ~S required by feature ~S")
+                       file module-name)))))))
+
 ;; auxiliary function: REQUIRE on file-compilation, cf. function REQUIRE
 (defun c-REQUIRE (module-name &optional (pathname nil p-given))
   (setq module-name (module-name module-name))
   (unless (or (member module-name *modules* :test #'string=)
               (member module-name *compiled-modules* :test #'string=))
     (unless p-given (setq pathname (pathname module-name)))
-    (flet ((load-lib (file)
-             (let* ((*load-paths*
-                      (cons (make-pathname :name nil :type nil
-                                           :defaults *compile-file-truename*)
-                            *load-paths*))
-                    (present-files
-                      (search-file file (append *source-file-types* '("lib"))))
-                    (newest-file (first present-files)))
-               ;; if the libfile occurs among the found Files
-               ;; and if it is the newest:
-               (if (and (consp present-files)
-                        (string= (pathname-type newest-file) "lib"))
-                 (load newest-file :verbose nil :print nil :echo nil) ; load libfile
-                 (let ((fi (or newest-file file)))
-                   (if (null *compile-file-directory*)
-                     ;; `compile-file' was called without an explicit
-                     ;; :output-file arg, so compile `in place'
-                     (compile-file fi)
-                     ;; `compile-file' was given :output-file,
-                     ;; so put the compiled file there
-                     (compile-file fi :output-file
-                                   (merge-pathnames *compile-file-directory*
-                                                    fi))))))))
-      (if (atom pathname) (load-lib pathname) (mapcar #'load-lib pathname)))))
+    (if (atom pathname)
+        (load-or-compile module-name pathname t)
+        (mapcar (lambda (path) (load-or-compile module-name path nil))
+                pathname))))
 
 ;;; auxiliary functions for
 ;;; LET/LET*/MULTIPLE-VALUE-BIND/Lambda-Expression/FLET/LABELS:
 
 ;; Syntax-Analysis:
+
+(defun c-illegal-syntax (form caller)
+  (c-error-c form (TEXT "Illegal syntax in ~A: ~S") caller form))
 
 ;; analyzes a parameter-list of LET/LET*, returns:
 ;; the List of Symbols,
@@ -3445,8 +3472,7 @@ for-value   NIL or T
                 (or (null (cdar L))
                     (and (consp (cdar L)) (null (cddar L)))))
            (push (caar L) symbols) (push (cadar L) forms))
-          (t (c-error-c (TEXT "Illegal syntax in LET/LET*: ~S")
-                        (car L))))))
+          (t (c-illegal-syntax (car L) "LET/LET*")))))
 
 ;; Analyzes a lambda-list of a function (CLtL2 p. 76, ANSI CL 3.4.1.).
 ;; Returns 13 values:
@@ -3465,10 +3491,10 @@ for-value   NIL or T
 ;; 13. list of init-forms of the &aux variables
 (defun c-analyze-lambdalist (lambdalist)
   (sys::analyze-lambdalist lambdalist
-    #'(lambda (form errorstring &rest arguments)
-        (declare (ignore form))
+    #'(lambda (form detail errorstring &rest arguments)
+        (declare (ignore form detail))
         (catch 'c-error
-          (apply #'c-error errorstring arguments)))))
+          (apply #'c-error lambdalist errorstring arguments)))))
 
 (defun lambda-list-to-signature (lambda-list)
   (multiple-value-bind (req opt opt-i opt-p rest
@@ -3542,9 +3568,15 @@ for-value   NIL or T
 
 ;; specially declared symbols:
 (defvar *specials*)   ; list of all symbols recently declared special
-(defvar *ignores*)    ; list of all symbols recently declared ignore
-(defvar *ignorables*) ; list of all symbols recently declared ignorable
+(defvar *ignores*)    ; list of all symbols/fnames recently declared ignore
+(defvar *ignorables*) ; list of all symbols/fnames recently declared ignorable
 (defvar *readonlys*)  ; list of all symbols recently declared read-only
+
+;; check whether (FUNCTION FNAME) is in LIST
+(defun fname-ignored-p (fname list)
+  (dolist (n list)
+    (when (and (consp n) (equal fname (second n)))
+      (return t))))
 
 ;; push all symbols for special variables into *venv* :
 (defun push-specials ()
@@ -3556,9 +3588,11 @@ for-value   NIL or T
     (if (memq sym *ignores*)
       ;; var ignore-declared
       (if (var-specialp var)
-        (c-warn (TEXT "Binding variable ~S can cause side effects despite IGNORE declaration~%since it is declared SPECIAL.")
+        (c-warn (TEXT "Binding variable ~S can cause side effects despite IGNORE declaration since it is declared SPECIAL.")
                 sym)
-        (if (var-for-value-usedp var)
+        (when (var-for-value-usedp var)
+          ;; style-warning as per 3.2.5, although
+          ;; COMPILER-DIAGNOSTICS:USE-HANDLER calls it a warning
           (c-style-warn (TEXT "variable ~S is used despite IGNORE declaration.")
                         sym)))
       ;; var not ignore-declared
@@ -3615,7 +3649,7 @@ for-value   NIL or T
     ;; must bind symbol dynamically:
     (progn
       (when (l-constantp symbol)
-        (c-error-c (TEXT "Constant ~S cannot be bound.")
+        (c-error-c symbol (TEXT "Constant ~S cannot be bound.")
                    symbol))
       (make-special-var symbol))
     ;; must bind symbol lexically :
@@ -3730,7 +3764,7 @@ for-value   NIL or T
     (progn
       (if (l-constantp symbol)
         (progn
-          (c-error-c (TEXT "Constant ~S cannot be bound.") symbol)
+          (c-error-c symbol (TEXT "Constant ~S cannot be bound.") symbol)
           (push 0 *stackz*))
         (push '(BIND 1) *stackz*))
       (make-special-var symbol))
@@ -3954,7 +3988,10 @@ for-value   NIL or T
 ;; compile (name lambdalist {declaration|docstring}* {form}*), return the FNODE
 (defun c-LAMBDABODY (name lambdabody &optional fenv-cons gf-p reqoptimflags)
   (test-list lambdabody 1)
-  (let* ((*func* (make-fnode :name name :enclosing *func* :venvc *venvc*))
+  (let* ((*func* (make-fnode :enclosing *func* :venvc *venvc*
+                             :name (if (integerp name)
+                                       (symbol-suffix (fnode-name *func*) name)
+                                       name)))
          (*stackz* *func*) ; empty stack
          (*venvc* (cons *func* *venvc*))
          (*func-start-label* (make-label 'NIL))
@@ -3975,15 +4012,17 @@ for-value   NIL or T
                 (sys::specialized-lambda-list-to-ordinary
                  lalist 'compile)))
             (c-analyze-lambdalist lalist)))
-      (setf (fnode-req-anz *func*) (length reqvar)
-            (fnode-opt-anz *func*) (length optvar)
+      (setf (fnode-req-num *func*) (length reqvar)
+            (fnode-opt-num *func*) (length optvar)
             (fnode-rest-flag *func*) (not (eql restvar 0))
             (fnode-keyword-flag *func*) keyflag
             (fnode-keywords *func*) keyword
+            (fnode-lambda-list *func*) lalist
             (fnode-allow-other-keys-flag *func*) allow-other-keys)
       (when fenv-cons (setf (caar fenv-cons) *func*)) ; Fixup for c-LABELS
-      (multiple-value-bind (body-rest declarations)
+      (multiple-value-bind (body-rest declarations docstring)
           (parse-body (cdr lambdabody) t)
+        (setf (fnode-documentation *func*) docstring)
         (setq declarations (nreconc type-decls declarations))
         (let ((oldstackz *stackz*)
               (*stackz* *stackz*)
@@ -3997,7 +4036,8 @@ for-value   NIL or T
               key-vars key-dummys key-anodes keys-vars keys-anodes key-stackzs
               aux-vars aux-anodes
               closuredummy-stackz closuredummy-venvc)
-          (multiple-value-setq (*specials* *ignores* *ignorables* *readonlys* other-decls)
+          (multiple-value-setq
+              (*specials* *ignores* *ignorables* *readonlys* other-decls)
             (process-declarations declarations))
           ;; visibility of Closure-Dummyvar:
           (push nil *venvc*)
@@ -4034,6 +4074,7 @@ for-value   NIL or T
             (bind-aux-vars auxvar auxinit))
           (push-specials)
           (push-*denv* other-decls)
+          (setf (fnode-denv *func*) *denv*)
           (let* ((body-anode (c-form `(PROGN ,@body-rest) (if gf-p 'ONE 'ALL)))
                  ;; check the variables:
                  (closurevars
@@ -4080,13 +4121,15 @@ for-value   NIL or T
             anode))))
     ;; this was the production of the Anode
     )))
+    ;; anonymous functions are ignorable
+    (unless (integerp name) (push *func* *fnode-list*))
     (setf (fnode-code *func*) anode)
     (when reqoptimflags
-      (decf (fnode-req-anz *func*) (count 'GONE reqoptimflags)))
+      (decf (fnode-req-num *func*) (count 'GONE reqoptimflags)))
     (when (eq (anode-type anode) 'ERROR)
       ;; turn it into a correct function, that does nothing
-      (setf (fnode-req-anz *func*) 0
-            (fnode-opt-anz *func*) 0
+      (setf (fnode-req-num *func*) 0
+            (fnode-opt-num *func*) 0
             (fnode-rest-flag *func*) t
             (fnode-keyword-flag *func*) nil
             (fnode-keywords *func*) '()
@@ -4425,7 +4468,7 @@ for-value   NIL or T
 ;; compile (DECLARE {declspec}*)
 (defun c-DECLARE ()
   (test-list *form* 1)
-  (c-error (TEXT "Misplaced declaration: ~S") *form*))
+  (c-error *form* (TEXT "Misplaced declaration: ~S") *form*))
 
 ;; compile (LOAD-TIME-VALUE form [read-only-p])
 (defun c-LOAD-TIME-VALUE ()
@@ -4450,6 +4493,15 @@ for-value   NIL or T
                                      :form form
                                      :ltv-form *form*))))
              '()))))
+
+
+;; compile (COMPILE-TIME-VALUE form)
+(defun c-COMPILE-TIME-VALUE ()
+  (test-list *form* 2 2)
+  (make-anode :type 'CONST
+              :sub-anodes '()
+              :seclass *seclass-foldable*
+              :code `((CONST ,(new-const (eval (second *form*)))))))
 
 ;; compile (CATCH tag {form}*)
 (defun c-CATCH ()
@@ -4634,7 +4686,7 @@ for-value   NIL or T
 (defun c-SETQ ()
   (test-list *form* 1)
   (when (evenp (length *form*))
-    (c-error (TEXT "Odd number of arguments to SETQ: ~S") *form*))
+    (c-error *form* (TEXT "Odd number of arguments to SETQ: ~S") *form*))
   (if (null (cdr *form*))
     (c-NIL) ; (SETQ) == (PROGN) == NIL
     (if (setqlist-macrop (cdr *form*))
@@ -4664,7 +4716,7 @@ for-value   NIL or T
                 (push setteri codelist)
                 (seclass-or-f seclass setteri)))
             (progn
-              (c-error-c (TEXT "Cannot assign to non-symbol ~S.")
+              (c-error-c symboli (TEXT "Cannot assign to non-symbol ~S.")
                          symboli)
               (push '(VALUES1) codelist))))))))
 
@@ -4673,7 +4725,7 @@ for-value   NIL or T
 (defun c-PSETQ ()
   (test-list *form* 1)
   (when (evenp (length *form*))
-    (c-error (TEXT "Odd number of arguments to PSETQ: ~S") *form*))
+    (c-error *form* (TEXT "Odd number of arguments to PSETQ: ~S") *form*))
   (if (null (cdr *form*))
     (c-NIL) ; (PSETQ) == (PROGN) == NIL
     (if (setqlist-macrop (cdr *form*))
@@ -4693,7 +4745,7 @@ for-value   NIL or T
                 (push anodei anodelist)
                 (push (c-VARSET symboli anodei nil) setterlist)
                 (push 0 *stackz*))
-              (c-error-c (TEXT "Cannot assign to non-symbol ~S.")
+              (c-error-c symboli (TEXT "Cannot assign to non-symbol ~S.")
                          symboli))))
         ;; try to reorganize them in a fashion, that as few  (PUSH)'s and
         ;; (POP)'s as possible are necessary:
@@ -4785,7 +4837,7 @@ for-value   NIL or T
                   (set-check-lock 'multiple-value-setq symbol)
                   (push setter codelist)
                   (seclass-or-f seclass setter)))
-              (c-error-c (TEXT "Cannot assign to non-symbol ~S.")
+              (c-error-c symbol (TEXT "Cannot assign to non-symbol ~S.")
                          symbol)))
           (push '(POP) codelist)
           (push 1 *stackz*))))))
@@ -4910,7 +4962,7 @@ for-value   NIL or T
   (let ((symbols (second *form*)))
     (dolist (sym symbols)
       (unless (symbolp sym)
-        (c-error (TEXT "Only symbols may be used as variables, not ~S")
+        (c-error sym (TEXT "Only symbols may be used as variables, not ~S")
                  sym)))
     (if (= (length symbols) 1)
       (c-form `(LET ((,(first symbols) ,(third *form*))) ,@(cdddr *form*)))
@@ -5000,12 +5052,11 @@ for-value   NIL or T
                 (or (null (cdar L))
                     (and (consp (cdar L)) (null (cddar L)))))
            (push (caar L) varlist) (push (eval (cadar L)) valueslist))
-          (t (c-error-c (TEXT "Illegal syntax in COMPILER-LET: ~S")
-                        (car L))))))
+          (t (c-illegal-syntax (car L) 'COMPILER-LET)))))
 
 (macrolet ((check-blockname (name)
              `(unless (symbolp ,name)
-                (c-error-c (TEXT "Block name must be a symbol, not ~S")
+                (c-error-c ,name (TEXT "Block name must be a symbol, not ~S")
                            ,name)
                 (setq ,name NIL)))) ; Default-Blockname
 
@@ -5047,7 +5098,8 @@ for-value   NIL or T
     (check-blockname name)
     (let ((a (benv-search name)))
       (cond ((null a) ; this Blockname is invisible
-             (c-error (TEXT "RETURN-FROM block ~S is impossible from here.")
+             (c-error name
+                      (TEXT "RETURN-FROM block ~S is impossible from here.")
                       name))
             ((block-p a) ; visible in *benv* without %benv%
              (let ((anode (c-form (third *form*) (block-for-value a))))
@@ -5105,7 +5157,7 @@ for-value   NIL or T
               (push item taglist)
               (push (make-label 'NIL) labellist))
             (c-error-c
-             (TEXT "Only numbers and symbols are valid tags, not ~S")
+             item (TEXT "Only numbers and symbols are valid tags, not ~S")
              item)))))
     (let* ((*stackz* (cons 0 *stackz*)) ; poss. TAGBODY-Frame
            (tagbody (make-tagbody :fnode *func* :labellist labellist
@@ -5177,10 +5229,10 @@ for-value   NIL or T
   (test-list *form* 2 2)
   (let ((tag (second *form*)))
     (unless (or (symbolp tag) (numberp tag))
-      (c-error (TEXT "Tag must be a symbol or a number, not ~S") tag))
+      (c-error tag (TEXT "Tag must be a symbol or a number, not ~S") tag))
     (multiple-value-bind (a b) (genv-search tag)
       (cond ((null a) ; this Tag is invisible
-             (c-error (TEXT "GO to tag ~S is impossible from here.") tag))
+             (c-error tag (TEXT "GO to tag ~S is impossible from here.") tag))
             ((tagbody-p a) ; visible in *genv* without %genv%
              (if (and (eq (tagbody-fnode a) *func*)
                       (may-UNWIND *stackz* (tagbody-stackz a)))
@@ -5253,8 +5305,10 @@ for-value   NIL or T
                  :code `((FCONST ,(const-value-safe f2))))
                (c-VAR (var-name f2))))
             (t (if (and (null f1) m)
-                 (c-error (TEXT "~S is not a function. It is a locally defined macro.")
-                          name)
+                 (c-error
+                  name
+                  (TEXT "~S is not a function. It is a locally defined macro.")
+                  name)
                  (compiler-error 'c-FUNCTION name))))))
       (let ((funname (car (last *form*))))
         (if (lambda-form-p funname)
@@ -5263,12 +5317,11 @@ for-value   NIL or T
                    (c-lambdabody
                      (if (and longp (function-name-p name))
                        name ; specified function-name
-                       (symbol-suffix (fnode-name *func*)
-                                      (incf *anonymous-count*)))
+                       (incf *anonymous-count*))
                      (cdr funname))))
             (unless *no-code* (propagate-far-used fnode))
             (c-fnode-function fnode))
-          (c-error (TEXT "Only symbols and lambda expressions are function names, not ~S")
+          (c-error funname (TEXT "Only symbols and lambda expressions are function names, not ~S")
                    funname))))))
 
 ;; compile (%GENERIC-FUNCTION-LAMBDA . lambdabody)
@@ -5277,7 +5330,7 @@ for-value   NIL or T
   (let* ((*no-code* (or *no-code* (null *for-value*)))
          (fnode
            (c-lambdabody
-             (symbol-suffix (fnode-name *func*) (incf *anonymous-count*))
+             (incf *anonymous-count*)
              (cdr *form*)
              nil
              t))) ; gf-p = T, build Code for generic function
@@ -5302,7 +5355,7 @@ for-value   NIL or T
          (reqoptimflags (copy-list (second *form*)))
          (fnode
            (c-lambdabody
-             (symbol-suffix (fnode-name *func*) (incf *anonymous-count*))
+             (incf *anonymous-count*)
              (cddr *form*)
              nil nil reqoptimflags)))
     (unless *no-code* (propagate-far-used fnode))
@@ -5316,216 +5369,218 @@ for-value   NIL or T
                   :seclass (anodes-seclass-or anode1 anode2)
                   :code `(,anode1 (PUSH) ,anode2 (CONS))))))
 
-;; skip (ignore) all declarations in the beginning of BODY
-(defun skip-declarations (body)
-  (do ((bo body (cdr bo)))
-      ((not (and (consp bo) (consp (car bo)) (eq (caar bo) 'declare)))
-       bo)))
-
 (macrolet ((err-syntax (specform fdef)
              `(c-error-c
-               (TEXT "Illegal function definition syntax in ~S: ~S")
+               ,fdef (TEXT "Illegal function definition syntax in ~S: ~S")
                ,specform ,fdef))
            (add-fenv (namelist fenvconslist)
              `(do ((namelistr ,namelist (cdr namelistr))
                    (fenvconslistr ,fenvconslist (cdr fenvconslistr))
                    (L nil))
                   ((null namelistr)
-                   (apply #'vector (nreverse (cons *fenv* L))))
+                   (sys::cons-*fenv* L))
                 (push (car namelistr) L)
                 (push (car fenvconslistr) L)))
+           (mk-var ()
+             '(make-var :name (gensym) :specialp nil :constantp nil
+               :usedp t :for-value-usedp t :really-usedp nil
+               :closurep nil ; later poss. set to T
+               :stackz *stackz* :venvc *venvc* :fnode *func*))
+           (c-declarations (c declarations body-rest
+                              &optional namelist fnodelist)
+             `(multiple-value-bind
+                    (*specials* *ignores* *ignorables* *readonlys* other-decls)
+                  (process-declarations ,declarations)
+                (push-specials) (push-*denv* other-decls)
+                ,@(when (and namelist fnodelist)
+                    `((mapc #'(lambda (name fnode)
+                                (setf (fnode-ignore fnode)
+                                      (fname-ignored-p name *ignores*)
+                                      (fnode-ignorable fnode)
+                                      (fname-ignored-p name *ignorables*)))
+                            ,namelist ,fnodelist)))
+                ;; compile the remaining forms:
+                (funcall ,c `(PROGN ,@body-rest))))
+           (with-bindings ((body body-rest declarations mvb-var)
+                           mvb-form &body forms)
+             `(multiple-value-bind (,body-rest ,declarations)
+                  (parse-body ,body)
+                (let ((oldstackz *stackz*)
+                      (*stackz* *stackz*)
+                      (*denv* *denv*)
+                      (*venvc* *venvc*)
+                      (*venv* *venv*))
+                  (push 0 *stackz*) (push nil *venvc*) ; for Closure-Dummyvar
+                  (let ((closuredummy-stackz *stackz*)
+                        (closuredummy-venvc *venvc*))
+                    (multiple-value-bind ,mvb-var ,mvb-form
+                      ,@forms)))))
            (get-anode (type)
              `(let* ((closurevars (checking-movable-var-list varlist anodelist))
                      (anode
-                       (make-anode
-                         :type ',type
-                         :sub-anodes `(,@anodelist ,body-anode)
-                         :seclass (seclass-without
-                                    (anodelist-seclass-or
-                                      `(,@anodelist ,body-anode))
-                                    varlist)
-                         :code `(,@(c-make-closure closurevars closuredummy-venvc
-                                                   closuredummy-stackz)
-                                 ,@(mapcap #'c-bind-movable-var-anode
-                                           varlist anodelist)
-                                 ,body-anode
-                                 (UNWIND ,*stackz* ,oldstackz ,*for-value*)))))
-               (closuredummy-add-stack-slot closurevars
-                                            closuredummy-stackz closuredummy-venvc)
-               (optimize-var-list varlist)
-               anode)))
+                      (make-anode
+                       :type ',type
+                       :sub-anodes `(,@anodelist ,body-anode)
+                       :seclass (seclass-without
+                                 (anodelist-seclass-or
+                                  `(,@anodelist ,body-anode))
+                                 varlist)
+                       :code `(,@(c-make-closure closurevars closuredummy-venvc
+                                                 closuredummy-stackz)
+                               ,@(mapcap #'c-bind-movable-var-anode
+                                         varlist anodelist)
+                               ,body-anode
+                               (UNWIND ,*stackz* ,oldstackz ,*for-value*)))))
+                (closuredummy-add-stack-slot closurevars closuredummy-stackz
+                                             closuredummy-venvc)
+                (optimize-var-list varlist)
+                anode)))
+  (macrolet ((check-fdef-name (caller fdef)
+               `(unless (and (consp ,fdef) (function-name-p (car ,fdef))
+                             (consp (cdr ,fdef)))
+                  (err-syntax ',caller ,fdef))))
 
 ;; compile (FLET ({fundef}*) {form}*)
 (defun c-FLET ()
   (test-list *form* 2)
   (test-list (second *form*) 0)
-  (multiple-value-bind (namelist fnodelist)
-      (do ((fdefsr (second *form*) (cdr fdefsr))
-           (L1 '())
-           (L2 '()))
-          ((null fdefsr) (values (nreverse L1) (nreverse L2)))
-        (let ((fdef (car fdefsr)))
-          (if (and (consp fdef) (function-name-p (car fdef))
-                   (consp (cdr fdef)))
-            (let* ((name (car fdef))
-                   (fnode (c-lambdabody
-                            (symbol-suffix (fnode-name *func*) name)
-                            (add-implicit-block name (cdr fdef)))))
-              (push name L1)
-              (push fnode L2))
-            (err-syntax 'FLET fdef))))
-    ;; namelist = list of names, fnodelist = list of fnodes of the functions
-    (let ((oldstackz *stackz*)
-          (*stackz* *stackz*)
-          (*venvc* *venvc*)
-          (*venv* *venv*))
-      (push 0 *stackz*) (push nil *venvc*) ; room for Closure-Dummyvar
-      (let ((closuredummy-stackz *stackz*)
-            (closuredummy-venvc *venvc*))
-        (multiple-value-bind (vfnodelist varlist anodelist *fenv*)
-            (do ((namelistr namelist (cdr namelistr))
-                 (fnodelistr fnodelist (cdr fnodelistr))
-                 (vfnodelist '())
-                 (varlist '())
-                 (anodelist '())
-                 (fenv '()))
-                ((null namelistr)
-                 (values (nreverse vfnodelist) (nreverse varlist)
-                         (nreverse anodelist)
-                         (apply #'vector (nreverse (cons *fenv* fenv)))))
-              (push (car namelistr) fenv)
-              (let ((fnode (car fnodelistr)))
-                (if (zerop (fnode-keyword-offset fnode))
-                  ;; function-definition is autonomous
-                  (push (cons (list fnode) (new-const fnode)) fenv)
-                  (progn
-                    (push fnode vfnodelist)
-                    (push (c-fnode-function fnode) anodelist)
-                    (push 1 *stackz*)
-                    (let ((var (make-var :name (gensym) :specialp nil
-                                 :constantp nil
-                                 :usedp t :for-value-usedp t :really-usedp nil
-                                 :closurep nil ; later poss. set to T
-                                 :stackz *stackz* :venvc *venvc*
-                                 :fnode *func*)))
-                      (push (cons (list fnode) var) fenv)
-                      (push var varlist))))))
-          (apply #'push-*venv* varlist) ; activate auxiliary variables
-          (let ((body-anode ; compile remaining forms
-                  (c-form `(PROGN ,@(skip-declarations (cddr *form*))))))
-            (unless *no-code*
-              (mapc #'(lambda (var fnode)
-                        (when (var-really-usedp var)
-                          (propagate-far-used fnode)))
-                    varlist vfnodelist))
-            (get-anode FLET)))))))
+  ;; namelist = list of names, fnodelist = list of fnodes of the functions
+  (with-bindings ((cddr *form*) body-rest declarations (namelist fnodelist))
+    (do ((fdefsr (second *form*) (cdr fdefsr))
+         (L1 '())               ; namelist
+         (L2 '()))              ; fnodelist
+        ((null fdefsr) (values (nreverse L1) (nreverse L2)))
+      (let ((fdef (car fdefsr)))
+        (check-fdef-name FLET fdef)
+        (let* ((name (car fdef))
+               (fnode (c-lambdabody
+                       (symbol-suffix (fnode-name *func*) name)
+                       (add-implicit-block name (cdr fdef)))))
+          (push name L1)
+          (push fnode L2))))
+    (multiple-value-bind (vfnodelist varlist anodelist *fenv*)
+        (do ((namelistr namelist (cdr namelistr))
+             (fnodelistr fnodelist (cdr fnodelistr))
+             (vfnodelist '())
+             (varlist '())
+             (anodelist '())
+             (fenv '()))
+            ((null namelistr)
+             (values (nreverse vfnodelist) (nreverse varlist)
+                     (nreverse anodelist)
+                     (sys::cons-*fenv* fenv)))
+          (push (car namelistr) fenv)
+          (let ((fnode (car fnodelistr)))
+            (if (zerop (fnode-keyword-offset fnode))
+              ;; function-definition is autonomous
+              (push (cons (list fnode) (new-const fnode)) fenv)
+              (progn
+                (push fnode vfnodelist)
+                (push (c-fnode-function fnode) anodelist)
+                (push 1 *stackz*)
+                (let ((var (mk-var)))
+                  (push (cons (list fnode) var) fenv)
+                  (push var varlist))))))
+      (apply #'push-*venv* varlist) ; activate auxiliary variables
+      (let ((body-anode (c-declarations #'c-form declarations body-rest
+                                        namelist fnodelist)))
+        (unless *no-code*
+          (mapc #'(lambda (var fnode)
+                    (when (var-really-usedp var)
+                      (propagate-far-used fnode)))
+                varlist vfnodelist))
+        (get-anode FLET)))))
 
 ;; compile (LABELS ({fundef}*) {form}*)
 (defun c-LABELS ()
   (test-list *form* 2)
   (test-list (second *form*) 0)
-  (let ((oldstackz *stackz*)
-        (*stackz* *stackz*)
-        (*venvc* *venvc*)
-        (*venv* *venv*))
-    (push 0 *stackz*) (push nil *venvc*) ; room for Closure-Dummyvar
-    (let ((closuredummy-stackz *stackz*)
-          (closuredummy-venvc *venvc*))
-      (multiple-value-bind
-            (namelist varlist lambdanamelist lambdabodylist fenvconslist)
-          (do ((fdefsr (second *form*) (cdr fdefsr))
-               (L1 '())
-               (L2 '())
-               (L3 '())
-               (L4 '())
-               (L5 '()))
-              ((null fdefsr)
-               (values (nreverse L1) (nreverse L2) (nreverse L3)
-                       (nreverse L4) (nreverse L5)))
-            (let ((fdef (car fdefsr)))
-              (if (and (consp fdef) (function-name-p (car fdef))
-                       (consp (cdr fdef)))
-                (let ((name (car fdef)))
-                  (push name L1)
-                  (push 1 *stackz*)
-                  (push (make-var :name (gensym) :specialp nil
-                                  :constantp nil
-                                  :usedp t :for-value-usedp t :really-usedp nil
-                                  :closurep nil ; later poss. set to T
-                                  :stackz *stackz* :venvc *venvc*
-                                  :fnode *func*)
-                        L2)
-                  (push (symbol-suffix (fnode-name *func*) name) L3)
-                  (push (cdr fdef) L4)
-                  (push
-                    (cons
-                      ;; fdescr, consisting of:
-                      (cons nil ; room for the FNODE
-                        (cons 'LABELS
-                          (multiple-value-list ; values from c-analyze-lambdalist
-                            (c-analyze-lambdalist
-                             (if *defun-accept-specialized-lambda-list*
-                               (sys::specialized-lambda-list-to-ordinary
-                                 (cadr fdef) 'compile)
-                               (cadr fdef))))))
-                      ;; Variable
-                      (car L2))
-                    L5))
-                (err-syntax 'LABELS fdef))))
-        ;; namelist = list of names, varlist = list of variables,
-        ;; lambdanamelist = list of Dummy-names of the functions,
-        ;; lambdabodylist = list of Lambda-bodies of the functions,
-        ;; fenvconslist = list of Conses (fdescr . var) for *fenv*
-        ;; (fdescr still without fnode, which is inserted later).
-        (let ((*fenv* ; activate function-name
-                (add-fenv namelist fenvconslist)))
-          (apply #'push-*venv* varlist) ; activate auxiliary variables
-          (let* ((fnodelist ; compile functions
-                   (mapcar #'(lambda (name lambdaname lambdabody fenvcons)
-                               (c-lambdabody
-                                 lambdaname
-                                 (add-implicit-block name lambdabody)
-                                 fenvcons))
-                           namelist lambdanamelist lambdabodylist
-                           fenvconslist))
-                 (anodelist
-                   (mapcar #'(lambda (fnode var)
-                               (c-fnode-function fnode (cdr (var-stackz var))))
-                           fnodelist varlist))
-                 (body-anode ; compile remaining forms
-                   (c-form `(PROGN ,@(skip-declarations (cddr *form*))))))
-            ;; the variables, for which the function was autonomous, are
-            ;; additionally declared as constants:
-            (do ((varlistr varlist (cdr varlistr))
-                 (fnodelistr fnodelist (cdr fnodelistr)))
-                ((null varlistr))
-              (let ((var (car varlistr))
-                    (fnode (car fnodelistr)))
-                (when (zerop (fnode-keyword-offset fnode))
-                  ;; function-definition is autonomous
-                  (setf (var-constantp var) t)
-                  (setf (var-constant var) (new-const fnode)))))
-            ;; Determine the functions which are really used.
-            ;; Functions with closure variables can pull in other functions.
-            (unless *no-code*
-              (let ((last-count 0))
-                (loop
-                  ;; Iterate as long as at least one function has been
-                  ;; pulled in.
-                  (when (eql last-count
-                             (setq last-count (count-if #'var-really-usedp
-                                                        varlist)))
-                    (return))
-                  (do ((varlistr varlist (cdr varlistr))
-                       (fnodelistr fnodelist (cdr fnodelistr)))
-                      ((null varlistr))
-                    (let ((var (car varlistr))
-                          (fnode (car fnodelistr)))
-                      (unless (zerop (fnode-keyword-offset fnode))
-                        ;; function with closure variables
-                        (when (var-really-usedp var)
-                          (propagate-far-used fnode))))))))
-            (get-anode LABELS)))))))
+  (with-bindings ((cddr *form*) body-rest declarations
+                  (namelist varlist lambdanamelist lambdabodylist fenvconslist))
+    (do ((fdefsr (second *form*) (cdr fdefsr))
+         (L1 '())               ; namelist
+         (L2 '())               ; varlist
+         (L3 '())               ; lambdanamelist
+         (L4 '())               ; lambdabodylist
+         (L5 '()))              ; fenvconslist
+        ((null fdefsr)
+         (values (nreverse L1) (nreverse L2) (nreverse L3)
+                 (nreverse L4) (nreverse L5)))
+      (let ((fdef (car fdefsr)))
+        (check-fdef-name LABELS fdef)
+        (let ((name (car fdef)))
+          (push name L1)
+          (push 1 *stackz*)
+          (push (mk-var) L2)
+          (push (symbol-suffix (fnode-name *func*) name) L3)
+          (push (cdr fdef) L4)
+          (push
+           (cons
+            ;; fdescr, consisting of:
+            (cons nil ; room for the FNODE
+              (cons 'LABELS
+                (multiple-value-list ; values from c-analyze-lambdalist
+                 (c-analyze-lambdalist
+                  (if *defun-accept-specialized-lambda-list*
+                      (sys::specialized-lambda-list-to-ordinary
+                       (cadr fdef) 'compile)
+                      (cadr fdef))))))
+            ;; Variable
+            (car L2))
+           L5))))
+    ;; namelist = list of names, varlist = list of variables,
+    ;; lambdanamelist = list of Dummy-names of the functions,
+    ;; lambdabodylist = list of Lambda-bodies of the functions,
+    ;; fenvconslist = list of Conses (fdescr . var) for *fenv*
+    ;; (fdescr still without fnode, which is inserted later).
+    (let ((*fenv* ; activate function-name
+           (add-fenv namelist fenvconslist)))
+      (apply #'push-*venv* varlist) ; activate auxiliary variables
+      (let* ((fnodelist ; compile functions
+              (mapcar #'(lambda (name lambdaname lambdabody fenvcons)
+                          (c-lambdabody
+                           lambdaname
+                           (add-implicit-block name lambdabody)
+                           fenvcons))
+                      namelist lambdanamelist lambdabodylist
+                      fenvconslist))
+             (anodelist
+              (mapcar #'(lambda (fnode var)
+                          (c-fnode-function fnode (cdr (var-stackz var))))
+                      fnodelist varlist))
+             (body-anode (c-declarations #'c-form declarations body-rest
+                                         namelist fnodelist)))
+        ;; the variables, for which the function was autonomous, are
+        ;; additionally declared as constants:
+        (do ((varlistr varlist (cdr varlistr))
+             (fnodelistr fnodelist (cdr fnodelistr)))
+            ((null varlistr))
+          (let ((var (car varlistr))
+                (fnode (car fnodelistr)))
+            (when (zerop (fnode-keyword-offset fnode))
+              ;; function-definition is autonomous
+              (setf (var-constantp var) t)
+              (setf (var-constant var) (new-const fnode)))))
+        ;; Determine the functions which are really used.
+        ;; Functions with closure variables can pull in other functions.
+        (unless *no-code*
+          (let ((last-count 0))
+            (loop
+              ;; Iterate as long as at least one function has been pulled in.
+              (when (eql last-count
+                         (setq last-count (count-if #'var-really-usedp
+                                                    varlist)))
+                (return))
+              (do ((varlistr varlist (cdr varlistr))
+                   (fnodelistr fnodelist (cdr fnodelistr)))
+                  ((null varlistr))
+                (let ((var (car varlistr))
+                      (fnode (car fnodelistr)))
+                  (unless (zerop (fnode-keyword-offset fnode))
+                    ;; function with closure variables
+                    (when (var-really-usedp var)
+                      (propagate-far-used fnode))))))))
+        (get-anode LABELS)))))
 
 ;; compile
 ;; (SYS::FUNCTION-MACRO-LET ({(name fun-lambdabody macro-lambdabody)}) {form})
@@ -5540,20 +5595,20 @@ for-value   NIL or T
           ((null funmacdefsr)
            (values (nreverse L1) (nreverse L2) (nreverse L3)))
         (let ((funmacdef (car funmacdefsr)))
-          (if (and (consp funmacdef)
-                   (symbolp (car funmacdef))
-                   (consp (cdr funmacdef)) (consp (second funmacdef))
-                   (consp (cddr funmacdef)) (consp (third funmacdef))
-                   (null (cdddr funmacdef)))
-            (let* ((name (car funmacdef))
-                   (fnode (c-lambdabody
-                            (symbol-suffix (fnode-name *func*) name)
-                            (second funmacdef)))
-                   (macro (make-funmacro-expander name (third funmacdef))))
-              (push name L1)
-              (push fnode L2)
-              (push macro L3))
-            (err-syntax 'SYSTEM::FUNCTION-MACRO-LET funmacdef))))
+          (unless (and (consp funmacdef)
+                       (symbolp (car funmacdef))
+                       (consp (cdr funmacdef)) (consp (second funmacdef))
+                       (consp (cddr funmacdef)) (consp (third funmacdef))
+                       (null (cdddr funmacdef)))
+            (err-syntax 'SYSTEM::FUNCTION-MACRO-LET funmacdef))
+          (let* ((name (car funmacdef))
+                 (fnode (c-lambdabody
+                         (symbol-suffix (fnode-name *func*) name)
+                         (second funmacdef)))
+                 (macro (make-funmacro-expander name (third funmacdef))))
+            (push name L1)
+            (push fnode L2)
+            (push macro L3))))
     ;; namelist  = list of names,
     ;; fnodelist = list of fnodes of the functions,
     ;; macrolist = list of Macro-Objects of the functions.
@@ -5575,10 +5630,11 @@ for-value   NIL or T
                 ((null namelistr)
                  (values (nreverse vfnodelist) (nreverse varlist)
                          (nreverse anodelist)
-                         (apply #'vector (nreverse (cons *fenv* fenv)))))
+                         (sys::cons-*fenv* fenv)))
               (push (car namelistr) fenv)
               (let ((fnode (car fnodelistr))
                     (macro (car macrolistr)))
+                (setf (fnode-ignorable fnode) t)
                 (if (zerop (fnode-keyword-offset fnode))
                   ;; function-definition is autonomous
                   (push (list* macro (list fnode) (new-const fnode)) fenv)
@@ -5586,12 +5642,7 @@ for-value   NIL or T
                     (push fnode vfnodelist)
                     (push (c-fnode-function fnode) anodelist)
                     (push 1 *stackz*)
-                    (let ((var (make-var :name (gensym) :specialp nil
-                                 :constantp nil
-                                 :usedp t :for-value-usedp t :really-usedp nil
-                                 :closurep nil ; later poss. set to T
-                                 :stackz *stackz* :venvc *venvc*
-                                 :fnode *func*)))
+                    (let ((var (mk-var)))
                       (push (cons macro (cons (list fnode) var)) fenv)
                       (push var varlist))))))
           (apply #'push-*venv* varlist) ; activate auxiliary variables
@@ -5615,17 +5666,15 @@ for-value   NIL or T
            (L3 '()))
           ((null fdefsr) (values (nreverse L1) (nreverse L2) (nreverse L3)))
         (let ((fdef (car fdefsr)))
-          (if (and (consp fdef) (function-name-p (car fdef))
-                   (consp (cdr fdef)))
-            (let ((name (first fdef)))
-              (push name L1)
-              (push (clos::defgeneric-lambdalist-callinfo 'clos:generic-flet
+          (check-fdef-name CLOS:GENERIC-FLET fdef)
+          (let ((name (first fdef)))
+            (push name L1)
+            (push (clos::defgeneric-lambdalist-callinfo 'clos:generic-flet
                       *form* name (second fdef))
-                    L2)
-              (push (clos::make-generic-function-form 'clos:generic-flet
-                      *form* name (second fdef) (cddr fdef))
-                    L3))
-            (err-syntax 'CLOS:GENERIC-FLET fdef))))
+                  L2)
+            (push (clos::make-generic-function-form
+                   'clos:generic-flet *form* name (second fdef) (cddr fdef))
+                  L3))))
     ;; namelist = list of Names,
     ;; signlist = list of Signatures of the generic functions,
     ;; formlist = list of Constructor-forms of the generic functions.
@@ -5645,15 +5694,11 @@ for-value   NIL or T
                  (fenv '()))
                 ((null namelistr)
                  (values (nreverse varlist) (nreverse anodelist)
-                         (apply #'vector (nreverse (cons *fenv* fenv)))))
+                         (sys::cons-*fenv* fenv)))
               (push (car namelistr) fenv)
               (push (c-form (car formlistr) 'ONE) anodelist)
               (push 1 *stackz*)
-              (let ((var (make-var :name (gensym) :specialp nil
-                           :constantp nil
-                           :usedp t :for-value-usedp t :really-usedp nil
-                           :closurep nil ; later poss. set to T
-                           :stackz *stackz* :venvc *venvc* :fnode *func*)))
+              (let ((var (mk-var)))
                 (push (cons (list* nil 'GENERIC (car signlistr)) var) fenv)
                 (push var varlist)))
           (apply #'push-*venv* varlist) ; activate auxiliary variables
@@ -5682,30 +5727,23 @@ for-value   NIL or T
                (values (nreverse L1) (nreverse L2) (nreverse L3)
                        (nreverse L4)))
             (let ((fdef (car fdefsr)))
-              (if (and (consp fdef) (function-name-p (car fdef))
-                       (consp (cdr fdef)))
-                (let ((name (first fdef)))
-                  (push name L1)
-                  (push 1 *stackz*)
-                  (push (make-var :name (gensym) :specialp nil
-                                  :constantp nil
-                                  :usedp t :for-value-usedp t :really-usedp nil
-                                  :closurep nil ; later poss. set to T
-                                  :stackz *stackz* :venvc *venvc*
-                                  :fnode *func*)
-                        L2)
-                  (push (cons
-                          ;; fdescr
-                          (list* nil 'GENERIC
-                                 (clos::defgeneric-lambdalist-callinfo
-                                   'clos:generic-labels *form* name (second fdef)))
-                          ;; Variable
-                          (car L2))
-                        L3)
-                  (push (clos::make-generic-function-form 'clos:generic-labels
-                          *form* name (second fdef) (cddr fdef))
-                        L4))
-                (err-syntax 'CLOS:GENERIC-LABELS fdef))))
+              (check-fdef-name CLOS:GENERIC-LABELS fdef)
+              (let ((name (first fdef)))
+                (push name L1)
+                (push 1 *stackz*)
+                (push (mk-var) L2)
+                (push (cons
+                        ;; fdescr
+                        (list* nil 'GENERIC
+                               (clos::defgeneric-lambdalist-callinfo
+                                 'clos:generic-labels *form* name (second fdef)))
+                        ;; Variable
+                        (car L2))
+                      L3)
+                (push (clos::make-generic-function-form
+                       'clos:generic-labels *form* name (second fdef)
+                       (cddr fdef))
+                      L4))))
         ;; namelist = liste of Names, varlist = list of Variables,
         ;; fenvconslist = list of Conses (fdescr . var) for *fenv*,
         ;; formlist = list of Constructor-Forms of the generic functions.
@@ -5718,8 +5756,6 @@ for-value   NIL or T
                    (c-form `(PROGN ,@(cddr *form*)))))
             (get-anode CLOS:GENERIC-LABELS)))))))
 
-) ; macrolet
-
 ;; compile (MACROLET ({macrodef}*) {form}*)
 (defun c-MACROLET (&optional (c #'c-form))
   (test-list *form* 2)
@@ -5727,13 +5763,16 @@ for-value   NIL or T
   (do ((L1 (second *form*) (cdr L1))
        (L2 '()))
       ((null L1)
-       (let ((*fenv* (apply #'vector (nreverse (cons *fenv* L2)))))
-         ;; compile the remaining forms:
-         (funcall c `(PROGN ,@(skip-declarations (cddr *form*))))))
+       (multiple-value-bind (body-rest declarations) (parse-body (cddr *form*))
+         (let ((*denv* *denv*) (*venv* *venv*)
+               (*fenv* (sys::cons-*fenv* L2)))
+           (c-declarations c declarations body-rest))))
     (let* ((macrodef (car L1))
            (name (car macrodef)))
       (push name L2)
       (push (make-macro-expander macrodef *form*) L2))))
+
+)) ; macrolet
 
 ;; compile (SYMBOL-MACROLET ({symdef}*) {declaration}* {form}*)
 (defun c-SYMBOL-MACROLET (&optional (c #'c-form))
@@ -5751,7 +5790,7 @@ for-value   NIL or T
             (progn
               (push (first symdef) symbols)
               (push (second symdef) expansions))
-            (c-error-c (TEXT "~S: Illegal syntax: ~S")
+            (c-error-c symdef (TEXT "~S: Illegal syntax: ~S")
                        'symbol-macrolet symdef))))
     (let ((*denv* *denv*)
           (*venv*
@@ -5767,10 +5806,10 @@ for-value   NIL or T
           (push-*denv* other-decls)
           (dolist (symbol symbols)
             (if (or (constantp symbol) (proclaimed-special-p symbol))
-              (c-error-c (TEXT "~S: symbol ~S is declared special and must not be declared a macro")
+              (c-error-c symbol (TEXT "~S: symbol ~S is declared SPECIAL and must not be declared a macro")
                          'symbol-macrolet symbol)
               (when (memq symbol *specials*)
-                (c-error-c (TEXT "~S: symbol ~S must not be declared SPECIAL and a macro at the same time")
+                (c-error-c symbol (TEXT "~S: symbol ~S must not be declared SPECIAL and a macro at the same time")
                            'symbol-macrolet symbol))))
           (funcall c `(PROGN ,@body-rest)))))))
 
@@ -5791,7 +5830,8 @@ for-value   NIL or T
         (((NOT EVAL) (NOT :EXECUTE)) (setq load-p t compile-p t))
         (((NOT COMPILE)) (setq load-p t eval-p t))
         (((NOT :COMPILE-TOPLEVEL)) (setq load-p t execute-p t))
-        (t (c-error (TEXT "~s situation must be ~s, ~s or ~s, but not ~s")
+        (t (c-error 'situation
+                    (TEXT "~S situation must be ~S, ~S or ~S, but not ~S")
                     'eval-when :load-toplevel :compile-toplevel :execute
                     situation))))
     (let ((form `(PROGN ,@(cddr *form*))))
@@ -5808,7 +5848,7 @@ for-value   NIL or T
         'NIL
         (let ((clause (car clauses)))
           (if (atom clause)
-            (c-error (TEXT "COND clause without test: ~S")
+            (c-error clause (TEXT "COND clause without test: ~S")
                      clause)
             (let ((test (car clause)))
               (if (cdr clause)
@@ -5830,7 +5870,7 @@ for-value   NIL or T
           ((endp clauses))
         (let ((clause (pop clauses)))
           (if (atom clause)
-            (c-error (TEXT "CASE clause without objects: ~S")
+            (c-error clause (TEXT "CASE clause without objects: ~S")
                      clause)
             (let ((keys (car clause)))
               (if default-passed ; was the Default already there?
@@ -5839,7 +5879,7 @@ for-value   NIL or T
                   (progn
                     (when clauses
                       (c-error-c
-                       (TEXT "~S: the ~S clause must be the last one: ~S")
+                       keys (TEXT "~S: the ~S clause must be the last one: ~S")
                        'case keys *form*))
                     (setq keys 'T)
                     (setq default-passed t))
@@ -6116,7 +6156,7 @@ for-value   NIL or T
       (when (and (null restvar) (> |t| (+ r s)))
         ;; too many arguments specified. Is redressed by introduction
         ;; of several additional optional arguments:
-        (c-error-c (TEXT "Too many arguments to ~S") funform)
+        (c-error-c funform (TEXT "Too many arguments to ~S") funform)
         (dotimes (i (- |t| (+ r s)))
           (let ((var (gensym)))
             (setq optvar (append optvar (list var)))
@@ -6127,7 +6167,7 @@ for-value   NIL or T
       (when (and (null applyarglist) (< |t| r))
         ;; too few arguments specified. Is redressed by introduction
         ;; of additional arguments:
-        (c-error-c (TEXT "Too few arguments to ~S") funform)
+        (c-error-c funform (TEXT "Too few arguments to ~S") funform)
         (setq arglist (append arglist
                               (make-list (- r |t|) :initial-element nil)))
         (setq |t| r))
@@ -6472,13 +6512,24 @@ for-value   NIL or T
           (multiple-value-bind (a m f1 f2 f3) (fenv-search fun)
             (declare (ignore m f1 f2))
             (if a           ; fun is local
-              (setq name fun
-                    req (fnode-req-anz (car f3))
-                    opt (fnode-opt-anz (car f3))
-                    rest-p (fnode-rest-flag (car f3))
-                    key-p (fnode-keyword-flag (car f3))
-                    keylist (fnode-keywords (car f3))
-                    allow-p (fnode-allow-other-keys-flag (car f3)))
+              (let ((fnode (car f3)))
+                (if fnode       ; valid entry
+                  (setq name fun
+                        req (fnode-req-num fnode)
+                        opt (fnode-opt-num fnode)
+                        rest-p (fnode-rest-flag fnode)
+                        key-p (fnode-keyword-flag fnode)
+                        keylist (fnode-keywords fnode)
+                        allow-p (fnode-allow-other-keys-flag fnode))
+                  (setq name fun ; labels: no fnode yet
+                        ;; (cddr f3) are the return values of
+                        ;; C-ANALYZE-LAMBDALIST, see c-LABELS
+                        req (length (third f3))
+                        opt (length (fourth f3))
+                        rest-p (symbolp (seventh f3))
+                        key-p (eighth f3)
+                        keylist (ninth f3)
+                        allow-p (nth 12 f3))))
               (multiple-value-setq (name req opt rest-p key-p keylist allow-p)
                 (function-signature fun t))) ; global functions only
             (if (and name (equal fun name))
@@ -7104,6 +7155,18 @@ for-value   NIL or T
                        ,@(cdddr *form*)))))
       (c-GLOBAL-FUNCTION-CALL 'FORMAT))))
 
+(defun c-SORT ()
+  (test-list *form* 3)
+  ;; Give a warning for the common error of transposed predicate and sequence
+  (let ((sequence-form (second *form*)))
+    (when (or (function-form-p sequence-form) (lambda-form-p sequence-form))
+      (c-warn (TEXT "First argument to ~S should be sequence, not ~S")
+              (car *form*) sequence-form))
+    (when (and (consp sequence-form) (quote-p sequence-form))
+      (c-warn (TEXT "~S is destructive, should not be called on a constant ~S")
+              (car *form*) sequence-form))
+    (c-GLOBAL-FUNCTION-CALL 'SORT)))
+
 ;; c-NTH for NTH; c-SETNTH for (SETF NTH)==SYSTEM::%SETNTH
 ;; mostly for (defstruct (foo (:type list))) accessors
 (macrolet ((simple-index-p (ival func)
@@ -7679,6 +7742,25 @@ for-value   NIL or T
                                               (nthcdr (+ pos 2) *form*)))))))))
         (c-GLOBAL-FUNCTION-CALL fun)))))
 
+;; (concatenate 'string ...) ==> (string-concat ...)
+;; this happens mostly in macros, so it is not clear how valuable this is:
+;; mcclim/Apps/Listener/file-types.lisp:define-mime-type
+;;   (concatenate 'string (symbol-name media-type) "/" (symbol-name subtype))
+(defconstant functions-returning-string
+  '(string symbol-name char-name namestring enough-namestring
+    princ-to-string prin1-to-string write-to-string with-output-to-string
+    get-output-stream-string))
+(defun c-CONCATENATE ()
+  (if (and (equal (second *form*) '(QUOTE STRING))
+           (every (lambda (f)
+                    (or (and (c-constantp f)
+                             (stringp (c-constant-value f)))
+                        (and (consp f)
+                             (memq (car f) functions-returning-string))))
+                  (cddr *form*)))
+      (c-GLOBAL-FUNCTION-CALL-form (cons 'EXT:STRING-CONCAT (cddr *form*)))
+      (c-GLOBAL-FUNCTION-CALL-form *form*)))
+
 ;; Recognizes a constant byte specifier and returns it, or NIL.
 (defun c-constant-byte-p (form)
   (cond ((c-constantp form)
@@ -7969,6 +8051,13 @@ New Operations:
 ;; form is a Form with this value or NIL,
 ;; horizon = :value (then form = NIL) or :all or :form.
 (defun value-form-index (value form ltv-form horizon &optional (func *func*))
+  (when (fnode-p value)
+    (setf (fnode-used value) t)
+    (when (fnode-ignore value)
+      ;; style-warning as per 3.2.5, although
+      ;; COMPILER-DIAGNOSTICS:USE-HANDLER calls it a warning
+      (c-style-warn (TEXT "function ~S is used despite IGNORE declaration.")
+                    (fnode-name value))))
   (let ((const-list (fnode-consts func))
         (forms-list (fnode-consts-forms func))
         (ltv-forms-list (fnode-consts-ltv-forms func))
@@ -9610,7 +9699,7 @@ Optimizations that might apply after this one are retried.
 |#
 
 ;; Executes Steps 1, 2 and 3:
-(defun compile-to-LAP ()
+(defun compile-to-LAP ()        ; LAP = Lisp Assembly Program
   (let ((*code-parts* (make-array 10 :adjustable t :fill-pointer 0))
         (*code-positions* (make-array 10 :adjustable t :fill-pointer 0)))
     ;; Expands the Code of Fnode *func* and divides it into pieces.
@@ -10561,12 +10650,28 @@ freshly rebuilt as list of bytes.
 
 The function make-closure is required.
 |#
+(defun non-user-symbol-p (sym)
+  (let ((package (symbol-package sym)))
+    (or (null package) (eq package #,(find-package "SYSTEM")))))
+(defun generatedp (fname lambda-list)
+  (or (null fname)              ; no name
+      (keywordp fname)          ; :lambda
+      (and (symbolp fname) (non-user-symbol-p fname)) ; gensym
+      (and (consp fname) (non-user-symbol-p (second fname))) ; (setf gensym)
+      (and (not (eq 'SYSTEM::<MACRO-FORM> (first lambda-list))) ; macroexpander
+           (some #'(lambda (arg) (and (symbolp arg) (non-user-symbol-p arg)))
+                 lambda-list)))) ; gensyms in lambda-list
 ;; enters a byte-list as Code into fnode.
-(defun create-fun-obj (fnode byte-list SPdepth)
+(defun create-fun-obj (fnode byte-list SPdepth
+                       &aux (fname (fnode-name fnode)) (denv (fnode-denv fnode))
+                            (lambda-list (fnode-lambda-list fnode))
+                            (space (declared-optimize 'space denv))
+                            (speed (declared-optimize 'speed denv))
+                            (!generatedp (not (generatedp fname lambda-list))))
   (setf (fnode-code fnode)
     (make-closure
-      :name (fnode-name fnode)
-      :codevec
+      :name fname
+      :code
         (macrolet ((as-word (anz)
                      (if *big-endian*
                        ;; BIG-ENDIAN-Processor
@@ -10577,24 +10682,24 @@ The function make-closure is required.
           (multiple-value-call #'list*
             (as-word (car SPdepth))
             (as-word (cdr SPdepth))
-            (as-word (fnode-req-anz fnode))
-            (as-word (fnode-opt-anz fnode))
+            (as-word (fnode-req-num fnode))
+            (as-word (fnode-opt-num fnode))
             (+ (if (fnode-rest-flag fnode) 1 0)
                (if (fnode-gf-p fnode) 16 0)
                (if (fnode-keyword-flag fnode)
                  (+ 128 (if (fnode-allow-other-keys-flag fnode) 64 0))
                  0))
             (values ; argument-type-shortcut
-              (let ((req-anz (fnode-req-anz fnode))
-                    (opt-anz (fnode-opt-anz fnode))
+              (let ((req-num (fnode-req-num fnode))
+                    (opt-num (fnode-opt-num fnode))
                     (rest (fnode-rest-flag fnode))
                     (key (fnode-keyword-flag fnode)))
-                (cond ((and (not rest) (not key) (< (+ req-anz opt-anz) 6))
-                       (+ (svref '#(1 7 12 16 19 21) opt-anz) req-anz))
-                      ((and rest (not key) (zerop opt-anz) (< req-anz 5))
-                       (+ 22 req-anz))
-                      ((and (not rest) key (< (+ req-anz opt-anz) 5))
-                       (+ (svref '#(27 32 36 39 41) opt-anz) req-anz))
+                (cond ((and (not rest) (not key) (< (+ req-num opt-num) 6))
+                       (+ (svref '#(1 7 12 16 19 21) opt-num) req-num))
+                      ((and rest (not key) (zerop opt-num) (< req-num 5))
+                       (+ 22 req-num))
+                      ((and (not rest) key (< (+ req-num opt-num) 5))
+                       (+ (svref '#(27 32 36 39 41) opt-num) req-num))
                       (t 0))))
             (if (fnode-keyword-flag fnode)
               (multiple-value-call #'values
@@ -10602,7 +10707,7 @@ The function make-closure is required.
                 (as-word (fnode-Keyword-Offset fnode)))
               (values))
             byte-list))
-      :consts
+      :constants
         (let ((l (append
                    (make-list (fnode-Keyword-Offset fnode))
                    (fnode-keywords fnode)
@@ -10614,13 +10719,24 @@ The function make-closure is required.
           (if (fnode-gf-p fnode)
             (list (coerce l 'simple-vector))
             l))
-        :seclass (anode-seclass (fnode-code fnode))))
+      :seclass (anode-seclass (fnode-code fnode))
+      ;; no metadata for anonymous functions
+      ;; NB: :lambda-list 0 ==> :documentation 0
+      :lambda-list (if (and !generatedp (>= 2 space))
+                       lambda-list
+                       0)       ; discard
+      :documentation (if (and !generatedp (>= 1 space))
+                         (fnode-documentation fnode)
+                         0)     ; discard
+      :jitc-p (if (or (>= 0 space) (<= 1 speed))
+                  1             ; allow
+                  0)))          ; not allow
   fnode)
 
 ;; Return the signature of the byte-compiled function object
 ;; values:
-;; 1. req-anz
-;; 2. opt-anz
+;; 1. req-num
+;; 2. opt-num
 ;; 3. rest-p
 ;; 4. key-p
 ;; 5. keyword-list
@@ -10639,14 +10755,14 @@ The function make-closure is required.
                    `(+ (pop ,listvar) (* 256 (pop ,listvar))))))
       (pop byte-list) (pop byte-list)
       (pop byte-list) (pop byte-list)
-      (let* ((req-anz (pop2 byte-list))
-             (opt-anz (pop2 byte-list))
+      (let* ((req-num (pop2 byte-list))
+             (opt-num (pop2 byte-list))
              (h (pop byte-list))
              (key-p (logbitp 7 h)))
         (pop byte-list)
         (values
-          req-anz
-          opt-anz
+          req-num
+          opt-num
           (logbitp 0 h)
           key-p
           (when key-p
@@ -10666,15 +10782,15 @@ The function make-closure is required.
 (defun pass3 ()
   (dolist (pair *fnode-fixup-table*)
     (let ((code (fnode-code (first pair))) (n (second pair)))
-      (macrolet ((closure-const (code n) `(sys::%record-ref ,code (+ 2 ,n))))
-        (setf (closure-const code n) (fnode-code (closure-const code n)))))))
+      (setf (closure-const code n) (fnode-code (closure-const code n))))))
 
 
 ;;;;****             TOP - LEVEL   CALL
 
 ;;; compile a lambdabody and return its code.
 (defun compile-lambdabody (name lambdabody)
-  (let ((fnode (c-lambdabody name lambdabody)))
+  (let* ((*fnode-list* '())
+         (fnode (c-lambdabody name lambdabody)))
     (assert (null (fnode-far-used-vars fnode)))
     (assert (null (fnode-far-assigned-vars fnode)))
     (assert (null (fnode-far-used-blocks fnode)))
@@ -10687,6 +10803,15 @@ The function make-closure is required.
         (let ((kf (assoc name *known-functions* :test #'equal)))
           (when kf ; save seclass for other functions in the file
             (setf (fourth kf) (function-side-effect (fnode-code fnode))))))
+      (dolist (fnode *fnode-list*)
+        (let ((name (fnode-name fnode)))
+          (unless (or (null (fnode-enclosing fnode))
+                      (null (symbol-package (if (atom name)
+                                                name (second name))))
+                      (fnode-used fnode)
+                      (fnode-ignore fnode)
+                      (fnode-ignorable fnode))
+            (c-style-warn (TEXT "function ~S is not used.~%Misspelled or missing IGNORE declaration?") name))))
       (fnode-code fnode))))
 
 ;; COMPILE-LAMBDA & COMPILE-FORM are "top-level", i.e., they bind all
@@ -10737,16 +10862,17 @@ The function make-closure is required.
 ;; and returns a functional object, that - called with 0 arguments -
 ;; executes this form.
 (let ((form-count 0))
-  (defun compile-form (form %venv% %fenv% %benv% %genv% %denv%)
-    (compile-lambda (symbol-suffix '#:COMPILED-FORM (incf form-count))
-                    `(() ,form)
+  (defun compile-form (form %venv% %fenv% %benv% %genv% %denv%
+                       &optional (name (symbol-suffix '#:COMPILED-FORM
+                                                      (incf form-count))))
+    (compile-lambda name `(() ,form)
                     %venv% %fenv% %benv% %genv% %denv% nil))
   ;; compiles a form in the Toplevel-Environment - only for LOAD :COMPILING T
   (defun compile-form-in-toplevel-environment
-      (form &aux (env *toplevel-environment*))
+      (form &optional (name (symbol-suffix '#:COMPILED-FORM (incf form-count)))
+       &aux (env *toplevel-environment*))
     (let ((*compiling-from-file* t))
-      (compile-lambda-helper (symbol-suffix '#:COMPILED-FORM (incf form-count))
-                             `(() ,form)
+      (compile-lambda-helper name `(() ,form)
                              (svref env 0)    ; %venv%
                              (svref env 1)    ; %fenv%
                              (svref env 2)    ; %benv%
@@ -10761,6 +10887,7 @@ The function make-closure is required.
 ;; Common-Lisp-Function COMPILE
 (defun compile (name &optional (definition nil svar)
                      &aux (macro-flag nil) (trace-flag nil) (save-flag nil)
+                          (macro-lambda-list nil)
                 #+clisp-debug (*form* definition))
   (setq name (check-function-name name 'compile))
   (let ((symbol (get-funname-symbol name)))
@@ -10797,8 +10924,9 @@ The function make-closure is required.
           (setq trace-flag t)
           (setq definition (symbol-function symbol)))
         (when (macrop definition)
-          (setq macro-flag t)
-          (setq definition (macro-expander definition)))
+          (setq macro-flag t
+                macro-lambda-list (macro-lambda-list definition)
+                definition (macro-expander definition)))
         (when (sys::%compiled-function-p definition)
           (warn #1# name)
           (return-from compile (values (or name definition) nil nil)))))
@@ -10833,11 +10961,18 @@ The function make-closure is required.
         (let ((lambdabody (or (closure-slot definition 1)
                               (cdr definition))))
           (let ((funobj (compile-lambdabody name lambdabody)))
+            ;; documentation in the closure might have been reset
+            ;; and may now be different from the one in lambdabody
+            (when funobj
+              (sys::closure-set-documentation
+               funobj (closure-slot definition 2)))
             (values
               (if (zerop *error-count*)
                 (if name
                   (progn
-                    (when macro-flag (setq funobj (make-macro funobj)))
+                    (when macro-flag
+                      (setq funobj (make-macro funobj (sys::maybe-arglist
+                                                       macro-lambda-list))))
                     (if trace-flag
                       (setf (get symbol 'sys::traced-definition) funobj)
                       (setf (symbol-function symbol) funobj))
@@ -10913,7 +11048,7 @@ The function make-closure is required.
                 (t (when (macro-function fun) ; global Macro ?
                      (return-from compile-toplevel-form
                        (compile-toplevel-form
-                        (mac-exp (macro-function fun) form))))))
+                         (mac-exp (macro-function fun) form))))))
               ;; defined locally
               (when (and m (null f1)) ; local Macro, but no local function
                 (return-from compile-toplevel-form
@@ -11031,6 +11166,7 @@ The function make-closure is required.
 (defmacro with-compilation-unit ((&key override) &body forms)
   `(let ((*c-top-call* (or ,override (not (boundp '*c-top-call*))))
          #+ffi (ffi::*foreign-language* ffi::*foreign-language*)
+         #+ffi (ffi::*foreign-library* ffi::*foreign-library*)
          (*c-listing-output* nil)
          (*c-error-output* *error-output*))
      ;; clean up from the outer `with-compilation-unit':
@@ -11068,7 +11204,7 @@ The function make-closure is required.
                    (open-stream-p output-file)
                    (output-stream-p output-file)))
         output-file
-        (let ((tmp (merge-extension "fas" input-file)))
+        (let ((tmp (merge-extension *internal-compiled-file-type* input-file)))
           (if (eq output-file 'T)
             tmp
             ;; Not (merge-pathnames output-file tmp) because that doesn't
@@ -11101,6 +11237,21 @@ The function make-closure is required.
                :version (or (pathname-version output-file)
                             (pathname-version tmp)))))))
       input-file)))
+
+(defun set-output-stream-fasl (stream)
+  (sys::stream-fasl-p stream t) ; set FASL flag for current output
+  (write-string "#0Y_ " stream) ; set FASL flag for future input
+  #+UNICODE ;; Set the stream's encoding to UTF-8, if it supports it.
+  (let ((*error-handler*
+         #'(lambda (&rest error-args)
+             (declare (ignore error-args))
+             (return-from set-output-stream-fasl nil)))
+        (encoding 'charset:utf-8))
+    (setf (stream-external-format stream) encoding)
+    (write-string "#0Y " stream)
+    (let ((*package* #,(find-package "CHARSET")))
+      (write encoding :stream stream :readably t))
+    (terpri stream)))
 
 ;; Common-Lisp-Function COMPILE-FILE
 ;; file          should be a Pathname/String/Symbol.
@@ -11161,18 +11312,13 @@ The function make-closure is required.
                (*load-forms* (make-hash-table :key-type 't :value-type 't
                                               :test 'eq))
                (compilation-successful nil))
-          (when *fasoutput-stream* (sys::allow-read-eval *fasoutput-stream* t))
-          (when *liboutput-stream* (sys::allow-read-eval *liboutput-stream* t))
           (unwind-protect
             (with-compilation-unit ()
               (when listing-stream
                 (fresh-line listing-stream)
                 (format listing-stream
-                  (TEXT "Listing of compilation of file ~A~%on ~@? by ~A, version ~A")
-                  input-file
-                  (date-format)
-                  (multiple-value-list (get-decoded-time))
-                  ;; List (sec min hour day month year ...)
+                  (TEXT "Listing of compilation of file ~A~%on ~A by ~A, version ~A")
+                  input-file (date-string)
                   (lisp-implementation-type) (lisp-implementation-version)))
               (let ((*compiling* t)
                     (*compiling-from-file* t)
@@ -11206,33 +11352,16 @@ The function make-closure is required.
                   (format verbose-out (TEXT ";; Compiling file ~A ...")
                           input-file)
                   (elastic-newline verbose-out))
-                (when *fasoutput-stream*
+                (when (and new-output-stream *fasoutput-stream*)
                   (let ((*package* *keyword-package*))
                     (write `(SYSTEM::VERSION ',(version))
                            :stream *fasoutput-stream*
                          ; :escape t :level nil :length nil :radix t
                            :readably t :right-margin 79 :case ':upcase))
-                  (terpri *fasoutput-stream*))
-                #+UNICODE
-                (flet ((set-utf-8 (stream)
-                         ;; Set the stream's encoding to UTF-8,
-                         ;; if it supports it.
-                         (block try
-                           (let ((*error-handler*
-                                   #'(lambda (&rest error-args)
-                                       (declare (ignore error-args))
-                                       (return-from try nil)))
-                                 (encoding 'charset:utf-8))
-                             (setf (stream-external-format stream) encoding)
-                             (write-string "#0Y " stream)
-                             (let ((*package* #,(find-package "CHARSET")))
-                               (write encoding :stream stream :readably t))
-                             (terpri stream)))))
-                  (when new-output-stream
-                    (when *fasoutput-stream*
-                      (set-utf-8 *fasoutput-stream*))
-                    (when *liboutput-stream*
-                      (set-utf-8 *liboutput-stream*))))
+                  (terpri *fasoutput-stream*)
+                  (set-output-stream-fasl *fasoutput-stream*))
+                (when (and new-output-stream *liboutput-stream*)
+                  (set-output-stream-fasl *liboutput-stream*))
                 (loop
                   (peek-char t istream nil eof-value)
                   (setq *compile-file-lineno1* (line-number istream))
@@ -11283,7 +11412,10 @@ The function make-closure is required.
               (when *coutput-stream*
                 (close *coutput-stream*))
               (unless compilation-successful
-                (delete-file output-file) (delete-file liboutput-file)))))
+                (delete-file output-file)
+                (delete-file liboutput-file)
+                (when *coutput-stream*
+                  (delete-file *coutput-file*))))))
         (when new-listing-stream
           (fresh-line listing-stream)
           (close listing-stream))))))
@@ -11311,7 +11443,7 @@ The function make-closure is required.
   (fresh-line stream)
   (terpri stream)
   (format stream (TEXT "Disassembly of function ~S") (closure-name closure))
-  (multiple-value-bind (req-anz opt-anz rest-p
+  (multiple-value-bind (req-num opt-num rest-p
                         key-p keyword-list allow-other-keys-p
                         byte-list const-list)
       (signature closure)
@@ -11320,9 +11452,9 @@ The function make-closure is required.
         ((null L))
       (format stream "~%(CONST ~S) = ~S" i (car L)))
     (terpri stream)
-    (format stream (TEXT "~S required argument~:P") req-anz)
+    (format stream (TEXT "~S required argument~:P") req-num)
     (terpri stream)
-    (format stream (TEXT "~S optional argument~:P") opt-anz)
+    (format stream (TEXT "~S optional argument~:P") opt-num)
     (terpri stream)
     (if rest-p
       (write-string (TEXT "Rest parameter") stream)
@@ -11408,9 +11540,11 @@ The function make-closure is required.
       (setq opt-num 0 rest-p t))
     (let ((fnode
             (make-fnode :name 'trampoline
-                        :req-anz req-num
-                        :opt-anz opt-num
+                        :req-num req-num
+                        :opt-num opt-num
                         :rest-flag (or rest-p key-p)
+                        ;; no lalist, docstring or jitc:
+                        :denv '((optimize (space 3) (speed 0)))
                         :code (let ((*form* nil) (*stackz* nil))
                                 (make-anode :seclass *seclass-dirty*))
                         :Blocks-Offset 0
@@ -11419,11 +11553,11 @@ The function make-closure is required.
                         :Consts-Offset 0)))
       (create-fun-obj fnode
                       (assemble-LAP
-                        (list (list 'VENV)
-                              (list 'SKIP&RETGF (+ 1 req-num (if (or rest-p key-p) 1 0)))))
+                       `((VENV) (SKIP&RETGF ,(+ 1 req-num
+                                                (if (or rest-p key-p) 1 0)))))
                       '(0 . 0))
       (let ((trampoline (fnode-code fnode)))
-        (sys::%record-ref trampoline 1)))))
+        (sys::closure-codevec trampoline)))))
 
 ;; The compilation of code using symbol-macros requires venv-search in
 ;; compiled form.

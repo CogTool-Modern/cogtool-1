@@ -1,7 +1,7 @@
 /*
  * Functions for weak references in CLISP
  * Bruno Haible 1999-2005
- * Sam Steingold 2003
+ * Sam Steingold 2003, 2007-2008
  */
 #include "lispbibl.c"
 
@@ -64,7 +64,7 @@ LISPFUNNR(weak_pointer_value,1) {
 
 /* (SETF (WEAK-POINTER-VALUE weak-pointer) value) */
 LISPFUNN(set_weak_pointer_value,2) {
-  # Stack layout: value, weak-pointer.
+  /* Stack layout: value, weak-pointer. */
   var object wp = check_weakpointer(STACK_0);
   var object value = STACK_1;
   skipSTACK(2);
@@ -83,7 +83,7 @@ LISPFUNN(set_weak_pointer_value,2) {
 local void copy_list_into_weak_list (object l, uintL len, object wl, uintL maxlen) {
   var uintL i;
   for (i = 0; i < len; i++, l = Cdr(l)) {
-    if (atomp(l)) # Huh? The list became shorter meanwhile.
+    if (atomp(l)) /* Huh? The list became shorter meanwhile. */
       break;
     TheWeakList(wl)->wl_elements[i] = Car(l);
   }
@@ -148,19 +148,19 @@ LISPFUNNR(weak_list_list,1) {
   var object mwl = STACK_0 = check_weaklist(STACK_0);
   var object wl = TheMutableWeakList(mwl)->mwl_list;
   var uintL len = posfixnum_to_V(TheWeakList(wl)->wl_count);
-  # Allocate result list.
+  /* Allocate result list. */
   pushSTACK(NIL);
   var object result = make_list(len);
   skipSTACK(1);
-  # Fetch mwl, wl, len again.
+  /* Fetch mwl, wl, len again. */
   mwl = popSTACK();
   wl = TheMutableWeakList(mwl)->mwl_list;
   var uintL newlen = posfixnum_to_V(TheWeakList(wl)->wl_count);
-  # The weak list may have shrunk during the allocation of the result.
+  /* The weak list may have shrunk during the allocation of the result. */
   ASSERT(newlen <= len);
   for (; len > newlen; len--)
     result = Cdr(result);
-  { # Fill the result list.
+  { /* Fill the result list. */
     var uintL i = 0;
     var object l;
     for (l = result; newlen > 0; l = Cdr(l), newlen--) {
@@ -177,13 +177,13 @@ LISPFUNNR(weak_list_list,1) {
 /* (SETF (WEAK-LIST-LIST weak-list) list)
    replaces the list of objects stored by a weak-list. */
 LISPFUNN(set_weak_list_list,2) {
-  # Stack layout: list, weak-list.
+  /* Stack layout: list, weak-list. */
   STACK_0 = check_weaklist(STACK_0);
   STACK_1 = check_list(STACK_1);
   var uintL len = llength(STACK_1);
   var uintL maxlen = Lrecord_length(TheMutableWeakList(STACK_0)->mwl_list)-2;
   if (len <= maxlen) {
-    # Can reuse the WeakList object.
+    /* Can reuse the WeakList object. */
     var object wl = TheMutableWeakList(STACK_0)->mwl_list;
     set_break_sem_1();
     copy_list_into_weak_list(STACK_1,len,wl,maxlen);
@@ -191,8 +191,8 @@ LISPFUNN(set_weak_list_list,2) {
     if (eq(TheWeakList(wl)->wp_cdr,unbound))
       activate_weak(wl); /* add to O(all_weakpointers) if needed */
   } else {
-    # Need to allocate a new WeakList object.
-    maxlen = maxlen + maxlen/4; # augment size proportionally
+    /* Need to allocate a new WeakList object. */
+    maxlen = maxlen + maxlen/4; /* augment size proportionally */
     if (maxlen < len)
       maxlen = len;
     var object wl = allocate_lrecord(Rectype_WeakList,2+maxlen,lrecord_type);
@@ -410,7 +410,7 @@ LISPFUNNR(weak_mapping_value,1) {
    replaces the value stored in a weak-mapping. It has no effect when the key
    has already been garbage-collected. */
 LISPFUNN(set_weak_mapping_value,2) {
-  # Stack layout: value, weak-mapping.
+  /* Stack layout: value, weak-mapping. */
   var object wm = check_weakmapping(STACK_0);
   var object value = STACK_1;
   skipSTACK(2);
@@ -433,7 +433,7 @@ LISPFUNN(make_weak_and_mapping,2) {
     pushSTACK(STACK_1); /* TYPE-ERROR slot DATUM */
     pushSTACK(S(cons)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: the keys list argument is empty"));
+    error(type_error,GETTEXT("~S: the keys list argument is empty"));
   }
   STACK_1 = copy_list(STACK_1);
   var uintL len = llength(STACK_1);
@@ -512,7 +512,7 @@ LISPFUNNR(weak_and_mapping_value,1) {
    replaces the value stored in a weak-and-mapping. It has no effect when some
    key has already been garbage-collected. */
 LISPFUNN(set_weak_and_mapping_value,2) {
-  # Stack layout: value, weak-and-mapping.
+  /* Stack layout: value, weak-and-mapping. */
   var object wam = check_weakandmapping(STACK_0);
   var object value = STACK_1;
   skipSTACK(2);
@@ -535,7 +535,7 @@ LISPFUNN(make_weak_or_mapping,2) {
     pushSTACK(STACK_1); /* TYPE-ERROR slot DATUM */
     pushSTACK(S(cons)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: the keys list argument is empty"));
+    error(type_error,GETTEXT("~S: the keys list argument is empty"));
   }
   STACK_1 = copy_list(STACK_1);
   var uintL len = llength(STACK_1);
@@ -614,7 +614,7 @@ LISPFUNNR(weak_or_mapping_value,1) {
    replaces the value stored in a weak-or-mapping. It has no effect when the
    keys have already been garbage-collected. */
 LISPFUNN(set_weak_or_mapping_value,2) {
-  # Stack layout: value, weak-or-mapping.
+  /* Stack layout: value, weak-or-mapping. */
   var object wom = check_weakormapping(STACK_0);
   var object value = STACK_1;
   skipSTACK(2);
@@ -626,19 +626,19 @@ LISPFUNN(set_weak_or_mapping_value,2) {
   VALUES1(value);
 }
 
-/* ======================== Weak Association Lists ======================== */
+/* ======================== Weak Association Lists ========================
 
-# Note that the GC is not allowed to compact the pairs in a WeakAlist,
-# because that would lead to undefined behaviour in WEAK-ALIST-ASSOC and
-# WEAK-ALIST-RASSOC. But (SETF WEAK-ALIST-VALUE) is allowed to compact a
-# WeakAlist.
+ Note that the GC is not allowed to compact the pairs in a WeakAlist,
+ because that would lead to undefined behaviour in WEAK-ALIST-ASSOC and
+ WEAK-ALIST-RASSOC. But (SETF WEAK-ALIST-VALUE) is allowed to compact a
+ WeakAlist.
 
-/* Copy an alist of length len into a weak-alist of size maxlen >= len. */
+ Copy an alist of length len into a weak-alist of size maxlen >= len. */
 local void copy_alist_into_weak_alist (object list, uintL len, object wal, uintL maxlen) {
   var uintL i;
   var object l;
   for (i = 0, l = list; i < len; i++, l = Cdr(l)) {
-    if (atomp(l)) # Huh? The list became shorter meanwhile.
+    if (atomp(l)) /* Huh? The list became shorter meanwhile. */
       break;
     var object pair = Car(l);
     if (!consp(pair)) {
@@ -646,7 +646,7 @@ local void copy_alist_into_weak_alist (object list, uintL len, object wal, uintL
       pushSTACK(pair);    /* TYPE-ERROR slot DATUM */
       pushSTACK(S(cons)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(list); pushSTACK(TheSubr(subr_self)->name);
-      fehler(type_error,GETTEXT("~S: ~S is not an association list"));
+      error(type_error,GETTEXT("~S: ~S is not an association list"));
     }
     TheWeakAlist(wal)->wal_data[2*i+0] = Car(pair);
     TheWeakAlist(wal)->wal_data[2*i+1] = Cdr(pair);
@@ -664,26 +664,26 @@ local void copy_alist_into_weak_alist (object list, uintL len, object wal, uintL
    an alist. */
 LISPFUN(make_weak_alist,seclass_read,0,0,norest,key,2,
         (kw(type),kw(initial_contents)) )
-{ # Stack layout: type, initial-contents.
-  # Check the type.
+{ /* Stack layout: type, initial-contents. */
+  /* Check the type. */
   var object type = STACK_1;
   var sintB rectype;
-  if (eq(type,unbound) || eq(type,S(Kkey))) # :KEY
+  if (eq(type,unbound) || eq(type,S(Kkey))) /* :KEY */
     rectype = Rectype_WeakAlist_Key;
-  else if (eq(type,S(Kvalue))) # :VALUE
+  else if (eq(type,S(Kvalue))) /* :VALUE */
     rectype = Rectype_WeakAlist_Value;
-  else if (eq(type,S(Kkey_and_value))) # :KEY-AND-VALUE
+  else if (eq(type,S(Kkey_and_value))) /* :KEY-AND-VALUE */
     rectype = Rectype_WeakAlist_Either;
-  else if (eq(type,S(Kkey_or_value))) # :KEY-OR-VALUE
+  else if (eq(type,S(Kkey_or_value))) /* :KEY-OR-VALUE */
     rectype = Rectype_WeakAlist_Both;
   else {
     pushSTACK(type); /* TYPE-ERROR slot DATUM */
     pushSTACK(O(type_weak_alist)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(S(Kkey_or_value)); pushSTACK(S(Kkey_and_value)); pushSTACK(S(Kvalue)); pushSTACK(S(Kkey));
     pushSTACK(type); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: argument ~S should be ~S, ~S, ~S or ~S."));
+    error(type_error,GETTEXT("~S: argument ~S should be ~S, ~S, ~S or ~S."));
   }
-  # Check the initial-contents.
+  /* Check the initial-contents. */
   if (eq(STACK_0,unbound))
     STACK_0 = NIL;
   else
@@ -739,14 +739,10 @@ local inline maygc object check_weakalist (object obj) {
 LISPFUNNR(weak_alist_type,1) {
   var object type;
   switch (Record_type(TheMutableWeakAlist(popSTACK())->mwal_list)) {
-    case Rectype_WeakAlist_Key:
-      type = S(Kkey); break;
-    case Rectype_WeakAlist_Value:
-      type = S(Kvalue); break;
-    case Rectype_WeakAlist_Either:
-      type = S(Kkey_and_value); break;
-    case Rectype_WeakAlist_Both:
-      type = S(Kkey_or_value); break;
+    case Rectype_WeakAlist_Key:    { type = S(Kkey); break; }
+    case Rectype_WeakAlist_Value:  { type = S(Kvalue); break; }
+    case Rectype_WeakAlist_Either: { type = S(Kkey_and_value); break; }
+    case Rectype_WeakAlist_Both:   { type = S(Kkey_or_value); break; }
     default: NOTREACHED;
   }
   VALUES1(type);
@@ -759,19 +755,19 @@ LISPFUNNR(weak_alist_contents,1) {
   var object mwal = STACK_0 = check_weakalist(STACK_0);
   var object wal = TheMutableWeakAlist(mwal)->mwal_list;
   var uintL len = posfixnum_to_V(TheWeakAlist(wal)->wal_count);
-  # Allocate result list.
+  /* Allocate result list. */
   pushSTACK(NIL);
   var object result = make_list(2*len);
   skipSTACK(1);
-  # Fetch mwal, wal, len again.
+  /* Fetch mwal, wal, len again. */
   mwal = popSTACK();
   wal = TheMutableWeakAlist(mwal)->mwal_list;
   var uintL newlen = posfixnum_to_V(TheWeakAlist(wal)->wal_count);
-  # The weak alist may have shrunk during the allocation of the result.
+  /* The weak alist may have shrunk during the allocation of the result. */
   ASSERT(newlen <= len);
   for (; len > newlen; len--)
     result = Cdr(Cdr(result));
-  { # Fill the result list.
+  { /* Fill the result list. */
     var uintL i = 0;
     var object l;
     for (l = result; newlen > 0; l = Cdr(l), newlen--) {
@@ -798,13 +794,13 @@ LISPFUNNR(weak_alist_contents,1) {
    replaces the contents of a weak-alist. The contents argument must be an
    alist. */
 LISPFUNN(set_weak_alist_contents,2) {
-  # Stack layout: contents, weak-alist.
+  /* Stack layout: contents, weak-alist. */
   STACK_0 = check_weakalist(STACK_0);
   STACK_1 = check_list(STACK_1);
   var uintL len = llength(STACK_1);
   var uintL maxlen = (Lrecord_length(TheMutableWeakAlist(STACK_0)->mwal_list)-2)/2;
   if (len <= maxlen) {
-    # Can reuse the WeakAlist object.
+    /* Can reuse the WeakAlist object. */
     var object wal = TheMutableWeakAlist(STACK_0)->mwal_list;
     set_break_sem_1();
     copy_alist_into_weak_alist(STACK_1,len,wal,maxlen);
@@ -814,8 +810,8 @@ LISPFUNN(set_weak_alist_contents,2) {
       activate_weak(wal); /* add to O(all_weakpointers) if needed */
     #endif
   } else {
-    # Need to allocate a new WeakAlist object.
-    maxlen = maxlen + maxlen/4; # augment size proportionally
+    /* Need to allocate a new WeakAlist object. */
+    maxlen = maxlen + maxlen/4; /* augment size proportionally */
     if (maxlen < len)
       maxlen = len;
     var sintB rectype = Record_type(TheMutableWeakAlist(STACK_0)->mwal_list);
@@ -829,137 +825,30 @@ LISPFUNN(set_weak_alist_contents,2) {
   skipSTACK(2);
 }
 
-# UP: Überprüft das :KEY-Argument
-# test_key_arg()
-# > STACK_0: optionales Argument
-# < STACK_0: korrekte KEY-Funktion
-local void test_key_arg (void) {
-  var object key_arg = STACK_0;
-  if (missingp(key_arg))
-    STACK_0 = L(identity); # #'IDENTITY als Default für :KEY
-}
-
-# Applies a :KEY argument.
-# funcall_key(key,item);
-# > key: value of the :KEY argument
-# > item: object being considered
-# < value1: (FUNCALL key item)
-#define funcall_key(key,item)                     \
-  {                                               \
-    var object _key = (key);                      \
-    var object _item = (item);                    \
-    # shortcut for :KEY #'IDENTITY, very frequent \
-    if (!eq(_key,L(identity))) {                  \
-      pushSTACK(_item); funcall(_key,1);          \
-    } else {                                      \
-      value1 = _item;                             \
-    }                                             \
-  }
-
-# Unterprogramm zum Ausführen des Tests :TEST
-# up_test(stackptr,x)
-# > *(stackptr+1): die Testfunktion
-# > *(stackptr+3): das zu vergleichende Item
-# > x: Argument
-# < ergebnis: true falls der Test erfüllt ist, false sonst
-# can trigger GC
-local maygc bool up_test (const gcv_object_t* stackptr, object x) {
-  # nach CLTL S. 247 ein (funcall testfun item x) ausführen:
-  var object item = *(stackptr STACKop 3);
-  var object fun = *(stackptr STACKop 1);
-  # Special case the most frequent cases,
-  if (eq(fun,L(eq)))
-    return eq(item,x);
-  if (eq(fun,L(eql)))
-    return eql(item,x);
-  if (eq(fun,L(equal)))
-    return equal(item,x);
-  pushSTACK(item);
-  pushSTACK(x); # x
-  funcall(fun,2);
-  if (nullp(value1))
-    return false;
-  else
-    return true;
-}
-
-# Unterprogramm zum Ausführen des Tests :TEST-NOT
-# up_test_not(stackptr,x)
-# > *(stackptr+0): die Testfunktion
-# > *(stackptr+3): das zu vergleichende Item
-# > x: Argument
-# < ergebnis: true falls der Test erfüllt ist, false sonst
-# can trigger GC
-local maygc bool up_test_not (const gcv_object_t* stackptr, object x) {
-  # nach CLTL S. 247 ein (not (funcall testfun item x)) ausführen:
-  pushSTACK(*(stackptr STACKop 3)); # item
-  pushSTACK(x); # x
-  funcall(*(stackptr STACKop 0),2);
-  if (nullp(value1))
-    return true;
-  else
-    return false;
-}
-
-# UP: Überprüft die :TEST, :TEST-NOT - Argumente
-# test_test_args()
-# > stackptr: Pointer in den STACK
-# > *(stackptr+1): :TEST-Argument
-# > *(stackptr+0): :TEST-NOT-Argument
-# < *(stackptr+1): verarbeitetes :TEST-Argument
-# < *(stackptr+0): verarbeitetes :TEST-NOT-Argument
-# < up_fun: Adresse einer Testfunktion, die wie folgt spezifiziert ist:
-#       > stackptr: derselbe Pointer in den Stack, *(stackptr+3) = item,
-#         *(stackptr+1) = :test-Argument, *(stackptr+0) = :test-not-Argument,
-#       > x: Argument
-#       < true, falls der Test erfüllt ist, false sonst.
-  # up_function_t sei der Typ der Adresse einer solchen Testfunktion:
-typedef maygc bool (*up_function_t) (const gcv_object_t* stackptr, object x);
-local up_function_t test_test_args (gcv_object_t* stackptr) {
-  var object test_arg = *(stackptr STACKop 1);
-  if (!boundp(test_arg))
-    test_arg = NIL;
-  # test_arg ist das :TEST-Argument
-  var object test_not_arg = *(stackptr STACKop 0);
-  if (!boundp(test_not_arg))
-    test_not_arg = NIL;
-  # test_not_arg ist das :TEST-NOT-Argument
-  if (nullp(test_not_arg)) {
-    # :TEST-NOT wurde nicht angegeben
-    if (nullp(test_arg))
-      *(stackptr STACKop 1) = L(eql); # #'EQL als Default für :TEST
-    return &up_test;
-  } else {
-    # :TEST-NOT wurde angegeben
-    if (nullp(test_arg))
-      return &up_test_not;
-    else
-      fehler_both_tests();
-  }
-}
+/* call test/test-not function on the appropriate STACK arguments */
+#define CALL_TEST(shift,key)  (*pcall_test)(&STACK_(shift),STACK_(shift+3),key)
 
 /* (WEAK-ALIST-ASSOC item weak-alist [:test] [:test-not] [:key])
    is equivalent to
    (ASSOC item (WEAK-ALIST-CONTENTS weak-alist) [:test] [:test-not] [:key]). */
 LISPFUN(weak_alist_assoc,seclass_default,2,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
-{ # Stack layout: item, weak-alist, test, test-not, key.
-  # Check weak-alist argument:
+{ /* Stack layout: item, weak-alist, test, test-not, key. */
+  /* Check weak-alist argument: */
   STACK_3 = check_weakalist(STACK_3);
-  # Check :TEST/:TEST-NOT arguments in STACK_2,STACK_1:
-  var up_function_t up_fun = test_test_args(&STACK_1);
-  # Check :KEY argument in STACK_0:
-  test_key_arg();
-  # Search:
+  /* Check :TEST/:TEST-NOT arguments in STACK_2,STACK_1: */
+  var funarg_t* pcall_test = check_test_args(&STACK_1);
+  check_key_arg(&STACK_0); /* Check :KEY argument in STACK_0 */
+  /* Search: */
   var object wal = TheMutableWeakAlist(STACK_3)->mwal_list;
-  # We cannot use TheWeakAlist(wal)->wal_count here, because it can be
-  # decremented by a GC happening during the loop.
+  /* We cannot use TheWeakAlist(wal)->wal_count here, because it can be
+     decremented by a GC happening during the loop. */
   var uintL maxlen = (Lrecord_length(wal)-2)/2;
   pushSTACK(wal);
   pushSTACK(NIL);
   pushSTACK(NIL);
-  # Stack layout: item, weak-alist, test, test-not, key,
-  #               wal, -, -.
+  /* Stack layout: item, weak-alist, test, test-not, key,
+                   wal, -, -. */
   var uintL i;
   for (i = 0; i < maxlen; i++) {
     var object key = TheWeakAlist(wal)->wal_data[2*i+0];
@@ -967,7 +856,7 @@ LISPFUN(weak_alist_assoc,seclass_default,2,0,norest,key,3,
       STACK_1 = key;
       STACK_0 = TheWeakAlist(wal)->wal_data[2*i+1];
       funcall_key(STACK_(0+3),key);
-      if (up_fun(&STACK_(1+3),value1)) {
+      if (CALL_TEST(1+3,value1)) {
         var object result = allocate_cons();
         Car(result) = STACK_1; Cdr(result) = STACK_0;
         VALUES1(result);
@@ -986,23 +875,22 @@ LISPFUN(weak_alist_assoc,seclass_default,2,0,norest,key,3,
    (RASSOC item (WEAK-ALIST-CONTENTS weak-alist) [:test] [:test-not] [:key]). */
 LISPFUN(weak_alist_rassoc,seclass_default,2,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
-{ # Stack layout: item, weak-alist, test, test-not, key.
-  # Check weak-alist argument:
+{ /* Stack layout: item, weak-alist, test, test-not, key. */
+  /* Check weak-alist argument: */
   STACK_3 = check_weakalist(STACK_3);
-  # Check :TEST/:TEST-NOT arguments in STACK_2,STACK_1:
-  var up_function_t up_fun = test_test_args(&STACK_1);
-  # Check :KEY argument in STACK_0:
-  test_key_arg();
-  # Search:
+  /* Check :TEST/:TEST-NOT arguments in STACK_2,STACK_1: */
+  var funarg_t* pcall_test = check_test_args(&STACK_1);
+  check_key_arg(&STACK_0); /* Check :KEY argument in STACK_0 */
+  /* Search: */
   var object wal = TheMutableWeakAlist(STACK_3)->mwal_list;
-  # We cannot use TheWeakAlist(wal)->wal_count here, because it can be
-  # decremented by a GC happening during the loop.
+  /* We cannot use TheWeakAlist(wal)->wal_count here, because it can be
+     decremented by a GC happening during the loop. */
   var uintL maxlen = (Lrecord_length(wal)-2)/2;
   pushSTACK(wal);
   pushSTACK(NIL);
   pushSTACK(NIL);
-  # Stack layout: item, weak-alist, test, test-not, key,
-  #               wal, -, -.
+  /* Stack layout: item, weak-alist, test, test-not, key,
+                   wal, -, -. */
   var uintL i;
   for (i = 0; i < maxlen; i++) {
     var object value = TheWeakAlist(wal)->wal_data[2*i+1];
@@ -1010,7 +898,7 @@ LISPFUN(weak_alist_rassoc,seclass_default,2,0,norest,key,3,
       STACK_0 = value;
       STACK_1 = TheWeakAlist(wal)->wal_data[2*i+0];
       funcall_key(STACK_(0+3),value);
-      if (up_fun(&STACK_(1+3),value1)) {
+      if (CALL_TEST(1+3,value1)) {
         var object result = allocate_cons();
         Car(result) = STACK_1; Cdr(result) = STACK_0;
         VALUES1(result);
@@ -1029,26 +917,26 @@ LISPFUN(weak_alist_rassoc,seclass_default,2,0,norest,key,3,
    (CDR (WEAK-ALIST-ASSOC item weak-alist [:test] [:test-not]). */
 LISPFUN(weak_alist_value,seclass_default,2,0,norest,key,2,
         (kw(test),kw(test_not)) )
-{ # Stack layout: item, weak-alist, test, test-not.
-  # Check weak-alist argument:
+{ /* Stack layout: item, weak-alist, test, test-not. */
+  /* Check weak-alist argument: */
   STACK_2 = check_weakalist(STACK_2);
-  # Check :TEST/:TEST-NOT arguments in STACK_1,STACK_0:
-  var up_function_t up_fun = test_test_args(&STACK_0);
-  # Search:
+  /* Check :TEST/:TEST-NOT arguments in STACK_1,STACK_0: */
+  var funarg_t* pcall_test = check_test_args(&STACK_0);
+  /* Search: */
   var object wal = TheMutableWeakAlist(STACK_2)->mwal_list;
-  # We cannot use TheWeakAlist(wal)->wal_count here, because it can be
-  # decremented by a GC happening during the loop.
+  /* We cannot use TheWeakAlist(wal)->wal_count here, because it can be
+     decremented by a GC happening during the loop. */
   var uintL maxlen = (Lrecord_length(wal)-2)/2;
   pushSTACK(wal);
   pushSTACK(NIL);
-  # Stack layout: item, weak-alist, test, test-not,
-  #               wal, -.
+  /* Stack layout: item, weak-alist, test, test-not,
+                   wal, -. */
   var uintL i;
   for (i = 0; i < maxlen; i++) {
     var object key = TheWeakAlist(wal)->wal_data[2*i+0];
     if (!eq(key,unbound)) {
       STACK_0 = TheWeakAlist(wal)->wal_data[2*i+1];
-      if (up_fun(&STACK_(0+2),key)) {
+      if (CALL_TEST(0+2,key)) {
         VALUES1(STACK_0);
         skipSTACK(4+2);
         return;
@@ -1066,31 +954,31 @@ LISPFUN(weak_alist_value,seclass_default,2,0,norest,key,2,
    is added to the alist. */
 LISPFUN(set_weak_alist_value,seclass_default,3,0,norest,key,2,
         (kw(test),kw(test_not)) )
-{ # Stack layout: value, item, weak-alist, test, test-not.
-  # Check weak-alist argument:
+{ /* Stack layout: value, item, weak-alist, test, test-not. */
+  /* Check weak-alist argument: */
   STACK_2 = check_weakalist(STACK_2);
-  # Check :TEST/:TEST-NOT arguments in STACK_1,STACK_0:
-  var up_function_t up_fun = test_test_args(&STACK_0);
-  # Search:
+  /* Check :TEST/:TEST-NOT arguments in STACK_1,STACK_0: */
+  var funarg_t* pcall_test = check_test_args(&STACK_0);
+  /* Search: */
   var object wal = TheMutableWeakAlist(STACK_2)->mwal_list;
-  # We cannot use TheWeakAlist(wal)->wal_count here, because it can be
-  # decremented by a GC happening during the loop.
+  /* We cannot use TheWeakAlist(wal)->wal_count here, because it can be
+     decremented by a GC happening during the loop. */
   var uintL maxlen = (Lrecord_length(wal)-2)/2;
   pushSTACK(wal);
   pushSTACK(NIL);
   pushSTACK(NIL);
-  # Stack layout: value, item, weak-alist, test, test-not,
-  #               wal, -, -.
+  /* Stack layout: value, item, weak-alist, test, test-not,
+                   wal, -, -. */
   var uintL i;
   for (i = 0; i < maxlen; i++) {
     var object key = TheWeakAlist(wal)->wal_data[2*i+0];
     if (!eq(key,unbound)) {
-      # Store the key and old value in the STACK, to keep the entry alive
-      # while we call the :TEST/:TEST-NOT function.
+      /* Store the key and old value in the STACK, to keep the entry alive
+         while we call the :TEST/:TEST-NOT function. */
       STACK_1 = key;
       STACK_0 = TheWeakAlist(wal)->wal_data[2*i+1];
-      if (up_fun(&STACK_(0+3),key)) {
-        # Replace the pair's value.
+      if (CALL_TEST(0+3,key)) {
+        /* Replace the pair's value. */
         wal = STACK_2;
         TheWeakAlist(wal)->wal_data[2*i+1] = STACK_(4+3);
         VALUES1(STACK_(4+3));
@@ -1100,9 +988,9 @@ LISPFUN(set_weak_alist_value,seclass_default,3,0,norest,key,2,
       wal = STACK_2;
     }
   }
-  # Append a new pair (item . value) to the weak alist.
+  /* Append a new pair (item . value) to the weak alist. */
   if (i < maxlen) {
-    # There is room at the end of wal, from index i to maxlen-1.
+    /* There is room at the end of wal, from index i to maxlen-1. */
     TheWeakAlist(wal)->wal_data[2*i+0] = STACK_(3+3);
     TheWeakAlist(wal)->wal_data[2*i+1] = STACK_(4+3);
     TheWeakAlist(wal)->wal_count = fixnum_inc(TheWeakAlist(wal)->wal_count,1);
@@ -1113,15 +1001,17 @@ LISPFUN(set_weak_alist_value,seclass_default,3,0,norest,key,2,
   } else {
     var uintL count = posfixnum_to_V(TheWeakAlist(wal)->wal_count);
     if (count < maxlen) {
-      # There is room in wal, but not at the end. We have to compact it first,
-      # before we can append a new pair.
+      /* There is room in wal, but not at the end. We have to compact it first,
+         before we can append a new pair. */
       var uintL j;
       for (i = 0, j = 0; j < maxlen; j++)
         if (!eq(TheWeakAlist(wal)->wal_data[2*j+0],unbound)) {
-          # Copy entry j to entry i (0 <= i <= j):
+          /* Copy entry j to entry i (0 <= i <= j): */
           if (i < j) {
-            TheWeakAlist(wal)->wal_data[2*i+0] = TheWeakAlist(wal)->wal_data[2*j+0];
-            TheWeakAlist(wal)->wal_data[2*i+1] = TheWeakAlist(wal)->wal_data[2*j+1];
+            TheWeakAlist(wal)->wal_data[2*i+0] =
+              TheWeakAlist(wal)->wal_data[2*j+0];
+            TheWeakAlist(wal)->wal_data[2*i+1] =
+              TheWeakAlist(wal)->wal_data[2*j+1];
           }
           i++;
         }
@@ -1134,27 +1024,29 @@ LISPFUN(set_weak_alist_value,seclass_default,3,0,norest,key,2,
         activate_weak(wal); /* add to O(all_weakpointers) if needed */
       #endif
     } else {
-      # No more room in wal. Need to allocate a new WeakAlist object.
+      /* No more room in wal. Need to allocate a new WeakAlist object. */
       var uintL old_maxlen = maxlen;
-      maxlen = maxlen + maxlen/4; # augment size proportionally
+      maxlen = maxlen + maxlen/4; /* augment size proportionally */
       if (maxlen < count+1)
         maxlen = count+1;
-      # Allocate a new wal.
+      /* Allocate a new wal. */
       var sintB rectype = Record_type(wal);
       wal = allocate_lrecord(rectype,2+2*maxlen,lrecord_type);
       TheWeakAlist(wal)->wp_cdr = unbound; /* a GC-invariant dummy */
       var object old_wal = STACK_2;
-      # Copy the old contents into it.
+      /* Copy the old contents into it. */
       var uintL j;
       for (i = 0, j = 0; j < old_maxlen; j++)
         if (!eq(TheWeakAlist(old_wal)->wal_data[2*j+0],unbound)) {
-          # Copy entry j of old_wal to entry i of wal (0 <= i <= j):
-          TheWeakAlist(wal)->wal_data[2*i+0] = TheWeakAlist(old_wal)->wal_data[2*j+0];
-          TheWeakAlist(wal)->wal_data[2*i+1] = TheWeakAlist(old_wal)->wal_data[2*j+1];
+          /* Copy entry j of old_wal to entry i of wal (0 <= i <= j): */
+          TheWeakAlist(wal)->wal_data[2*i+0] =
+            TheWeakAlist(old_wal)->wal_data[2*j+0];
+          TheWeakAlist(wal)->wal_data[2*i+1] =
+            TheWeakAlist(old_wal)->wal_data[2*j+1];
           i++;
         }
       ASSERT(i == count);
-      # Add the new pair.
+      /* Add the new pair. */
       TheWeakAlist(wal)->wal_data[2*i+0] = STACK_(3+3);
       TheWeakAlist(wal)->wal_data[2*i+1] = STACK_(4+3);
       i++;

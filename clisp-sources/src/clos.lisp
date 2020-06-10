@@ -1,6 +1,6 @@
 ;;;; Common Lisp Object System for CLISP
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2004
+;;;; Sam Steingold 1998 - 2004, 2007
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 ;;;; method combinations: James Anderson 2003
 
@@ -48,6 +48,7 @@
 (load "clos-custom")
 (setq *allow-making-generic* nil)
 (load "documentation")
+(setq *enable-clos-warnings* t)
 
 
 ;; Bootstrapping techniques

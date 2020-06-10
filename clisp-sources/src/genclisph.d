@@ -1,7 +1,7 @@
 /*
  * Export CLISP internals for modules
  * Bruno Haible 1994-2005
- * Sam Steingold 1998-2005
+ * Sam Steingold 1998-2010
  */
 
 #include "lispbibl.c"
@@ -20,13 +20,13 @@ typedef struct {
     uint8 val8;
     uint16 val16;
     uint32 val32;
-    #ifdef HAVE_LONGLONG
+    #ifdef HAVE_LONG_LONG_INT
     uint64 val64;
     #endif
   } value;
 } printf_arg;
 
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   #define fill_printf_arg(where,expr)  \
     where.size = sizeof(expr); \
     if (sizeof(expr) == sizeof(uint8)) { where.value.val8 = (uint8)(expr); } \
@@ -43,9 +43,8 @@ typedef struct {
     else abort();
 #endif
 
-static const char* Lsuffix = "L";
 static const char* ULsuffix = "UL";
-#ifdef HAVE_LONGLONG
+#if defined(HAVE_LONG_LONG_INT) && !(long_bitsize == 64)
 static const char* ULLsuffix = "ULL";
 #endif
 
@@ -61,7 +60,7 @@ static void print_printf_arg (const printf_arg* arg)
     case sizeof(uint32):
       printf(arg->base=='d' ? "%lu%s" : "0x%lX%s", (unsigned long)(arg->value.val32), ULsuffix);
       break;
-   #ifdef HAVE_LONGLONG
+   #ifdef HAVE_LONG_LONG_INT
     case sizeof(uint64):
      #if (long_bitsize == 64)
       if (!(sizeof(uint64) == sizeof(unsigned long))) abort();
@@ -153,6 +152,8 @@ static void printf_with_args (const char* string, int argcount,
     printf_with_args(string,7,args); \
   }
 
+#if !defined(HAVE_STDBOOL_H)
+/* an alternative for "#include <fname>" */
 static void print_file (const char* fname) {
   char buf[BUFSIZ];
   FILE* includefile = fopen(fname,"r");
@@ -162,12 +163,13 @@ static void print_file (const char* fname) {
     fputs(line,stdout);
   if (ferror(includefile) || fclose(includefile)) { perror(fname); exit(1); }
 }
+#endif
 
 static FILE *header_f = NULL, *test_f = NULL;
 static unsigned int test_count = 0, typedef_count = 0, define_count = 0;
 
 static void emit_typedef_test (const char *new_type) {
-  fprintf(test_f,"  printf(\"sizeof(%s)=%%d\\n\",sizeof(%s));\n",
+  fprintf(test_f,"  printf(\"sizeof(%s)=%%ld\\n\",(long)sizeof(%s));\n",
           new_type,new_type);
   test_count++;
 }
@@ -197,16 +199,37 @@ static void emit_define (const char* form, const char* definition) {
   if (test_f) emit_define_test(form,definition);
 }
 
-/* this cannot be used on X whose definition includes ## ! */
+/* this cannot be used on X whose definition includes ##! */
 #define export_def(x)  puts("#define " #x "  " STRING(x))
 #define export_literal(x)  puts(STRING(x))
+
+static void emit_to_I (const char* name, int signedp, int size)
+{ printf("#define %s_to_I %cint%d_to_I\n",name,(signedp ? 's' : 'u'),size*8); }
+#define EMIT_TO_I(name,type)  emit_to_I(name,(type)-1<(type)0,sizeof(type))
+
+#if DYNAMIC_TABLES
+static FILE *def_f = NULL;
+static void emit_dll_def(char *varname) {
+  fprintf(def_f,"\t" EXECUTABLE_NAME ".%s\n",varname);
+}
+#else
+#define emit_dll_def(v)
+#endif
+#define exportV(t,v)  emit_export_declaration(STRINGIFY(modimp) " " STRING(t),STRING(v),"")
+#define exportF(p,o,s)  emit_export_declaration(STRINGIFY(modimp) " " STRING(p),STRING(o),STRING(s))
+#define exportE(o,a)  emit_export_declaration("nonreturning_function(" STRINGIFY(modimp) ",",STRING(o),", " STRING(a) ")")
+
+static void emit_export_declaration (char *prefix, char *o, char *suffix) {
+  emit_dll_def(o);
+  printf("%s %s%s;\n",prefix,o,suffix);
+}
 
 int main(int argc, char* argv[])
 {
   char buf[BUFSIZ];
 
   header_f = stdout;
-  if (argc == 2) {              /* open the test file and start it */
+  if (argc >= 2) {              /* open the test file and start it */
     test_f = fopen(argv[1],"w");
     if (test_f == NULL) { perror(argv[1]); exit(1); }
     fprintf(stderr,"writing test file %s\n",argv[1]);
@@ -216,9 +239,17 @@ int main(int argc, char* argv[])
             "int main () {\n",
             __FILE__,__DATE__,__TIME__);
   }
+ #if DYNAMIC_TABLES
+  if (argc >= 3) {           /* open the DLL export file and start it */
+    def_f = fopen(argv[2],"w");
+    if (def_f == NULL) { perror(argv[2]); exit(1); }
+    fprintf(stderr,"writing DLL export file %s\n",argv[2]);
+    fprintf(def_f,"EXPORTS\nIMPORTS\n");
+  }
+ #endif
 
   printf("#define SAFETY %d\n",SAFETY);
- #if defined(UNICODE)
+ #if defined(ENABLE_UNICODE)
   printf("#define CLISP_UNICODE 1\n");
  #else
   printf("#define CLISP_UNICODE 0\n");
@@ -227,21 +258,21 @@ int main(int argc, char* argv[])
   /* The definitions are extracted from lispbibl.d. */
 #include "gen.lispbibl.c"
 
-   printf("#define LISPFUNN(name,req_anz)  LISPFUN(name,sec,req_anz,0,norest,nokey,0,NIL)\n");
-   /* In LISPFUN_B, emit the decl first, to avoid "gcc -missing-declarations" warnings. */
-   printf("#define LISPFUN_B(name,sec,req_anz,opt_anz,rest_flag,key_flag,key_anz,keywords)  Values C_##name subr_##rest_flag##_function_args; Values C_##name subr_##rest_flag##_function_args\n");
-   printf("#define subr_norest_function_args  (void)\n");
-   printf("#define subr_rest_function_args  (uintC argcount, object* rest_args_pointer)\n");
+  printf("#define LISPFUNN(name,req_count)  LISPFUN(name,sec,req_count,0,norest,nokey,0,NIL)\n");
+  /* In LISPFUN_B, emit the decl first, to avoid "gcc -missing-declarations" warnings. */
+  printf("#define LISPFUN_B(name,sec,req_count,opt_count,rest_flag,key_flag,key_count,keywords)  Values C_##name subr_##rest_flag##_function_args; Values C_##name subr_##rest_flag##_function_args\n");
+  printf("#define subr_norest_function_args  (void)\n");
+  printf("#define subr_rest_function_args  (uintC argcount, object* rest_args_pointer)\n");
  #ifdef TYPECODES
   #ifdef DEBUG_GCSAFETY
-   printf4("#define LISPFUN_F(name,sec,req_anz,opt_anz,rest_flag,key_flag,key_anz,keywords)  { gcv_nullobj, %d,%d,%d,%d, gcv_nullobj, gcv_nullobj, (lisp_function_t)(&C_##name), 0, req_anz, opt_anz, (uintB)subr_##rest_flag, (uintB)subr_##key_flag, key_anz, sec},\n", Rectype_Subr, 0, subr_length, subr_xlength);
+  printf4("#define LISPFUN_F(name,sec,req_count,opt_count,rest_flag,key_flag,key_count,keywords)  { gcv_nullobj, %d,%d,%d,%d, gcv_nullobj, gcv_nullobj, (lisp_function_t)(&C_##name), 0, req_count, opt_count, (uintB)subr_##rest_flag, (uintB)subr_##key_flag, key_count, sec, 0},\n", Rectype_Subr, 0, subr_length, subr_xlength);
   #else
-   printf4("#define LISPFUN_F(name,sec,req_anz,opt_anz,rest_flag,key_flag,key_anz,keywords)  { { gcv_nullobj }, %d,%d,%d,%d, gcv_nullobj, gcv_nullobj, (lisp_function_t)(&C_##name), 0, req_anz, opt_anz, (uintB)subr_##rest_flag, (uintB)subr_##key_flag, key_anz, sec},\n", Rectype_Subr, 0, subr_length, subr_xlength);
+  printf4("#define LISPFUN_F(name,sec,req_count,opt_count,rest_flag,key_flag,key_count,keywords)  { { gcv_nullobj }, %d,%d,%d,%d, gcv_nullobj, gcv_nullobj, (lisp_function_t)(&C_##name), 0, req_count, opt_count, (uintB)subr_##rest_flag, (uintB)subr_##key_flag, key_count, sec, 0},\n", Rectype_Subr, 0, subr_length, subr_xlength);
   #endif
  #else
-   printf1("#define LISPFUN_F(name,sec,req_anz,opt_anz,rest_flag,key_flag,key_anz,keywords)  { gcv_nullobj, %d, gcv_nullobj, gcv_nullobj, (lisp_function_t)(&C_##name), 0, req_anz, opt_anz, (uintB)subr_##rest_flag, (uintB)subr_##key_flag, key_anz, sec},\n", xrecord_tfl(Rectype_Subr,0,subr_length,subr_xlength));
+  printf1("#define LISPFUN_F(name,sec,req_count,opt_count,rest_flag,key_flag,key_count,keywords)  { gcv_nullobj, %d, gcv_nullobj, gcv_nullobj, (lisp_function_t)(&C_##name), 0, req_count, opt_count, (uintB)subr_##rest_flag, (uintB)subr_##key_flag, key_count, sec, 0},\n", xrecord_tfl(Rectype_Subr,0,subr_length,subr_xlength));
  #endif
-   printf("#define LISPFUN  LISPFUN_B\n");
+  printf("#define LISPFUN  LISPFUN_B\n");
 
   /* Note: The following inline/macro definitions are _not_ in lispbibl.d! */
 
@@ -251,6 +282,9 @@ int main(int argc, char* argv[])
          "}\n");
   printf("#endif\n");
   printf("#define check_uint_default0(obj) check_uint_defaulted(obj,0)\n");
+  EMIT_TO_I("size",size_t);
+  EMIT_TO_I("ssize",ssize_t);
+  EMIT_TO_I("off",off_t);
 
 #if defined(UNIX_CYGWIN32)
   printf("#ifndef COMPILE_STANDALONE\n");
@@ -276,6 +310,7 @@ int main(int argc, char* argv[])
   printf("#undef PACKAGE_STRING\n");
   printf("#undef PACKAGE_TARNAME\n");
   printf("#undef PACKAGE_VERSION\n");
+  printf("#undef PACKAGE_URL\n");
   /* Additional stuff for modules. */
   printf("#define DEFMODULE(module_name,package_name)\n");
   printf("#define DEFUN(funname,lambdalist,signature) LISPFUN signature\n");

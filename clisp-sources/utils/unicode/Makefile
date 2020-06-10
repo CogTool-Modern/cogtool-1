@@ -72,7 +72,6 @@ ALL = $(DESTDIR)uni_upcase.c $(DESTDIR)uni_downcase.c $(DESTDIR)uni_attribute.c 
  $(DESTDIR)nls_cp1256.c \
  $(DESTDIR)nls_cp1257.c \
  $(DESTDIR)nls_hp_roman8.c \
- $(DESTDIR)nls_nextstep.c \
  $(DESTDIR)nls_jisx0201.c
 
 CC = gcc -O -Wall
@@ -274,9 +273,6 @@ $(DESTDIR)nls_cp1257.c : $(TABLESDIR)/unicode.org-mappings/VENDORS/MICSFT/WINDOW
 
 $(DESTDIR)nls_hp_roman8.c : $(TABLESDIR)/glibc-2.1-iconv/HP-ROMAN8.TXT nls_table
 	./nls_table hp-roman8 nls_hp_roman8.c $(DESTDIR) < $<
-
-$(DESTDIR)nls_nextstep.c : $(TABLESDIR)/clisp/NEXTSTEP.TXT nls_table
-	./nls_table nextstep nls_nextstep.c $(DESTDIR) < $<
 
 $(DESTDIR)nls_jisx0201.c : $(TABLESDIR)/clisp/JIS_X0201.TXT nls_table
 	./nls_table jisx0201 nls_jisx0201.c $(DESTDIR) < $<

@@ -1,13 +1,8 @@
-file_list='regexi.o'
-mod_list='regexp'
-if test -z "@REGEX_O@"; then
-  rm -f regex*; # use system-wide regex implementation
-fi
-make clisp-module \
-     CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}" \
-     INCLUDES="$absolute_linkkitdir"
-NEW_FILES="$file_list @REGEX_O@ @ALLOCA@ regexp.dvi"
-NEW_LIBS="$file_list @REGEX_O@ @ALLOCA@"
-NEW_MODULES="$mod_list"
+${MAKE-make} clisp-module \
+  CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}" \
+  CLISP_LINKKIT="$absolute_linkkitdir" CLISP="${CLISP}"
+NEW_FILES='regexi.o libgnu_rx.a'
+NEW_LIBS="${NEW_FILES}"
+NEW_MODULES="regexp"
 TO_LOAD='regexp'
 TO_PRELOAD='preload.lisp'

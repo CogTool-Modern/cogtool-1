@@ -1,4 +1,4 @@
-# Extern-Deklarationen zu ARILEV1.D
+/* extern declarations for ARILEV1.D */
 
 BEGIN_DECLS
 

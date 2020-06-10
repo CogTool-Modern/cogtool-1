@@ -1,4 +1,4 @@
-;;; Copyright (C) 2001-2004 by Sam Steingold
+;;; Copyright (C) 2001-2009 by Sam Steingold
 ;;; released under the GNU GPL <http://www.gnu.org/copyleft/gpl.html>
 ;;; as a part of CLISP <http://clisp.cons.org>
 ;;;
@@ -42,10 +42,10 @@
     (message "C-name: %s; c-def: %s" c-name c-def)
     (tags-search (concat "^" c-def))))
 
-(defun d-mode-current-defun-function ()
-  "Return the name of the current function."
-  (save-excursion
-    (d-mode-beg-of-defun)
+(defun d-mode-extract-index-name-function ()
+  "Extract the index item name, given a position.
+A valid value for `imenu-extract-index-name-function'."
+  (save-match-data
     (cond ((looking-at "LISP")
            (search-forward "(")
            (let ((c-name (buffer-substring-no-properties
@@ -59,7 +59,7 @@
           ((looking-at "DEFUN")
            (re-search-forward "([-A-Za-Z]*::?\\([^ ,]+\\)")
            (match-string 1))
-          ((looking-at "\\(local\\|global\\)")
+          ((looking-at "\\(local\\|global\\|modexp\\)")
            (search-forward "(") (forward-char -1)
            (let ((beg (scan-sexps (point) -1)))
              (buffer-substring-no-properties beg (scan-sexps beg 1))))
@@ -72,11 +72,18 @@
            (let ((add-log-current-defun-function nil))
              (add-log-current-defun))))))
 
+(defun d-mode-current-defun-function ()
+  "Return the name of the current function."
+  (save-excursion
+    (d-mode-beg-of-defun)
+    (d-mode-extract-index-name-function)))
+
 (defun d-mode-beg-of-defun ()
   "A valid value for `beginning-of-defun-function' for `d-mode'."
   (re-search-backward
    (eval-when-compile
-    (concat "^" (regexp-opt '("LISPFUN" "LISPSPECFORM" "local " "global "
+    (concat "^" (regexp-opt '("LISPFUN" "LISPSPECFORM"
+                              "local " "global " "modexp "
                               "#define " "nonreturning_function"
                               "typedef " "struct " "DEFUN")
                             t)))
@@ -171,8 +178,8 @@ The point should be on the prototype and the definition should follow."
 
 (defvar d-extra-keywords
   (eval-when-compile
-   (regexp-opt '("var" "local" "global" "true" "false" "NIL" "T" "loop"
-                 "inline" "NULL" "nullobj" "maygc"
+   (regexp-opt '("var" "local" "global" "modexp" "true" "false" "NIL" "T"
+                 "loop" "inline" "NULL" "nullobj" "maygc" "per_thread"
                  "popSTACK" "pushSTACK" "skipSTACK" "skipSTACKop" "STACKop"
                  "dotimespC" "dotimesC" "dotimespL" "dotimesL" "dotimespW"
                  "dotimesW" "nonreturning_function" "return_Values"
@@ -199,7 +206,9 @@ The point should be on the prototype and the definition should follow."
 
 (defvar d-mode-font-lock-defaults
   (d-mode-add-font-locking
-   (if (boundp 'running-xemacs) (get 'c-mode 'font-lock-defaults)
+   (if (boundp 'running-xemacs)
+       (get 'c-mode 'font-lock-defaults)
+       ;; for pre-21 emacs; newer versions inherit font lock automatically
        (cdr (assq 'c-mode font-lock-defaults-alist))))
   "The `font-lock-defaults' for `d-mode'.")
 
@@ -221,6 +230,31 @@ The point should be on the prototype and the definition should follow."
     (back-to-indentation)
     (vector (+ (current-column) c-basic-offset))))
 
+(defun d-mode-compile-command ()
+  "Compute a reasonable value for the buffer-local `compile-command'."
+  (let* ((target (if (eq window-system 'w32) "lisp.exe" "lisp.run"))
+         build-dir
+         (make (if (eq window-system 'w32) "nmake" "make"))
+         (makefile
+          (cond ((file-readable-p "Makefile") nil)
+                ((file-readable-p "makefile") nil)
+                ((file-readable-p "makefile-msvc") "makefile-msvc")
+                ((file-readable-p "makefile.msvc") "makefile.msvc")
+                ((file-readable-p "makefile.msvc5") "makefile.msvc5")
+                ((file-readable-p "Makefile.msvc5") "Makefile.msvc5")
+                ((file-readable-p "makefile-msvs") "makefile-msvs")
+                ((file-readable-p "makefile-gcc")
+                 (setq make "make") "makefile-gcc")
+                ((file-directory-p d-mode-build-dir)
+                 (setq build-dir d-mode-build-dir make "make")
+                 "Makefile")
+                (t nil))))
+    (if build-dir
+        (concat make " -C " build-dir " -f " makefile " " target)
+        (if makefile
+            (concat make " -f " makefile " " target)
+            (concat make " " target)))))
+
 (define-derived-mode d-mode c-mode "D"
   "Major mode for editing CLISP source code.
 Special commands:
@@ -230,41 +264,22 @@ if that value is non-nil.
 If you are using Emacs 20.2 or earlier (including XEmacs) and want to
 use fontifications, you have to (require 'font-lock) first.  Sorry.
 Beware - this will modify the original C-mode too!"
-  (set (make-local-variable 'compile-command)
-       (let* ((target (if (eq window-system 'w32) "lisp.exe" "lisp.run"))
-              build-dir
-              (make (if (eq window-system 'w32) "nmake" "make"))
-              (makefile
-               (cond ((file-readable-p "Makefile") nil)
-                     ((file-readable-p "makefile") nil)
-                     ((file-readable-p "makefile-msvc") "makefile-msvc")
-                     ((file-readable-p "makefile.msvc") "makefile.msvc")
-                     ((file-readable-p "makefile.msvc5") "makefile.msvc5")
-                     ((file-readable-p "Makefile.msvc5") "Makefile.msvc5")
-                     ((file-readable-p "makefile-msvs") "makefile-msvs")
-                     ((file-readable-p "makefile-gcc")
-                      (setq make "make") "makefile-gcc")
-                     ((file-directory-p d-mode-build-dir)
-                      (setq build-dir d-mode-build-dir make "make")
-                      "Makefile")
-                     (t nil))))
-         (if build-dir
-             (concat make " -C " build-dir " -f " makefile " " target)
-             (if makefile
-                 (concat make " -f " makefile " " target)
-                 (concat make " " target)))))
   (set (make-local-variable 'add-log-current-defun-function)
        'd-mode-current-defun-function)
+  (set (make-local-variable 'imenu-extract-index-name-function)
+       'd-mode-extract-index-name-function)
   (c-set-offset 'cpp-macro 'd-mode-indent-sharp)
   (c-set-offset 'block-close 'd-indent-to-boi)
   (c-set-offset 'statement-block-intro 'd-indent-to-boi+offset)
   ;; (setq defun-prompt-regexp
-  ;; "^\\(LISPFUNN?(.*) \\|\\(local\\|global\\|nonreturning_function\\) .*\\)")
+  ;; "^\\(LISPFUNN?(.*) \\|\\(local\\|global\\|modexp\\|nonreturning_function\\) .*\\)")
   (set (make-local-variable 'beginning-of-defun-function)
        'd-mode-beg-of-defun)
   (when (<= 21 emacs-major-version)
     (set (make-local-variable 'font-lock-defaults)
          d-mode-font-lock-defaults)))
+
+(eval-after-load "add-log" '(add-to-list 'add-log-c-like-modes 'd-mode))
 
 (when window-system
   ;; enable font locking

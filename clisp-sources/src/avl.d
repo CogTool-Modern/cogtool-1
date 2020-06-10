@@ -112,7 +112,7 @@
 /* Determines if an element with a given key is in the tree. */
 #ifndef NO_AVL_MEMBER0
 local NODE* AVL(AVLID,member0) (KEY key, NODE * tree) {
-  loop {
+  while (1) {
     if (tree == EMPTY)
       return (NODE*)NULL;
     var SIGNED_INT sign = COMPARE(key,KEYOF(tree->nodedata.value));
@@ -133,7 +133,7 @@ local NODE* AVL(AVLID,member0) (KEY key, NODE * tree) {
 #ifndef NO_AVL_MEMBER
 local NODE* AVL(AVLID,member) (ELEMENT element, NODE * tree) {
   var KEY key = KEYOF(element);
-  loop {
+  while (1) {
     if (tree == EMPTY)
       return (NODE*)NULL;
     var SIGNED_INT sign = COMPARE(key,KEYOF(tree->nodedata.value));
@@ -247,7 +247,7 @@ local NODE* AVL(AVLID,insert) (ELEMENT value, NODE* tree) {
   var NODE** stack[MAXHEIGHT]; /* a little private-stack */
   var uintC stack_count = 0; /* number of elements on the stack */
   var NODE** * stack_ptr = &stack[0]; /* always = &stack[stack_count] */
-  loop {
+  while (1) {
     var NODE* node = *nodeplace;
     if (node == EMPTY)
       break;
@@ -277,7 +277,7 @@ local NODE* AVL(AVLID,insert1) (NODE* new_node, NODE* tree) {
   var NODE** stack[MAXHEIGHT]; /* a little private-stack */
   var uintC stack_count = 0; /* number of elements on the stack */
   var NODE** * stack_ptr = &stack[0]; /* always = &stack[stack_count] */
-  loop {
+  while (1) {
     var NODE* node = *nodeplace;
     if (node == EMPTY)
       break;
@@ -308,17 +308,17 @@ local NODE* AVL(AVLID,delete) (ELEMENT value, NODE* tree) {
   var uintC stack_count = 0; /* number of elements on the stack */
   var NODE** * stack_ptr = &stack[0]; /* always = &stack[stack_count] */
   var NODE* node_to_delete;
-  loop {
+  while (1) {
     var NODE* node = *nodeplace;
     if (node == EMPTY)
-      goto fertig; /* element not found */
+      goto done; /* element not found */
     *stack_ptr++ = nodeplace; stack_count++;
     var SIGNED_INT sign = COMPARE(key,KEYOF(node->nodedata.value));
     if (sign == 0) {
       if (EQUAL(value,node->nodedata.value)) { /* found? */
         node_to_delete = node; break;
       } else
-        goto fertig;
+        goto done;
     }
     if (sign < 0)
       /* key < KEYOF(node->nodedata.value)  --> remove in left subtree: */
@@ -339,7 +339,7 @@ local NODE* AVL(AVLID,delete) (ELEMENT value, NODE* tree) {
     var NODE** * stack_ptr_to_delete = stack_ptr;
     var NODE** nodeplace = &node_to_delete->nodedata.left;
     var NODE* node;
-    loop {
+    while (1) {
       node = *nodeplace;
       if (node->nodedata.right == EMPTY)
         break;
@@ -358,7 +358,7 @@ local NODE* AVL(AVLID,delete) (ELEMENT value, NODE* tree) {
   }
   FREE(node_to_delete);
   AVL(AVLID,rebalance)(stack_ptr,stack_count);
- fertig:
+ done:
   return tree;
 }
 #endif
@@ -370,7 +370,7 @@ local NODE* AVL(AVLID,delete) (ELEMENT value, NODE* tree) {
    in the tree. Stores the path at stack_ptr, and returns the new stack_ptr. */
 local NODE** * AVL(AVLID,delete1find) (NODE* node_to_delete, KEY key,
                                        NODE* tree, NODE** * stack_ptr) {
-  loop {
+  while (1) {
     if (tree == EMPTY)
       return (NODE***)NULL;
     var SIGNED_INT sign = COMPARE(key,KEYOF(tree->nodedata.value));
@@ -405,10 +405,10 @@ local NODE* AVL(AVLID,delete1) (NODE* node_to_delete, NODE* tree) {
   var NODE** stack[MAXHEIGHT]; /* a little private-stack */
   var uintC stack_count = 0; /* number of elements on the stack */
   var NODE** * stack_ptr = &stack[0]; /* always = &stack[stack_count] */
-  loop {
+  while (1) {
     var NODE* node = *nodeplace;
     if (node == EMPTY)
-      goto fertig; /* element not found */
+      goto done; /* element not found */
     *stack_ptr++ = nodeplace; stack_count++;
     var SIGNED_INT sign = COMPARE(key,KEYOF(node->nodedata.value));
     if (sign == 0) {
@@ -420,7 +420,7 @@ local NODE* AVL(AVLID,delete1) (NODE* node_to_delete, NODE* tree) {
         nodeplace = stack_ptr[-1];
         break;
       } else
-        goto fertig; /* not found */
+        goto done; /* not found */
     }
     if (sign < 0)
       /* key < KEYOF(node->nodedata.value)  --> remove in left subtree: */
@@ -443,7 +443,7 @@ local NODE* AVL(AVLID,delete1) (NODE* node_to_delete, NODE* tree) {
       var NODE** * stack_ptr_to_delete = stack_ptr;
       var NODE** nodeplace = &node_to_delete->nodedata.left;
       var NODE* node;
-      loop {
+      while (1) {
         node = *nodeplace;
         if (node->nodedata.right == EMPTY)
           break;
@@ -462,7 +462,7 @@ local NODE* AVL(AVLID,delete1) (NODE* node_to_delete, NODE* tree) {
     }
   }
   AVL(AVLID,rebalance)(stack_ptr,stack_count);
- fertig:
+ done:
   return tree;
 }
 #endif
@@ -595,7 +595,7 @@ local NODE* AVL(AVLID,least) (KEY limit, NODE** tree_ptr,
   /* mark = current subtree, node = last considered element within.
      markdepth = stack depth up to mark, nodedepth = stack depth up to node.
      markdepth <= nodedepth. */
-  loop {
+  while (1) {
     stack->path[nodedepth++] = nodeplace;
     var NODE* node = *nodeplace;
     /* all elements with Key >= Limit are either in the subtree
@@ -638,7 +638,7 @@ local void AVL(AVLID,move) (AVL(AVLID,stack) * stack) {
     var NODE** * stack_ptr_to_delete = stack_ptr;
     var NODE** nodeplace = &node_to_delete->nodedata.left;
     var NODE* node;
-    loop {
+    while (1) {
       node = *nodeplace;
       if (node->nodedata.right == EMPTY)
         break;
@@ -660,7 +660,7 @@ local void AVL(AVLID,move) (AVL(AVLID,stack) * stack) {
   var KEY key = KEYOF(node_to_delete->nodedata.value);
   var NODE** nodeplace = stack->path[0]; /* = &tree */
   stack_count = 0; stack_ptr = &stack->path[0];
-  loop {
+  while (1) {
     var NODE* node = *nodeplace;
     if (node == EMPTY)
       break;

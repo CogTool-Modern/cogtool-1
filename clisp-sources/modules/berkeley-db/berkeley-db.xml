@@ -2,20 +2,36 @@
 
 <section id="berkeley-db"><title>Berkeley DB access</title>
 
-<para>This interface to <ulink role="bdb" url="index.html">Berkeley DB
-  from Sleepycat Software</ulink> exports most
- functions in the official &c-lang; API.
- Supported versions:<simplelist type="horiz" columns="1">
+<para>This interface to <ulink role="bdb" url="index.html">Berkeley DB</ulink>
+ from <ulink url="http://en.wikipedia.org/wiki/Sleepycat_Software">Sleepycat
+  Software</ulink>/&oracle-link; exports most functions in the official
+ &c-lang; API.  Supported versions:<simplelist type="horiz" columns="1">
   <member><ulink role="bdb" url="ref/upgrade.4.2/toc.html">4.2</ulink></member>
   <member><ulink role="bdb" url="ref/upgrade.4.3/toc.html">4.3</ulink></member>
   <member><ulink role="bdb" url="ref/upgrade.4.4/toc.html">4.4</ulink></member>
+  <member><ulink role="bdb" url="ref/upgrade.4.5/toc.html">4.5</ulink></member>
+  <member><ulink role="bdb" url="ref/upgrade.4.6/toc.html">4.6</ulink></member>
+  <member><ulink role="bdb" url="ref/upgrade.4.7/toc.html">4.7</ulink></member>
+  <member><ulink role="bdb" url="ref/upgrade.4.8/toc.html">4.8</ulink></member>
 </simplelist></para>
 
-<simpara>When this module is present, &features-var; contains the
+<simpara>When this module is present, &features-my; contains the
  symbol <constant>:BERKELEY-DB</constant>.</simpara>
 
 <simpara>See <filename role="clisp-cvs">modules/berkeley-db/test.tst</filename>
  for sample usage.</simpara>
+
+<note><para>The symbol names do evolve with new Berkeley DB releases.
+  E.g., version 4.3 introduced <constant>DB_DSYNC_LOG</constant> which
+  was renamed to <constant>DB_LOG_DSYNC</constant> in version 4.7.
+  The corresponding Lisp symbol was renamed from
+  <constant>:DSYNC-LOG</constant> to <constant>:LOG-DSYNC</constant>
+  when support for version 4.7 was added.
+  This means that we always use Lisp names which correspond to the
+  &c-lang; names in the latest Berkeley DB release, even though we keep suport
+  for older releases.
+  This is convenient because the online documentation to which this
+  manual refers documents the latest Berkeley DB release.</para></note>
 
 <section id="bdb-objects"><title>Berkeley-DB Objects</title>
 
@@ -45,7 +61,7 @@
 <para>&close; will close (or commit, in the case of a
  <link linkend="bdb-transaction">transaction</link>, or
  put, in the case of a <link linkend="bdb-lock">lock</link>)
- the Berkeley-DB handle objects.  &gc;or will also call &close;.
+ the Berkeley-DB handle objects.  The &gc;or will also call &close;.
  Closing an object will &close; all its dependents and remove the object
  itself from the dependents lists of its parents (but see
  <link linkend="bdb-lock"><function>BDB:LOCK-CLOSE</function></link>).</para>
@@ -121,15 +137,20 @@
 <variablelist>
 <varlistentry id="dbe-set-options"><term><code>(BDB:DBE-SET-OPTIONS dbe
    &key-amp; MSGFILE ERRFILE ERRPFX PASSWORD ENCRYPT LOCK-TIMEOUT TXN-TIMEOUT
-   SHM-KEY TAS-SPINS TX-TIMESTAMP TX-MAX DATA-DIR TMP-DIR LG-BSIZE LG-DIR
-   LG-MAX LG-REGIONMAX LK-CONFLICTS LK-DETECT LK-MAX-LOCKERS LK-MAX-LOCKS
-   LK-MAX-OBJECTS AUTO-COMMIT CDB-ALLDB DIRECT-DB DSYNC-LOG LOG-AUTOREMOVE
-   LOG-INMEMORY DIRECT-LOG NOLOCKING NOMMAP NOPANIC OVERWRITE PANIC-ENVIRONMENT
-   REGION-INIT TXN-NOSYNC TXN-WRITE-NOSYNC YIELDCPU VERB-CHKPOINT VERB-DEADLOCK
-   VERB-RECOVERY VERB-REPLICATION VERB-WAITSFOR VERBOSE)</code></term>
+   SHM-KEY TAS-SPINS TX-TIMESTAMP TX-MAX DATA-DIR TMP-DIR
+   INTERMEDIATE-DIR-MODE LG-BSIZE LG-DIR
+   LG-MAX LG-REGIONMAX NCACHE CACHESIZE CACHE LK-CONFLICTS LK-DETECT
+   LK-MAX-LOCKERS LK-MAX-LOCKS LK-MAX-OBJECTS
+   LOG-DIRECT LOG-DSYNC LOG-AUTO-REMOVE LOG-IN-MEMORY LOG-ZERO
+   AUTO-COMMIT CDB-ALLDB DIRECT-DB NOLOCKING NOMMAP NOPANIC
+   OVERWRITE PANIC-ENVIRONMENT REGION-INIT TXN-NOSYNC TXN-WRITE-NOSYNC YIELDCPU
+   VERB-CHKPOINT VERB-DEADLOCK VERB-RECOVERY VERB-REPLICATION VERB-WAITSFOR
+   VERBOSE)</code></term>
  <listitem><para>Set some environment options using <simplelist columns="3">
     <member><function role="bdb">DB_ENV-&gt;set_flags</function></member>
+    <member><function role="bdb">DB_ENV-&gt;log_set_config</function> (v4.7+)</member>
     <member><function role="bdb">DB_ENV-&gt;set_verbose</function></member>
+    <member><function role="bdb">DB_ENV-&gt;set_intermediate_dir_mode</function> (v4.7+)</member>
     <member><function role="bdb">DB_ENV-&gt;set_tmp_dir</function></member>
     <member><function role="bdb">DB_ENV-&gt;set_data_dir</function></member>
     <member><function role="bdb">DB_ENV-&gt;set_tx_max</function></member>
@@ -150,6 +171,7 @@
     <member><function role="bdb">DB_ENV-&gt;set_lk_max_lockers</function></member>
     <member><function role="bdb">DB_ENV-&gt;set_lk_max_locks</function></member>
     <member><function role="bdb">DB_ENV-&gt;set_lk_max_objects</function></member>
+    <member><function role="bdb">DB_ENV-&gt;set_cachesize</function></member>
 </simplelist></para></listitem></varlistentry>
 <varlistentry id="dbe-get-options"><term><code>(BDB:DBE-GET-OPTIONS dbe
    &optional-amp; &what-r;)</code></term>
@@ -175,6 +197,11 @@
      <listitem><simpara>temporary directory
        (<function role="bdb">DB_ENV-&gt;get_tmp_dir</function>).
        May be &nil;.</simpara></listitem></varlistentry>
+    <varlistentry><term><constant>:INTERMEDIATE-DIR-MODE</constant></term>
+     <listitem><simpara>mode for creating intermediate directories
+       during recovery (v4.7+)
+       (<function role="bdb">DB_ENV-&gt;get_intermediate_dir_mode</function>).
+    </simpara></listitem></varlistentry>
     <varlistentry><term>&verbose-k;</term>
      <listitem><simpara>the &list-t; of verbosity settings
        (<function role="bdb">DB_ENV-&gt;get_verbose</function>).
@@ -182,10 +209,11 @@
     <varlistentry><term><constant>:AUTO-COMMIT</constant></term>
      <term><constant>:CDB-ALLDB</constant></term>
      <term><constant>:DIRECT-DB</constant></term>
-     <term><constant>:DSYNC-LOG</constant></term>
-     <term><constant>:LOG-AUTOREMOVE</constant></term>
-     <term><constant>:LOG-INMEMORY</constant></term>
-     <term><constant>:DIRECT-LOG</constant></term>
+     <term><constant>:LOG-DIRECT</constant></term>
+     <term><constant>:LOG-DSYNC</constant></term>
+     <term><constant>:LOG-AUTO-REMOVE</constant></term>
+     <term><constant>:LOG-IN-MEMORY</constant></term>
+     <term><constant>:LOG-ZERO</constant></term>
      <term><constant>:NOLOCKING</constant></term>
      <term><constant>:NOMMAP</constant></term>
      <term><constant>:NOPANIC</constant></term>
@@ -202,8 +230,9 @@
      <term><constant>:VERB-WAITSFOR</constant></term>
      <listitem><simpara>a &boolean-t; indicator of whether this
        option is set or not
-       (<function role="bdb">DB_ENV-&gt;get_verbose</function> and
-       <function role="bdb">DB_ENV-&gt;get_flags</function>).
+       (<function role="bdb">DB_ENV-&gt;get_verbose</function>,
+       <function role="bdb">DB_ENV-&gt;get_flags</function>, and
+       <function role="bdb">DB_ENV-&gt;log_get_config</function>).
     </simpara></listitem></varlistentry>
     <varlistentry><term><constant>:LG-BSIZE</constant></term>
      <listitem><simpara>log buffer size
@@ -220,6 +249,12 @@
     <varlistentry><term><constant>:LG-REGIONMAX</constant></term>
      <listitem><simpara>logging region size
        (<function role="bdb">DB_ENV-&gt;get_lg_regionmax</function>).
+    </simpara></listitem></varlistentry>
+    <varlistentry><term><constant>:NCACHE</constant></term>
+     <term><constant>:CACHESIZE</constant></term>
+     <term><constant>:CACHE</constant></term>
+     <listitem><simpara>cache parameters
+       (<function role="bdb">DB_ENV-&gt;get_cachesize</function>).
     </simpara></listitem></varlistentry>
     <varlistentry><term><constant>:LK-CONFLICTS</constant></term>
      <listitem><simpara>lock conflicts matrix
@@ -271,7 +306,7 @@
      <listitem><simpara>&string-t; or &nil;
        (<function role="bdb">DB_ENV-&gt;get_errpfx</function>).
     </simpara></listitem></varlistentry>
-    <varlistentry><term><constant>:DB-XIDDATASIZE</constant></term>
+    <varlistentry><term><constant>:DB-GID-SIZE</constant></term>
      <listitem><simpara>the &length; of the globally unique
        &ubyte-vec; which must be passed to
        <function role="bdb">DB_TXN-&gt;prepare</function>.
@@ -284,6 +319,10 @@
      <listitem><simpara>the &list-t; of flags passed to &dbe-open;
        (<function role="bdb">DB_ENV-&gt;get_open_flags</function>).
     </simpara></listitem></varlistentry>
+    <varlistentry><term><constant>:CACHE</constant></term>
+     <listitem><simpara>database cache information
+       (<function role="bdb">DB_ENV-&gt;get_cachesize</function>).
+    </simpara></listitem></varlistentry>
 </variablelist></para></listitem></varlistentry>
 </variablelist></section>
 
@@ -295,8 +334,7 @@
  DB->errx	Error message
  -->
 <variablelist>
-<varlistentry id="db-create"><term><code>(BDB:DB-CREATE dbe &key-amp;
-   XA)</code></term>
+<varlistentry id="db-create"><term><code>(BDB:DB-CREATE dbe)</code></term>
  <listitem><simpara>Create a database handle
    (<function role="bdb">db_create</function>).
 </simpara></listitem></varlistentry>
@@ -473,7 +511,9 @@
     </simpara></listitem></varlistentry>
     <varlistentry><term><constant>:CACHE</constant></term>
      <listitem><simpara>database cache information
-       (<function role="bdb">DB-&gt;get_cachesize</function>).
+       (<function role="bdb">DB-&gt;get_cachesize</function> or
+       <function role="bdb">DB_ENV-&gt;get_cachesize</function> if the
+       database was created within an environment).
     </simpara></listitem></varlistentry>
    <varlistentry><term><constant>:ENCRYPTION</constant></term>
      <listitem><simpara>encryption flags
@@ -555,8 +595,7 @@
     the handle can only be used for that type.
     The methods <function role="bdb">DB-&gt;get_re_delim</function>
     and <function role="bdb">DB-&gt;get_re_source</function> are for
-    a <constant>:RECNO</constant> database so
-    you <emphasis>cannot</emphasis> call them
+    a <constant>:RECNO</constant> database so you &cannot-e; call them
     (by passing <constant>:RE-DELIM</constant>
     or <constant>:RE-SOURCE</constant> to this function)
     and then use the database handle to open a database of different type
@@ -581,7 +620,7 @@
  <listitem><simpara>Return count of duplicates
    (<function role="bdb">DBCursor-&gt;count</function>).
 </simpara></listitem></varlistentry>
-<varlistentry><term><code>(BDB:DBC-DEL cursor)</code></term>
+<varlistentry><term><code>(BDB:DBC-DEL cursor &key-amp; CONSUME)</code></term>
  <listitem><simpara>Delete by cursor
    (<function role="bdb">DBCursor-&gt;del</function>).
 </simpara></listitem></varlistentry>
@@ -613,8 +652,7 @@
     <member><constant>:SET-RANGE</constant></member>
     <member><constant>:SET-RECNO</constant></member></simplelist>
 </para></listitem></varlistentry>
-<varlistentry><term><code>(BDB:DBC-PUT cursor key data
-   flag)</code></term>
+<varlistentry><term><code>(BDB:DBC-PUT cursor key data flag)</code></term>
  <listitem><simpara>Store by cursor
    (<function role="bdb">DBCursor-&gt;put</function>).
 </simpara></listitem></varlistentry>
@@ -658,8 +696,8 @@
    environment with which it has been acquired.
    This is used to &finalize; <type>BDB:DBLOCK</type> objects.</simpara>
   <warning><simpara>If that environment has already been closed, you are
-    in big trouble (segfault), so you better release your locks or do not
-    drop them.</simpara></warning></listitem></varlistentry>
+    in a big trouble (segfault), so you better release your locks or do
+    not drop them.</simpara></warning></listitem></varlistentry>
 <varlistentry><term><code>(BDB:LOCK-STAT dbe &key-amp;
    STAT-CLEAR)</code></term>
  <listitem><simpara>Return lock subsystem statistics

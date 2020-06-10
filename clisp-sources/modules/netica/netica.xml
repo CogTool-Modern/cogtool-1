@@ -2,17 +2,37 @@
 
 <section id="netica"><title>Netica Interface</title>
 
-<para>This is an interface to the &netica-link; for working with
- Bayesian belief networks and influence diagrams.</para>
+<para>This is an interface to the &netica-link; (&c-lang; API version 3.25)
+ for working with Bayesian belief networks and influence diagrams.</para>
 
-<para>The package <quote role="package">NETICA</quote> is
- <link linkend="package-case">case-sensitive</link>, e.g., you would write
- <code>(netica:GetNodeExpectedUtils_bn ...)</code>
+<para>The package <quote role="package">NETICA</quote> is &case-sensitive-k;,
+ e.g., you would write <code>(netica:GetNodeExpectedUtils_bn ...)</code>
  when you need to call
  <function role="netica">GetNodeExpectedUtils_bn</function>.</para>
 
-<para>An interface to all public &c-lang; functions is provided.
- Additionally, some higher level functionality is available
+<simpara>When this module is present, &features-my;
+ contains the symbol <constant>:NETICA</constant>.</simpara>
+
+<para>All public &c-lang; functions are available as
+ &foreign-function-t;s.</para>
+
+<para>The functions which are specified to return &c-lang; arrays,
+namely <simplelist>
+ <member><function role="netica">GetNodeBeliefs_bn</function></member>
+ <member><function role="netica">GetNodeExpectedUtils_bn</function></member>
+ <member><function role="netica">GetNodeLikelihood_bn</function></member>
+ <member><function role="netica">GetNodeProbs_bn</function></member>
+ <member><function role="netica">GetNodeLevels_bn</function></member>
+ </simplelist> correspond to &foreign-function-t;s which return &c-pointer;s.
+ We define low level wrappers for them, namely <simplelist>
+ <member><function>GetNodeBeliefs</function></member>
+ <member><function>GetNodeExpectedUtils</function></member>
+ <member><function>GetNodeLikelihood</function></member>
+ <member><function>GetNodeProbs</function></member>
+ <member><function>GetNodeLevels</function></member>
+</simplelist> which return the appropriate &vector-t;s.</para>
+
+<para>Additionally, some higher level functionality is available
  (see <filename role="clisp-cvs">modules/netica/demo.lisp</filename>
  for sample usage):</para>
 
@@ -20,7 +40,7 @@
 <varlistentry><term><code>(netica:start-netica &key-amp;
    :license :verbose)</code></term>
  <listitem><simpara>Call <function role="netica">NewNeticaEnviron_ns</function>
-   and <function role="netica">InitNetica_bn</function> and print some
+   and <function role="netica">InitNetica2_bn</function> and print some
    statistics; initialize <varname>netica:*env*</varname>.
 </simpara></listitem></varlistentry>
 <varlistentry><term><code>(netica:check-errors &key-amp;
@@ -42,7 +62,7 @@
 </simplelist></para></listitem></varlistentry>
 <varlistentry><term><code>(netica:close-netica &key-amp;
    :env :verbose)</code></term>
- <listitem><simpara>Terminate the netica session.
+ <listitem><simpara>Terminate the Netica session.
    Sets <varname>netica:*env*</varname> to &nil;.
 </simpara></listitem></varlistentry>
 <varlistentry><term><code>(netica:make-net &key-amp; :name
@@ -72,12 +92,13 @@
 <varlistentry><term><code>(netica:get-beliefs node
    &key-amp; :env :verbose)</code></term>
  <listitem><simpara>Call <function role="netica">GetNodeBeliefs_bn</function>
-   on the node.</simpara></listitem></varlistentry>
+   on the node and pretty-print the results when <constant>:VERBOSE</constant>
+   is non-&nil;.</simpara></listitem></varlistentry>
 <varlistentry><term><code>(netica:enter-finding net node
    state &key-amp; :env :verbose)</code></term>
  <listitem><simpara>Call <function role="netica">EnterFinding_bn</function>
-   using <function role="netica">NodeNamed_bn</function>
-   and <function role="netica">StateNamed_bn</function>.
+   using <function role="netica">GetNodeNamed_bn</function>
+   and <function role="netica">GetStateNamed_bn</function>.
 </simpara></listitem></varlistentry>
 <varlistentry><term><code>(netica:save-net net &key-amp;
    :file :env :verbose)</code></term>
@@ -89,7 +110,7 @@
 </simpara></listitem></varlistentry>
 <varlistentry><term><code>(netica:with-open-dne-file (var
    file &rest-amp; opts) &body-amp; body)</code></term>
- <listitem><simpara>Call <function role="netica">NewStreamFile_ns</function>,
+ <listitem><simpara>Call <function role="netica">NewFileStream_ns</function>,
    execute &body-r;, then <function role="netica">DeleteStream_ns</function>
    - just like &with-open-stream;.</simpara></listitem></varlistentry>
 <varlistentry><term><varname>netica:*verbose*</varname></term>

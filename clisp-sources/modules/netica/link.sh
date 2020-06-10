@@ -1,15 +1,8 @@
-file_list=''
-mod_list=''
-if test -f netica.c; then
-  file_list="$file_list"' netica.o'
-  mod_list="$mod_list"' netica'
-fi
-netica=/usr/local/netica/
-make clisp-module \
-     CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}" \
-     INCLUDES="$absolute_linkkitdir"
-NEW_FILES="$file_list"
-NEW_LIBS="$file_list ${netica}netica.lib"
-NEW_MODULES="$mod_list"
+${MAKE-make} clisp-module \
+  CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}" \
+  CLISP_LINKKIT="$absolute_linkkitdir" CLISP="${CLISP}"
+NEW_FILES="netica.o"
+# netica 3.25 requires g++
+NEW_LIBS="${NEW_FILES} -lnetica -L${NETICA_C_API}/lib -lstdc++ -lpthread"
+NEW_MODULES="netica"
 TO_LOAD='netica wrap'
-CLFLAGS="${CLFLAGS} -L${netica}"

@@ -1,5 +1,5 @@
 ;;; MAKE-LOAD-FORM for CLISP
-;;; Sam Steingold 2001-2004
+;;; Sam Steingold 2001-2004, 2009
 ;;; Bruno Haible 2004
 
 ;; this could have been placed in in clos.lisp,
@@ -71,7 +71,7 @@
                 ">-"))))
       `(FUNCTION ,funname
          (LAMBDA ()
-           ,@(if (and compiler::*compiling* compiler::*compiling-from-file*)
+           ,@(if (and sys::*compiling* sys::*compiling-from-file*)
                '((DECLARE (COMPILE)))
                '())
            ,(if initialization-form
@@ -84,12 +84,12 @@
               creation-form))))))
 
 (defun make-init-form (object)
-  (when compiler::*load-forms*
+  (when sys::*load-forms*
     (multiple-value-bind (form found-p)
-        (gethash object compiler::*load-forms*)
+        (gethash object sys::*load-forms*)
       (if found-p
         form
-        (setf (gethash object compiler::*load-forms*)
+        (setf (gethash object sys::*load-forms*)
               (block compute-init-form
                 (handler-bind
                   ((missing-load-form

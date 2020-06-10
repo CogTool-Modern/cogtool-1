@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; restarts
 (defmacro check-use-value (fun good bad &key (type 'type-error) (test 'eql))
   `(handler-bind ((,type (lambda (c) (princ-error c) (use-value ',good))))
@@ -227,6 +227,18 @@ T
   (symbol-value 'foo))
 1
 
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=2941408&group_id=1355
+(let ((count 5))
+  (flet ((handler (c)
+           (princ c)
+           (decf count)
+           (use-value (if (zerop count) 'x count))))
+    (handler-bind ((program-error #'handler)
+                   (type-error #'handler))
+      (setq :const-var 12)))
+  (list count x))
+(0 12)
+
 ;; make-hash-table
 (flet ((mht (test) (make-hash-table :test test)))
   (check-use-value mht eql bazonk :test equalp)) t
@@ -347,11 +359,17 @@ T
         (last '#1# 2)))
 ((9 8) (9 8) (7 6) (7 6))
 
-(handler-bind ((error (lambda (c) (princ c) (use-value 'doc-restart))))
-  (setf (documentation '(doc-restart) 'function)
-        "docstring for doc-restart")
-  (documentation 'doc-restart 'function))
-"docstring for doc-restart"
+(handler-bind ((error (lambda (c) (princ c) (use-value 'check-use-value))))
+  (setf (documentation '(check-use-value) 'function)
+        "docstring for check-use-value")
+  (documentation 'check-use-value 'function))
+"docstring for check-use-value"
 
-(unintern 'doc-restart)
-T
+(handler-bind ((error (lambda (c) (princ c) (use-value 'use-value-read))))
+  (setf (documentation '(use-value-read) 'function)
+        "docstring for use-value-read")
+  (documentation 'use-value-read 'function))
+"docstring for use-value-read"
+
+(unintern 'check-use-value) T
+(unintern 'use-value-read) T

@@ -1,7 +1,7 @@
 ;;; Condition System for CLISP
 ;;; David Gadbois <gadbois@cs.utexas.edu> 30.11.1993
 ;;; Bruno Haible 24.11.1993, 2.12.1993 -- 2005
-;;; Sam Steingold 1998-2005
+;;; Sam Steingold 1998-2005, 2007-2010
 
 (in-package "COMMON-LISP")
 ;;; exports:
@@ -87,12 +87,7 @@
 ;; DEFINE-CONDITION, CLtL2 p. 898
 (defmacro define-condition (&whole whole-form
                             name parent-types slot-specs &rest options)
-  (unless (symbolp name)
-    (error-of-type 'source-program-error
-      :form whole-form
-      :detail name
-      (TEXT "~S: the name of a condition must be a symbol, not ~S")
-      'define-condition name))
+  (setq name (check-not-declaration name 'define-condition))
   (unless (and (listp parent-types) (every #'symbolp parent-types))
     (error-of-type 'source-program-error
       :form whole-form
@@ -230,7 +225,7 @@
   (handler-case
       (apply #'try-coerce-to-condition datum arguments
              caller-name default-type more-initargs)
-    (TYPE-ERROR (error) (signal error))
+    (TYPE-ERROR (error) (error error))
     (ERROR (error)
       ;; ANSI CL wants a type error here.
       (error-of-type 'type-error
@@ -311,6 +306,14 @@
 ;       |-- simple-warning
 ;       |
 ;       |-- style-warning
+;       |   |
+;       |   |-- simple-style-warning
+;       |
+;       |-- clos-warning
+;           |
+;           |-- gf-already-called-warning
+;           |
+;           |-- gf-replacing-method-warning
 ;
 
 ;; X3J13 writeup <CONDITION-SLOTS:HIDDEN> wants the slot names to be hidden,
@@ -434,6 +437,17 @@
   ; conditions which are a matter of programming style (not serious)
   (define-condition style-warning (warning) ())
 
+  ; CLOS user notifications [CLISP specific]
+  (define-condition clos:clos-warning (warning) ())
+
+    ; CLOS: generic function is being modified, but has already been called
+    (define-condition clos:gf-already-called-warning (clos:clos-warning) ())
+    ; CLISP specific
+
+    ; CLOS: replacing method in a GF
+    (define-condition clos:gf-replacing-method-warning (clos:clos-warning) ())
+    ; CLISP specific
+
 ;; These shouldn't be separate types but we cannot adjoin slots without
 ;; defining subtypes.
 
@@ -472,6 +486,13 @@
 
 ;; conditions usually created by WARN
 (define-condition simple-warning (simple-condition warning) ())
+
+(define-condition simple-style-warning (simple-condition style-warning) ())
+
+;; CLOS warnings
+(define-condition clos::simple-clos-warning (simple-condition clos:clos-warning) ())
+(define-condition clos::simple-gf-already-called-warning (simple-condition clos:gf-already-called-warning) ())
+(define-condition clos::simple-gf-replacing-method-warning (simple-condition clos:gf-replacing-method-warning) ())
 
 ;; All conditions created by the C runtime code are of type simple-condition.
 ;; Need the following types. Don't use them for discrimination.
@@ -621,7 +642,7 @@
 
 ;; IGNORE-ERRORS, CLtL2 p. 897
 (defmacro ignore-errors (&body body)
-  (let ((blockname (gensym)))
+  (let ((blockname (gensym "IGNORE-ERRORS-")))
     `(BLOCK ,blockname
        (HANDLER-BIND
          ((ERROR #'(LAMBDA (CONDITION)
@@ -659,10 +680,10 @@
                 :detail varlist
                 (TEXT "~S: too many variables ~S in clause ~S")
                 'handler-case varlist clause)))
-          (push (cons (gensym) clause) extended-clauses))))
+          (push (cons (gensym "HANDLER-") clause) extended-clauses))))
     (setq extended-clauses (nreverse extended-clauses))
-    (let ((blockname (gensym))
-          (tempvar (gensym)))
+    (let ((blockname (gensym "HANDLER-CASE-"))
+          (tempvar (gensym "CONDITION-")))
       `(BLOCK ,blockname
          (LET (,tempvar) ; tempvar is IGNORABLE since it is a gensym
            (TAGBODY
@@ -1021,8 +1042,8 @@
                     `(,(gensym) ,name ,test ,interactive ,report ,meaningfulp
                        ,arglist ,@clause))))
             restart-clauses))
-          (blockname (gensym))
-          (arglistvar (gensym))
+          (blockname (gensym "RESTART-"))
+          (arglistvar (gensym "ARGS-"))
           (associate
            ;; Yick.  As a pretty lame way of allowing for an association
            ;; between conditions and restarts, RESTART-CASE has to
@@ -1032,7 +1053,7 @@
                 (case (first form)
                   ((SIGNAL ERROR CERROR WARN ERROR-OF-TYPE) t)
                   (t nil))
-                (gensym))))
+                (gensym "RESTARTS-"))))
       `(BLOCK ,blockname
          (LET (,arglistvar) ; arglistvar is IGNORABLE since it is a gensym
            (TAGBODY
@@ -1126,8 +1147,8 @@
     ;; Here's an example of how we can easily optimize things. There is no
     ;; need to refer to anything in the lexical environment, so we can avoid
     ;; consing a restart at run time.
-    (let ((blockname (gensym))
-          (tag (gensym)))
+    (let ((blockname (gensym "RESTART-"))
+          (tag (gensym "SIMPLE-RESTART-")))
       `(BLOCK ,blockname
          (CATCH ',tag
            (LET ((*ACTIVE-RESTARTS*
@@ -1181,25 +1202,25 @@
   (cond ((= place-numvalues 1)
          (format *debug-io*
                  (if instead-p
-                   (concatenate 'string "~&"
-                     (TEXT "Use instead~@[ of ~S~]: "))
+                   (concatenate 'string "~&" (TEXT "Use instead~@[ of ~S~]")
+                                (prompt-finish))
                    (prompt-for-new-value-string))
                  place)
-         (list (read *debug-io*)))
-        ((do ((ii 1 (1+ ii)) res)
-             ((> ii place-numvalues) (nreverse res))
-           (fresh-line *debug-io*)
-           (format *debug-io*
-                   (if instead-p
-                     (TEXT "Use instead of ~S [value ~D of ~D]: ")
-                     (TEXT "New ~S [value ~D of ~D]: "))
-                   place ii place-numvalues)
-           (push (read *debug-io*) res)))))
+         (list (eval (read *debug-io*))))
+        (t (do ((ii 1 (1+ ii)) res)
+               ((> ii place-numvalues) (nreverse res))
+             (fresh-line *debug-io*)
+             (format *debug-io*
+                     (if instead-p
+                       (TEXT "Use instead of ~S [value ~D of ~D]~A")
+                       (TEXT "New ~S [value ~D of ~D]~A"))
+                     place ii place-numvalues (prompt-finish))
+             (push (eval (read *debug-io*)) res)))))
 
 ;; CHECK-TYPE, CLtL2 p. 889
 (defmacro check-type (place typespec &optional (string nil) &environment env)
-  (let ((tag1 (gensym))
-        (tag2 (gensym))
+  (let ((tag1 (gensym "CHECK-TYPE-"))
+        (tag2 (gensym "OK-"))
         (var (gensym)))
     `(TAGBODY
        ,tag1
@@ -1220,17 +1241,17 @@
       place-oldvalue)
     ;; Only one restart. Call it STORE-VALUE, not CONTINUE, so that it's not
     ;; chosen by "continue".
-    (STORE-VALUE
+    (STORE-VALUE (new-value)
       :report (lambda (stream)
                 (format stream (report-one-new-value-string) place))
       :interactive (lambda () (prompt-for-new-value place place-numvalues))
-      (new-value) (funcall place-setter new-value))))
+      (funcall place-setter new-value))))
 
 ;; ASSERT, CLtL2 p. 891
 (defmacro assert (test-form &optional (place-list nil) (datum nil) &rest args
                   &environment env)
-  (let ((tag1 (gensym))
-        (tag2 (gensym)))
+  (let ((tag1 (gensym "ASSERT-"))
+        (tag2 (gensym "OK-")))
     `(TAGBODY
        ,tag1
        (WHEN ,test-form (GO ,tag2))
@@ -1267,7 +1288,7 @@
         "~A" error-string)
       (apply #'error condition-datum+args)) ; use coerce-to-condition??
     ;; Only one restart: CONTINUE.
-    (CONTINUE
+    (CONTINUE (&rest new-values)
       :REPORT (lambda (stream)
                 (apply #'format stream
                        (if (= (length place-list) 1)
@@ -1278,7 +1299,7 @@
                      (mapcan #'(lambda (place place-numvalues)
                                  (prompt-for-new-value place place-numvalues))
                              place-list place-numvalues-list))
-      (&rest new-values) (apply places-setter new-values))))
+      (apply places-setter new-values))))
 (defun simple-assert-failed (error-string &rest condition-datum+args) ; ABI
   (restart-case
     ;; No need for explicit association, see APPLICABLE-RESTART-P.
@@ -1288,10 +1309,9 @@
       (apply #'error condition-datum+args)) ; use coerce-to-condition??
     ;; Only one restart: CONTINUE.
     ;; But mark it as not meaningful, because it leads to user frustration.
-    (CONTINUE
+    (CONTINUE ()
       :REPORT (lambda (stream) (format stream (report-no-new-value-string)))
-      MEANINGFULP nil
-      ())))
+      MEANINGFULP nil)))
 
 (defun correctable-error (options condition)
   (let ((restarts
@@ -1324,15 +1344,26 @@
 (defun check-value (place condition)
   (let ((restarts
          (nconc
-          (list (make-restart
-                 :name 'USE-VALUE
-                 :report
-                   (lambda (stream)
-                     (format stream (report-one-new-value-string-instead)
-                             place))
-                 :interactive (lambda () (prompt-for-new-value place 1 t))
-                 :invoke-function
-                   (lambda (val) (return-from check-value (values val nil)))))
+          (when (eq place 'SYSTEM::PATHNAME-ENCODING)
+            (setq place '*pathname-encoding*) ; make it look nicer
+            (list (make-restart ; for direntry_to_string
+                   :name 'CONTINUE
+                   :report (lambda (stream)
+                             (format stream
+                                     (TEXT "Discard this directory entry")))
+                   :invoke-function
+                     (lambda () (return-from check-value (values nil 0))))))
+          (unless (eq place '*pathname-encoding*)
+            (list (make-restart
+                   :name 'USE-VALUE
+                   :report
+                     (lambda (stream)
+                       (format stream (report-one-new-value-string-instead)
+                               place))
+                   :interactive (lambda () (prompt-for-new-value place 1 t))
+                   :invoke-function
+                     (lambda (val)
+                       (return-from check-value (values val nil))))))
           (when (and (consp place) (eq 'fdefinition (car place)))
             (list (make-restart ; for check_fdefinition() only!
                    :name 'RETRY
@@ -1377,21 +1408,26 @@
 ;; we cannot use *LOAD-TRUENAME* because when the error is in a nested LOAD,
 ;; we will get the truename of the inner-most file instead of the current one
 (defun eval-loaded-form (obj file)
-  (restart-case (eval-loaded-form-low obj)
-    (skip
-        :report (lambda (out)
-                  (format out (TEXT "skip "))
-                  (if (compiled-function-p obj)
-                      (write (sys::closure-name obj) :stream out
-                             :pretty nil :escape nil)
-                      (write obj :stream out :pretty nil :escape nil
-                             :level 2 :length 3)))
+  (flet ((report (word obj out)
+           (write-string word out)
+           (if (compiled-function-p obj)
+               (write (closure-name obj) :stream out
+                      :pretty nil :escape nil)
+               (write obj :stream out :pretty nil :escape nil
+                      :level 2 :length 3))))
+    (restart-case (eval-loaded-form-low obj)
+      (skip ()
+        :report (lambda (out) (report (TEXT "skip ") obj out))
         :interactive default-restart-interactive
-        () (return-from eval-loaded-form 'skip))
-    (stop
+        (return-from eval-loaded-form 'skip))
+      (retry ()
+        :report (lambda (out) (report (TEXT "retry ") obj out))
+        :interactive default-restart-interactive
+        (return-from eval-loaded-form 'retry))
+      (stop ()
         :report (lambda (out) (format out (TEXT "stop loading file ~A") file))
         :interactive default-restart-interactive
-        () (return-from eval-loaded-form 'stop))))
+        (return-from eval-loaded-form 'stop)))))
 
 ;;; 29.4.3. Exhaustive Case Analysis
 
@@ -1427,7 +1463,7 @@
                                       keyclause (list keyclause)))
                               keyclauselist)))
          (simply-error (casename form clauselist errorstring expected-type)
-           (let ((var (gensym)))
+           (let ((var (gensym (string-concat (symbol-name casename) "-KEY-"))))
              `(LET ((,var ,form))
                 (,casename ,var ,@(parenthesize-keys clauselist)
                   ;; if a clause contains an OTHERWISE or T key,
@@ -1435,8 +1471,8 @@
                   (OTHERWISE
                     (ETYPECASE-FAILED ,var ,errorstring ',expected-type))))))
          (retry-loop (casename place clauselist errorstring expected-type env)
-           (let ((g (gensym))
-                 (h (gensym)))
+           (let ((g (gensym (symbol-name casename)))
+                 (h (gensym "RETRY-")))
              `(BLOCK ,g
                 (TAGBODY
                   ,h
@@ -1472,6 +1508,14 @@
                   (case-errorstring keyform keyclauselist)
                   (case-expected-type keyclauselist)
                   env))
+    ;; for use in macros: when a file with generated ffi forms is compiled
+    ;; (prime example: gtk.lisp), any error message can become cryptic because
+    ;; the sources are efemeral - unless the whole form is printed in the error
+    (defmacro mecase (whole-form keyform &rest keyclauselist)
+      (simply-error 'CASE keyform keyclauselist
+                    `(format nil (TEXT "In form ~S~%~A") ,whole-form
+                             ,(case-errorstring keyform keyclauselist))
+                    (case-expected-type keyclauselist)))
 ) )
 (defun etypecase-failed (value errorstring expected-type) ; ABI
   (error-of-type 'type-error
@@ -1488,11 +1532,11 @@
         place-oldvalue))
     ;; Only one restart. Call it STORE-VALUE, not CONTINUE, so that it's not
     ;; chosen by "continue".
-    (STORE-VALUE
+    (STORE-VALUE (new-value)
       :report (lambda (stream)
                 (format stream (report-one-new-value-string) place))
       :interactive (lambda () (prompt-for-new-value place place-numvalues))
-      (new-value) (funcall place-setter new-value))))
+      (funcall place-setter new-value))))
 
 ;;; 29.4.11. Debugging Utilities
 
@@ -1588,9 +1632,7 @@
 
 (defvar *break-on-warnings* nil)
 
-;; WARN, CLtL2 p. 912
-;; (WARN format-string {arg}*)
-(defun warn (format-string &rest args)
+(defun warn-of-type (type format-string &rest args)
   (if (not *use-clcs*)
     (progn
       (fresh-line *error-output*)
@@ -1600,12 +1642,16 @@
       (elastic-newline *error-output*)
       (when *break-on-warnings* (funcall *break-driver* t)))
     (block warn
-      (let ((condition (coerce-to-condition format-string args 'warn 'simple-warning)))
+      (let ((condition (coerce-to-condition format-string args 'warn type)))
         (unless (typep condition 'warning)
           (error-of-type 'type-error
             :datum condition :expected-type 'warning
             (TEXT "~S: This is more serious than a warning: ~A")
             'warn condition))
+        (when (boundp '*warning-count*) (incf *warning-count*))
+        (when (and (boundp '*style-warning-count*)
+                   (typep condition 'style-warning))
+          (incf *style-warning-count*))
         (with-restarts ((MUFFLE-WARNING () (return-from warn)))
           (with-condition-restarts condition (list (find-restart 'MUFFLE-WARNING))
             (signal condition)))
@@ -1618,17 +1664,35 @@
         (elastic-newline *error-output*)
         (when *break-on-warnings*
           (with-restarts
-              ((CONTINUE
-                :report (lambda (stream)
-                          (format stream (TEXT "Return from ~S loop") 'break))
-                () (return-from warn)))
+              ((CONTINUE :report
+                 (lambda (stream)
+                   (format stream (TEXT "Return from ~S loop") 'break))
+                 () (return-from warn)))
             (with-condition-restarts condition (list (find-restart 'CONTINUE))
               ;; We don't call  (invoke-debugger condition)  because that
-              ;; would tell the user about a "Continuable error". Actually,
-              ;; it is only a warning!
+              ;; would tell the user about a "Continuable error".
+              ;; Actually, it is only a warning!
               (funcall *break-driver* nil condition nil)))))))
   nil)
 
+;; for X3J13 Issue COMPILER-DIAGNOSTICS:USE-HANDLER
+(defun c-warning (type format-string &rest args)
+  (let ((*error-output* *c-error-output*))
+    (apply #'warn-of-type type (string-concat "~A" format-string)
+           (c-current-location) args)))
+
+(defun c-cerror (location detail format-string &rest args)
+  (let ((*error-output* *c-error-output*))
+    (apply #'cerror-of-type (TEXT "Ignore the error and proceed")
+           'simple-source-program-error
+           :form *form* :detail detail
+           (string-concat location format-string)
+           args)))
+
+;; WARN, CLtL2 p. 912
+;; (WARN format-string {arg}*)
+(defun warn (format-string &rest args)
+  (apply #'warn-of-type 'simple-warning format-string args))
 
 #|
 Todo:
@@ -1746,8 +1810,7 @@ HANDLER should be funcallable (symbol or function).
 If it returns, the next applicable error handler is invoked.
 When HANDLER is nil, remove the global handler for CONDITION.
 Returns the added or removed method(s)."
-  (let ((clos::*warn-if-gf-already-called* nil)
-        (clos::*gf-warn-on-replacing-method* nil))
+  (let ((clos::*enable-clos-warnings* nil))
     (cond (handler              ; install handler
            (clos::do-defmethod 'global-handler
              (lambda (backpointer)
@@ -1755,8 +1818,7 @@ Returns the added or removed method(s)."
                (list
                 (lambda (condition)
                   ;; avoid infinite recursion by disabling the handler
-                  (let ((clos::*gf-warn-on-replacing-method* nil)
-                        (clos::*warn-if-gf-already-called* nil)
+                  (let ((clos::*enable-clos-warnings* nil)
                         (old-handler (set-global-handler condition-name nil)))
                     (unwind-protect (funcall handler condition)
                       (when old-handler
@@ -1791,3 +1853,42 @@ Returns the added or removed method(s)."
     `(let ((,handlers (set-global-handler nil nil)))
        (unwind-protect (progn ,@body)
          (set-global-handler ,handlers nil)))))
+
+;;; <http://www.lisp.org/HyperSpec/Body/dec_type.html>:
+;;;   A symbol cannot be both the name of a type and the name of a
+;;;   declaration. Defining a symbol as the name of a class, structure,
+;;;   condition, or type, when the symbol has been declared as a
+;;;   declaration name, or vice versa, signals an error.
+(defun check-not-type (symbol caller)
+  (loop
+    (setq symbol (check-symbol symbol caller))
+    (when (handler-bind ((error #'(lambda (c)
+                                    (declare (ignore c))
+                                    (return-from check-not-type symbol))))
+            (type-expand symbol))
+      (with-restarts ((use-value (new-value)
+                        :report
+                         (lambda (stream)
+                           (format stream (report-one-new-value-string-instead)
+                                   symbol))
+                         :interactive
+                          (lambda () (prompt-for-new-value symbol 1 t))
+                         (setq symbol new-value)))
+        (error (TEXT "~S: ~S defines a type, cannot be declared a ~S")
+               caller symbol 'declaration)))))
+
+(defun check-not-declaration (symbol caller)
+  (loop
+    (setq symbol (check-symbol symbol caller))
+    (unless (memq symbol (cdar *toplevel-denv*))
+      (return-from check-not-declaration symbol))
+    (with-restarts ((use-value (new-value)
+                      :report
+                       (lambda (stream)
+                         (format stream (report-one-new-value-string-instead)
+                                 symbol))
+                       :interactive
+                        (lambda () (prompt-for-new-value symbol 1 t))
+                       (setq symbol new-value)))
+      (error (TEXT "~S: ~S names a ~S, cannot name a type")
+             caller symbol 'declaration))))

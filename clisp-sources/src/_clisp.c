@@ -9,7 +9,7 @@
  * All other options are passed to the main program.
  *
  * Bruno Haible 31.3.1997
- * Sam Steingold 1998-2005
+ * Sam Steingold 1998-2009
  */
 
 /*
@@ -23,16 +23,30 @@
  * Note: This file is preprocessed. Only the #if's and #include's with
  * no space after the # are resolved. The other ones are preserved by
  * the preprocessing.
+ * This double pre-processing (once by txt2c on the build system
+ * and once by cpp on the target system) is necessary because
+ * the _distmakefile has this command:
+ * $(CC) $(CFLAGS) -DLISPLIBDIR='"$(lisplibdir)"' -DLOCALEDIR='"$(localedir)"' src/clisp.c -o $(bindir)/clisp
+ * So, _clisp.c is preprocessed for a first time on the system that
+ * builds a binary distribution,
+ * then preprocessed a second time while being compiled on the target system,
+ * therefore we cannot not just include lispbibl.c and be done with it:
+ * lispbibl.c contains #ifs that you cannot transport from one system to
+ * another (e.g. from Solaris 9 to Solaris 10).
+ * This is preferred over the 'hardcode' command, because that command
+ * violates all abstraction, by assuming special things about object
+ * files and executables.
+ * (E.g. if some day encrypted or signed executables appear, the
+ * 'hardcode' program will not work any more.)
  */
 #endif
 
 /* Declare strlen(), strcpy(), strcat(). */
 # include <string.h>
-/* Declare stderr. */
+/* Declare stderr, perror(). */
 # include <stdio.h>
 
 #if defined(WIN32_NATIVE)
-# undef UNICODE
 # include <windows.h>
 int shell_quote (char * dest, const char * source);
 BOOL real_path (LPCSTR namein, LPSTR nameout);
@@ -51,15 +65,6 @@ BOOL real_path (LPCSTR namein, LPSTR nameout);
 int find_executable (const char * program_name);
 #include "execname.c"
 
-#if !defined(HAVE_PERROR_DECL)
-/* Both <errno.h> and <stdio.h> failed to declare perror(). Declare it now. */
-# if defined(__cplusplus)
-extern "C" void perror (const char *);
-# else
-extern void perror (const char *);
-# endif
-#endif
-
 #if defined(UNIX_BINARY_DISTRIB)
 # if !ENABLE_RELOCATABLE
 
@@ -74,15 +79,22 @@ char room_for_localedir[10240] = "%MAGIC%LOCALEDIR=" LOCALEDIR;
 # endif
 #endif
 
+static int usage (char *program_name, char *option) {
+  fprintf(stderr,"%s: invalid command-line option (%s), try `%s --help'\n",
+          program_name,option,program_name);
+  return 1;
+}
+#define USAGE(o) usage(program_name,o)
+
 int main (int argc, char* argv[])
 {
   char* lisplibdir;
   char* localedir;
   char* argv_lisplibdir = NULL;
 #if defined(WIN32_NATIVE) && !defined(__MINGW32__)
-  char* argv_linkingset = "";
+  char* argv_linkingset = (char*)"";
 #else
-  char* argv_linkingset = "base";
+  char* argv_linkingset = (char*)"base";
 #endif
   char* argv_memfile = NULL;
   char* argv_localedir = NULL;
@@ -108,7 +120,7 @@ int main (int argc, char* argv[])
 # if ENABLE_RELOCATABLE
   /* Put this executable's absolute path into executable_name. */
   if (find_executable(program_name) < 0) {
-    fprintf(stderr,"%s: cannot figure out the absolute executable path",
+    fprintf(stderr,"%s: cannot figure out the absolute executable path\n",
             program_name);
     return 1;
   }
@@ -213,16 +225,28 @@ int main (int argc, char* argv[])
       char* arg = *argptr++;
       if ((arg[0] == '-') && !(arg[1] == '\0')) {
         switch (arg[1]) {
-#        define OPTION_ARG  \
-          if (arg[2] == '\0') \
-            { if (argptr < argptr_limit) arg = *argptr++; else goto usage; } \
-          else { arg = &arg[2]; }
+#        define OPTION_ARG                               \
+          if (arg[2] == '\0') {                          \
+            if (argptr < argptr_limit) arg = *argptr++;  \
+            else return USAGE(arg);                      \
+          } else { arg = &arg[2]; }
           /* Options to which we have to pay attention. */
+          case 'b':             /* this is NOT a lisp.run option!!! */
+            /* we could also use
+                  clisp -q -norc -x '(namestring *lib-directory*)'
+               instead of "clisp -b", but this shortcut saves an exec
+               and really ensures that no debugging output
+               (e.g., "STACK size" in spvw.d) gets in the way. */
+            /* not puts() so that the woe32 CR will not get in the way;
+               this makes screen output ugly, but this option is for
+               Makefiles $(clisp -b) anyway, and that usage is now saved */
+            printf("%s",lisplibdir);
+            return 0;
           case 'B':
             OPTION_ARG;
             lisplibdir = argv_lisplibdir = arg;
             break;
-          case 'K':
+          case 'K':             /* this is NOT a lisp.run option!!! */
             OPTION_ARG;
             argv_linkingset = arg;
             break;
@@ -242,16 +266,17 @@ int main (int argc, char* argv[])
           case 'C':
           case 'l':
           case 'a':
+          case 't':
           case 'w':
           case 'n': /* -norc */
           case 'r': /* -repl */
           case 'v':
-          case '-':
             break;
+          case '-':
+            if (arg[2] == '\0') goto done_options; /* --: end of arguments */
+            else break;   /* GNU-style long options --help, --version */
           /* Skippable options with arguments. */
           case 'm':
-          case 's':
-          case 't':
           case 'L':
           case 'o':
           case 'p':
@@ -259,7 +284,7 @@ int main (int argc, char* argv[])
             OPTION_ARG;
             break;
           case 'E':
-            if (argptr < argptr_limit) argptr++; else goto usage;
+            if (argptr < argptr_limit) argptr++; else return USAGE("-E");
             break;
           case 'i':
             if (arg[2] == '\0') argv_for = for_init;
@@ -268,7 +293,7 @@ int main (int argc, char* argv[])
             argv_for = for_compile;
             break;
           default:
-            goto usage;
+            return USAGE(arg);
         }
       } else {
         switch (argv_for) {
@@ -301,9 +326,9 @@ int main (int argc, char* argv[])
     }
     { /* Compute executable's name. */
 #if defined(WIN32_NATIVE) || defined(UNIX_CYGWIN32)
-      char* execname = "lisp.exe";
+      const char* execname = "lisp.exe";
 #else
-      char* execname = "lisp.run";
+      const char* execname = "lisp.run";
 #endif
       executable = (char*)malloc(strlen(linkingsetdir)+1+strlen(execname)+1);
       if (!executable) goto oom;
@@ -319,22 +344,22 @@ int main (int argc, char* argv[])
       char** argptr_limit = &argv[argc];
       char** new_argptr = &new_argv[1];
       if (!argv_lisplibdir) {
-        *new_argptr++ = "-B";
+        *new_argptr++ = (char*)"-B";
         *new_argptr++ = lisplibdir;
       }
       if (!argv_memfile) {
-        char* filename = "lispinit.mem";
+        const char* filename = "lispinit.mem";
         argv_memfile =
           (char*)malloc(strlen(linkingsetdir)+1+strlen(filename)+1);
         if (!argv_memfile) goto oom;
         strcpy(argv_memfile, linkingsetdir);
         strcat(argv_memfile, "/");
         strcat(argv_memfile, filename);
-        *new_argptr++ = "-M";
+        *new_argptr++ = (char*)"-M";
         *new_argptr++ = argv_memfile;
       }
       if (!argv_localedir) {
-        *new_argptr++ = "-N";
+        *new_argptr++ = (char*)"-N";
         *new_argptr++ = localedir;
       }
       while (argptr < argptr_limit) { *new_argptr++ = *argptr++; }
@@ -399,11 +424,6 @@ int main (int argc, char* argv[])
       errno = saved_errno; perror(executable);
     }
 #endif
-    return 1;
-  }
-  usage: {
-    fprintf(stderr,"%s: invalid command-line option, try `%s --help'\n",
-            program_name,program_name);
     return 1;
   }
   oom: {

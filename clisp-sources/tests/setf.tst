@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 (SETf LI1 '(A (B) ((C) (D)) )  VEC1 '#(0 1 2 3))
 #(0 1 2 3)
@@ -368,6 +368,10 @@ x
 (list y z w v u)
 (2 nil nil 8 9)
 
+(let ((i #x69)) (rotatef (ldb (byte 4 4) i)
+                         (ldb (byte 4 0) i)) i)
+#x96
+
 (progn
   (defsetf my-subseq (sequence start &optional end) (new-sequence)
     `(progn (replace ,sequence ,new-sequence :start1 ,start :end1 ,end)
@@ -650,10 +654,38 @@ NIL
 ("macro doc" "new macro doc" "new macro doc"
  "macro doc" "replaced doc" "replaced doc")
 
+(let ((d (documentation 'when 'function))) ; WHEN is a special operator in CLISP
+  (and (or (null d) (stringp d))
+       (progn (setf (documentation 'when 'function) "when doc")
+              (string= "when doc" (documentation 'when 'function)))
+       (progn (setf (documentation 'when 'function) d)
+              (string= d (documentation 'when 'function)))))
+T
+
 ;; user may pass env=NIL to get-setf-expansion to mean null lexical environment
 (length (multiple-value-list (get-setf-expansion '(x) nil)))
 5
 
-; Clean up.
-(unintern 'x)
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1604579&group_id=1355&atid=101355
+(defun foo (z) "some doc" z) FOO
+(documentation 'foo 'function) "some doc"
+(setf (documentation 'foo 'function) nil) NIL
+(documentation 'foo 'function) NIL
+(compile 'foo) FOO
+(documentation 'foo 'function) NIL
+(setf (documentation 'foo 'function) "other doc") "other doc"
+(documentation 'foo 'function) "other doc"
+(setf (documentation 'foo 'function) nil) NIL
+(documentation 'foo 'function) NIL
+
+(defmacro foo () "docstring" nil) FOO
+(documentation 'foo 'function) "docstring"
+(compile 'foo) FOO
+(documentation 'foo 'function) "docstring"
+
+;; Clean up.
+(progn (symbol-cleanup 'x)
+       (symbol-cleanup 'func01)
+       (symbol-cleanup 'func03)
+       (symbol-cleanup 'foo))
 T

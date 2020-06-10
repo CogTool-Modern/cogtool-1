@@ -45,14 +45,12 @@
 (defun compiler-macro-function (name &optional environment)
   (declare (ignore environment))
   (setq name (check-function-name name 'compiler-macro-function))
-  (if (symbolp name) (get name 'compiler-macro)
-      (get (second name) 'compiler-macro-setf)))
+  (get (get-funname-symbol name) 'compiler-macro))
 
 (defun (setf compiler-macro-function) (newf name &optional environment) ; ABI
   (declare (ignore environment))
   (setq name (check-function-name name '(setf compiler-macro-function)))
-  (if (symbolp name) (setf (get name 'compiler-macro) newf)
-      (setf (get (second name) 'compiler-macro-setf) newf)))
+  (setf (get (get-funname-symbol name) 'compiler-macro) newf))
 
 ;; (proclaim '(inline function-form-p simple-function-form-p))
 
@@ -80,7 +78,7 @@
     (declare (ignore expansion-lambdabody lambdalist))
     (sys::check-redefinition name 'define-compiler-macro
                              (and (compiler-macro-function name)
-                                  "compiler macro"))
+                                  (TEXT "compiler macro")))
     `(EVAL-WHEN (COMPILE LOAD EVAL)
        ,@(when docstring
            `((SYSTEM::%SET-DOCUMENTATION ',name 'COMPILER-MACRO ,docstring)))

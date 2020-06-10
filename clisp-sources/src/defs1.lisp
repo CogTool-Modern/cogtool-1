@@ -2,14 +2,19 @@
 ;;;; 1.8.1989, 2.9.1989, 8.10.1989
 
 (in-package "EXT")
-(export '(doseq dohash without-package-lock memoized))
+(export '(expand-form doseq dohash without-package-lock memoized))
 
 (export '(#-(or UNIX WIN32) custom::*default-time-zone*
+          custom::*user-lib-directory*
           custom::*system-package-list*)
         "CUSTOM")
 (ext:re-export "CUSTOM" "EXT")
 
 (in-package "SYSTEM")
+
+;;; code walker
+(defun expand-form (form &aux *fenv* *venv*)
+  (%expand-form form))
 
 ;;; functions for symbols (Chapter 10)
 
@@ -44,7 +49,7 @@
 (defmacro do-symbols ((var &optional (packageform '*package*) (resultform nil))
                       &body body)
   (multiple-value-bind (body-rest declarations) (system::parse-body body)
-    (let ((packvar (gensym)))
+    (let ((packvar (gensym "PACKAGE-")))
       `(BLOCK NIL
          (LET ((,packvar ,packageform))
            (LET ((,var NIL))
@@ -60,7 +65,7 @@
                                     (resultform nil))
                                &body body)
   (multiple-value-bind (body-rest declarations) (system::parse-body body)
-    (let ((packvar (gensym)))
+    (let ((packvar (gensym "PACKAGE-")))
       `(BLOCK NIL
          (LET ((,packvar ,packageform))
            (LET ((,var NIL))
@@ -101,8 +106,8 @@
            (TEXT "~S: flag must be one of the symbols ~S, ~S, ~S, not ~S")
            'with-package-iterator ':internal ':external ':inherited
            symboltype))))
-  (let ((iterfun (gensym "WPI")))
-    `(LET ((,iterfun (PACKAGE-ITERATOR-FUNCTION
+  (let ((iterfun (gensym "WPI-")))
+    `(LET ((,iterfun (SYS::PACKAGE-ITERATOR-FUNCTION
                        ,pack-list ',(remove-duplicates types))))
        (MACROLET ((,name () '(FUNCALL ,iterfun)))
          ,@body))))
@@ -123,8 +128,8 @@
 
 (defvar *system-package-list*
   '("SYSTEM" "COMMON-LISP" "EXT" "I18N" "GRAY" "CHARSET" "CLOS"
-    #+sockets "SOCKET" #+generic-streams "GSTREAM" #+syscalls "POSIX"
-    #+ffi "FFI" #+(or) "AFFI" #+screen "SCREEN")
+    #+sockets "SOCKET" #+generic-streams "GSTREAM"
+    #+ffi "FFI" #+screen "SCREEN")
   "The list of packages that will be locked by SAVEINITMEM.
 Also the default packages to unlock by WITHOUT-PACKAGE-LOCK.")
 
@@ -160,20 +165,41 @@ Also the default packages to unlock by WITHOUT-PACKAGE-LOCK.")
 (defun provide (name)
   (setq *modules* (adjoin (module-name name) *modules* :test #'string=)))
 
+(defvar *user-lib-directory* nil
+  "The location of user-installed modules.")
+
+(defun augment-load-path (paths)
+  (dolist (path paths *load-paths*)
+    (when path (setq *load-paths* (adjoin path *load-paths* :test #'equal)))))
+
+(defun load-path-augmentations (dynmod)
+  (list (merge-pathnames dynmod *lib-directory*)
+        (and *user-lib-directory*
+             (merge-pathnames dynmod *user-lib-directory*))
+        (and *load-pathname* ; not truename to respect symlinks
+             (make-pathname :name nil :type nil :defaults *load-pathname*))
+        (and *compile-file-pathname* ; could be called by eval-when-compile
+             (make-pathname :name nil :type nil
+                            :defaults *compile-file-pathname*))))
+
+(defmacro with-augmented-load-path (dirs &body body)
+  `(let ((*load-paths*
+          ;; the name "dynmod/" used here should be in sync with clisp-link
+          (augment-load-path
+           ,(if dirs `(list ,@dirs) '(load-path-augmentations "dynmod/")))))
+     ,@body))
+
 (defun require (module-name &optional (pathname nil p-given))
   (setq module-name (module-name module-name))
   (unless (member module-name *modules* :test #'string=)
     (unless p-given (setq pathname (pathname module-name)))
-    (let (#+CLISP (*load-paths* *load-paths*)
-          #-CLISP (*default-pathname-defaults* '#""))
-      #+CLISP (pushnew (merge-pathnames "dynmod/" *lib-directory*) *load-paths*
-                       :test #'equal)
-      #+CLISP (when *load-truename*
-                (pushnew (make-pathname :name nil :type nil
-                                        :defaults *load-truename*)
-                         *load-paths* :test #'equal))
-      (if (atom pathname) (load pathname) (mapcar #'load pathname)))))
-
+    (prog1
+        (with-augmented-load-path ()
+          (if (atom pathname) (load pathname) (mapcar #'load pathname)))
+      ;; we might have loaded a `system' package: lock it,
+      ;; unless CLISP was started with "-d" and thus locking is not desired
+      (when (package-lock "SYSTEM")
+        (|(SETF PACKAGE-LOCK)| t *system-package-list*)))))
 
 ;;; integer constants (Chapter 12)
 
@@ -218,7 +244,7 @@ Also the default packages to unlock by WITHOUT-PACKAGE-LOCK.")
 
 (defmacro doseq ((var seqform &optional resultform) &body body)
   (multiple-value-bind (body-rest declarations) (system::parse-body body)
-    (let ((seqvar (gensym)))
+    (let ((seqvar (gensym "SEQ-")))
       `(BLOCK NIL
          (LET ((,seqvar ,seqform))
            (LET ((,var NIL))
@@ -242,7 +268,7 @@ Also the default packages to unlock by WITHOUT-PACKAGE-LOCK.")
                        (eq 'fasthash-eq)
                        ((eql nil) 'fasthash-eql)
                        (equal 'fasthash-equal)
-                       (equalp 'fasthash-equalp))))
+                       (equalp 'equalp)))) ; no separate fasthash & stablehash
         (when ht-test
           ;; --- boxers or briefs? ---
           ;; when is it worthwhile to use HASH-TABLEs as opposed to LISTS?
@@ -422,7 +448,7 @@ Also the default packages to unlock by WITHOUT-PACKAGE-LOCK.")
 
 (defmacro dohash ((keyvar valuevar HTform &optional resultform) &body body)
   (multiple-value-bind (body-rest declarations) (system::parse-body body)
-    (let ((HTvar (gensym)))
+    (let ((HTvar (gensym "HASH-TABLE-")))
       `(BLOCK NIL
          (LET ((,HTvar ,HTform))
            (LET ((,keyvar NIL) (,valuevar NIL))
@@ -468,8 +494,7 @@ Also the default packages to unlock by WITHOUT-PACKAGE-LOCK.")
 (ext:re-export "CUSTOM" "EXT")
 #+LOGICAL-PATHNAMES
 (progn
-  (defvar *load-logical-pathname-translations-database*
-    '(#p"loghosts" #p"loghosts/"))
+  (defvar *load-logical-pathname-translations-database* '(#p"loghosts"))
   (defun logical-pathname-translations (host)
     (setq host (string-upcase host))
     (or (gethash host *logical-pathname-translations*) ; :test #'equal !
@@ -520,17 +545,18 @@ Also the default packages to unlock by WITHOUT-PACKAGE-LOCK.")
                 host (read-from-string (getenv ho)))
                (return-from load-logical-pathname-translations t))
               ((dolist (file *load-logical-pathname-translations-database*)
-                 (if (pathname-name file)
-                   (dolist (ff (search-file file '(nil "host")))
-                     (when (load-lpt-many ff host) ; successfully defined?
-                       (return-from load-logical-pathname-translations t)))
-                   (dolist (ff (search-file file nil))
-                     (and (string-equal host (pathname-name ff))
-                          (or (null (pathname-type ff))
-                              (string-equal "host" (pathname-type ff)))
-                          (load-lpt-one ff host) ; successfully defined?
-                          (return-from load-logical-pathname-translations
-                            t))))))))
+                 (dolist (f (search-file file '(nil "host")))
+                   (if (pathname-name f)
+                     (when (load-lpt-many f host) ; host defined?
+                       (return-from load-logical-pathname-translations t))
+                     (dolist (f1 (nconc (directory (make-pathname
+                                                    :name host :defaults f))
+                                        (directory (make-pathname
+                                                    :name host :type "host"
+                                                    :defaults f))))
+                       (when (load-lpt-one f1 host) ; host defined?
+                         (return-from load-logical-pathname-translations
+                           t)))))))))
       (error (TEXT "No translations for logical host ~S found") host)))
   (set-logical-pathname-translations "SYS"
     '((";*.LISP" "*.lisp") (";*" "*") ("*" "/*"))))

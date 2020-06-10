@@ -1,4 +1,4 @@
-;;; -*- Lisp -*-
+;;; -*- Lisp -*- vim:filetype=lisp
 ;;; Interactive tests for non-blocking I/O on various kinds of handles
 
 ;; On Linux or FreeBSD, use strace to see what system calls are performed.
@@ -21,7 +21,7 @@ coerce-byte-array
 
 ;;; * Reading from files
 
-(defparameter *file* "file.test") *file*
+(defparameter *file* "socket-tst-file.test") *file*
 (with-open-file (s *file* :direction :output)
   (loop :repeat 3 :do (write-line "abcdefghijklmnopqrstuvwxyz" s)))
 NIL
@@ -413,11 +413,11 @@ NIL
 
 ;;; * generic socket servers
 
-(defparameter *server* (socket-server)) *server*
+(defparameter *server* (show (socket-server))) *server*
 (multiple-value-list (socket-status *server* 0)) (NIL 0)
 
 (defparameter *socket-1*
-  (socket-connect (socket-server-port *server*) "localhost" :timeout 0))
+  (show (socket-connect (socket-server-port *server*) "localhost" :timeout 0)))
 *socket-1*
 
 (defparameter *status-arg* (list (list *server*) (list *socket-1* :io)))
@@ -426,7 +426,7 @@ NIL
 (cdr (assoc *server* *status-arg*))    T
 (cddr (assoc *socket-1* *status-arg*)) :OUTPUT
 
-(defparameter *socket-2* (socket-accept *server*)) *socket-2*
+(defparameter *socket-2* (show (socket-accept *server*))) *socket-2*
 (progn (push (list *socket-2* :io) *status-arg*)
        (eq *status-arg* (socket-status *status-arg* 0))) T
 (cdr (assoc *server* *status-arg*))    NIL
@@ -445,12 +445,49 @@ NIL
 
 (close *socket-1*) T
 (close *socket-2*) T
+
+(multiple-value-list (socket-status *server* 0)) (NIL 0)
+
+(defparameter *socket-3*
+  (show (socket-connect (socket-server-port *server*) "localhost" :timeout 0
+                        :element-type '(unsigned-byte 8))))
+*socket-3*
+
+(defparameter *status-arg* (list (list *server*) (list *socket-3* :io)))
+*status-arg*
+(eq (socket-status *status-arg* 0) *status-arg*) T
+(cdr (assoc *server* *status-arg*))    T
+(cddr (assoc *socket-3* *status-arg*)) :OUTPUT
+
+(defparameter *socket-4*
+  (show (socket-accept *server* :element-type '(unsigned-byte 8))))
+*socket-4*
+(progn (push (list *socket-4* :io) *status-arg*)
+       (eq *status-arg* (socket-status *status-arg* 0))) T
+(cdr (assoc *server* *status-arg*))    NIL
+(cddr (assoc *socket-3* *status-arg*)) :OUTPUT
+(cddr (assoc *socket-4* *status-arg*)) :OUTPUT
+
+(read-byte-no-hang *socket-3*) nil
+(write-byte 65 *socket-3*) 65
+(finish-output *socket-3*) nil
+
+(eq (socket-status *status-arg* 0) *status-arg*) T
+(cdr (assoc *server* *status-arg*))    NIL
+(cddr (assoc *socket-3* *status-arg*)) :OUTPUT
+(cddr (assoc *socket-4* *status-arg*)) :IO
+
+(read-byte *socket-4*) 65
+
+(close *socket-3*) T
+(close *socket-4*) T
 (socket-server-close *server*) NIL
 
 (progn
-  (setq *server* (socket-server 9090)
-        *socket-1* (socket-connect 9090 "localhost" :timeout 0 :buffered nil)
-        *socket-2* (socket-accept *server* :buffered nil))
+  (setq *server* (show (socket-server 9090))
+        *socket-1* (show (socket-connect 9090 "localhost" :timeout 0
+                                         :buffered nil))
+        *socket-2* (show (socket-accept *server* :buffered nil)))
   (write-char #\a *socket-1*))
 #\a
 
@@ -463,6 +500,9 @@ NIL
   :pretty t))
 T
 
+(search " (" (socket:socket-stream-local *socket-1* t)) NIL
+(search " (" (socket:socket-stream-peer *socket-1* t)) NIL
+
 (socket-status (cons *socket-2* :input) 0) :INPUT
 (read-char *socket-2*) #\a
 (socket-status (cons *socket-2* :input) 0) NIL
@@ -472,10 +512,31 @@ T
 (multiple-value-list (socket-status *server* 0)) (NIL 0)
 (socket-server-close *server*) NIL
 
+;; no one should be listening on 12345
+;; <http://article.gmane.org/gmane.lisp.clisp.general/12286>
+(socket:socket-connect 12345 "localhost" :timeout 30) ERROR ; ECONNREFUSED
+(open-stream-p (setq *socket-1* (socket:socket-connect
+                                 12345 "localhost" :timeout 0))) T
+(read-line *socket-1*) ERROR ; ECONNREFUSED
+(close *socket-1*) T
+
+(let ((interfaces '(nil "localhost" "0.0.0.0" "127.0.0.1")))
+  (mapcar (lambda (i)
+            (let ((s (socket-server 0 :interface i)))
+              (unwind-protect (socket-server-host (show s))
+                (socket-server-close s))))
+          interfaces))
+("0.0.0.0" "127.0.0.1" "0.0.0.0" "127.0.0.1")
+
 ;; clean-up
 (progn (makunbound '*server*) (unintern '*server*)
        (delete-file *file*) (makunbound '*file*) (unintern '*file*)
        (makunbound '*s*) (unintern '*s*)
        (makunbound '*socket-1*) (unintern '*socket-1*)
-       (makunbound '*socket-2*) (unintern '*socket-2*))
+       (makunbound '*socket-2*) (unintern '*socket-2*)
+       (makunbound '*socket-3*) (unintern '*socket-3*)
+       (makunbound '*socket-4*) (unintern '*socket-4*))
 T
+
+(socket-server 1240 :interface "[/]=")
+ERROR

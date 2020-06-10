@@ -1,7 +1,7 @@
 # Externe Routinen zu ARILEV1.D
 # Prozessor: 680x0 mit x>=2
 # Assembler-Syntax: meist "$" streichen, auf A/UX "$" durch "%" ersetzen
-# Compiler: CC oder GNU-C auf SUN3 oder AMIGA oder A/UX
+# Compiler: CC oder GNU-C auf AMIGA oder A/UX
 # Parameter-Übergabe:
 #   auf dem Stack: sp@(4), sp@(8), ... (.W-Größen belegen 4 Byte!),
 #   Rückgabewert in d0.

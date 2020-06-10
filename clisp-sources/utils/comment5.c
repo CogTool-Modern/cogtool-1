@@ -41,10 +41,10 @@ int main (int argc, char* argv[]) {
   FILE * outfile;
   if (argc==3) { /* Aufruf der Form 'comment source destination' */
     { char* p1 = argv[1]; char* p2 = infilenamebuffer;
-      while ((*p2++ = *p1++) != '\0');
+      while ((*p2++ = *p1++) != '\0') {}
     }
     { char* p1 = argv[2]; char* p2 = outfilenamebuffer;
-      while ((*p2++ = *p1++) != '\0');
+      while ((*p2++ = *p1++) != '\0') {}
     }
   } else {
     char filenamebuffer[1000];
@@ -119,7 +119,7 @@ int main (int argc, char* argv[]) {
     L4a: /* possibly start of '／＊' comment */
          /* EOF impossible */
          fputc(c,outfile);
-         if (!(c=='/')) {  goto L1; } 
+         if (!(c=='/')) {  goto L1; }
          c = fgetc(infile) ;
          if (c==EOF){ goto L3; }
          fputc(c,outfile);

@@ -1,3 +1,4 @@
+;; -*- Lisp -*- vim:filetype=lisp
 ;; Tests for datatypes containing weak references
 ;; Bruno Haible 2004-05-05
 
@@ -11,7 +12,9 @@
                   (weak-mapping-p x)
                   (weak-and-mapping-p x)
                   (weak-or-mapping-p x)
-                  (weak-alist-p x)))
+                  (weak-alist-p x)
+                  (stringp (with-output-to-string (*standard-output*)
+                             (describe x)))))
         (list '(a b c)
               #(a b c)
               (make-weak-pointer (list 'x))
@@ -22,17 +25,17 @@
               (make-weak-and-mapping (list '#:G15 '#:G16) '#:G17)
               (make-weak-or-mapping (list '#:G15 '#:G16) '#:G17)
               (make-weak-alist)))
-((nil nil nil nil nil nil nil nil)
- (nil nil nil nil nil nil nil nil)
- ( t  nil nil nil nil nil nil nil)
- (nil  t  nil nil nil nil nil nil)
- (nil nil  t  nil nil nil nil nil)
- (nil nil nil  t  nil nil nil nil)
- (nil nil nil nil  t  nil nil nil)
- (nil nil nil nil nil  t  nil nil)
- (nil nil nil nil nil nil  t  nil)
- (nil nil nil nil nil nil nil  t ))
- 
+((nil nil nil nil nil nil nil nil t)
+ (nil nil nil nil nil nil nil nil t)
+ ( t  nil nil nil nil nil nil nil t)
+ (nil  t  nil nil nil nil nil nil t)
+ (nil nil  t  nil nil nil nil nil t)
+ (nil nil nil  t  nil nil nil nil t)
+ (nil nil nil nil  t  nil nil nil t)
+ (nil nil nil nil nil  t  nil nil t)
+ (nil nil nil nil nil nil  t  nil t)
+ (nil nil nil nil nil nil nil  t  t))
+
 
 ;; WEAK-POINTER
 

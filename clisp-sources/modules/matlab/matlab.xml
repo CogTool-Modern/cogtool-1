@@ -3,12 +3,14 @@
 <section id="matlab"><title>Matlab Interface</title>
 
 <para>This is an interface to the
- <ulink role="matlab" url="apiref.shtml">Matlab C API</ulink>.
- The package <quote role="package">MATLAB</quote> is
- <link linkend="package-case">case-sensitive</link>, so you would write
- <code>(matlab:engOpen ...)</code>
- when you need to call <function role="matlab">engOpen</function>.
-</para>
+ <ulink role="matlab" url="">Matlab C API</ulink>.</para>
+
+<para>The package <quote role="package">MATLAB</quote> is &case-sensitive-k;,
+ so you would write <code>(matlab:engOpen ...)</code>
+ when you need to call <function role="matlab">engOpen</function>.</para>
+
+<simpara>When this module is present, &features-my;
+ contains the symbol <constant>:MATLAB</constant>.</simpara>
 
 <para>Additionally, some higher level functionality is available
  (see <filename role="clisp-cvs">modules/matlab/test.tst</filename>

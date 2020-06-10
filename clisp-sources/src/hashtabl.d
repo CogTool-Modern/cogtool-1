@@ -1,7 +1,7 @@
 /*
  * Hash-Tables in CLISP
  * Bruno Haible 1990-2005
- * Sam Steingold 1998-2004
+ * Sam Steingold 1998-2009
  * German comments translated into English: Stefan Kain 2002-01-29
  */
 
@@ -203,23 +203,37 @@ local uint32 hashcode_fixnum(object obj) { return hashcode1(obj); }
 #else
 #define hashcode_fixnum(obj)  hashcode1(obj)
 #endif
-/* Bignum: length*2 + (MSD*2^16 + LSD) */
+/* Bignum: length*2 + all digits */
 local uint32 hashcode_bignum (object obj) {
   var uintL len = (uintL)Bignum_length(obj); /* number of Words */
-  return
-   #if (intDsize==32)
-    misch(TheBignum(obj)->data[0],     /* MSD */
-          TheBignum(obj)->data[len-1]) /* and LSD */
-   #elif (intDsize==16) || (bn_minlength<4)
-    highlow32(TheBignum(obj)->data[0],     /* MSD */
-              TheBignum(obj)->data[len-1]) /* and LSD */
-   #else  /* (intDsize==8) && (bn_minlength>=4) */
-    ( (((uint32)TheBignum(obj)->data[0]) << 24)
-      |(((uint32)TheBignum(obj)->data[1]) << 16)
-      |(((uint32)TheBignum(obj)->data[2]) << 8)
-      |((uint32)TheBignum(obj)->data[len-1]))
-   #endif
-    + 2*len;                    /* and length*2 */
+  var uint32 code = 2*len;
+  var uintL pos;
+ #if (intDsize==32)
+  for (pos=0; pos<len; pos++)
+    code = misch(code,TheBignum(obj)->data[pos]);
+ #elif (intDsize==16)
+  var uintL len1 = len & 1;     /* len mod 2 */
+  var uintL len2 = len - len1;  /* len div 2 */
+  for (pos=0; pos<len2; pos+=2)
+    code = misch(code,highlow32(TheBignum(obj)->data[pos],
+                                TheBignum(obj)->data[pos+1]));
+  if (len1 != 0) code = misch(code,TheBignum(obj)->data[len2]); /* LSD */
+ #else  /* (intDsize==8) */
+  var uintL len1 = len & 3;     /* len mod 4 */
+  var uintL len2 = len - len1;  /* len div 4 */
+  for (pos=0; pos<len2; pos+=4)
+    code = misch(code,( (((uint32)TheBignum(obj)->data[pos])   << 24)
+                       |(((uint32)TheBignum(obj)->data[pos+1]) << 16)
+                       |(((uint32)TheBignum(obj)->data[pos+2]) << 8)
+                       |(((uint32)TheBignum(obj)->data[pos+3]))));
+  if (len1 != 0) {
+    var uint32 lsd=0;
+    for (pos=0; pos<len1; pos++)
+      lsd |= ((uint32)TheBignum(obj)->data[len2+pos]) << (pos<<3);
+    code = misch(code,lsd);
+  }
+ #endif
+  return code;
 }
 /* Short-Float: internal representation */
 local uint32 hashcode_sfloat (object obj);
@@ -411,7 +425,7 @@ global bool gcinvariant_hashcode2stable_p (object obj) {
  < result: hashcode, a 32-Bit-number */
 global uint32 hashcode3 (object obj);
 /* auxiliary functions for known type:
- String -> length, first max. 31 characters, utilize last character */
+ String -> length + all characters */
 local uint32 hashcode_string (object obj) {
   var uintL len;
   var uintL offset;
@@ -519,8 +533,22 @@ global uint32 hashcode4 (object obj);
 #else
 #define hashcode_pathcomp(obj)  hashcode3(obj)
 #endif
+local uint32 hashcode_pathname (object obj) { /* obj is a pathname! */
+  check_SP();
+  var uint32 bish_code = 0xB0DD939EUL;
+  var const gcv_object_t* ptr = ((Record)ThePathname(obj))->recdata;
+  var uintC count = Xrecord_length(obj);
+  do {
+    var uint32 next_code = hashcode_pathcomp(*ptr++); /* hashcode of the next component */
+    bish_code = misch(bish_code,next_code);           /* add */
+  } while (--count);
+  return bish_code;
+}
+#undef hashcode_pathcomp
+
 /* atom -> differentiation by type */
-local uint32 hashcode3_atom (object obj) {
+local uint32 hashcode3_atom (object obj, int level) {
+  unused(level); /* recursion is possible only on conses, not HTs & arrays */
  #ifdef TYPECODES
   if (symbolp(obj)) {           /* a symbol? */
     return hashcode1(obj);      /* yes -> take EQ-hashcode */
@@ -534,17 +562,8 @@ local uint32 hashcode3_atom (object obj) {
       return hashcode_bvector(obj); /* look at it component-wise */
     if (type == (sstring_type & ~bit(notsimple_bit_t))) /* string ? */
       return hashcode_string(obj); /* look at it component-wise */
-    if (xpathnamep(obj)) { /* -> look at it component-wise: */
-      check_SP();
-      var uint32 bish_code = 0xB0DD939EUL;
-      var const gcv_object_t* ptr = &((Record)ThePathname(obj))->recdata[0];
-      var uintC count;
-      dotimespC(count,Xrecord_length(obj), {
-        var uint32 next_code = hashcode_pathcomp(*ptr++); /* hashcode of the next component */
-        bish_code = misch(bish_code,next_code);           /* add */
-      });
-      return bish_code;
-    }
+    if (xpathnamep(obj))           /* look at it component-wise */
+      return hashcode_pathname(obj);
     /* else: take EQ-hashcode (for characters: EQL == EQ) */
     return hashcode1(obj);
   }
@@ -567,17 +586,8 @@ local uint32 hashcode3_atom (object obj) {
      #ifdef LOGICAL_PATHNAMES
       case Rectype_Logpathname:
      #endif
-      case Rectype_Pathname: { /* pathname -> look at it component-wise: */
-        check_SP();
-        var uint32 bish_code = 0xB0DD939EUL;
-        var gcv_object_t* ptr = &((Record)ThePathname(obj))->recdata[0];
-        var uintC count;
-        dotimespC(count,Xrecord_length(obj), {
-          var uint32 next_code = hashcode_pathcomp(*ptr++); /* hashcode of the next component */
-          bish_code = misch(bish_code,next_code);           /* add */
-        });
-        return bish_code;
-      }
+      case Rectype_Pathname:    /* look at it component-wise */
+        return hashcode_pathname(obj);
       default:
         break;
     }
@@ -587,63 +597,67 @@ local uint32 hashcode3_atom (object obj) {
   return hashcode1(obj);
  #endif
 }
-/* cons -> look at content up to depth 4:
+/* tree -> look at content up to depth 4, more if some paths end early
  determine the hashcode of the CAR and the hashcode of the CDR at a time
- and combine them shifted. As shifts we can choose e.g. 16,7,5,3, because
+ and combine them shifted. As shifts we can choose, e.g. 16,7,5,3, because
  {0,16} + {0,7} + {0,5} + {0,3} = {0,3,5,7,8,10,12,15,16,19,21,23,24,26,28,31}
- consists of 16 different elements of {0,...,31} . */
-/* object, at cons only up to depth 0 */
-local inline uint32 hashcode3_cons0 (object obj) {
+ consists of 16 different elements of {0,...,31} .
+ > obj : the arbitrary object, tree(=cons) or leaf(=atom)
+ > need : how many objects are still needed
+ > level : the current distance from the root, to avoid circularity
+ > hashcode_atom : how to compute the hash code of a leaf */
+#define HASHCODE_MAX_LEVEL 16
+#define HASHCODE_NEED_LEAVES 16
+local inline uint32 hashcode_tree_rec (object obj, int* need, int level,
+                                       uint32 (hashcode_leaf) (object, int)) {
   if (atomp(obj)) {
-    return hashcode3_atom(obj);
-  } else {                      /* cons -> hashcode := 1 */
+    (*need)--;
+    return hashcode_leaf(obj,level+1);
+  } else if (level > HASHCODE_MAX_LEVEL || *need == 0) {
     return 1;
-  }
-}
-/* object, at cons only up to depth 1 */
-local inline uint32 hashcode3_cons1 (object obj) {
-  if (atomp(obj)) {
-    return hashcode3_atom(obj);
   } else {
-    /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode3_cons0(Car(obj));
-    var uint32 code2 = hashcode3_cons0(Cdr(obj));
-    return rotate_left(3,code1) ^ code2;
+    var local const uint8 shifts[4] = { 16 , 7 , 5 , 3 };
+    var uint32 car_code =
+      hashcode_tree_rec(Car(obj),need,level+1,hashcode_leaf);
+    var uint32 cdr_code = *need == 0 ? 1 :
+      hashcode_tree_rec(Cdr(obj),need,level+1,hashcode_leaf);
+    return rotate_left(shifts[level & 3],car_code) ^ cdr_code;
   }
 }
-/* object, at cons only up to depth 2 */
-local inline uint32 hashcode3_cons2 (object obj) {
+local inline uint32 hashcode_tree (object obj, int level,
+                                   uint32 (hashcode_leaf) (object, int)) {
+  int need = HASHCODE_NEED_LEAVES;
+  return hashcode_tree_rec(obj,&need,level,hashcode_leaf);
+}
+
+/* similar to hashcode_tree
+ NB: use the SAME top-level need initial value (e.g., HASHCODE_NEED_LEAVES)
+   for the corresponding hashcode_tree and gcinvariant_hashcode_tree_p calls */
+local inline bool gcinvariant_hashcode_tree_p_rec
+(object obj, int* need, int level,
+ bool (gcinvariant_hashcode_leaf_p) (object)) {
   if (atomp(obj)) {
-    return hashcode3_atom(obj);
+    (*need)--;
+    return gcinvariant_hashcode_leaf_p(obj);
+  } else if (level > HASHCODE_MAX_LEVEL || *need == 0) {
+    return true;
   } else {
-    /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode3_cons1(Car(obj));
-    var uint32 code2 = hashcode3_cons1(Cdr(obj));
-    return rotate_left(5,code1) ^ code2;
+    return gcinvariant_hashcode_tree_p_rec(Car(obj),need,level+1,
+                                           gcinvariant_hashcode_leaf_p)
+      && (*need == 0 ? true :
+          gcinvariant_hashcode_tree_p_rec(Cdr(obj),need,level+1,
+                                          gcinvariant_hashcode_leaf_p));
   }
 }
-/* object, at cons only up to depth 3 */
-local inline uint32 hashcode3_cons3 (object obj) {
-  if (atomp(obj)) {
-    return hashcode3_atom(obj);
-  } else {
-    /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode3_cons2(Car(obj));
-    var uint32 code2 = hashcode3_cons2(Cdr(obj));
-    return rotate_left(7,code1) ^ code2;
-  }
+local inline bool gcinvariant_hashcode_tree_p
+(object obj, bool (gcinvariant_hashcode_leaf_p) (object)) {
+  int need = HASHCODE_NEED_LEAVES;
+  return gcinvariant_hashcode_tree_p_rec(obj,&need,0,
+                                         gcinvariant_hashcode_leaf_p);
 }
-/* object, at cons only up to depth 4 */
-global uint32 hashcode3 (object obj) {
-  if (atomp(obj)) {
-    return hashcode3_atom(obj);
-  } else {
-    /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode3_cons3(Car(obj));
-    var uint32 code2 = hashcode3_cons3(Cdr(obj));
-    return rotate_left(16,code1) ^ code2;
-  }
-}
+
+global uint32 hashcode3 (object obj)
+{ return hashcode_tree(obj,0,hashcode3_atom); }
 
 /* Tests whether hashcode3 of an object is guaranteed to be GC-invariant. */
 global bool gcinvariant_hashcode3_p (object obj);
@@ -680,40 +694,8 @@ local bool gcinvariant_hashcode3_atom_p (object obj) {
   #endif
   return false;
 }
-local inline bool gcinvariant_hashcode3_cons0_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3_atom_p(obj);
-  else
-    return true;
-}
-local inline bool gcinvariant_hashcode3_cons1_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3_atom_p(obj);
-  else
-    return gcinvariant_hashcode3_cons0_p(Car(obj))
-           && gcinvariant_hashcode3_cons0_p(Cdr(obj));
-}
-local inline bool gcinvariant_hashcode3_cons2_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3_atom_p(obj);
-  else
-    return gcinvariant_hashcode3_cons1_p(Car(obj))
-           && gcinvariant_hashcode3_cons1_p(Cdr(obj));
-}
-local inline bool gcinvariant_hashcode3_cons3_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3_atom_p(obj);
-  else
-    return gcinvariant_hashcode3_cons2_p(Car(obj))
-           && gcinvariant_hashcode3_cons2_p(Cdr(obj));
-}
-global bool gcinvariant_hashcode3_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3_atom_p(obj);
-  else
-    return gcinvariant_hashcode3_cons3_p(Car(obj))
-           && gcinvariant_hashcode3_cons3_p(Cdr(obj));
-}
+global bool gcinvariant_hashcode3_p (object obj)
+{ return gcinvariant_hashcode_tree_p(obj,gcinvariant_hashcode3_atom_p); }
 
 /* --------------------------- STABLEHASH EQUAL --------------------------- */
 
@@ -727,7 +709,8 @@ global bool gcinvariant_hashcode3_p (object obj) {
  < result: hashcode, a 32-Bit-number */
 global uint32 hashcode3stable (object obj);
 /* atom -> differentiation by type */
-local uint32 hashcode3stable_atom (object obj) {
+local uint32 hashcode3stable_atom (object obj, int level) {
+  unused(level); /* recursion is possible only on conses, not HTs & arrays */
  #ifdef TYPECODES
   if (symbolp(obj)) {           /* a symbol? */
     return hashcode1stable(obj); /* yes -> take EQ-hashcode */
@@ -741,17 +724,8 @@ local uint32 hashcode3stable_atom (object obj) {
       return hashcode_bvector(obj); /* look at it component-wise */
     if (type == (sstring_type & ~bit(notsimple_bit_t))) /* string ? */
       return hashcode_string(obj); /* look at it component-wise */
-    if (xpathnamep(obj)) { /* -> look at it component-wise: */
-      check_SP();
-      var uint32 bish_code = 0xB0DD939EUL;
-      var const gcv_object_t* ptr = &((Record)ThePathname(obj))->recdata[0];
-      var uintC count;
-      dotimespC(count,Xrecord_length(obj), {
-        var uint32 next_code = hashcode_pathcomp(*ptr++); /* hashcode of the next component */
-        bish_code = misch(bish_code,next_code);           /* add */
-      });
-      return bish_code;
-    }
+    if (xpathnamep(obj))           /* look at it component-wise */
+      return hashcode_pathname(obj);
     /* else: take EQ-hashcode (for characters: EQL == EQ) */
     return hashcode1stable(obj);
   }
@@ -774,17 +748,8 @@ local uint32 hashcode3stable_atom (object obj) {
      #ifdef LOGICAL_PATHNAMES
       case Rectype_Logpathname:
      #endif
-      case Rectype_Pathname: { /* pathname -> look at it component-wise: */
-        check_SP();
-        var uint32 bish_code = 0xB0DD939EUL;
-        var gcv_object_t* ptr = &((Record)ThePathname(obj))->recdata[0];
-        var uintC count;
-        dotimespC(count,Xrecord_length(obj), {
-          var uint32 next_code = hashcode_pathcomp(*ptr++); /* hashcode of the next component */
-          bish_code = misch(bish_code,next_code);           /* add */
-        });
-        return bish_code;
-      }
+      case Rectype_Pathname:    /* look at it component-wise */
+        return hashcode_pathname(obj);
       default:
         break;
     }
@@ -794,59 +759,9 @@ local uint32 hashcode3stable_atom (object obj) {
   return hashcode1stable(obj);
  #endif
 }
-/* cons -> look at content up to depth 4:
- determine the hashcode of the CAR and the hashcode of the CDR at a time
- and combine them shifted. As Shifts fit e.g. 16,7,5,3,
- because {0,16} + {0,7} + {0,5} + {0,3} = {0,3,5,7,8,10,12,15,16,19,21,23,24,26,28,31}
- consists of 16 different elements of {0,...,31} .
- object, at cons only up to depth 0 */
-local uint32 hashcode3stable_cons0 (object obj) {
-  if (atomp(obj)) {
-    return hashcode3stable_atom(obj);
-  } else {                      /* cons -> hashcode := 1 */
-    return 1;
-  }
-}
-/* object, at cons only up to depth 1 */
-local uint32 hashcode3stable_cons1 (object obj) {
-  if (atomp(obj)) {
-    return hashcode3stable_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode3stable_cons0(Car(obj));
-    var uint32 code2 = hashcode3stable_cons0(Cdr(obj));
-    return rotate_left(3,code1) ^ code2;
-  }
-}
-/* object, at cons only up to depth 2 */
-local uint32 hashcode3stable_cons2 (object obj) {
-  if (atomp(obj)) {
-    return hashcode3stable_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode3stable_cons1(Car(obj));
-    var uint32 code2 = hashcode3stable_cons1(Cdr(obj));
-    return rotate_left(5,code1) ^ code2;
-  }
-}
-/* object, at cons only up to depth 3 */
-local uint32 hashcode3stable_cons3 (object obj) {
-  if (atomp(obj)) {
-    return hashcode3stable_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode3stable_cons2(Car(obj));
-    var uint32 code2 = hashcode3stable_cons2(Cdr(obj));
-    return rotate_left(7,code1) ^ code2;
-  }
-}
-/* object, at cons only up to depth 4 */
-global uint32 hashcode3stable (object obj) {
-  if (atomp(obj)) {
-    return hashcode3stable_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode3stable_cons3(Car(obj));
-    var uint32 code2 = hashcode3stable_cons3(Cdr(obj));
-    return rotate_left(16,code1) ^ code2;
-  }
-}
+
+global uint32 hashcode3stable (object obj)
+{ return hashcode_tree(obj,0,hashcode3stable_atom); }
 
 /* Tests whether hashcode3stable of an object is guaranteed to be
    GC-invariant. */
@@ -884,40 +799,8 @@ local bool gcinvariant_hashcode3stable_atom_p (object obj) {
   #endif
   return instance_of_stablehash_p(obj) || symbolp(obj);
 }
-local inline bool gcinvariant_hashcode3stable_cons0_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3stable_atom_p(obj);
-  else
-    return true;
-}
-local inline bool gcinvariant_hashcode3stable_cons1_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3stable_atom_p(obj);
-  else
-    return gcinvariant_hashcode3stable_cons0_p(Car(obj))
-           && gcinvariant_hashcode3stable_cons0_p(Cdr(obj));
-}
-local inline bool gcinvariant_hashcode3stable_cons2_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3stable_atom_p(obj);
-  else
-    return gcinvariant_hashcode3stable_cons1_p(Car(obj))
-           && gcinvariant_hashcode3stable_cons1_p(Cdr(obj));
-}
-local inline bool gcinvariant_hashcode3stable_cons3_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3stable_atom_p(obj);
-  else
-    return gcinvariant_hashcode3stable_cons2_p(Car(obj))
-           && gcinvariant_hashcode3stable_cons2_p(Cdr(obj));
-}
-global bool gcinvariant_hashcode3stable_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode3stable_atom_p(obj);
-  else
-    return gcinvariant_hashcode3stable_cons3_p(Car(obj))
-           && gcinvariant_hashcode3stable_cons3_p(Cdr(obj));
-}
+global bool gcinvariant_hashcode3stable_p (object obj)
+{ return gcinvariant_hashcode_tree_p(obj,gcinvariant_hashcode3stable_atom_p); }
 
 /* ---------------------------- FASTHASH EQUALP ---------------------------- */
 
@@ -927,6 +810,7 @@ global bool gcinvariant_hashcode3stable_p (object obj) {
  of the object.
  (equalp X Y) implies (= (hashcode4 X) (hashcode4 Y)). */
 global uint32 hashcode4 (object obj);
+#define hashcode4_(obj)  hashcode_tree(obj,level+1,hashcode4_atom);
 /* auxiliary functions for known type:
  character -> case-insensitive. */
 #define hashcode4_char(c)  (0xCAAEACEFUL + (uint32)as_cint(up_case(c)))
@@ -934,9 +818,10 @@ global uint32 hashcode4 (object obj);
 extern uint32 hashcode4_real (object obj); /* see REALELEM.D */
 extern uint32 hashcode4_uint32 (uint32 x); /* see REALELEM.D */
 extern uint32 hashcode4_uint4 [16];        /* see REALELEM.D */
+local uint32 hashcode4_atom (object obj, int level);
 /* vectors: look at them component-wise */
 local uint32 hashcode4_vector_T (object dv, uintL index,
-                                 uintL count, uint32 bish_code);
+                                 uintL count, uint32 bish_code, int level);
 local uint32 hashcode4_vector_Char (object dv, uintL index,
                                     uintL count, uint32 bish_code);
 local uint32 hashcode4_vector_Bit (object dv, uintL index,
@@ -952,14 +837,14 @@ local uint32 hashcode4_vector_16Bit (object dv, uintL index,
 local uint32 hashcode4_vector_32Bit (object dv, uintL index,
                                      uintL count, uint32 bish_code);
 local uint32 hashcode4_vector (object dv, uintL index,
-                               uintL count, uint32 bish_code);
+                               uintL count, uint32 bish_code, int level);
 local uint32 hashcode4_vector_T (object dv, uintL index,
-                                 uintL count, uint32 bish_code) {
+                                 uintL count, uint32 bish_code, int level) {
   if (count > 0) {
     check_SP();
     var const gcv_object_t* ptr = &TheSvector(dv)->data[index];
     dotimespL(count,count, {
-      var uint32 next_code = hashcode4(*ptr++); /* next component's hashcode */
+      var uint32 next_code = hashcode4_(*ptr++); /* next component's hashcode */
       bish_code = misch(bish_code,next_code);   /* add */
     });
   }
@@ -1054,10 +939,11 @@ local uint32 hashcode4_vector_32Bit (object dv, uintL index,
   return bish_code;
 }
 local uint32 hashcode4_vector (object dv, uintL index,
-                               uintL count, uint32 bish_code) {
+                               uintL count, uint32 bish_code, int level) {
+  if (count > HASHCODE_NEED_LEAVES) count = HASHCODE_NEED_LEAVES;
   switch (Array_type(dv)) {
     case Array_type_svector:    /* simple-vector */
-      return hashcode4_vector_T(dv,index,count,bish_code);
+      return hashcode4_vector_T(dv,index,count,bish_code,level);
     case Array_type_sbvector:   /* simple-bit-vector */
       return hashcode4_vector_Bit(dv,index,count,bish_code);
     case Array_type_sb2vector:
@@ -1080,7 +966,7 @@ local uint32 hashcode4_vector (object dv, uintL index,
   }
 }
 /* atom -> differentiation by type */
-local uint32 hashcode4_atom (object obj) {
+local uint32 hashcode4_atom (object obj, int level) {
  #ifdef TYPECODES
   if (symbolp(obj)) {           /* a symbol? */
     return hashcode1(obj);      /* yes -> take EQ-hashcode */
@@ -1122,11 +1008,13 @@ local uint32 hashcode4_atom (object obj) {
     case_vector: {              /* (VECTOR T), (VECTOR NIL) */
       /* look at it component-wise: */
       var uintL len = vector_length(obj); /* length */
-      var uintL index = 0;
-      var object dv = array_displace_check(obj,len,&index);
-      /* dv is the data-vector, index is the index into the data-vector. */
       var uint32 bish_code = 0x724BD24EUL + len; /* utilize length */
-      return hashcode4_vector(dv,index,len,bish_code);
+      if (level <= HASHCODE_MAX_LEVEL) {
+        var uintL index = 0;
+        var object dv = array_displace_check(obj,len,&index);
+        /* dv is the data-vector, index is the index into the data-vector. */
+        return hashcode4_vector(dv,index,len,bish_code,level+1);
+      } else return bish_code;
     }
     case_mdarray: {             /* array with rank /=1 */
       /* rank and dimensions, then look at it component-wise: */
@@ -1143,12 +1031,12 @@ local uint32 hashcode4_atom (object obj) {
           });
         }
       }
-      {
+      if (level <= HASHCODE_MAX_LEVEL) {
         var uintL len = TheIarray(obj)->totalsize;
         var uintL index = 0;
         var object dv = iarray_displace_check(obj,len,&index);
-        return hashcode4_vector(dv,index,len,bish_code);
-      }
+        return hashcode4_vector(dv,index,len,bish_code,level+1);
+      } else return bish_code;
     }
    #ifdef TYPECODES
     _case_structure
@@ -1183,19 +1071,19 @@ local uint32 hashcode4_atom (object obj) {
        #endif
         default: ;
       }
-    /* FIXME: The case that obj is a hash-table should be handled specially. */
-    {                           /* look at flags, type, components: */
+    { /* look at flags, type, components: */
       var uintC len = SXrecord_nonweak_length(obj);
       var uint32 bish_code =
         0x03168B8D + (Record_flags(obj) << 24) + (Record_type(obj) << 16) + len;
-      if (len > 0) {
+      if (level <= HASHCODE_MAX_LEVEL && len > 0) {
         check_SP();
         var const gcv_object_t* ptr = &TheRecord(obj)->recdata[0];
-        var uintC count;
-        dotimespC(count,len, {
-          var uint32 next_code = hashcode4(*ptr++); /* next component's hashcode */
+        var uintC count = len < HASHCODE_NEED_LEAVES
+          ? len : HASHCODE_NEED_LEAVES; /* MIN(len,HASHCODE_NEED_LEAVES) */
+        do {
+          var uint32 next_code = hashcode4_(*ptr++); /* next component's hashcode */
           bish_code = misch(bish_code,next_code);   /* add */
-        });
+        } while (--count);
       }
       if (Record_type(obj) >= rectype_limit) {
         var uintC xlen = Xrecord_xlength(obj);
@@ -1226,60 +1114,11 @@ local uint32 hashcode4_atom (object obj) {
     default: NOTREACHED;
   }
 }
-/* cons -> look at content up to depth 4:
- determine hashcode of the CAR and hashcode of the CDR at a time
- and combine them shifted. As shifts fit e.g. 16,7,5,3,
- because {0,16} + {0,7} + {0,5} + {0,3} =
-         {0,3,5,7,8,10,12,15,16,19,21,23,24,26,28,31}
- consists of 16 different elements of {0,...,31} .
- object, at cons only up to depth 0 */
-local uint32 hashcode4_cons0 (object obj) {
-  if (atomp(obj)) {
-    return hashcode4_atom(obj);
-  } else {                      /* cons -> hashcode := 1 */
-    return 1;
-  }
-}
-/* object, at cons only up to depth 1 */
-local uint32 hashcode4_cons1 (object obj) {
-  if (atomp(obj)) {
-    return hashcode4_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode4_cons0(Car(obj));
-    var uint32 code2 = hashcode4_cons0(Cdr(obj));
-    return rotate_left(3,code1) ^ code2;
-  }
-}
-/* object, at cons only up to depth 2 */
-local uint32 hashcode4_cons2 (object obj) {
-  if (atomp(obj)) {
-    return hashcode4_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode4_cons1(Car(obj));
-    var uint32 code2 = hashcode4_cons1(Cdr(obj));
-    return rotate_left(5,code1) ^ code2;
-  }
-}
-/* object, at cons only up to depth 3 */
-local uint32 hashcode4_cons3 (object obj) {
-  if (atomp(obj)) {
-    return hashcode4_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode4_cons2(Car(obj));
-    var uint32 code2 = hashcode4_cons2(Cdr(obj));
-    return rotate_left(7,code1) ^ code2;
-  }
-}
-/* object, at cons only up to depth 4 */
-global uint32 hashcode4 (object obj) {
-  if (atomp(obj)) {
-    return hashcode4_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = hashcode4_cons3(Car(obj));
-    var uint32 code2 = hashcode4_cons3(Cdr(obj));
-    return rotate_left(16,code1) ^ code2;
-  }
-}
+#undef HASHCODE_MAX_LEVEL
+#undef HASHCODE_NEED_LEAVES
+
+global uint32 hashcode4 (object obj)
+{ return hashcode_tree(obj,0,hashcode4_atom); }
 
 /* Tests whether hashcode4 of an object is guaranteed to be GC-invariant. */
 global bool gcinvariant_hashcode4_p (object obj);
@@ -1316,40 +1155,8 @@ local bool gcinvariant_hashcode4_atom_p (object obj) {
   #endif
   return false;
 }
-local inline bool gcinvariant_hashcode4_cons0_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode4_atom_p(obj);
-  else
-    return true;
-}
-local inline bool gcinvariant_hashcode4_cons1_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode4_atom_p(obj);
-  else
-    return gcinvariant_hashcode4_cons0_p(Car(obj))
-           && gcinvariant_hashcode4_cons0_p(Cdr(obj));
-}
-local inline bool gcinvariant_hashcode4_cons2_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode4_atom_p(obj);
-  else
-    return gcinvariant_hashcode4_cons1_p(Car(obj))
-           && gcinvariant_hashcode4_cons1_p(Cdr(obj));
-}
-local inline bool gcinvariant_hashcode4_cons3_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode4_atom_p(obj);
-  else
-    return gcinvariant_hashcode4_cons2_p(Car(obj))
-           && gcinvariant_hashcode4_cons2_p(Cdr(obj));
-}
-global bool gcinvariant_hashcode4_p (object obj) {
-  if (atomp(obj))
-    return gcinvariant_hashcode4_atom_p(obj);
-  else
-    return gcinvariant_hashcode4_cons3_p(Car(obj))
-           && gcinvariant_hashcode4_cons3_p(Cdr(obj));
-}
+global bool gcinvariant_hashcode4_p (object obj)
+{ return gcinvariant_hashcode_tree_p(obj,gcinvariant_hashcode4_atom_p); }
 
 /* ----------------------------- USER DEFINED ----------------------------- */
 
@@ -1362,63 +1169,62 @@ local uint32 hashcode_raw_user (object fun, object obj) {
 
 /* =========================== Hash table record =========================== */
 
-# Specification of the flags in a hash-table:
-  #define htflags_test_builtin_B  (bit(1)|bit(0)) # for distinguishing builtin tests
-  #define htflags_test_eq_B       (    0 |    0 ) # test is EQ
-  #define htflags_test_eql_B      (    0 |bit(0)) # test is EQL
-  #define htflags_test_equal_B    (bit(1)|    0 ) # test is EQUAL
-  #define htflags_test_equalp_B   (bit(1)|bit(0)) # test is EQUALP
-  #define htflags_test_user_B     bit(2) # set for user-defined test
-  #define htflags_stablehash_B    bit(3) # hash code of instances of
-                                         # STANDARD-STABLEHASH, STRUCTURE-STABLEHASH
-                                         # is GC-invariant
-  #define htflags_pending_warn_forced_gc_rehash bit(4) # Must call
-                                         # warn_forced_gc_rehash at the next
-                                         # opportunity
-  # define htflags_warn_gc_rehash_B bit(5) # Warn when a key is being added
-                                         # whose hash code is not GC-invariant.
-  # define htflags_gc_rehash_B    bit(6) # Set after a key has been added
-                                         # whose hash code is not GC-invariant.
-  # define htflags_invalid_B      bit(7) # Set when the list structure is
-                                         # invalid and the table needs a rehash.
+/* Specification of the flags in a hash-table: */
+#define htflags_test_builtin_B  (bit(1)|bit(0)) /* for distinguishing builtin tests */
+#define htflags_test_eq_B       (    0 |    0 ) /* test is EQ */
+#define htflags_test_eql_B      (    0 |bit(0)) /* test is EQL */
+#define htflags_test_equal_B    (bit(1)|    0 ) /* test is EQUAL */
+#define htflags_test_equalp_B   (bit(1)|bit(0)) /* test is EQUALP */
+#define htflags_test_user_B     bit(2) /* set for user-defined test */
+/* hash code of instances of STANDARD-STABLEHASH, STRUCTURE-STABLEHASH
+   is GC-invariant */
+#define htflags_stablehash_B    bit(3)
+/* Must call warn_forced_gc_rehash at the next opportunity */
+#define htflags_pending_warn_forced_gc_rehash bit(4)
+/* Warn when a key is being added whose hash code is not GC-invariant.
+ - define htflags_warn_gc_rehash_B bit(5)
+   Set after a key has been added whose hash code is not GC-invariant.
+ - define htflags_gc_rehash_B    bit(6)
+   Set when the list structure is invalid and the table needs a rehash.
+ - define htflags_invalid_B      bit(7)
 
-# Specification of the two types of Pseudo-Functions:
+ Specification of the two types of Pseudo-Functions:
 
-  # Specification for LOOKUP - Pseudo-Function:
-  # lookup(ht,obj,allowgc,&KVptr,&Iptr)
-  # > ht: hash-table
-  # > obj: object
-  # > allowgc: whether GC is allowed during hash lookup
-  # < if found: result=true,
-  #     KVptr[0], KVptr[1] : key, value in key-value-vector,
-  #     KVptr[2] : index of next entry,
-  #     *Iptr : previous index pointing to KVptr[0..2]
-  # < if not found: result=false,
-  #     *Iptr : entry belonging to key in index-vector
-  #             or an arbitrary element of the "list" starting there
-  # can trigger GC - if allowgc is true
-    typedef maygc bool (* lookup_Pseudofun) (object ht, object obj, bool allowgc, gcv_object_t** KVptr_, gcv_object_t** Iptr_);
+ Specification for LOOKUP - Pseudo-Function:
+ lookup(ht,obj,allowgc,&KVptr,&Iptr)
+ > ht: hash-table
+ > obj: object
+ > allowgc: whether GC is allowed during hash lookup
+ < if found: result=true,
+     KVptr[0], KVptr[1] : key, value in key-value-vector,
+     KVptr[2] : index of next entry,
+     *Iptr : previous index pointing to KVptr[0..2]
+ < if not found: result=false,
+     *Iptr : entry belonging to key in index-vector
+             or an arbitrary element of the "list" starting there
+ can trigger GC - if allowgc is true */
+typedef maygc bool (* lookup_Pseudofun) (object ht, object obj, bool allowgc, gcv_object_t** KVptr_, gcv_object_t** Iptr_);
 
-  # Specification for HASHCODE - Pseudo-Function:
-  # hashcode(obj)
-  # > obj: object
-  # < result: its hash code
-    typedef uint32 (* hashcode_Pseudofun) (object obj);
+/* Specification for HASHCODE - Pseudo-Function:
+ hashcode(obj)
+ > obj: object
+ < result: its hash code */
+typedef uint32 (* hashcode_Pseudofun) (object obj);
 
-  # Specification for TEST - Pseudo-Function:
-  # test(obj1,obj2)
-  # > obj1: object
-  # > obj2: object
-  # < result: true if they are considered equal
-    typedef bool (* test_Pseudofun) (object obj1, object obj2);
+/* Specification for TEST - Pseudo-Function:
+ test(obj1,obj2)
+ > obj1: object
+ > obj2: object
+ < result: true if they are considered equal */
+typedef bool (* test_Pseudofun) (object obj1, object obj2);
 
-  # Specification for GCINVARIANT - Pseudo-Function:
-  # gcinvariant(obj)
-  # > obj: object
-  # < result: true if its hash code is guaranteed to be GC-invariant
-    typedef bool (* gcinvariant_Pseudofun) (object obj);
+/* Specification for GCINVARIANT - Pseudo-Function:
+ gcinvariant(obj)
+ > obj: object
+ < result: true if its hash code is guaranteed to be GC-invariant */
+typedef bool (* gcinvariant_Pseudofun) (object obj);
 
-# Extract Pseudo-Functions of a hash-table:
+/* Extract Pseudo-Functions of a hash-table: */
 #define lookupfn(ht)  \
   (*(lookup_Pseudofun)ThePseudofun(TheHashtable(ht)->ht_lookupfn))
 #define hashcodefn(ht)  \
@@ -1567,13 +1373,14 @@ local maygc void warn_forced_gc_rehash (object ht) {
              or an arbitrary element of the "list" starting there
  can trigger GC - if allowgc is true */
 global /*maygc*/ bool hash_lookup_builtin (object ht, object obj, bool allowgc,
-                                           gcv_object_t** KVptr_, gcv_object_t** Iptr_) {
+                                           gcv_object_t** KVptr_,
+                                           gcv_object_t** Iptr_) {
   GCTRIGGER_IF(allowgc, GCTRIGGER2(ht,obj));
   #ifdef GENERATIONAL_GC
   if (!ht_validp(TheHashtable(ht))) { /* hash-table must be reorganized? */
-    # Rehash it before the warning, otherwise we risk an endless recursion.
+    /* Rehash it before the warning, otherwise we risk an endless recursion. */
     ht = rehash(ht);
-    # Warn if *WARN-ON-HASHTABLE-NEEDING-REHASH-AFTER-GC* is true:
+    /* Warn if *WARN-ON-HASHTABLE-NEEDING-REHASH-AFTER-GC* is true: */
     if (!nullpSv(warn_on_hashtable_needing_rehash_after_gc)) {
       if (allowgc) {
         record_flags_clr(TheHashtable(ht),htflags_pending_warn_forced_gc_rehash);
@@ -1583,8 +1390,8 @@ global /*maygc*/ bool hash_lookup_builtin (object ht, object obj, bool allowgc,
         if (!ht_validp(TheHashtable(ht))) /* must be reorganized again? */
           ht = rehash(ht);
       } else {
-        # We cannot warn now, because in this call we are not allowed to
-        # trigger GC, therefore we delay the call until the next opportunity.
+        /* We cannot warn now, because in this call we are not allowed to
+         trigger GC, therefore we delay the call until the next opportunity. */
         record_flags_set(TheHashtable(ht),htflags_pending_warn_forced_gc_rehash);
       }
     }
@@ -1592,7 +1399,7 @@ global /*maygc*/ bool hash_lookup_builtin (object ht, object obj, bool allowgc,
   #endif
   if (allowgc
       && (record_flags(TheHashtable(ht)) & htflags_pending_warn_forced_gc_rehash)) {
-    # Now is an opportunity to get rid of the pending warn_forced_gc_rehash task.
+    /* Now is an opportunity to get rid of the pending warn_forced_gc_rehash task. */
     record_flags_clr(TheHashtable(ht),htflags_pending_warn_forced_gc_rehash);
     pushSTACK(ht); pushSTACK(obj);
     warn_forced_gc_rehash(ht);
@@ -1631,9 +1438,9 @@ global /*maygc*/ bool hash_lookup_builtin_with_rehash (object ht, object obj, bo
                                                        gcv_object_t** KVptr_, gcv_object_t** Iptr_) {
   GCTRIGGER_IF(allowgc, GCTRIGGER2(ht,obj));
   if (!ht_validp(TheHashtable(ht))) { /* hash-table must be reorganized? */
-    # Rehash it before the warning, otherwise we risk an endless recursion.
+    /* Rehash it before the warning, otherwise we risk an endless recursion. */
     ht = rehash(ht);
-    # Warn if *WARN-ON-HASHTABLE-NEEDING-REHASH-AFTER-GC* is true:
+    /* Warn if *WARN-ON-HASHTABLE-NEEDING-REHASH-AFTER-GC* is true: */
     if (!nullpSv(warn_on_hashtable_needing_rehash_after_gc)) {
       if (allowgc) {
         record_flags_clr(TheHashtable(ht),htflags_pending_warn_forced_gc_rehash);
@@ -1643,8 +1450,8 @@ global /*maygc*/ bool hash_lookup_builtin_with_rehash (object ht, object obj, bo
         if (!ht_validp(TheHashtable(ht))) /* must be reorganized again? */
           ht = rehash(ht);
       } else {
-        # We cannot warn now, because in this call we are not allowed to
-        # trigger GC, therefore we delay the call until the next opportunity.
+        /* We cannot warn now, because in this call we are not allowed to
+         trigger GC, therefore we delay the call until the next opportunity. */
         record_flags_set(TheHashtable(ht),htflags_pending_warn_forced_gc_rehash);
       }
     }
@@ -1667,7 +1474,8 @@ global /*maygc*/ bool hash_lookup_builtin_with_rehash (object ht, object obj, bo
              or an arbitrary element of the "list" starting there
  can trigger GC - if allowgc is true */
 global maygc bool hash_lookup_user (object ht, object obj, bool allowgc,
-                                    gcv_object_t** KVptr_, gcv_object_t** Iptr_) {
+                                    gcv_object_t** KVptr_, gcv_object_t** Iptr_)
+{
   ASSERT(allowgc);
   pushSTACK(ht); pushSTACK(obj);
   if (!ht_validp(TheHashtable(ht))) /* hash-table must be reorganized */
@@ -1788,18 +1596,12 @@ global object hash_table_weak_type (object ht) {
   var object kvt = TheHashtable(ht)->ht_kvtable;
   if (simple_vector_p(kvt))
     return NIL;
-  else {
-    switch (Record_type(kvt)) {
-      case Rectype_WeakHashedAlist_Key:
-        return S(Kkey);
-      case Rectype_WeakHashedAlist_Value:
-        return S(Kvalue);
-      case Rectype_WeakHashedAlist_Either:
-        return S(Kkey_and_value);
-      case Rectype_WeakHashedAlist_Both:
-        return S(Kkey_or_value);
+  else switch (Record_type(kvt)) {
+      case Rectype_WeakHashedAlist_Key:    { return S(Kkey); }
+      case Rectype_WeakHashedAlist_Value:  { return S(Kvalue); }
+      case Rectype_WeakHashedAlist_Either: { return S(Kkey_and_value); }
+      case Rectype_WeakHashedAlist_Both:   { return S(Kkey_or_value); }
       default: NOTREACHED;
-    }
   }
 }
 
@@ -1816,13 +1618,13 @@ local inline maygc object allocate_kvt (object weak, uintL maxcount) {
     return kvt;
   } else {
     var sintB rectype;
-    if (eq(weak,S(Kkey))) # :KEY
+    if (eq(weak,S(Kkey)))       /* :KEY */
       rectype = Rectype_WeakHashedAlist_Key;
-    else if (eq(weak,S(Kvalue))) # :VALUE
+    else if (eq(weak,S(Kvalue))) /* :VALUE */
       rectype = Rectype_WeakHashedAlist_Value;
-    else if (eq(weak,S(Kkey_and_value))) # :KEY-AND-VALUE
+    else if (eq(weak,S(Kkey_and_value))) /* :KEY-AND-VALUE */
       rectype = Rectype_WeakHashedAlist_Either;
-    else if (eq(weak,S(Kkey_or_value))) # :KEY-OR-VALUE
+    else if (eq(weak,S(Kkey_or_value))) /* :KEY-OR-VALUE */
       rectype = Rectype_WeakHashedAlist_Both;
     else
       NOTREACHED;
@@ -1871,7 +1673,7 @@ local maygc uintL prepare_resize (object maxcount, object mincount_threshold,
     pushSTACK(maxcount);        /* MAXCOUNT */
     pushSTACK(fixnum(sizeV));   /* SIZE */
     /* MINCOUNT := (floor (* maxcount mincount-threshold)) */
-    pushSTACK(maxcount); pushSTACK(mincount_threshold); funcall(L(mal),2);
+    pushSTACK(maxcount); pushSTACK(mincount_threshold); funcall(L(star),2);
     pushSTACK(value1); funcall(L(floor),1);
     pushSTACK(value1);
     /* stack-layout: MAXCOUNT, SIZE, MINCOUNT.
@@ -1933,7 +1735,7 @@ local maygc object resize (object ht, object maxcount) {
       if (count==0) {           /* is the new vector already full? */
         /* There is not enough room!! */
         pushSTACK(ht);          /* hash-table */
-        fehler(serious_condition,
+        error(serious_condition,
                GETTEXT("internal error occured while resizing ~S"));
       }
       count--;
@@ -1981,7 +1783,7 @@ local maygc object resize (object ht, object maxcount) {
         /* calculate new maxcount: */                                   \
         pushSTACK(TheHashtable(ht)->ht_maxcount);                       \
         pushSTACK(TheHashtable(ht)->ht_rehash_size); /* REHASH-SIZE (>1) */ \
-        funcall(L(mal),2); /* (* maxcount rehash-size), is > maxcount */ \
+        funcall(L(star),2); /* (* maxcount rehash-size), is > maxcount */ \
         pushSTACK(value1);                                              \
         funcall(L(ceiling),1); /* (ceiling ...), integer > maxcount */  \
         ht = resize(STACK_(hash_pos),value1); /* enlarge table */       \
@@ -2040,14 +1842,14 @@ local object get_eq_hashfunction (void) {
     return value;
   else {
     Symbol_value(S(eq_hashfunction)) = S(fasthash_eq);
-    pushSTACK(value);                   # TYPE-ERROR slot DATUM
-    pushSTACK(O(type_eq_hashfunction)); # TYPE-ERROR slot EXPECTED-TYPE
+    pushSTACK(value);                   /* TYPE-ERROR slot DATUM */
+    pushSTACK(O(type_eq_hashfunction)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(S(fasthash_eq));
     pushSTACK(value);
     pushSTACK(S(stablehash_eq)); pushSTACK(S(fasthash_eq));
     pushSTACK(S(eq_hashfunction));
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,
+    error(type_error,
            GETTEXT("~S: The value of ~S should be ~S or ~S, not ~S.\n"
                    "It has been reset to ~S."));
   }
@@ -2060,14 +1862,14 @@ local object get_eql_hashfunction (void) {
     return value;
   else {
     Symbol_value(S(eql_hashfunction)) = S(fasthash_eql);
-    pushSTACK(value);                    # TYPE-ERROR slot DATUM
-    pushSTACK(O(type_eql_hashfunction)); # TYPE-ERROR slot EXPECTED-TYPE
+    pushSTACK(value);                    /* TYPE-ERROR slot DATUM */
+    pushSTACK(O(type_eql_hashfunction)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(S(fasthash_eql));
     pushSTACK(value);
     pushSTACK(S(stablehash_eql)); pushSTACK(S(fasthash_eql));
     pushSTACK(S(eql_hashfunction));
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,
+    error(type_error,
            GETTEXT("~S: The value of ~S should be ~S or ~S, not ~S.\n"
                    "It has been reset to ~S."));
   }
@@ -2080,14 +1882,14 @@ local object get_equal_hashfunction (void) {
     return value;
   else {
     Symbol_value(S(equal_hashfunction)) = S(fasthash_equal);
-    pushSTACK(value);                      # TYPE-ERROR slot DATUM
-    pushSTACK(O(type_equal_hashfunction)); # TYPE-ERROR slot EXPECTED-TYPE
+    pushSTACK(value);                      /* TYPE-ERROR slot DATUM */
+    pushSTACK(O(type_equal_hashfunction)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(S(fasthash_equal));
     pushSTACK(value);
     pushSTACK(S(stablehash_equal)); pushSTACK(S(fasthash_equal));
     pushSTACK(S(equal_hashfunction));
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,
+    error(type_error,
            GETTEXT("~S: The value of ~S should be ~S or ~S, not ~S.\n"
                    "It has been reset to ~S."));
   }
@@ -2208,7 +2010,7 @@ LISPFUN(make_hash_table,seclass_read,0,0,norest,key,9,
             pushSTACK(O(type_hashtable_test)); /* TYPE-ERROR slot EXPECTED-TYPE */
             pushSTACK(test); pushSTACK(S(Ktest));
             pushSTACK(S(make_hash_table));
-            check_value(type_error,GETTEXT("~S: illegal ~S argument ~S"));
+            check_value(type_error,GETTEXT("~S: Illegal ~S argument ~S"));
             STACK_3 = value1;
             goto check_test_restart;
           }
@@ -2254,22 +2056,23 @@ LISPFUN(make_hash_table,seclass_read,0,0,norest,key,9,
           goto check_rehash_size;
         }
         /* As it is senseless to enlarge a table always only by a fixed
-           number of elements (results in disastrous efficiency), we set
+           number of elements (results in disastrous inefficiency), we set
            rehash-size := min(1 + rehash-size/size , 2.0) . */
         pushSTACK(STACK_1); /* rehash-size */
         pushSTACK(STACK_(2+1)); /* size */
-        funcall(L(durch),2); /* (/ rehash-size size) */
+        funcall(L(slash),2); /* (/ rehash-size size) */
         pushSTACK(value1);
-        funcall(L(einsplus),1); /* (1+ ...) */
+        funcall(L(plus_one),1); /* (1+ ...) */
         pushSTACK(value1);
         pushSTACK(make_SF(0,SF_exp_mid+2,bit(SF_mant_len))); /* 2.0s0 */
         funcall(L(min),2); /* (MIN ... 2.0s0) */
         STACK_1 = value1; /* =: rehash-size */
       }
-      /* check (> rehash-size 1) : */
-      pushSTACK(STACK_1); /* rehash-size */
-      pushSTACK(Fixnum_1); /* 1 */
-      funcall(L(groesser),2); /* (> rehash-size 1) */
+      { /* check (> rehash-size 1) : */
+        pushSTACK(STACK_1); /* rehash-size */
+        pushSTACK(Fixnum_1); /* 1 */
+        funcall(L(greater),2); /* (> rehash-size 1) */
+      }
       if (nullp(value1)) goto bad_rehash_size;
       /* convert rehash-size into a short-float: */
       pushSTACK(STACK_1); /* rehash-size */
@@ -2300,7 +2103,7 @@ LISPFUN(make_hash_table,seclass_read,0,0,norest,key,9,
       pushSTACK(Fixnum_1);
       pushSTACK(rehash_threshold);
       pushSTACK(Fixnum_0);
-      funcall(L(grgleich),3); /* (>= 1 rehash-threshold 0) */
+      funcall(L(gtequal),3); /* (>= 1 rehash-threshold 0) */
       if (nullp(value1)) goto bad_rehash_threshold;
     }
   }
@@ -2318,9 +2121,9 @@ LISPFUN(make_hash_table,seclass_read,0,0,norest,key,9,
     var object rehash_size = STACK_1;
     pushSTACK(rehash_size);
     pushSTACK(rehash_size);
-    funcall(L(mal),2); /* (* rehash-size rehash-size) */
+    funcall(L(star),2); /* (* rehash-size rehash-size) */
     pushSTACK(value1);
-    funcall(L(durch),1); /* (/ ...) */
+    funcall(L(slash),1); /* (/ ...) */
     STACK_0 = value1;
   }
   /* STACK layout:
@@ -2386,7 +2189,7 @@ LISPFUN(make_hash_table,seclass_read,0,0,norest,key,9,
           if (eq(freelist,nix)) { /* empty "list" ? */
             pushSTACK(STACK_0); /* hash-table */
             pushSTACK(S(make_hash_table));
-            fehler(serious_condition,
+            error(serious_condition,
                    GETTEXT("~S: internal error while building ~S"));
           }
           ht = STACK_0; /* restore ht */
@@ -2409,7 +2212,7 @@ LISPFUN(make_hash_table,seclass_read,0,0,norest,key,9,
             (should be true if the hash-table has a user-defined test)
  < result: if found, belonging value, else nullobj
  can trigger GC - if allowgc is true */
-global /*maygc*/ object gethash (object obj, object ht, bool allowgc) {
+modexp /*maygc*/ object gethash (object obj, object ht, bool allowgc) {
   GCTRIGGER_IF(allowgc, GCTRIGGER2(obj,ht));
   var gcv_object_t* KVptr;
   var gcv_object_t* Iptr;
@@ -2437,7 +2240,7 @@ local maygc object check_hashtable (object obj) {
   return obj;
 }
 
-LISPFUN(gethash,seclass_default,2,1,norest,nokey,0,NIL)
+LISPFUN(gethash,seclass_read,2,1,norest,nokey,0,NIL)
 { /* (GETHASH key hashtable [default]), CLTL p. 284 */
   var object ht = check_hashtable(STACK_1); /* hashtable argument */
   var gcv_object_t* KVptr;
@@ -2533,7 +2336,7 @@ LISPFUNN(remhash,2)
       pushSTACK(ht);            /* save hashtable */
       pushSTACK(TheHashtable(ht)->ht_maxcount);
       pushSTACK(TheHashtable(ht)->ht_rehash_size); /* REHASH-SIZE (>1) */
-      funcall(L(durch),2); /* (/ maxcount rehash-size), is < maxcount */
+      funcall(L(slash),2); /* (/ maxcount rehash-size), is < maxcount */
       pushSTACK(value1);
       funcall(L(floor),1); /* (floor ...), an integer >=0, < maxcount */
       var object maxcount = value1;
@@ -2629,19 +2432,19 @@ global maygc object hash_table_test (object ht) {
   var uintB test_code = ht_test_code(record_flags(TheHashtable(ht)));
   switch (test_code) {
     case htflags_test_eq_B:
-      return S(fasthash_eq);
+      { return S(fasthash_eq); }
     case htflags_test_eq_B | htflags_stablehash_B:
-      return S(stablehash_eq);
+      { return S(stablehash_eq); }
     case htflags_test_eql_B:
-      return S(fasthash_eql);
+      { return S(fasthash_eql); }
     case htflags_test_eql_B | htflags_stablehash_B:
-      return S(stablehash_eql);
+      { return S(stablehash_eql); }
     case htflags_test_equal_B:
-      return S(fasthash_equal);
+      { return S(fasthash_equal); }
     case htflags_test_equal_B | htflags_stablehash_B:
-      return S(stablehash_equal);
+      { return S(stablehash_equal); }
     case htflags_test_equalp_B:
-      return S(equalp);
+      { return S(equalp); }
     case bit(2): { /* user-defined ==> (test . hash) */
       pushSTACK(ht);
       var object ret = allocate_cons();
@@ -2701,7 +2504,7 @@ LISPFUNN(hash_table_iterate,1) {
   var object state = popSTACK(); /* internal state */
   if (consp(state)) {            /* hopefully a cons */
     var object table = Car(state); /* key-value-vector */
-    loop {
+    while (1) {
       var uintL index = posfixnum_to_V(Cdr(state));
       if (index==0)             /* index=0 -> no more elements */
         break;
@@ -2908,14 +2711,14 @@ LISPFUN(class_tuple_gethash,seclass_default,2,0,rest,nokey,0,NIL) {
         kvt_data + 3*index;
       if (equal_tuple(KVptr[0],argcount,rest_args_pointer)) { /* compare key */
         /* found */
-        VALUES1(KVptr[1]); goto fertig; /* Value as value */
+        VALUES1(KVptr[1]); goto done; /* Value as value */
       }
       Nptr = &KVptr[2];         /* pointer to index of next entry */
     }
   }
   /* not found */
   VALUES1(NIL);
- fertig:
+ done:
   set_args_end_pointer(rest_args_pointer STACKop 1); /* clean up STACK */
 }
 
@@ -2928,7 +2731,8 @@ LISPFUN(class_tuple_gethash,seclass_default,2,0,rest,nokey,0,NIL) {
 local uint32 sxhash (object obj);
 /* auxiliary functions for known type:
  atom -> fall differentiation by type */
-local uint32 sxhash_atom (object obj) {
+local uint32 sxhash_atom (object obj, int level) {
+  unused(level); /* recursion is possible only on conses, not HTs & arrays */
   #ifdef TYPECODES
   switch (typecode(obj))        /* per type */
   #else
@@ -3114,60 +2918,8 @@ local uint32 sxhash_atom (object obj) {
     }
   }
 }
-/* cons -> look at content up to depth 4:
- determine the hashcode of the CAR and the hashcode of the CDR at a time
- and combine them shifted. As shifts fit e.g. 16,7,5,3,
- because {0,16} + {0,7} + {0,5} + {0,3}
-       = {0,3,5,7,8,10,12,15,16,19,21,23,24,26,28,31}
- consists of 16 different elements of {0,...,31} .
- object, for cons only up to depth 0 */
-local uint32 sxhash_cons0 (object obj) {
-  if (atomp(obj)) {
-    return sxhash_atom(obj);
-  } else {                      /* cons -> hashcode := 1 */
-    return 1;
-  }
-}
-/* object, for cons only up to depth 1 */
-local uint32 sxhash_cons1 (object obj) {
-  if (atomp(obj)) {
-    return sxhash_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = sxhash_cons0(Car(obj));
-    var uint32 code2 = sxhash_cons0(Cdr(obj));
-    return rotate_left(3,code1) ^ code2;
-  }
-}
-/* object, for cons only up to depth 2 */
-local uint32 sxhash_cons2 (object obj) {
-  if (atomp(obj)) {
-    return sxhash_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = sxhash_cons1(Car(obj));
-    var uint32 code2 = sxhash_cons1(Cdr(obj));
-    return rotate_left(5,code1) ^ code2;
-  }
-}
-/* object, for cons only up to depth 3 */
-local uint32 sxhash_cons3 (object obj) {
-  if (atomp(obj)) {
-    return sxhash_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = sxhash_cons2(Car(obj));
-    var uint32 code2 = sxhash_cons2(Cdr(obj));
-    return rotate_left(7,code1) ^ code2;
-  }
-}
-/* object, for cons only up to depth 4 */
-local uint32 sxhash (object obj) {
-  if (atomp(obj)) {
-    return sxhash_atom(obj);
-  } else { /* cons -> determine the hashcode of the CAR and the CDR and mix: */
-    var uint32 code1 = sxhash_cons3(Car(obj));
-    var uint32 code2 = sxhash_cons3(Cdr(obj));
-    return rotate_left(16,code1) ^ code2;
-  }
-}
+local uint32 sxhash (object obj)
+{ return hashcode_tree(obj,0,sxhash_atom); }
 
 LISPFUNN(sxhash,1)
 { /* (SXHASH object), CLTL p. 285 */
@@ -3192,7 +2944,7 @@ LISPFUNN(sxhash,1)
   sx = sx % 0xFFFFFF;
   VALUES1(fixnum(sx));
 #else
- #error "sxhash results do not fit in a fixnum"
+ #error sxhash results do not fit in a fixnum
 #endif
 }
 

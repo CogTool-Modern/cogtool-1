@@ -1,6 +1,6 @@
 ;;; Macros that export their definienda
 ;;; Bruno Haible 2004-12-15
-;;; Sam Steingold 2005
+;;; Sam Steingold 2005-2007
 
 (defpackage "EXPORTING"
   (:use "COMMON-LISP")
@@ -12,8 +12,7 @@
                  define-method-combination
                  #+FFI def-c-type #+FFI def-c-enum #+FFI def-c-struct
                  #+FFI def-c-var #+FFI def-c-const
-                 #+FFI def-c-call-out #+FFI def-call-out
-                 #+AFFI def-lib-call-out))
+                 #+FFI def-c-call-out #+FFI def-call-out))
   (:export . #1#))
 
 (in-package "EXPORTING")
@@ -112,11 +111,11 @@
 
 (cl:defun export-structure-accessories (name) ; ABI
   (export name)
-  (export (sys::structure-kconstructor name))
-  (export (sys::structure-boa-constructors name))
-  (export (sys::structure-copier name))
-  (export (sys::structure-predicate name))
-  (dolist (slot (sys::structure-direct-slots name))
+  (export (ext:structure-keyword-constructor name))
+  (export (ext:structure-boa-constructors name))
+  (export (ext:structure-copier name))
+  (export (ext:structure-predicate name))
+  (dolist (slot (ext:structure-direct-slots name))
     (export (slot-definition-accessor-symbols slot))))
 
 (cl:defmacro defstruct (name+options &rest slots)
@@ -148,10 +147,10 @@
 ;; FFI.
 
 #+FFI
-(cl:defmacro def-c-type (name typespec)
+(cl:defmacro def-c-type (name &rest options)
   `(PROGN
      (EXPORT ',(or name '(NIL)))
-     (FFI:DEF-C-TYPE ,name ,typespec)))
+     (FFI:DEF-C-TYPE ,name ,@options)))
 
 #+FFI
 (cl:defmacro def-c-enum (name &rest items)
@@ -190,12 +189,6 @@
   `(PROGN
      (EXPORT ',(or name '(NIL)))
      (FFI:DEF-CALL-OUT ,name ,@options)))
-
-#+AFFI
-(cl:defmacro def-lib-call-out (name library &rest options)
-  `(PROGN
-     (EXPORT ',(or name '(NIL)))
-     (FFI:DEF-LIB-CALL-OUT ,name ,library ,@options)))
 
 #| ;; def-c-call-in and def-call-in don't actually define anything;
    ;; they are more like declarations.

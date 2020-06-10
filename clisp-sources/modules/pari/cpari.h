@@ -6,4 +6,3 @@
 
 void init_for_clisp (long parisize, long maxprime);
 void fini_for_clisp (int leaving);
-

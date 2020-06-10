@@ -38,10 +38,11 @@
 (defmacro defindent (operator indentation)
   `(put ',operator 'common-lisp-indent-function ',indentation))
 
-(setq lisp-body-indent 2)       ; default
-(setq lisp-indent-maximum-backtracking 4) ; needed for flet/labels
-(setq lisp-tag-body-indentation 2) ; for tagbody/prog/prog*
-(setq lisp-tag-indentation 2)   ; for tagbody/prog/prog*
+(custom-set-variables
+ '(lisp-body-indent 2)                 ; default
+ '(lisp-indent-maximum-backtracking 4) ; needed for flet/labels
+ '(lisp-tag-body-indentation 2)        ; for tagbody/prog/prog*
+ '(lisp-tag-indentation 2))            ; for tagbody/prog/prog*
 
 (defindent and (&rest 2))
 (defindent appease-cerrors (&rest 2))
@@ -57,6 +58,8 @@
 (defindent decf (2 2))
 (defindent declaim (&rest 2))
 (defindent declare (&rest 2))
+(defindent def-c-enum (4 &rest 2))
+(defindent def-c-struct (4 &rest 2))
 (defindent defclass (10 (&whole 10 1 &rest 1) &rest (&whole 2 &rest 1)))
 (defindent defconstant (4 2 2))                                  ; default
 (defindent defgeneric (4 (&whole 4 1 &rest 1) &body))
@@ -152,6 +155,7 @@
 (defindent rotatef (&body))
 (defindent setf (6 8 6 8 6 8 6 8 6 8 6 8 6 8 6 8 6 8 6 8 6))
 (defindent setq (6 8 6 8 6 8 6 8 6 8 6 8 6 8 6 8 6 8 6 8 6))
+(defindent :shadowing-import-from (4 &rest 2))
 (defindent shiftf (&body))
 (defindent space (2))
 (defindent step (2))

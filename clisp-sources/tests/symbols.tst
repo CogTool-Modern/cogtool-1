@@ -1,10 +1,11 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 (SYMBOL-NAME (QUOTE XYZ))
 "XYZ"
 
 (PROGN (SETQ *GENSYM-COUNTER* 32) (GENSYM) T) T
 
+;; the following two tests assume that tests.lisp has been compiled
 (PRIN1-TO-STRING (GENSYM "FOO-"))
 "#:FOO-33"
 
@@ -255,3 +256,16 @@
         (set-difference extra known-extra)
         (set-difference known-extra extra)))
 (nil nil nil nil)
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1713130&group_id=1355&atid=101355
+#+clisp
+(with-collect (c)
+  (dolist (p custom:*system-package-list*)
+    (do-external-symbols (s p)
+      (unless (or (not (fboundp s))
+                  (sys::subr-info s)
+                  (special-operator-p s)
+                  (documentation s 'sys::file)
+                  (not (eq s (sys::function-name (or (macro-function s) s)))))
+        (c (list s (symbol-plist s) (fdefinition s)))))))
+#+clisp NIL

@@ -9,10 +9,10 @@
      bad_args:
       pushSTACK(O(type_posfixnum)); # TYPE-ERROR slot EXPECTED-TYPE
       pushSTACK(position); pushSTACK(size);
-      fehler(type_error,
+      error(type_error,
              GETTEXT("The arguments to BYTE must be fixnums >=0: ~S, ~S")
             );
-    } elif (!(I_fixnump(position) && !R_minusp(position))) {
+    } else if (!(I_fixnump(position) && !R_minusp(position))) {
       pushSTACK(position); # TYPE-ERROR slot DATUM
       goto bad_args;
     } else {
@@ -26,11 +26,11 @@
   }
 
 # Fehler, wenn Argument kein Byte.
-  nonreturning_function(local, fehler_byte, (object bad)) {
+  nonreturning_function(local, error_byte, (object bad)) {
     pushSTACK(bad); # TYPE-ERROR slot DATUM
     pushSTACK(S(byte)); # TYPE-ERROR slot EXPECTED-TYPE
     pushSTACK(bad);
-    fehler(type_error,
+    error(type_error,
            GETTEXT("~S is not a BYTE specifier")
           );
   }
@@ -43,7 +43,7 @@
     if (bytep(obj))
       return TheByte(obj)->byte_size;
     else
-      fehler_byte(obj);
+      error_byte(obj);
   }
 
 # Liefert (BYTE-POSITION byte). Das Argument wird überprüft.
@@ -52,18 +52,18 @@
     if (bytep(obj))
       return TheByte(obj)->byte_position;
     else
-      fehler_byte(obj);
+      error_byte(obj);
   }
 
 # Byte_to_V_V(byte, size=,position=); wandelt das Byte byte (eine Variable)
 # um in size und position, beides uintL >=0, <2^oint_data_len.
-  #define Byte_to_V_V(byte, size_zuweisung,position_zuweisung)           \
+  #define Byte_to_V_V(byte, size_assignment,position_assignment)           \
     {                                                                    \
       if (bytep(byte)) {                                                 \
-        size_zuweisung posfixnum_to_V(TheByte(byte)->byte_size);         \
-        position_zuweisung posfixnum_to_V(TheByte(byte)->byte_position); \
+        size_assignment posfixnum_to_V(TheByte(byte)->byte_size);         \
+        position_assignment posfixnum_to_V(TheByte(byte)->byte_position); \
       } else                                                             \
-        fehler_byte(byte);                                               \
+        error_byte(byte);                                               \
     }
 
 # fullbyte_I(p,q) liefert zu p,q die Zahl 2^q-2^p als Integer,

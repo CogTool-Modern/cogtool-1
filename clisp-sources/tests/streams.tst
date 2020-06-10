@@ -1,5 +1,4 @@
-;; -*- lisp -*-
-(progn (in-package "COMMON-LISP-USER") t) t
+;; -*- Lisp -*- vim:filetype=lisp
 
 #-(or AKCL ECL ALLEGRO SBCL OpenMCL) (PRIN1-TO-STRING (MAKE-BROADCAST-STREAM))
 #+XCL "#<%TYPE-STRUCTURE-STREAM NIL>"
@@ -751,6 +750,20 @@ T
 (CHARACTER CHARACTER CHARACTER)
 
 #+clisp
+(let ((*print-right-margin* 15) (*print-pretty* t))
+  (with-output-to-string (out)
+    (with-fill-stream (fill out :text-indent 3)
+      (format fill "~%~S, ~S, ~S, ~S, ~S, ~S, ~S, ~S, ~S, ~S,~%"
+              'a 'bb 'ccc 'dddd 'eeeee 'ffffff 'gggg 'hhh 'ii 'j))))
+#+clisp "
+   A, BB, CCC,
+   DDDD, EEEEE
+   , FFFFFF,
+   GGGG, HHH,
+   II, J,
+"
+
+#+clisp
 (progn
   (defvar *my-indent-level*)
   (with-output-to-string (out)
@@ -774,16 +787,16 @@ T
      the level
      specified by
      the
-      :TEXT-INDENT
+     :TEXT-INDENT
      argument which
      can be a
-      SYMBOL
-     or an INTEGER
-     - cool!
+     SYMBOL or an
+     INTEGER -
+  cool!
   Don't forget to
   call FORCE-OUTPUT
   on it, and/or use
-   WITH-FILL-STREAM
+  WITH-FILL-STREAM
   Pretty formatting
   of the
   S-expressions
@@ -793,7 +806,6 @@ T
     (IF X (+ Y Z)
      (* Y Z)))
 "
-
 
 #+clisp
 (with-output-to-string (*error-output*)
@@ -815,14 +827,13 @@ WARNING: This form contains an error, a mistake, a bug, a
          nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-   (NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
-         neither today nor tomorrow nor next week nor next
-         month nor next year
+         (NIL NIL NIL NIL NIL NIL) and can therefore not be
+         correctly interpreted, neither today nor tomorrow
+         nor next week nor next month nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-   (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
+         (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL) and
+         can therefore not be correctly interpreted,
          neither today nor tomorrow nor next week nor next
          month nor next year
 
@@ -836,10 +847,9 @@ WARNING: This form contains an error, a mistake, a bug, a
          nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-                    (NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
-         neither today nor tomorrow nor next week nor next
-         month nor next year
+         (NIL NIL NIL NIL NIL NIL) and can therefore not be
+         correctly interpreted, neither today nor tomorrow
+         nor next week nor next month nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
                     (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL
@@ -858,14 +868,13 @@ WARNING: This form contains an error, a mistake, a bug, a
          nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-\(NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
-         neither today nor tomorrow nor next week nor next
-         month nor next year
+         (NIL NIL NIL NIL NIL NIL) and can therefore not be
+         correctly interpreted, neither today nor tomorrow
+         nor next week nor next month nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-\(NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
+         (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL) and
+         can therefore not be correctly interpreted,
          neither today nor tomorrow nor next week nor next
          month nor next year
 
@@ -879,14 +888,13 @@ WARNING: This form contains an error, a mistake, a bug, a
          nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-         (NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
-         neither today nor tomorrow nor next week nor next
-         month nor next year
+         (NIL NIL NIL NIL NIL NIL) and can therefore not be
+         correctly interpreted, neither today nor tomorrow
+         nor next week nor next month nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-         (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
+         (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL) and
+         can therefore not be correctly interpreted,
          neither today nor tomorrow nor next week nor next
          month nor next year
 
@@ -900,14 +908,13 @@ WARNING: This form contains an error, a mistake, a bug, a
          nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-          (NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
-         neither today nor tomorrow nor next week nor next
-         month nor next year
+         (NIL NIL NIL NIL NIL NIL) and can therefore not be
+         correctly interpreted, neither today nor tomorrow
+         nor next week nor next month nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-          (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
+         (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL) and
+         can therefore not be correctly interpreted,
          neither today nor tomorrow nor next week nor next
          month nor next year
 
@@ -921,14 +928,13 @@ WARNING: This form contains an error, a mistake, a bug, a
          nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-        (NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
-         neither today nor tomorrow nor next week nor next
-         month nor next year
+         (NIL NIL NIL NIL NIL NIL) and can therefore not be
+         correctly interpreted, neither today nor tomorrow
+         nor next week nor next month nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-        (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
+         (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL) and
+         can therefore not be correctly interpreted,
          neither today nor tomorrow nor next week nor next
          month nor next year
 
@@ -942,10 +948,9 @@ WARNING: This form contains an error, a mistake, a bug, a
          nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
-                  (NIL NIL NIL NIL NIL NIL)
-         and can therefore not be correctly interpreted,
-         neither today nor tomorrow nor next week nor next
-         month nor next year
+         (NIL NIL NIL NIL NIL NIL) and can therefore not be
+         correctly interpreted, neither today nor tomorrow
+         nor next week nor next month nor next year
 WARNING: This form contains an error, a mistake, a bug, a
          blunder, a bungle, a blooper:
                   (NIL NIL NIL NIL NIL NIL NIL NIL NIL NIL
@@ -955,15 +960,24 @@ WARNING: This form contains an error, a mistake, a bug, a
          month nor next year
 "
 
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1482465&group_id=1355&atid=101355
+#+clisp
+(let ((c (nth-value 1 (ignore-errors (format t " ~a ~a,~a~ ~a~%" 1 2 3 4)))))
+  (string= (princ-to-string c)
+           (with-output-to-string (s) (with-fill-stream (f s) (princ c f)))))
+#+clisp T
 
-(let ((f "foo.bar") fwd1 fwd2)
+#+clisp (with-output-to-string (s) (with-fill-stream (f s) (format f "~5T")))
+#+clisp "     "
+
+(let ((f "streams-tst-foo.bar") fwd1 fwd2)
   (unwind-protect
        (progn ; FILE-WRITE-DATE should work on :PROBE streams
          (with-open-file (s f :direction :output
                             #+(or CMU SBCL) :if-exists
                             #+(or CMU SBCL) :supersede)
-           (write f :stream s)
-           (setq fwd1 (file-write-date s)))
+           (write f :stream s))
+         (with-open-file (s f) (setq fwd1 (file-write-date s)))
          (with-open-file (s f :direction :probe)
            (list (or (= fwd1 (setq fwd2 (file-write-date s)))
                      (list fwd1 fwd2))
@@ -973,12 +987,13 @@ WARNING: This form contains an error, a mistake, a bug, a
 (T NIL)
 
 #+clisp
-(let ((f "foo.bar") fwd size dir decoded)
+(let ((f "streams-tst-foo.bar") fwd size dir decoded)
   (unwind-protect
        (progn (with-open-file (s f :direction :output)
                 (write s :stream s)
-                (setq fwd (file-write-date s)
-                      size (file-length s)))
+                (setq size (file-length s)))
+              (with-open-file (s f :direction :probe)
+                (setq fwd (file-write-date s)))
               (setq dir (first (directory f :full t))
                     decoded (subseq (multiple-value-list
                                      (decode-universal-time fwd))
@@ -992,7 +1007,7 @@ WARNING: This form contains an error, a mistake, a bug, a
 
 ;; http://sourceforge.net/tracker/index.php?func=detail&aid=1399709&group_id=1355&atid=101355
 ;; test :if-exists :append
-(let ((f "foo.bar") pos)
+(let ((f "streams-tst-foo.bar") pos)
   (unwind-protect
        (progn (with-open-file (s f :direction :output :if-exists :supersede
                                  #+clisp :external-format #+clisp :unix)
@@ -1024,6 +1039,11 @@ T
 (stringp (with-output-to-string (s) (describe nil s)))
 T
 
+;; https://sourceforge.net/tracker/index.php?func=detail&aid=1622642&group_id=1355&atid=101355
+(let ((s "a   b"))
+  (search s (with-output-to-string (*standard-output*) (describe s))))
+2
+
 (WITH-INPUT-FROM-STRING (*S* "abcde")
   (DECLARE (SPECIAL *S*))
   (LET ((SS (MAKE-SYNONYM-STREAM '*S*)))
@@ -1053,7 +1073,10 @@ T
 (file-string-length (make-broadcast-stream) "foo") 1
 (stream-element-type (make-broadcast-stream))      T
 
-(let ((o (open "foo.bin" :direction :output #+(or CMU SBCL LISPWORKS) :if-exists #+(or CMU SBCL LISPWORKS) :supersede :element-type '(unsigned-byte 8)))
+(let ((o (open "streams-tst-foo.bin" :direction :output
+               #+(or CMU SBCL LISPWORKS) :if-exists
+               #+(or CMU SBCL LISPWORKS) :supersede
+               :element-type '(unsigned-byte 8)))
       (i (make-string-input-stream "foo")))
   (unwind-protect (stream-element-type (make-two-way-stream i o))
     (close o) (delete-file o)
@@ -1072,6 +1095,9 @@ T
   (list (typep #\z (stream-element-type s))
         (typep #\a (array-element-type (get-output-stream-string s)))))
 (NIL NIL)
+
+(stream-element-type (make-concatenated-stream)) NIL
+(stream-element-type (make-broadcast-stream)) T
 
 ;; [ 1412268 ] Buffer overflow in stream handling code
 ;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1412268&group_id=1355
@@ -1134,37 +1160,118 @@ T
 (clear-output *standard-output*) nil
 (clear-output *terminal-io*) nil
 
+;; https://sourceforge.net/tracker/index.php?func=detail&aid=1623179&group_id=1355&atid=101355
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1483762&group_id=1355
+#+clisp
+(let ((if "streams-tst-tmp-input-file") (of "streams-tst-tmp-output-file"))
+  (open if :direction :probe :if-does-not-exist :create)
+  (unwind-protect
+       (with-open-file (o of :direction :output)
+         (with-open-file (i if :direction :input)
+           (with-open-stream (2way (make-two-way-stream i o))
+             (list
+              (eq (stream-external-format i) (stream-external-format o))
+              (eq (stream-external-format i) (stream-external-format 2way))
+              (progn (setf (stream-external-format i) :dos
+                           (stream-external-format i) :mac)
+                     (cons (equalp (stream-external-format i)
+                                   (stream-external-format o))
+                           (stream-external-format 2way)))
+              (progn (setf (stream-external-format 2way :input) :unix
+                           (stream-external-format 2way :output) :unix)
+                     (encoding-line-terminator (stream-external-format 2way)))
+              (type-of (stream-external-format 2way))
+              (equalp (stream-external-format i) (stream-external-format o))))))
+    (delete-file if)
+    (delete-file of)))
+#+clisp (T T (NIL . :DEFAULT) :UNIX ENCODING T)
+
+;; file-length on unbuffered streams
+(mapcar (lambda (buf)
+          (let ((f "streams-tst-tmp-file"))
+            (unwind-protect
+                 (let ((len (with-open-file (s f :direction :output)
+                              (write-line f s)
+                              (file-length s))))
+                   (= len
+                      (with-open-file (s f :direction :input
+                                         #+clisp :buffered #+clisp buf)
+                        (file-length s))))
+              (delete-file f))))
+        '(nil t))
+(T T)
+
+;; file-position on unbuffered streams
+(mapcar (lambda (buf)
+          (let ((f "streams-tst-tmp-file"))
+            (unwind-protect
+                 (progn (with-open-file (s f :direction :output
+                                           #+clisp :buffered #+clisp buf)
+                          (write-line "12345" s)
+                          (file-position s 2)
+                          (write-line "12345" s))
+                        (with-open-file (s f :direction :input)
+                          (read-line s)))
+              (delete-file f))))
+        '(t nil))
+("1212345" "1212345")
+
+;; fresh-line on broadcast streams
+(let* ((s1 (make-string-output-stream))
+       (s2 (make-string-output-stream))
+       (b (make-broadcast-stream s1 s2)))
+  (write-char #\a s1)
+  (list (fresh-line b)
+        (get-output-stream-string s1)
+        (get-output-stream-string s2)))
+(NIL
+ "a
+"
+ "")
+
+(let* ((s1 (make-string-output-stream))
+       (s2 (make-string-output-stream))
+       (b (make-broadcast-stream s2 s1)))
+  (write-char #\a s1)
+  (list (fresh-line b)
+        (get-output-stream-string s1)
+        (get-output-stream-string s2)))
+(T
+ "a
+"
+ "")
+
 (progn
-(makunbound 's)
-(makunbound 's1)
-(makunbound 's2)
-(makunbound 's3)
-(makunbound 's4)
-(makunbound 's5)
-(makunbound 's6)
-(makunbound 's7)
-(makunbound 's8)
-(makunbound 's9)
-(makunbound 's10)
-(makunbound 'b1)
-(makunbound 'b2)
-(makunbound 'c1)
-(makunbound 'c2)
-(makunbound 'c3)
-(makunbound 'c4)
-(makunbound 'inptw)
-(makunbound 'sy)
-(makunbound 'tw)
-(makunbound 'ec)
-(makunbound 'str1)
-(makunbound 'strgstream)
-(makunbound 'os)
-(makunbound 'os1)
-(makunbound 'is)
-(makunbound 'es)
-(makunbound 's50)
-(makunbound 's49)
-(setq *print-length* nil)
-t)
-T
+  (symbol-cleanup 's)
+  (symbol-cleanup 's1)
+  (symbol-cleanup 's2)
+  (symbol-cleanup 's3)
+  (symbol-cleanup 's4)
+  (symbol-cleanup 's5)
+  (symbol-cleanup 's6)
+  (symbol-cleanup 's7)
+  (symbol-cleanup 's8)
+  (symbol-cleanup 's9)
+  (symbol-cleanup 's10)
+  (symbol-cleanup 'b1)
+  (symbol-cleanup 'b2)
+  (symbol-cleanup 'c1)
+  (symbol-cleanup 'c2)
+  (symbol-cleanup 'c3)
+  (symbol-cleanup 'c4)
+  (symbol-cleanup 'inptw)
+  (symbol-cleanup 'sy)
+  (symbol-cleanup 'tw)
+  (symbol-cleanup 'ec)
+  (symbol-cleanup 'str1)
+  (symbol-cleanup 'strgstream)
+  (symbol-cleanup 'os)
+  (symbol-cleanup 'os1)
+  (symbol-cleanup 'is)
+  (symbol-cleanup 'es)
+  (symbol-cleanup 's50)
+  (symbol-cleanup 's49)
+  (symbol-cleanup '*my-indent-level*)
+  (setq *print-length* nil))
+NIL
 

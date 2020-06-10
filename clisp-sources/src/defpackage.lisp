@@ -156,7 +156,7 @@
         (setq intern-list (nreverse intern-list))
         (setq export-list (nreverse export-list))
         ;; Produce the expansion:
-        `(EVAL-WHEN (LOAD COMPILE EVAL)
+        `(EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
            (SYSTEM::%IN-PACKAGE ,packname :NICKNAMES ',nickname-list :USE '()
                                 :CASE-SENSITIVE ,case-sensitive
                                 :CASE-INVERTED ,case-inverted)

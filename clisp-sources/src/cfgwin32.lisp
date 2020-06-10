@@ -31,7 +31,7 @@
   "(edit-file file) edits a file."
   (execute (editor-name) (namestring (absolute-pathname file))))
 
-;; Treat Ctrl-Z in files as whitespace. Some losing middle-age
+;; Treat Ctrl-Z in files as whitespace. Some losing medieval
 ;; editors insist on appending this to files.
 (eval-when (load eval compile)
   (set-syntax-from-char #\Code26 #\Space))
@@ -77,4 +77,3 @@ in ~/.clisprc.  On win32 you can also use the Registry."
         (check-type s (or null string))
         s)
       *clhs-root-default*))
-(setq *clhs-root-default* "http://www.lisp.org/HyperSpec/")

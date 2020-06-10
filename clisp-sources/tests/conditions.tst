@@ -1,4 +1,4 @@
-;;;; -*- Lisp -*-
+;;;; -*- Lisp -*- vim:filetype=lisp
 ;;;; Test suite for the Common Lisp condition system
 ;;;; Written by David Gadbois <gadbois@cs.utexas.edu> 30.11.1993
 
@@ -543,4 +543,45 @@ T
                                  (princ-error c)
                                  (return (streamp (stream-error-stream c))))))
     (read-from-string ",1")))
+T
+
+;; <http://article.gmane.org/gmane.lisp.clisp.devel/21281>
+(block nil
+  (handler-bind ((style-warning
+                  (lambda (c)
+                    (princ-error c)
+                    (return t))))
+    (defun test~ (b $) #+clisp (declare (compile)) (cond (b nil) (t t)))))
+T
+
+;; process-declarations is not called in interpreted code
+(let (bad)
+  (declare (optimize safety))
+  (dolist (tp '(arithmetic-error cell-error condition
+                control-error division-by-zero end-of-file error
+                file-error floating-point-inexact
+                floating-point-invalid-operation
+                floating-point-underflow floating-point-overflow
+                package-error parse-error print-not-readable
+                  program-error reader-error serious-condition
+                simple-condition simple-error simple-type-error
+                simple-warning storage-condition stream-error
+                style-warning type-error unbound-slot
+                unbound-variable undefined-function warning)
+           bad)
+    (unless (typep (handler-case (make-condition tp) (error () nil))
+                   'condition)
+      (push tp bad))))
+NIL
+
+(progn ; Clean up.
+  (symbol-cleanup 'my-cpl)
+  (symbol-cleanup 'check-superclasses)
+  (symbol-cleanup 'test)
+  (symbol-cleanup 'test2)
+  (symbol-cleanup 'test3)
+  (symbol-cleanup 'test4)
+  (symbol-cleanup 'test5)
+  (symbol-cleanup 'test6)
+  (symbol-cleanup 'test~))
 T

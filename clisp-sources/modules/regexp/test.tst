@@ -1,15 +1,24 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; clisp -E 1:1 -q -norc -i ../tests/tests -x '(run-test "regexp/test")'
 
+(require "regexp") NIL
 (listp (show (multiple-value-list (ext:module-info "regexp" t)) :pretty t)) T
 
 (let ((rc (regexp:regexp-compile "a(a)*" :extended t)))
-  (prog1 (multiple-value-list (regexp:regexp-exec rc "a"))
+  (prog1 (list (multiple-value-list (regexp:regexp-exec rc "a"))
+               (regexp:regexp-exec rc "a" :return-type 'list)
+               (regexp:regexp-exec rc "a" :return-type 'vector)
+               (multiple-value-list (regexp:regexp-exec rc "z"))
+               (regexp:regexp-exec rc "z" :return-type 'list)
+               (regexp:regexp-exec rc "z" :return-type 'vector))
     (gc) (gc)))
-(#S(REGEXP:MATCH :START 0 :END 1) NIL)
+((#S(REGEXP:MATCH :START 0 :END 1) NIL)
+ (#S(REGEXP:MATCH :START 0 :END 1) NIL)
+ #(#S(REGEXP:MATCH :START 0 :END 1) NIL)
+ () () #())
 
 (ext:letf ((*apropos-matcher* #'regexp:regexp-matcher)
-           (*misc-encoding* charset:utf-8)) ; handle non-ASCII symbols
+           #+UNICODE(*misc-encoding* charset:utf-8)) ; handle non-ASCII symbols
   (apropos-list "regexp.*r$"))
 (REGEXP:REGEXP-MATCHER)
 
@@ -17,10 +26,22 @@
 (REGEXP:REGEXP-EXEC (ffi:foreign-pointer (ffi:unsigned-foreign-address 0)) "a")
 #+ffi ERROR
 
+(let* ((s "abcdefghijklmnopqrstuvwxyz") (r "") p m
+       (s3 (concatenate 'string s s s)))
+  (loop :repeat 3 :do
+    (loop :for c :across s :do
+      (setq r (concatenate 'string "\\(" r "\\)\\(" (string c) "\\)"))))
+  (setq p (regexp:regexp-compile r))
+  (setq m (regexp:regexp-exec p s3))
+  (list (length m)
+        (string= s3 (regexp:match-string s3 (car m)))))
+(157 T)
+
 ;;; SDS: WARNING: the following tests are checking the underlying regexp
 ;;; implementation rather than CLISP regexp interface.
 ;;; a test failure should be reported to the regexp maintainer.
-;;; a segmentation fault should be reported to <clisp-list>
+;;; a segmentation fault should be reported to the clisp maintainers
+;;; at <http://clisp.cons.org/impnotes/faq.html#faq-bugs>
 
 ;;; note also that some original tests had empty alternatives in grouping
 ;;; which is forbidden by POSIX
@@ -269,6 +290,10 @@ ERROR ; (")("): "Unmatched ( or \\("
 (re-test "a[-]?c" "ac") ("ac")
 (re-test "a[-]?c" "ac") ("ac")
 (re-test "a[-]?c" "ac") ("ac")
+
+;; the following 7 tests require locale=C
+(defparameter *saved-locale* (i18n:set-locale :all)) *saved-locale*
+(i18n:set-locale :all "C")      "C"
 (re-test "[ -~]*" "abc") ("abc")
 (re-test "[ -~ -~]*" "abc") ("abc")
 (re-test "[ -~ -~ -~]*" "abc") ("abc")
@@ -276,6 +301,7 @@ ERROR ; (")("): "Unmatched ( or \\("
 (re-test "[ -~ -~ -~ -~ -~]*" "abc") ("abc")
 (re-test "[ -~ -~ -~ -~ -~ -~]*" "abc") ("abc")
 (re-test "[ -~ -~ -~ -~ -~ -~ -~]*" "abc") ("abc")
+(string= *saved-locale* (i18n:set-locale :all *saved-locale*)) T
 
 ;; Tests from from the Zebu package (originally for nregex.lisp)
 (re-test "(na)x+" "naxna") ("nax" "na")

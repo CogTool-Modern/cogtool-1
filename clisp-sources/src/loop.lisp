@@ -2,8 +2,8 @@
 ;; (LOOP {loop-clause}*), CLtL2 p. 163,709-747
 ;; <http://www.lisp.org/HyperSpec/Body/sec_6-1.html>
 ;; <http://www.lisp.org/HyperSpec/Body/mac_loop.html>
-;; Bruno Haible 1991-2002
-;; Sam Steingold 1999-2004
+;; Bruno Haible 1991-2004
+;; Sam Steingold 1999-2009
 
 (in-package "COMMON-LISP")
 (export '(loop loop-finish))
@@ -111,7 +111,7 @@
 (defun helpvar (n)
   ;; '*helpvars*' is extended if necessary.
   (when (= n (fill-pointer *helpvars*))
-    (vector-push-extend (gensym) *helpvars*))
+    (vector-push-extend (gensym "PATTERN-") *helpvars*))
   (aref *helpvars* n))
 
 ;; (destructure pattern form) returns a list of lists (variable_i form_i).
@@ -177,16 +177,17 @@
             ; If the assignment has to be evaluated once for each iteration:
             ; a cons, pointing at the right place in the stepafter-code.
   (requires-stepbefore nil) ; True if the variables can get their values only
-                            ; in the stepbefore-code or initially-code,
+                            ; in the stepbefore-code or preamble,
                             ; false if the first assignment can be merged
                             ; with the initial binding.
   (depends-preceding nil) ; True if everytime=NIL and the values may depend
                           ; on preceding variables, so that these preceding
                           ; variables must get their values no later than in
-                          ; the initially-code.
+                          ; the preamble (= prologue + startup)
+  preamble                      ; cons = location in preamble
   (later-depend nil)) ; True if some later variables depend on these values,
                       ; so that these values
-                      ; must be computed no later than in the initially-code.
+                      ; must be computed no later than in the preamble.
 
 (proclaim '(inline li-vars))
 (defun li-vars (li)
@@ -209,10 +210,22 @@
               ,form))))
   form)
 
+(defun wrap-unwind-protect (protect-forms form)
+  (if protect-forms
+      `(unwind-protect ,form ,@protect-forms)
+      form))
+
 ;; Variable containing the last test result, called "it".
 (defvar *last-it*)
 ;; Flag whether this variable is used.
 (defvar *used-it*)
+
+;;; (revadd a b c d)) ==
+;;; (SETF A (REVAPPEND B (REVAPPEND C (REVAPPEND D A))))
+(defmacro revadd (place &rest forms)
+  (labels ((expand (rest)
+             (if rest `(revappend ,(car rest) ,(expand (cdr rest))) place)))
+    `(setf ,place ,(expand forms))))
 
 ;; The bulk of the expander.
 (defun expand-loop (*whole* body)
@@ -233,8 +246,7 @@
         (initializations nil) ; Bindungen: (init ...) (umgedrehte Liste)
         (seen-for-as-= nil) ; schon eine FOR-AS-= Klausel gesehen?
         (seen-endtest nil) ; schon eine FOR-AS Klausel mit Abbruchbedingung gesehen?
-        (initially-code nil) ; initially-Code (umgedrehte Liste)
-        (startup-code nil) ; forms from for ... = ... then and end conditions
+        (preamble nil) ; annotated: ([:INITIALLY|:START] . code) (reversed)
         (stepbefore-code nil) ; Code zum Abbruch vor dem Schleifendurchlauf (umgedrehte Liste)
         (main-code nil) ; Code im Hauptteil der Schleife (umgedrehte Liste)
         (stepafter-code nil) ; Code zur Vorbereitung des nächsten Schleifendurchlaufs (umgedrehte Liste)
@@ -247,11 +259,13 @@
              ((NCONC NCONCING APPEND APPENDING)
               (unless (eq (loop-keywordp (caddr rest)) 'INTO)
                 (return nil))))))
+        (protect-forms '())
         (results nil)) ; alist (value-form . (clause list))
     (labels
       ((next-kw () ; Schaut, ob als nächstes ein Keyword kommt.
                    ; Wenn ja, wird es geliefert. Wenn nein, Ergebnis NIL.
          (and (consp body-rest) (loop-keywordp (first body-rest))))
+       (preamble (kind &optional form) (car (push (cons kind form) preamble)))
        (cons-forward (form accuvar accufuncsym)
          (let ((tailvar
                 (cdr (or (assoc accuvar accuvar-tailvar-alist)
@@ -259,7 +273,7 @@
                                     (acons accuvar
                                            (gensym (symbol-name accuvar))
                                            accuvar-tailvar-alist))))))
-               (incrementvar (gensym)))
+               (incrementvar (gensym "ADDLIST-")))
            (push accuvar accu-vars-nil)
            (push tailvar accu-vars-nil)
            `(LET ((,incrementvar
@@ -468,7 +482,7 @@
                  ((IF WHEN UNLESS)
                   (pop body-rest)
                   (let* ((condition (parse-form kw))
-                         (it-var (gensym))
+                         (it-var (gensym "IT-"))
                          used-it
                          (true-form
                            (let ((*last-it* it-var) (*used-it* nil))
@@ -516,7 +530,7 @@
        ; - Beim Initialisieren von FOR-AS-= Variablen sind mindestens alle
        ;   vorherigen FOR-AS Variablen initialisiert und deren Abbruch-
        ;   bedingungen abgeprüft.
-       ; Man könnte erst alle Variablen binden und dann im initially-code
+       ; Man könnte erst alle Variablen binden und dann im preamble
        ; die Initialisierungen durchführen. Wir führen demgegenüber zwei
        ; Optimierungen durch:
        ; - Falls vor der FOR-AS Variablen keine FOR-AS-= Klausel kommt,
@@ -550,6 +564,7 @@
            :declspecs nil
            :endtest-forms (list endtest-form)
            :everytime (setq stepafter-code (cons 'NIL stepafter-code))
+           :preamble (preamble :start)
            :requires-stepbefore seen-endtest)))
       ;; Los geht's!
       ; parst: [named name]
@@ -586,7 +601,7 @@
                              (new-result 'T (list kw form))
                              `(WHEN ,form (RETURN-FROM ,block-name 'NIL)))
                            (THEREIS
-                             (let ((dummy (gensym)))
+                             (let ((dummy (gensym "THEREIS-")))
                                (new-result 'NIL (list kw form))
                                `(BLOCK ,dummy
                                   (RETURN-FROM ,block-name
@@ -594,7 +609,7 @@
                          main-code)))
                 ((INITIALLY)
                  (pop body-rest)
-                 (push `(PROGN ,@(parse-nonempty-progn kw)) initially-code))
+                 (preamble :INITIALLY `(PROGN ,@(parse-nonempty-progn kw))))
                 ((FINALLY)
                  (pop body-rest)
                  (push (let ((form (parse-unconditional)))
@@ -635,6 +650,7 @@
                           :everytime nil
                           ;; WITH vars should always be bound on top
                           :requires-stepbefore nil ; seen-endtest
+                          :preamble (preamble :start)
                           :depends-preceding t))))
                    ((FOR AS)
                     ; for-as ::= {for | as} for-as-clause {and [{for | as}] for-as-clause}*
@@ -657,6 +673,8 @@
                           (initializations nil)
                           (stepafter nil)
                           (old-seen-endtest seen-endtest)
+                          ;; remember the _CURRENT_ location in preamble
+                          (preamble-entry (preamble :start))
                           (depends-preceding nil))
                       (flet ((note-initialization (initialization)
                                ;; supersedes the outer definition!
@@ -677,10 +695,10 @@
                                      (setq step-function-form (parse-form 'by))
                                      (unless (and (function-form-p step-function-form)
                                                   (function-name-p (second step-function-form)))
-                                       (setq step-function-var (gensym))))
+                                       (setq step-function-var (gensym "BY-"))))
                                    (let ((var (if (and pattern (symbolp pattern)
                                                        (eq preposition 'ON))
-                                                  pattern (gensym))))
+                                                  pattern (gensym "LIST-"))))
                                      (push `(,var ,start-form) bindings)
                                      (when step-function-var
                                        (push `(,step-function-var ,step-function-form)
@@ -698,6 +716,7 @@
                                          :bindings (destructure pattern (if (eq preposition 'IN) `(CAR ,var) var))
                                          :declspecs new-declspecs
                                          :everytime t
+                                         :preamble (preamble :start)
                                          :requires-stepbefore seen-endtest)))
                                      (push
                                        (list var
@@ -723,15 +742,15 @@
                                      ;; `depends-preceding', because the
                                      ;; `stepafter-code' depends on the order of
                                      ;; the steppings, which forbids moving
-                                     ;; some code from `initially-code' +
+                                     ;; some code from `preamble' +
                                      ;; `stepafter-code' to `stepbefore-code.'
                                      (setq depends-preceding t))
                                    (setq stepafter (revappend (destructure pattern then-form) stepafter))))
                                 (ACROSS
                                  (pop body-rest)
                                  (let ((vector-form (parse-form preposition))
-                                       (vector-var (gensym))
-                                       (index-var (gensym)))
+                                       (vector-var (gensym "VECTOR-"))
+                                       (index-var (gensym "INDEX-")))
                                    (push `(,vector-var ,vector-form) bindings)
                                    (push `(,index-var 0) bindings)
                                    (note-initialization
@@ -742,6 +761,7 @@
                                        :bindings (destructure pattern `(AREF ,vector-var ,index-var))
                                        :declspecs new-declspecs
                                        :everytime t
+                                       :preamble (preamble :start)
                                        :requires-stepbefore seen-endtest))
                                    (push (list index-var `(1+ ,index-var)) stepafter)))
                                 (BEING
@@ -788,10 +808,10 @@
                                                               ((HASH-KEY HASH-KEYS) t) (t nil)))))
                                               (loop-syntax-error 'using))
                                             (setq other-pattern (second (pop body-rest))))
-                                          (let ((state-var (gensym))
-                                                (nextp-var (gensym))
-                                                (nextkey-var (gensym))
-                                                (nextvalue-var (gensym)))
+                                          (let ((state-var (gensym "WHTI-"))
+                                                (nextp-var (gensym "MORE?"))
+                                                (nextkey-var (gensym "HASH-KEY-"))
+                                                (nextvalue-var (gensym "HASH-VALUE-")))
                                             (multiple-value-bind (nextmain-var nextother-var)
                                                 (case preposition
                                                   ((HASH-KEY HASH-KEYS) (values nextkey-var nextvalue-var))
@@ -805,6 +825,7 @@
                                                 :declspecs (unless other-pattern `((IGNORE ,nextother-var)))
                                                 :endtest-forms `((UNLESS ,nextp-var (LOOP-FINISH)))
                                                 :everytime t
+                                                :preamble (preamble :start)
                                                 :requires-stepbefore seen-endtest))
                                               (note-initialization
                                                (make-loop-init
@@ -812,6 +833,7 @@
                                                 :bindings (destructure pattern nextmain-var)
                                                 :declspecs new-declspecs
                                                 :everytime t
+                                                :preamble (preamble :start)
                                                 :requires-stepbefore seen-endtest))
                                               (when other-pattern
                                                 (note-initialization
@@ -820,6 +842,7 @@
                                                   :bindings (destructure other-pattern nextother-var)
                                                   :declspecs nil
                                                   :everytime t
+                                                  :preamble (preamble :start)
                                                   :requires-stepbefore seen-endtest)))))))
                                        ((SYMBOL SYMBOLS PRESENT-SYMBOL PRESENT-SYMBOLS
                                          INTERNAL-SYMBOL INTERNAL-SYMBOLS EXTERNAL-SYMBOL EXTERNAL-SYMBOLS)
@@ -828,9 +851,9 @@
                                                        ((PRESENT-SYMBOL PRESENT-SYMBOLS) '(:internal :external))
                                                        ((INTERNAL-SYMBOL INTERNAL-SYMBOLS) '(:internal))
                                                        ((EXTERNAL-SYMBOL EXTERNAL-SYMBOLS) '(:external))))
-                                              (state-var (gensym))
-                                              (nextp-var (gensym))
-                                              (nextsym-var (gensym))
+                                              (state-var (gensym "WPI-"))
+                                              (nextp-var (gensym "MORE?"))
+                                              (nextsym-var (gensym "SYMBOL-"))
                                               (form
                                                (case (next-kw)
                                                  ((IN OF) (pop body-rest)
@@ -846,6 +869,7 @@
                                             :declspecs nil
                                             :endtest-forms `((UNLESS ,nextp-var (LOOP-FINISH)))
                                             :everytime t
+                                            :preamble (preamble :start)
                                             :requires-stepbefore seen-endtest))
                                           (note-initialization
                                            (make-loop-init
@@ -853,10 +877,11 @@
                                             :bindings (destructure pattern nextsym-var)
                                             :declspecs new-declspecs
                                             :everytime t
+                                            :preamble (preamble :start)
                                             :requires-stepbefore seen-endtest))))))))
                                 (t
                                  (unless (symbolp pattern) (loop-syntax-error kw))
-                                 (unless pattern (setq pattern (gensym)))
+                                 (unless pattern (setq pattern (gensym "FOR-NUM-")))
                                  ;; ANSI CL 6.1.2.1.1 implies that the
                                  ;; start/end/by clauses can come in any
                                  ;; order, but only one of each kind.
@@ -890,7 +915,7 @@
                                             (pop body-rest)
                                             (setq step-end-form (parse-form preposition))
                                             (unless (constantp step-end-form)
-                                              (let ((step-end-var (gensym)))
+                                              (let ((step-end-var (gensym "LIMIT-")))
                                                 (push `(,step-end-var ,step-end-form) bindings)
                                                 (setq step-end-form step-end-var))))
                                            ((and (not step-by-p)
@@ -899,7 +924,7 @@
                                             (pop body-rest)
                                             (setq step-by-form (parse-form 'by))
                                             (unless (constantp step-by-form)
-                                              (let ((step-by-var (gensym)))
+                                              (let ((step-by-var (gensym "BY-")))
                                                 (push `(,step-by-var ,step-by-form) bindings)
                                                 (setq step-by-form step-by-var))))
                                            (t (return)))
@@ -962,6 +987,7 @@
                           :declspecs (nreverse declspecs)
                           :everytime nil
                           :requires-stepbefore old-seen-endtest
+                          :preamble preamble-entry
                           :depends-preceding depends-preceding))
                       (dolist (initialization (nreverse initializations))
                         (when (li-everytime initialization)
@@ -969,7 +995,7 @@
                         (note-initialization initialization))))
                    ((REPEAT)
                     (let ((form (parse-form kw))
-                          (var (gensym)))
+                          (var (gensym "COUNT-")))
                       (note-initialization
                         (make-loop-init
                           :specform 'LET
@@ -977,6 +1003,7 @@
                           :declspecs nil
                           :everytime nil
                           :requires-stepbefore seen-endtest
+                          :preamble (preamble :start)
                           :depends-preceding t))
                       (push `(SETQ ,var (1- ,var)) stepafter-code)
                       (note-initialization
@@ -999,6 +1026,7 @@
                ;; `*helpvars*' must be bound first thing
                (list (make-loop-init
                       :specform 'LET
+                      :preamble (preamble :start)
                       :bindings
                       (map 'list #'(lambda (var) `(,var NIL)) *helpvars*))))))
         ; `depends-preceding' backpropagation:
@@ -1029,34 +1057,39 @@
                   (make-loop-init
                     :specform 'LET
                     :bindings (default-bindings vars declarations)
+                    :preamble (preamble :start)
                     :declspecs declarations)
                   initializations1)
                 (if everytime
                   (if (li-later-depend initialization)
-                    ;; double code: initially-code and stepafter-code
-                    (setf startup-code (revappend endtest-forms (revappend initforms startup-code))
-                          (cdr everytime) (revappend endtest-forms (revappend initforms (cdr everytime))))
-                    (setq stepbefore-code (revappend endtest-forms (revappend initforms stepbefore-code))))
-                  (setq startup-code (revappend endtest-forms (revappend initforms startup-code)))))
+                    (progn ; double code: preamble and stepafter-code
+                      (revadd (cdr (li-preamble initialization))
+                              endtest-forms initforms)
+                      (revadd (cdr everytime) endtest-forms initforms))
+                    (revadd stepbefore-code endtest-forms initforms))
+                  (revadd (cdr (li-preamble initialization))
+                          endtest-forms initforms)))
               ; Initialisierungsklausel nach initializations1 schaffen:
               (progn
                 (push
                   (make-loop-init
                     :specform name
                     :bindings bindings
+                    :preamble (preamble :start)
                     :declspecs declarations)
                   initializations1)
                 (if everytime
                   (progn
                     ; put the initforms into the stepafter-code only.
-                    (setf (cdr everytime) (revappend initforms (cdr everytime)))
+                    (revadd (cdr everytime) initforms)
                     ; handle the endtest-forms.
                     (if (li-later-depend initialization)
-                      ;; double endtest: initially-code and stepafter-code
-                      (setf startup-code (revappend endtest-forms startup-code)
-                            (cdr everytime) (revappend endtest-forms (cdr everytime)))
-                      (setq stepbefore-code (revappend endtest-forms stepbefore-code))))
-                  (setq startup-code (revappend endtest-forms startup-code)))))))
+                      (progn ; double endtest: preamble and stepafter-code
+                        (revadd (cdr (li-preamble initialization))
+                                endtest-forms)
+                        (revadd (cdr everytime) endtest-forms))
+                      (revadd stepbefore-code endtest-forms)))
+                  (revadd (cdr (li-preamble initialization)) endtest-forms))))))
         (flet ((check-accu-var (var)
                  (when (memq var var-list)
                    (error-of-type 'source-program-error
@@ -1071,49 +1104,58 @@
                         (delete-duplicates accu-vars-nil))
               ,@(mapcar #'(lambda (var) (check-accu-var (car var)) var)
                         (delete-duplicates accu-vars-0 :key #'car)))
+            :preamble (preamble :start)
             :declspecs (nreverse accu-declarations))
            initializations1))
+        (setq preamble
+              (mapcan (lambda (rec)
+                        (case (car rec)
+                          (:start (nreverse
+                                   (mapcar (lambda (f) (cons :start f))
+                                           (cdr rec))))
+                          (:initially (list rec))))
+                      preamble))
         ;; Remove the NIL placeholders in stepafter-code.
         (setq stepafter-code (delete 'NIL stepafter-code))
-        ;; If initially-code and stepafter-code both end in the same
+        ;; If preamble and stepafter-code both end in the same
         ;; forms, drag these forms across the label to stepbefore-code.
-        (unless initially-code
-          (flet ((form-eq (form1 form2) ; Calling EQUAL on user-given forms would be wrong
-                   (or (eql form1 form2)
-                       (and (consp form1) (consp form2)
-                            (eql (length form1) (length form2))
-                            (or (eq (car form1) (car form2))
-                                (and (case (length form1) ((1 3) t))
-                                     (case (car form1) ((SETQ PSETQ) t))
-                                     (case (car form2) ((SETQ PSETQ) t))))
-                            (every #'eq (cdr form1) (cdr form2))))))
-            (loop
-              (unless (and (consp startup-code) (consp stepafter-code)
-                           (form-eq (car startup-code) (car stepafter-code)))
-                (return))
-              (setq stepbefore-code
-                    (nconc stepbefore-code (list (pop stepafter-code))))
-              (pop startup-code))))
+        (flet ((form-eq (form1 form2) ; Calling EQUAL on user-given forms would be wrong
+                 (or (eql form1 form2)
+                     (and (consp form1) (consp form2)
+                          (eql (length form1) (length form2))
+                          (or (eq (car form1) (car form2))
+                              (and (case (length form1) ((1 3) t))
+                                   (case (car form1) ((SETQ PSETQ) t))
+                                   (case (car form2) ((SETQ PSETQ) t))))
+                          (every #'eq (cdr form1) (cdr form2))))))
+          (loop
+            (unless (and (consp preamble) (consp stepafter-code)
+                         (eq :start (caar preamble))
+                         (form-eq (cdar preamble) (car stepafter-code)))
+              (return))
+            (setq stepbefore-code
+                  (nconc stepbefore-code (list (pop stepafter-code))))
+            (pop preamble)))
         ;; Final macroexpansion.
         `(MACROLET ((LOOP-FINISH () (LOOP-FINISH-ERROR)))
            (BLOCK ,block-name
              ,(wrap-initializations initializations1
+               (wrap-unwind-protect protect-forms
                 `(MACROLET ((LOOP-FINISH () '(GO END-LOOP)))
                    (TAGBODY
-                     ,@(if startup-code (nreverse startup-code))
-                     ,@(if initially-code (nreverse initially-code))
-                     BEGIN-LOOP
+                     ,@(if preamble (nreverse (mapcar #'cdr preamble)))
+                    BEGIN-LOOP
                      ,@(if stepbefore-code (nreverse stepbefore-code))
                      ,(cons 'PROGN (nreverse main-code))
                      ,@(if stepafter-code (nreverse stepafter-code))
                      (GO BEGIN-LOOP)
-                     END-LOOP
+                    END-LOOP
                      ,@(mapcar #'(lambda (var)
                                    `(SETQ ,var (SYS::LIST-NREVERSE ,var)))
                                accu-vars-nreverse)
                      (MACROLET ((LOOP-FINISH () (LOOP-FINISH-WARN)
                                   '(GO END-LOOP)))
-                       ,@(nreverse finally-code)))))))))))
+                       ,@(nreverse finally-code))))))))))))
 
 ;; Der eigentliche Macro:
 (defmacro loop (&whole whole &body body)
@@ -1121,7 +1163,7 @@
     ;; "extended" loop form
     (expand-loop whole body)
     ;; "simple" loop form
-    (let ((tag (gensym)))
+    (let ((tag (gensym "LOOP-")))
       `(BLOCK NIL (TAGBODY ,tag ,@body (GO ,tag))))))
 (defmacro loop-finish (&whole whole)
   (error (TEXT "~S is possible only from within ~S")
@@ -1135,7 +1177,7 @@
 
 ;; Run-Time-Support:
 
-(defun max-if (x y)
+(defun max-if (x y) ; ABI
   (if y (max x y) x))
-(defun min-if (x y)
+(defun min-if (x y) ; ABI
   (if y (min x y) x))

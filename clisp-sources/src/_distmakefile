@@ -39,7 +39,7 @@ localedir = $(datadir)/locale
 #ifdef UNIX_AIX
 CC = xlc
 #else
-#if defined(UNIX_SUNOS4) || defined(UNIX_CYGWIN32)
+#ifdef UNIX_CYGWIN32
 CC = gcc
 #else
 #ifdef UNIX_HPUX
@@ -49,7 +49,7 @@ CC = cc
 #endif
 #endif
 #endif
-CFLAGS = -O
+CFLAGS = -O @@EXPORT_DYNAMIC_FLAG_SPEC@@
 
 #endif
 # Programs used by "make install":

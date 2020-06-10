@@ -15,6 +15,6 @@ AC_DEFUN([CL_DYNLOAD],
 AC_CHECK_HEADERS(dlfcn.h)
 if test "$ac_cv_header_dlfcn_h" = yes; then
   AC_SEARCH_LIBS(dlopen, dl)
-  AC_CHECK_FUNCS(dlopen dlsym dlerror dlclose)
+  AC_CHECK_FUNCS(dlopen dlsym dlvsym dlerror dlclose dladdr)
 fi
 ])

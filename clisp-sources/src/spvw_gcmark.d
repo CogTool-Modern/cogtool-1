@@ -2,212 +2,223 @@
 
 local void gc_mark (object obj)
 {
-  var object dies = obj; /* current object */
-  var object vorg = nullobj; /* predecessor-object */
+  var object curr = obj; /* current object */
+  var object pred = nullobj; /* predecessor-object */
   IF_DEBUG_GC_MARK(fprintf(stderr,"gc_mark obj = 0x%"PRIoint"x\n", as_oint(obj)));
 
 #define down_pair()                                                     \
-  if (in_old_generation(dies,typecode(dies),1))                         \
+  if (in_old_generation(curr,typecode(curr),1))                         \
     goto up; /* do not mark older generation */                         \
-  { var gcv_object_t* dies_ = (gcv_object_t*)ThePointer(dies);          \
-    if (marked(dies_)) goto up; /* marked -> go up */                   \
-    MARK(dies_); /* mark */                                             \
+  { var gcv_object_t* curr_ = (gcv_object_t*)ThePointer(curr);          \
+    if (marked(curr_)) goto up; /* marked -> go up */                   \
+    MARK(curr_); /* mark */                                             \
   }                                                                     \
-  { var object dies_ = objectplus(dies,(soint)(sizeof(cons_)-sizeof(gcv_object_t))<<(oint_addr_shift-addr_shift)); \
+  { var object curr_ = objectplus(curr,(soint)(sizeof(cons_)-sizeof(gcv_object_t))<<(oint_addr_shift-addr_shift)); \
     /* start with the last pointer */                                   \
-    var object nachf = *(gcv_object_t*)ThePointer(dies_); /* successor */ \
-    *(gcv_object_t*)ThePointer(dies_) = vorg; /* store predecessor */   \
-    vorg = dies_; /* current object becomes new predecessor */          \
-    dies = nachf; /* successor becomes current object */                \
+    var object succ = *(gcv_object_t*)ThePointer(curr_); /* successor */\
+    *(gcv_object_t*)ThePointer(curr_) = pred; /* store predecessor */   \
+    pred = curr_; /* current object becomes new predecessor */          \
+    curr = succ; /* successor becomes current object */                 \
     goto down; /* and descent */                                        \
   }
 #define up_pair()                                       \
-  { MARK(ThePointer(vorg)); /* mark again */            \
-    dies = vorg; /* Cons becomes object */              \
-    vorg = vorvorg; goto up; /* go further up */        \
+  { MARK(ThePointer(pred)); /* mark again */            \
+    curr = pred; /* Cons becomes object */              \
+    pred = prepred; goto up; /* go further up */        \
   }
 #define down_varobject(The,first_offset,last_offset)                    \
-  if (in_old_generation(dies,typecode(dies),0))                         \
+  if (in_old_generation(curr,typecode(curr),0))                         \
     goto up; /* do not mark older generation */                         \
-  { var gcv_object_t* dies_ = (gcv_object_t*)The(dies);                 \
-    if (marked(dies_)) goto up; /* marked -> up */                      \
-    MARK(dies_); /* mark */                                             \
-    mark(pointerplus(dies_,first_offset)); /* mark first pointer */     \
+  { var gcv_object_t* curr_ = (gcv_object_t*)The(curr);                 \
+    if (marked(curr_)) goto up; /* marked -> up */                      \
+    MARK(curr_); /* mark */                                             \
+    mark(pointerplus(curr_,first_offset)); /* mark first pointer */     \
   }                                                                     \
-  { var object dies_ = objectplus(dies,(soint)(last_offset)<<(oint_addr_shift-addr_shift)); \
+  { var object curr_ = objectplus(curr,(soint)(last_offset)<<(oint_addr_shift-addr_shift)); \
     /* start with the last pointer */                                   \
-    var object nachf = *(gcv_object_t*)The(dies_); /* successor */      \
-    *(gcv_object_t*)The(dies_) = vorg; /* store predecessor */          \
-    vorg = dies_; /* current object becomes new predecessor */          \
-    dies = nachf; /* predecessor becomes current object */              \
+    var object succ = *(gcv_object_t*)The(curr_); /* successor */       \
+    *(gcv_object_t*)The(curr_) = pred; /* store predecessor */          \
+    pred = curr_; /* current object becomes new predecessor */          \
+    curr = succ; /* predecessor becomes current object */               \
     goto down; /* and descent */                                        \
   }
 #define up_varobject(first_offset)                                      \
-  { dies = objectplus(vorg,-(soint)(first_offset)<<(oint_addr_shift-addr_shift)); /* becomes current object */ \
-    vorg = vorvorg; goto up; /* go further up */                        \
+  { curr = objectplus(pred,-(soint)(first_offset)<<(oint_addr_shift-addr_shift)); /* becomes current object */ \
+    pred = prepred; goto up; /* go further up */                        \
   }
 #define down_nopointers(The)                    \
-  if (in_old_generation(dies,typecode(dies),0)) \
+  if (in_old_generation(curr,typecode(curr),0)) \
     goto up; /* do not mark older generation */ \
-  MARK(The(dies)); /* mark */                   \
+  MARK(The(curr)); /* mark */                   \
   goto up; /* and up */
 #define down_iarray()                                                   \
-  if (in_old_generation(dies,typecode(dies),0))                         \
+  if (in_old_generation(curr,typecode(curr),0))                         \
     goto up; /* do not mark older generation */                         \
-  { var gcv_object_t* dies_ = (gcv_object_t*)TheIarray(dies);           \
-    if (marked(dies_)) goto up; /* marked -> up */                      \
-    MARK(dies_); /* mark */                                             \
+  { var gcv_object_t* curr_ = (gcv_object_t*)TheIarray(curr);           \
+    if (marked(curr_)) goto up; /* marked -> up */                      \
+    MARK(curr_); /* mark */                                             \
   }                                                                     \
-  { var object dies_ = objectplus(dies,(soint)(iarray_data_offset)<<(oint_addr_shift-addr_shift)); \
+  { var object curr_ = objectplus(curr,(soint)(iarray_data_offset)<<(oint_addr_shift-addr_shift)); \
     /* data vector is the first and only pointer */                     \
-    var object nachf = *(gcv_object_t*)TheIarray(dies_); /* successor */ \
-    *(gcv_object_t*)TheIarray(dies_) = vorg; /* store predecessor */    \
-    MARK(TheIarray(dies_)); /* mark first and only pointer */           \
-    vorg = dies_; /* current object becomes new predecessor */          \
-    dies = nachf; /* predecessor becomes current object */              \
+    var object succ = *(gcv_object_t*)TheIarray(curr_); /* successor */ \
+    *(gcv_object_t*)TheIarray(curr_) = pred; /* store predecessor */    \
+    MARK(TheIarray(curr_)); /* mark first and only pointer */           \
+    pred = curr_; /* current object becomes new predecessor */          \
+    curr = succ; /* predecessor becomes current object */               \
     goto down; /* and descent */                                        \
   }
 #define up_iarray()                                                     \
-  { dies = objectplus(vorg,-(soint)iarray_data_offset<<(oint_addr_shift-addr_shift)); /* array becomes current object */ \
-    vorg = vorvorg; goto up; /* go further up */                        \
+  { curr = objectplus(pred,-(soint)iarray_data_offset<<(oint_addr_shift-addr_shift)); /* array becomes current object */ \
+    pred = prepred; goto up; /* go further up */                        \
   }
 #define down_sistring()                                                 \
-  if (in_old_generation(dies,typecode(dies),0))                         \
+  if (in_old_generation(curr,typecode(curr),0))                         \
     goto up; /* do not mark older generation */                         \
-  { var gcv_object_t* dies_ = (gcv_object_t*)TheSistring(dies);         \
-    if (marked(dies_)) goto up; /* marked -> up */                      \
-    MARK(dies_); /* mark */                                             \
+  { var gcv_object_t* curr_ = (gcv_object_t*)TheSistring(curr);         \
+    if (marked(curr_)) goto up; /* marked -> up */                      \
+    MARK(curr_); /* mark */                                             \
   }                                                                     \
-  { var object dies_ = objectplus(dies,(soint)(sistring_data_offset)<<(oint_addr_shift-addr_shift)); \
+  { var object curr_ = objectplus(curr,(soint)(sistring_data_offset)<<(oint_addr_shift-addr_shift)); \
     /* data vector is the first and only pointer */                     \
-    var object nachf = *(gcv_object_t*)TheSistring(dies_); /* successor */ \
-    *(gcv_object_t*)TheSistring(dies_) = vorg; /* store predecessor */  \
-    MARK(TheSistring(dies_)); /* mark first and only pointer */         \
-    vorg = dies_; /* current object becomes new predecessor */          \
-    dies = nachf; /* predecessor becomes current object */              \
+    var object succ = *(gcv_object_t*)TheSistring(curr_); /* successor */\
+    *(gcv_object_t*)TheSistring(curr_) = pred; /* store predecessor */  \
+    MARK(TheSistring(curr_)); /* mark first and only pointer */         \
+    pred = curr_; /* current object becomes new predecessor */          \
+    curr = succ; /* predecessor becomes current object */               \
     goto down; /* and descent */                                        \
   }
 #define up_sistring()                                                   \
-  { dies = objectplus(vorg,-(soint)sistring_data_offset<<(oint_addr_shift-addr_shift)); /* array becomes current object */ \
-    vorg = vorvorg; goto up; /* go further up */                        \
+  { curr = objectplus(pred,-(soint)sistring_data_offset<<(oint_addr_shift-addr_shift)); /* array becomes current object */ \
+    pred = prepred; goto up; /* go further up */                        \
   }
 #define down_svector()                                                  \
-  if (in_old_generation(dies,typecode(dies),0))                         \
+  if (in_old_generation(curr,typecode(curr),0))                         \
     goto up; /* do not mark older generation */                         \
-  { var gcv_object_t* dies_ = (gcv_object_t*)TheSvector(dies);          \
-    if (marked(dies_)) goto up; /* marked -> up */                      \
-    MARK(dies_); /* mark */                                             \
+  { var gcv_object_t* curr_ = (gcv_object_t*)TheSvector(curr);          \
+    if (marked(curr_)) goto up; /* marked -> up */                      \
+    MARK(curr_); /* mark */                                             \
   }                                                                     \
-  { var uintL len = Svector_length(dies);                               \
+  { var uintL len = Svector_length(curr);                               \
     if (len==0) goto up; /* Length 0: up again */                       \
-   {var object dies_ = objectplus(dies,((soint)offsetofa(svector_,data) << (oint_addr_shift-addr_shift)) \
+   {var object curr_ = objectplus(curr,((soint)offsetofa(svector_,data) << (oint_addr_shift-addr_shift)) \
     /* the "<< 1" and "/2" are a workaround against a gcc-2.7.2         \
        missed optimization in WIDE_SOFT mode */                         \
       + (((soint)len << 1) * (soint)(sizeof(gcv_object_t)/2) << (oint_addr_shift-addr_shift)) \
-      - ((soint)sizeof(gcv_object_t) << (oint_addr_shift-addr_shift)) ); \
+      - ((soint)sizeof(gcv_object_t) << (oint_addr_shift-addr_shift)) );\
     /* start with the last pointer */                                   \
-    var object nachf = *(gcv_object_t*)TheSvector(dies_); /* successor */ \
-    *(gcv_object_t*)TheSvector(dies_) = vorg; /* store predecessor */   \
-    mark(&TheSvector(dies)->data[0]); /* mark first pointer */          \
-    vorg = dies_; /* current object becomes new predecessor */          \
-    dies = nachf; /* predecessor becomes current object */              \
+    var object succ = *(gcv_object_t*)TheSvector(curr_); /* successor */\
+    *(gcv_object_t*)TheSvector(curr_) = pred; /* store predecessor */   \
+    mark(&TheSvector(curr)->data[0]); /* mark first pointer */          \
+    pred = curr_; /* current object becomes new predecessor */          \
+    curr = succ; /* predecessor becomes current object */               \
     goto down; /* and descent */                                        \
   }}
 #define up_svector()                            \
-  { dies = objectplus(vorg,-(soint)offsetofa(svector_,data)<<(oint_addr_shift-addr_shift)); /* Svector becomes current object */ \
-    vorg = vorvorg; goto up; /* go further up */ \
+  { curr = objectplus(pred,-(soint)offsetofa(svector_,data)<<(oint_addr_shift-addr_shift)); /* Svector becomes current object */ \
+    pred = prepred; goto up; /* go further up */ \
   }
 #define down_lrecord()                                                  \
-  if (in_old_generation(dies,typecode(dies),0))                         \
+  if (in_old_generation(curr,typecode(curr),0))                         \
     goto up; /* do not mark older generation */                         \
-  { var gcv_object_t* dies_ = (gcv_object_t*)TheLrecord(dies);          \
-    if (marked(dies_)) goto up; /* marked -> up */                      \
-    MARK(dies_); /* marked */                                           \
+  { var gcv_object_t* curr_ = (gcv_object_t*)TheLrecord(curr);          \
+    if (marked(curr_)) goto up; /* marked -> up */                      \
+    MARK(curr_); /* marked */                                           \
   }                                                                     \
-  { var uintL len = Lrecord_nonweak_length(dies);                       \
+  { var uintL len = Lrecord_nonweak_length(curr);                       \
     if (len==0) goto up; /* Length 0: up again */                       \
-   {var object dies_ = objectplus(dies,((soint)offsetofa(record_,recdata) << (oint_addr_shift-addr_shift)) \
+   {var object curr_ = objectplus(curr,((soint)offsetofa(record_,recdata) << (oint_addr_shift-addr_shift)) \
     /* the "<< 1" and "/2" are a workaround against a gcc-2.7.2         \
        missed optimization in WIDE_SOFT mode */                         \
       + (((soint)len << 1) * (soint)(sizeof(gcv_object_t)/2) << (oint_addr_shift-addr_shift)) \
-      - ((soint)sizeof(gcv_object_t) << (oint_addr_shift-addr_shift)) ); \
+      - ((soint)sizeof(gcv_object_t) << (oint_addr_shift-addr_shift)) );\
     /* start with the last pointer */                                   \
-    var object nachf = *(gcv_object_t*)TheLrecord(dies_); /* successor */ \
-    *(gcv_object_t*)TheLrecord(dies_) = vorg; /* store predecessor */   \
-    mark(&TheLrecord(dies)->recdata[0]); /* mark first pointer */       \
-    vorg = dies_; /* current object becomes new predecessor */          \
-    dies = nachf; /* predecessor becomes current object */              \
+    var object succ = *(gcv_object_t*)TheLrecord(curr_); /* successor */\
+    *(gcv_object_t*)TheLrecord(curr_) = pred; /* store predecessor */   \
+    mark(&TheLrecord(curr)->recdata[0]); /* mark first pointer */       \
+    pred = curr_; /* current object becomes new predecessor */          \
+    curr = succ; /* predecessor becomes current object */               \
     goto down; /* and descent */                                        \
   }}
 #define up_lrecord()                             \
-  { dies = objectplus(vorg,-(soint)offsetofa(record_,recdata)<<(oint_addr_shift-addr_shift)); /* Lrecord becomes current object */ \
-    vorg = vorvorg; goto up; /* go further up */ \
+  { curr = objectplus(pred,-(soint)offsetofa(record_,recdata)<<(oint_addr_shift-addr_shift)); /* Lrecord becomes current object */ \
+    pred = prepred; goto up; /* go further up */ \
   }
 #define down_sxrecord()                                                 \
-  if (in_old_generation(dies,typecode(dies),0))                         \
+  if (in_old_generation(curr,typecode(curr),0))                         \
     goto up; /* do not mark older generation */                         \
-  { var gcv_object_t* dies_ = (gcv_object_t*)TheRecord(dies);           \
-    if (marked(dies_)) goto up; /* marked -> up */                      \
-    MARK(dies_); /* marked */                                           \
+  { var gcv_object_t* curr_ = (gcv_object_t*)TheRecord(curr);           \
+    if (marked(curr_)) goto up; /* marked -> up */                      \
+    MARK(curr_); /* marked */                                           \
   }                                                                     \
-  { var uintL len = SXrecord_nonweak_length(dies);                      \
+  { var uintL len = SXrecord_nonweak_length(curr);                      \
     if (len==0) goto up; /* Length 0: up again */                       \
-   {var object dies_ = objectplus(dies,((soint)offsetofa(record_,recdata) << (oint_addr_shift-addr_shift)) \
+   {var object curr_ = objectplus(curr,((soint)offsetofa(record_,recdata) << (oint_addr_shift-addr_shift)) \
     /* the "<< 1" and "/2" are a workaround against a gcc-2.7.2         \
        missed optimization in WIDE_SOFT mode */                         \
       + (((soint)len << 1) * (soint)(sizeof(gcv_object_t)/2) << (oint_addr_shift-addr_shift)) \
-      - ((soint)sizeof(gcv_object_t) << (oint_addr_shift-addr_shift)) ); \
+      - ((soint)sizeof(gcv_object_t) << (oint_addr_shift-addr_shift)) );\
     /* start with the last pointer */                                   \
-    var object nachf = *(gcv_object_t*)TheRecord(dies_); /* successor */ \
-    *(gcv_object_t*)TheRecord(dies_) = vorg; /* store predecessor */    \
-    mark(&TheRecord(dies)->recdata[0]); /* mark first pointer */        \
-    vorg = dies_; /* current object becomes new predecessor */          \
-    dies = nachf; /* predecessor becomes current object */              \
+    var object succ = *(gcv_object_t*)TheRecord(curr_); /* successor */ \
+    *(gcv_object_t*)TheRecord(curr_) = pred; /* store predecessor */    \
+    mark(&TheRecord(curr)->recdata[0]); /* mark first pointer */        \
+    pred = curr_; /* current object becomes new predecessor */          \
+    curr = succ; /* predecessor becomes current object */               \
     goto down; /* and descent */                                        \
   }}
+#if defined(USE_JITC)
+ #define down_cclosure()  if (cclosurep(curr) && cclosure_jitc_p(curr)) { \
+   object jitc = cclosure_jitc(curr);                                   \
+   if (fpointerp(jitc)) {                                               \
+     if (gc_drop_jitc) cclosure_jitc(curr) = NIL;                       \
+     else gc_mark_jitc_object(TheFpointer(jitc)->fp_pointer);           \
+   }                                                                    \
+ }
+#else
+ #define down_cclosure()
+#endif
 #define up_sxrecord()                             \
-  { dies = objectplus(vorg,-(soint)offsetofa(record_,recdata)<<(oint_addr_shift-addr_shift)); /* record becomes current object */ \
-    vorg = vorvorg; goto up; /* go further up */  \
+  { curr = objectplus(pred,-(soint)offsetofa(record_,recdata)<<(oint_addr_shift-addr_shift)); /* record becomes current object */ \
+    pred = prepred; goto up; /* go further up */  \
   }
 #ifdef STANDARD_HEAPCODES
 #define down_subr()                                                     \
-  if (in_old_generation(dies,typecode(dies),0))                         \
+  if (in_old_generation(curr,typecode(curr),0))                         \
     goto up; /* do not mark older generation */                         \
-  { var gcv_object_t* dies_ = (gcv_object_t*)TheSubr(dies);             \
-    if (marked(dies_)) goto up; /* marked -> up */                      \
-    MARK(dies_); /* marked */                                           \
+  { var gcv_object_t* curr_ = (gcv_object_t*)TheSubr(curr);             \
+    if (marked(curr_)) goto up; /* marked -> up */                      \
+    MARK(curr_); /* marked */                                           \
   }                                                                     \
-  { var object dies_ = objectplus(dies,((soint)offsetofa(record_,recdata) << (oint_addr_shift-addr_shift)) \
+  { var object curr_ = objectplus(curr,((soint)offsetofa(record_,recdata) << (oint_addr_shift-addr_shift)) \
       + ((soint)subr_length * (soint)sizeof(gcv_object_t) << (oint_addr_shift-addr_shift)) \
       - ((soint)sizeof(gcv_object_t) << (oint_addr_shift-addr_shift)) ); \
     /* start with the last pointer */                                   \
-    var object nachf = *(gcv_object_t*)TheSubr(dies_); /* successor */  \
-    *(gcv_object_t*)TheSubr(dies_) = vorg; /* store predecessor */      \
-    mark(&((Record)TheSubr(dies))->recdata[0]); /* mark first pointer */ \
-    vorg = dies_; /* current object becomes new predecessor */          \
-    dies = nachf; /* predecessor becomes current object */              \
+    var object succ = *(gcv_object_t*)TheSubr(curr_); /* successor */   \
+    *(gcv_object_t*)TheSubr(curr_) = pred; /* store predecessor */      \
+    mark(&((Record)TheSubr(curr))->recdata[0]); /* mark first pointer */ \
+    pred = curr_; /* current object becomes new predecessor */          \
+    curr = succ; /* predecessor becomes current object */               \
     goto down; /* and descent */                                        \
   }
 #define up_subr()                                                       \
-  { dies = objectplus(vorg,-(soint)offsetofa(record_,recdata)<<(oint_addr_shift-addr_shift)); /* SUBR becomes current object */ \
-    vorg = vorvorg; goto up; /* go further up */  \
+  { curr = objectplus(pred,-(soint)offsetofa(record_,recdata)<<(oint_addr_shift-addr_shift)); /* SUBR becomes current object */ \
+    pred = prepred; goto up; /* go further up */  \
   }
 #endif
 
  down: /* entry for further descent.
-          dies = object to be marked (engl. this),
-          vorg = its predecessor */
-  IF_DEBUG_GC_MARK(fprintf(stderr,"down: vorg = 0x%"PRIoint"x, dies = 0x%"PRIoint"x\n",
-                           as_oint(vorg), as_oint(dies)));
+          curr = object to be marked (engl. this),
+          pred = its predecessor */
+  IF_DEBUG_GC_MARK(fprintf(stderr,"down: pred = 0x%"PRIoint"x, curr = 0x%"PRIoint"x\n",
+                           as_oint(pred), as_oint(curr)));
  #ifdef TYPECODES
-  switch (typecode(dies)) {
+  switch (typecode(curr)) {
     case_pair: /* object with exactly two 2 pointers (Cons and similar) */
       down_pair();
     case_symbol: /* Symbol */
       down_varobject(TheSymbol,symbol_objects_offset,
-                     sizeof(symbol_)-sizeof(gcv_object_t));
+                     symbol_length*sizeof(gcv_object_t));
     case_sstring: /* simple-string */
-      if (sstring_reallocatedp(TheSstring(dies))) {
+      if (sstring_reallocatedp(TheSstring(curr))) {
         down_sistring();
       }
       /*FALLTHROUGH*/
@@ -234,6 +245,7 @@ local void gc_mark (object obj)
     case_lrecord: /* Lrecord */
       down_lrecord();
     case_sxrecord: /* Srecord/Xrecord */
+      down_cclosure();          /*FALLTHROUGH*/
     case_subr: /* SUBR */
       down_sxrecord();
     case_machine: /* machine address */
@@ -250,15 +262,15 @@ local void gc_mark (object obj)
       /*NOTREACHED*/ abort();
   }
  #else
-  switch (as_oint(dies) & nonimmediate_heapcode_mask) {
+  switch (as_oint(curr) & nonimmediate_heapcode_mask) {
     case cons_bias+conses_misaligned: /* cons */
       #ifdef STANDARD_HEAPCODES
       /* NB: (immediate_bias & nonimmediate_heapcode_mask) == cons_bias. */
-      if (immediate_object_p(dies)) goto up;
+      if (immediate_object_p(curr)) goto up;
       #endif
       down_pair();
     case varobject_bias+varobjects_misaligned:
-      switch (Record_type(dies)) {
+      switch (Record_type(curr)) {
         case Rectype_Sbvector:
         case Rectype_Sb2vector:
         case Rectype_Sb4vector:
@@ -304,6 +316,7 @@ local void gc_mark (object obj)
         case Rectype_WeakHashedAlist_Both: /* Lrecord */
           down_lrecord();
         default: /* Srecord/Xrecord */
+          down_cclosure();
           down_sxrecord();
       }
     #ifdef STANDARD_HEAPCODES
@@ -321,35 +334,35 @@ local void gc_mark (object obj)
   }
  #endif
  up: /* entry for ascent.
-        dies = currently marked object, vorg = its predecessor */
-  IF_DEBUG_GC_MARK(fprintf(stderr,"up:   vorg = 0x%"PRIoint"x, dies = 0x%"PRIoint"x\n",
-                           as_oint(vorg), as_oint(dies)));
-  if (eq(vorg,nullobj)) /* ending flag reached? */
+        curr = currently marked object, pred = its predecessor */
+  IF_DEBUG_GC_MARK(fprintf(stderr,"up:   pred = 0x%"PRIoint"x, curr = 0x%"PRIoint"x\n",
+                           as_oint(pred), as_oint(curr)));
+  if (eq(pred,nullobj)) /* ending flag reached? */
     return; /* yes -> finished */
-  if (!marked(ThePointer(vorg))) { /* already through? */
+  if (!marked(ThePointer(pred))) { /* already through? */
     /* no ->
        next element further left (come from 'up', go to 'down')
-       dies = currently marked  object, store in *vorg */
-    var object vorvorg = *(gcv_object_t*)ThePointer(vorg); /* old predecessor */
-    *(gcv_object_t*)ThePointer(vorg) = dies; /* write back component */
-    vorg = objectplus(vorg,-(soint)(sizeof(gcv_object_t))<<(oint_addr_shift-addr_shift)); /* go to next component */
-    if (marked(ThePointer(vorg))) { /* already marked? */
-      dies = /* next component, without mark */
-        without_mark_bit(*(gcv_object_t*)ThePointer(vorg));
-      *(gcv_object_t*)ThePointer(vorg) = /* further relocate old predecessor, thereby renew mark */
-        with_mark_bit(vorvorg);
+       curr = currently marked  object, store in *pred */
+    var object prepred = *(gcv_object_t*)ThePointer(pred); /* old predecessor */
+    *(gcv_object_t*)ThePointer(pred) = curr; /* write back component */
+    pred = objectplus(pred,-(soint)(sizeof(gcv_object_t))<<(oint_addr_shift-addr_shift)); /* go to next component */
+    if (marked(ThePointer(pred))) { /* already marked? */
+      curr = /* next component, without mark */
+        without_mark_bit(*(gcv_object_t*)ThePointer(pred));
+      *(gcv_object_t*)ThePointer(pred) = /* further relocate old predecessor, thereby renew mark */
+        with_mark_bit(prepred);
     } else {
-      dies = *(gcv_object_t*)ThePointer(vorg); /* next component, without mark */
-      *(gcv_object_t*)ThePointer(vorg) = vorvorg; /* further relocate old predecessor */
+      curr = *(gcv_object_t*)ThePointer(pred); /* next component, without mark */
+      *(gcv_object_t*)ThePointer(pred) = prepred; /* further relocate old predecessor */
     }
     goto down;
   }
   { /* already through -> ascent again */
-    var object vorvorg = /* fetch old predecessor, without mark bit */
-      without_mark_bit(*(gcv_object_t*)ThePointer(vorg));
-    *(gcv_object_t*)ThePointer(vorg) = dies; /* write back first component */
+    var object prepred = /* fetch old predecessor, without mark bit */
+      without_mark_bit(*(gcv_object_t*)ThePointer(pred));
+    *(gcv_object_t*)ThePointer(pred) = curr; /* write back first component */
    #ifdef TYPECODES
-    switch (typecode(vorg)) {
+    switch (typecode(pred)) {
       case_pair: /* object with exactly two pointers (Cons and similar) */
         up_pair();
       case_symbol: /* Symbol */
@@ -367,8 +380,8 @@ local void gc_mark (object obj)
       case_subr: /* SUBR */
         up_sxrecord();
       case_sstring: /* simple-string */
-        { var object vorg_ = objectplus(vorg,-(soint)sistring_data_offset<<(oint_addr_shift-addr_shift));
-          if (sstring_reallocatedp(TheSstring(vorg_)))
+        { var object pred_ = objectplus(pred,-(soint)sistring_data_offset<<(oint_addr_shift-addr_shift));
+          if (sstring_reallocatedp(TheSstring(pred_)))
             up_sistring();
         }
         /*FALLTHROUGH*/
@@ -398,7 +411,7 @@ local void gc_mark (object obj)
         /*NOTREACHED*/ abort();
     }
    #else
-    switch (as_oint(vorg) & nonimmediate_heapcode_mask) {
+    switch (as_oint(pred) & nonimmediate_heapcode_mask) {
       case cons_bias+conses_misaligned: /* Cons */
         up_pair();
       case varobject_bias+varobjects_misaligned:
@@ -429,4 +442,5 @@ local void gc_mark (object obj)
 #undef down_varobject
 #undef up_pair
 #undef down_pair
+#undef down_cclosure
 }

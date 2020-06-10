@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2005 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -26,7 +26,7 @@ AC_CHECK_DECLS(environ,,,[#include <stdlib.h>
 #endif])
 if test "$ac_cv_func_unsetenv" = yes; then
   AC_MSG_CHECKING(return value of unsetenv)
-  CL_PROTO_RET([#include <stdlib.h>],[int unsetenv(char*);],[int unsetenv();],
+  CL_PROTO_RET([#include <stdlib.h>],[int unsetenv(char*);],
 cl_cv_proto_unsetenv_ret,int,void)
   AC_MSG_RESULT($cl_cv_proto_unsetenv_ret)
   if test "$cl_cv_proto_unsetenv_ret" = int;

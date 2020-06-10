@@ -32,23 +32,121 @@ int shell_quote (char * dest, const char * source) {
 /*========== shell shortcut resolution ==========*/
 #include <shlobj.h>
 
+/* is_cygwin_symlink based on path.cc from cygwin sources
+   for win_shortcut_hdr description see also,
+   http://msdn.microsoft.com/en-us/library/dd871305(PROT.10).aspx */
+
+static const GUID GUID_shortcut =
+  {0x00021401L, 0, 0, {0xc0, 0, 0, 0, 0, 0, 0, 0x46}};
+
+enum {
+  WSH_FLAG_IDLIST = 0x01,
+  WSH_FLAG_FILE = 0x02,
+  WSH_FLAG_DESC = 0x04,
+  WSH_FLAG_RELPATH = 0x08,
+  WSH_FLAG_WD = 0x10,
+  WSH_FLAG_CMDLINE = 0x20,
+  WSH_FLAG_ICON = 0x40
+};
+
+struct win_shortcut_hdr
+  {
+    DWORD size;            /* Header size in bytes.  Must contain 0x4c. */
+    GUID magic;            /* GUID of shortcut files. */
+    DWORD flags;           /* Content flags.  See above. */
+
+    /* The next fields from attr to icon_no are always set to 0 in Cygwin
+       and U/Win shortcuts. */
+    DWORD attr;            /* Target file attributes. */
+    FILETIME ctime;        /* These filetime items are never touched by the */
+    FILETIME mtime;        /* system, apparently. Values don't matter. */
+    FILETIME atime;
+    DWORD filesize;        /* Target filesize. */
+    DWORD icon_no;         /* Icon number. */
+
+    DWORD run;             /* Values defined in winuser.h. Use SW_NORMAL. */
+    DWORD hotkey;          /* Hotkey value. Set to 0.  */
+    DWORD dummy[2];        /* Future extension probably. Always 0. */
+  };
+
+#define WINSHDRSIZE sizeof(struct win_shortcut_hdr)
+
+static int
+cmp_shortcut_header (struct win_shortcut_hdr *file_header)
+{
+  /* A Cygwin or U/Win shortcut only contains a description and a relpath.
+     Cygwin shortcuts also might contain an ITEMIDLIST. The run type is
+     always set to SW_NORMAL. */
+  DWORD * pzero = &file_header->attr;
+  /* FILETIME is two DWORDS so check it as array of DWORDS */
+  while (pzero < &file_header->run && !*pzero++);
+  return file_header->size == WINSHDRSIZE
+      && !memcmp (&file_header->magic, &GUID_shortcut, sizeof GUID_shortcut)
+      && (file_header->flags & ~WSH_FLAG_IDLIST)
+         == (WSH_FLAG_DESC | WSH_FLAG_RELPATH)
+      && pzero >= &file_header->run
+      && file_header->run == SW_NORMAL;
+}
+
+enum cygsym_enum { cygsym_notsym = 0, cygsym_issym, cygsym_err };
+
+enum cygsym_enum is_cygwin_symlink (const char * filename);
+
+enum cygsym_enum is_cygwin_symlink (const char * filename)
+{
+  HANDLE handle;
+  enum cygsym_enum result = cygsym_err;
+  handle = CreateFile(filename,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,
+                      NULL,OPEN_EXISTING,FILE_FLAG_SEQUENTIAL_SCAN,NULL);
+  if (handle == INVALID_HANDLE_VALUE) return result;
+  do {
+    DWORD got;
+    BY_HANDLE_FILE_INFORMATION finfo;
+    struct win_shortcut_hdr header;
+    if (!GetFileInformationByHandle (handle, &finfo)) break;
+    result = cygsym_notsym;
+    if (!(finfo.dwFileAttributes & FILE_ATTRIBUTE_READONLY)) break;
+    if (GetFileSize (handle, NULL) > 8192) break;
+    if (!ReadFile (handle, &header, WINSHDRSIZE, &got, NULL)) break;
+    if (got != WINSHDRSIZE || !cmp_shortcut_header (&header))
+      break;
+    result = cygsym_issym;
+  } while (0);
+  CloseHandle(handle);
+  return result;
+}
+
+/* We will need "breakthrough" (BT) version of every COM function
+   which could be called on unitialized (in the current thread)
+   COM library  */
+
+HRESULT BTCoCreateInstance (REFCLSID rclsid,  LPUNKNOWN pUnkOuter,
+                            DWORD dwClsContext, REFIID riid,
+                            LPVOID * ppv)
+{
+  HRESULT result = CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+  if (result != CO_E_NOTINITIALIZED || CoInitialize(NULL) != S_OK)
+    return result;
+  return CoCreateInstance(rclsid, pUnkOuter, dwClsContext, riid, ppv);
+}
+
 /* extracts a filename field from windows shortcut
  > filename: name the shortcut file
  < resolved: buffer not less than MAX_PATH
  < result:   true if link was successfully resolved */
 static BOOL resolve_shell_shortcut (LPCSTR filename, LPSTR resolved) {
-  DWORD fileattr;
   HRESULT hres;
   IShellLink* psl;
   WIN32_FIND_DATA wfd;
   BOOL result = FALSE;
   IPersistFile* ppf;
 
-  fileattr = GetFileAttributes(filename);
-  if (fileattr == 0xFFFFFFFF) return FALSE;
+  /* no matter it's FS error or not cygwin shortcut -
+     probably it should be fixed */
+  if (is_cygwin_symlink(filename) != cygsym_issym) return FALSE;
   /* Get a pointer to the IShellLink interface. */
-  hres = CoCreateInstance(&CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
-                          &IID_IShellLink, (LPVOID *) &psl);
+  hres = BTCoCreateInstance(&CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER,
+                            &IID_IShellLink, (LPVOID*)&psl);
   if (FAILED(hres)) return FALSE;
   /* Get a pointer to the IPersistFile interface. */
   hres = psl->lpVtbl->QueryInterface(psl, &IID_IPersistFile,(LPVOID *) &ppf);
@@ -108,7 +206,6 @@ static BOOL augment_relative_pathname(LPCSTR filename, LPSTR pathname) {
   }
   return TRUE;
 }
-
 
 typedef enum {
   shell_shortcut_notresolved = 0,
@@ -187,7 +284,7 @@ resolve_shell_symlink (LPCSTR filename, LPSTR resolved)
 
 /* the ultimate shortcut megaresolver
    style inspired by directory_search_scandir
- > namein: filename pointing to file or directory
+ > namein: absolute filename pointing to file or directory
             wildcards (only asterisk) may appear only as filename
  < nameout: filename with directory and file shortcuts resolved
              on failure holds filename resolved so far
@@ -197,13 +294,14 @@ BOOL real_path (LPCSTR namein, LPSTR nameout) {
   HANDLE h = NULL;
   char * nametocheck;
   char * nametocheck_end;
+  int    name_len;
   /* drive|dir1|dir2|name
            ^nametocheck
                ^nametocheck_end */
   char saved_char;
   BOOL next_name = 0;/* if we found an lnk and need to start over */
   int try_counter = 33;
-  if (strlen(namein) >= MAX_PATH) return FALSE;
+  if ((name_len = strlen(namein)) >= MAX_PATH) return FALSE;
   strcpy(nameout,namein);
   do { /* whole file names */
     next_name = FALSE;
@@ -212,9 +310,26 @@ BOOL real_path (LPCSTR namein, LPSTR nameout) {
     nametocheck = nameout;
     if (((*nametocheck >= 'a' && *nametocheck <= 'z')
          || (*nametocheck >= 'A' && *nametocheck <= 'Z'))
-        && nametocheck[1] == ':' && cpslashp(nametocheck[2]))
-      /* drive */
-      nametocheck += 3;
+        && nametocheck[1] == ':')
+    { if (cpslashp(nametocheck[2])) {
+        /* drive */
+        nametocheck += 3;
+      } else {
+        /* default directory on drive */
+        char drive[4] = "C:.", *name;
+        int default_len;
+        drive[0] = namein[0];
+        if (!GetFullPathName(drive,_MAX_PATH,nameout,&name)
+            || (default_len = strlen(nameout)) + name_len
+               >= _MAX_PATH) return FALSE;
+        nameout[default_len] = '\\';
+        strcpy(nameout + default_len + 1, namein + 2);
+        name_len += default_len - 1; /* Was C:lisp.exe
+                                        Now C:\clisp\lisp.exe
+                                        removed 2
+                                        added default_len + 1 chars */
+        nametocheck += default_len + 1;
+    } }
     else if (nametocheck[0]=='\\' && nametocheck[1]=='\\') {
       int i;
       /* host */
@@ -242,8 +357,8 @@ BOOL real_path (LPCSTR namein, LPSTR nameout) {
       { char * cp = nametocheck;
         for (;*cp=='.';cp++);
         dots_only = !(*cp) && cp > nametocheck; }
-      /* Stars in the middle of filename: error
-         Stars as pathname: success */
+      /* Asterisks in the middle of filename: error
+         Asterisks as pathname: success */
       { char * cp = nametocheck;
         for (;*cp && *cp!='*';cp++);
         have_stars = *cp == '*'; }
@@ -267,22 +382,27 @@ BOOL real_path (LPCSTR namein, LPSTR nameout) {
           h = FindFirstFile(nameout,&wfd);
           if (h != INVALID_HANDLE_VALUE) {
             /* make space for full (non 8.3) name component */
-            int l = strlen(wfd.cFileName);
+            int     l = strlen(wfd.cFileName),
+                 oldl = nametocheck_end - nametocheck,
+                 new_name_len = name_len + l - oldl;
             FindClose(h);
-            if (l != (nametocheck_end - nametocheck)) {
+            if (new_name_len >= _MAX_PATH) return FALSE;
+            if (l != oldl) {
               int restlen =
-                saved_char?(strlen(nametocheck_end+1)
-                            +1/*saved_char*/+1/*zero byte*/)
-                :0;
-              if (nametocheck - nameout + restlen + l + 2 > MAX_PATH)
-                return FALSE;
-              if (restlen) memmove(nametocheck+l,nametocheck_end,restlen);
+                saved_char?(name_len - (nametocheck_end - nameout)):0;
+              memmove(nametocheck+l,nametocheck_end,restlen);
             }
             strncpy(nametocheck,wfd.cFileName,l);
             nametocheck_end = nametocheck + l;
-          } else {/* try shortcut */
+            name_len = new_name_len;
+          } else {/* try shortcut
+                     Note: something\cyglink.lnk doesn't resolve to the contents
+                           of cyglink.lnk so one can read/write symlink .lnk
+                           files although they are not present in DIRECTORY output.
+                           Is it bug or feature? */
             char saved[4];
             char resolved[MAX_PATH];
+            int  resolved_len;
             shell_shortcut_target_t rresult;
             if (nametocheck_end - nameout + 4 > MAX_PATH) return FALSE;
             strncpy(saved,nametocheck_end+1,4);
@@ -296,13 +416,15 @@ BOOL real_path (LPCSTR namein, LPSTR nameout) {
                 || (saved_char ? rresult == shell_shortcut_file
                     : rresult == shell_shortcut_directory))
               return FALSE;
+            resolved_len = strlen(resolved);
             if (saved_char) {
               /*need to subst nameout..nametocheck-1 with resolved path */
-              int l1 = strlen(resolved);
-              int l2 = strlen(nametocheck_end + 1);
-              if (l1 + l2 + 2 > MAX_PATH) return FALSE;
-              strncat(resolved,nametocheck_end + 1,l2+1);
+              int l2 = name_len - (nametocheck_end - nameout);
+              if (resolved_len + l2 + 2 > MAX_PATH) return FALSE;
+              strncpy(resolved + resolved_len, nametocheck_end + 1, l2);
+              name_len = l2 - 1;
             }
+            name_len += resolved_len;
             strcpy(nameout,resolved);
             next_name = TRUE;
           }

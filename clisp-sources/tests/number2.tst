@@ -1,4 +1,4 @@
-;; -*- lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 (defun check-xgcd (a b)
   (multiple-value-bind (g u v) (xgcd a b)
@@ -71,9 +71,15 @@ z               #C(1d-1 0d0)
 (log -8d0 -2d0) #C(1.0928406470908163d0 -0.4207872484158604d0)
 (log z)         #C(-2.3025850929940455d0 0d0)
 z               #C(1d-1 0d0)
+(log #c(1 0))   0
+(log #c(0 1))   #C(0 1.5707964)
+(log 0)   ERROR
+(log 0d0) ERROR
+(log (complex 0.0 0.0)) ERROR
 
 (cis 10)    #c(-0.8390715 -0.5440211)
 (cis 123)   #c(-0.8879689 -0.45990348)
+(cis (* 7.25d0 pi)) #C(-0.7071067811865476d0 -0.7071067811865476d0)
 
 (cis #c(0.0d0 1.0d0))
 #+CLISP #c(0.36787944117144233d0 0.0d0)
@@ -243,7 +249,7 @@ t
 (asinh 1)  0.88137364
 (acosh 1)  0
 (acosh 3)  1.762747
-(atanh 3)    #C(0.3465736 -1.5707964)
+(atanh 3)    #C(0.3465736 1.5707964)
 (atanh 0.9)  1.4722193
 
 ;; bits
@@ -317,7 +323,7 @@ check-sqrt
 (check-mult   LEAST-NEGATIVE-LONG-FLOAT) T
 (check-mult    MOST-NEGATIVE-LONG-FLOAT) T
 
-(loop :for x :in '(1.0s0 1.0f0 1.0d0 1.0l0) :for eps :in
+(loop :for x :in '(1s0 1f0 1d0 1l0) :for eps :in
   (list short-float-epsilon single-float-epsilon double-float-epsilon
         long-float-epsilon)
   :for eps2 = (* eps 9/10) :unless
@@ -392,9 +398,9 @@ NIL
 (ACOSH #C(1d0 2d0)) #C(1.5285709194809982d0 1.1437177404024204d0)
 (ACOSH #C(1L0 2L0)) #C(1.528570919480998161L0 1.1437177404024204937L0)
 
-(LOG #C(1s0 2s0))   #C(0.80471s0 1.10715s0)
+(LOG #C(1s0 2s0))   #C(0.80472s0 1.10715s0)
 (LOG #C(1f0 2f0))   #C(0.804719f0 1.1071488f0)
-(LOG #C(1d0 2d0))   #C(0.8047189562170503d0 1.1071487177940904d0)
+(LOG #C(1d0 2d0))   #C(0.8047189562170501d0 1.1071487177940904d0)
 (LOG #C(1L0 2L0))   #C(0.8047189562170501873L0 1.107148717794090503L0)
 
 (ATANH #C(1s0 2s0)) #C(0.173286s0 1.1781s0)
@@ -449,7 +455,6 @@ NIL
           (loop :for n :from #b0000 :to #b1111 :collect (boole-n n 5 3)))))
 (NIL (0 1 2 3 4 5 6 7 -8 -7 -6 -5 -4 -3 -2 -1))
 
-
 (loop :for i :from 1 :to 100 :collect (list i (integer-length (ext:! i))))
 ((1 1) (2 2) (3 3) (4 5) (5 7) (6 10) (7 13) (8 16) (9 19) (10 22) (11 26)
  (12 29) (13 33) (14 37) (15 41) (16 45) (17 49) (18 53) (19 57) (20 62)
@@ -466,14 +471,169 @@ NIL
 
 (multiple-value-list (integer-decode-float 1d23)) (5960464477539062 24 1)
 (prin1-to-string 1d22) "1.0d22"
-(prin1-to-string 1d23) "9.999999999999999d22"
+(prin1-to-string 1d23) "1.0d23"
 (prin1-to-string 1d24) "1.0d24"
-(format nil "~G" 1d22) "10000000000000000000000.    "
-(format nil "~G" 1d23) "100000000000000000000000.    "
-(format nil "~G" 1d24) "1000000000000000000000000.    "
-(format nil "~F" 1d22) "10000000000000000000000.0"
-(format nil "~F" 1d23) "100000000000000000000000.0"
-(format nil "~F" 1d24) "1000000000000000000000000.0"
-(format nil "~E" 1d22) "1.0d+22"
-(format nil "~E" 1d23) "1.0d+23"
-(format nil "~E" 1d24) "1.0d+24"
+(loop :for i :from -200 :upto 200
+  :for s = (format nil "1.0d~d" i)
+  :for x = (read-from-string s)
+  :unless (or (<= -3 i 6) (string= (prin1-to-string x) s))
+  :collect (list i s x))
+NIL
+
+(defun test-float-io-consistency (&key from to by repeat)
+  (loop :for max = from :then (* by max) :while (< max to) :nconc
+    (loop :repeat repeat :for x = (random max)
+      :for y = (if (zerop (random 2)) x (- x))
+      :unless (= y (read-from-string (prin1-to-string y)))
+      :collect (cons y (multiple-value-list (integer-decode-float y))))))
+TEST-FLOAT-IO-CONSISTENCY
+
+(test-float-io-consistency :from 1s-30 :by 10 :to 1s30 :repeat 100) NIL
+(test-float-io-consistency :from 1f-30 :by 10 :to 1f30 :repeat 100) NIL
+(test-float-io-consistency :from 1d-300 :by 100 :to 1d300 :repeat 10) NIL
+(test-float-io-consistency :from 1L-3000 :by 1000 :to 1L3000 :repeat 10) NIL
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1589311&group_id=1355
+(loop :repeat 6400 :for x = -1L2 :then (+ x 0.03125l0)
+  :for (x1 x2) = (multiple-value-list (round x))
+  :for (x3 x4) = (multiple-value-list (round (float x 1s0)))
+  :unless (and (= x1 x3) (= x2 x4)) :collect (list x x1 x2 x3 x4))
+NIL
+
+;; https://sourceforge.net/tracker/index.php?func=detail&aid=1246248&group_id=1355&atid=101355
+(numberp (log internal-time-units-per-second)) T
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1436987&group_id=1355&atid=101355
+(loop :for x :in '(2s0 2f0 2d0 2l0 -2s0 -2f0 -2d0 -2l0)
+  :always (plusp (imagpart (atanh (complex x (float 0 x))))))
+T
+(loop :for x :in '(2s0 2f0 2d0 2l0 -2s0 -2f0 -2d0 -2l0)
+  :always (plusp (imagpart (atanh x))))
+T
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1208124&group_id=1355&atid=101355
+(loop :with min = (ash 1 64) :with max = (- (ash 1 200) min) :repeat 100
+  :for b = (+ min (random max)) :for s = (sxhash b)
+  :for b1 = (logxor b (ash 1 (floor (integer-length b) 2))) :for s1 = (sxhash b1)
+  :when (= s s1) :collect (list b s b1 s1))
+NIL
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1683394&group_id=1355
+(tanh 1s13)    1s0
+(tanh 1s3)     1s0
+(tanh 1s2)     1s0
+(tanh 1s1)     1s0
+(tanh 1s0)     0.7616s0
+(tanh 1f0)     0.7615942
+(tanh 1d0)     0.7615941559557649d0
+(tanh 1l0)     0.7615941559557648881L0
+(tanh 1f1)     1f0
+(tanh 1d1)     0.9999999958776927d0
+(tanh 1l1)     0.9999999958776927636L0
+(tanh 1l100)   1L0
+(tanh 1d100)   1d0
+(tanh 1f10)    1f0
+(tanh 1s10)    1s0
+(tanh 1d-10)   1d-10
+(tanh 1L-10)   1L-10
+(tanh 1L-17)   1L-17
+(tanh 1L-47)   1L-47
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1934968&group_id=1355
+(= (float (realpart (log (coerce #c(1d0 1d-8) '(complex long-float)))) 0d0)
+   (realpart (log #c(1d0 1d-8))))  T
+(= (float (realpart (log (coerce #c(1.000000001d0 1d-5) '(complex long-float))))
+          0d0)
+   (realpart (log #c(1.000000001d0 1d-5))))  T
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1942246&group_id=1355
+(coerce 1 'double-float) 1d0
+(coerce 1 '(double-float 0d0)) 1d0
+(coerce 1 '(double-float * *)) 1d0
+(coerce 1 '(double-float * -1d0)) ERROR
+
+(+ (log most-positive-short-float) (log least-positive-short-float))
+1.38574s0
+(+ (log most-positive-single-float) (log least-positive-single-float))
+1.3862915f0
+(+ (log most-positive-double-float) (log least-positive-double-float))
+1.3862943611198943d0
+(+ (log most-positive-long-float) (log least-positive-long-float))
+-0.69314718060195446014L0
+(mapcar #'log '(1.0s0 1.0 1.0d0 1.0L0)) (0.0s0 0.0 0.0d0 0.0L0)
+
+(< (expt 10 -100) least-positive-short-float)
+T
+(#+clisp without-floating-point-underflow #-clisp progn
+         (= (+ least-positive-short-float (expt 10 -100))
+            least-positive-short-float))
+T
+(defun float-rational-cmp (x &optional (scale 10))
+  (let* ((r (rational x))
+         (n (numerator r))
+         (d (denominator r))
+         (y (/ (1+ (* scale n)) (1+ (* scale d))))
+         (z (/ (1+ (* scale scale n)) (1+ (* scale d)))))
+    (list (= y x)               ; nil
+          (or (< (- x) x z) (> (- x) x z))
+          (or (< 1 y x) (> 1 y x))))) ; t
+float-rational-cmp
+
+(float-rational-cmp pi) (NIL T T)
+(float-rational-cmp (float pi 1d0)) (NIL T T)
+(float-rational-cmp (float pi 1f0)) (NIL T T)
+(float-rational-cmp (float pi 1s0)) (NIL T T)
+(float-rational-cmp (float pi -1d0)) (NIL T T)
+(float-rational-cmp (float pi -1f0)) (NIL T T)
+(float-rational-cmp (float pi -1s0)) (NIL T T)
+(float-rational-cmp (/ pi)) (NIL T T)
+(float-rational-cmp (float (/ pi) 1d0)) (NIL T T)
+(float-rational-cmp (float (/ pi) 1f0)) (NIL T T)
+(float-rational-cmp (float (/ pi) 1s0)) (NIL T T)
+
+(float-rational-cmp most-positive-short-float) (NIL T T)
+(float-rational-cmp least-positive-short-float) (NIL T T)
+(float-rational-cmp most-positive-single-float) (NIL T T)
+(float-rational-cmp least-positive-single-float) (NIL T T)
+(float-rational-cmp most-positive-double-float) (NIL T T)
+(float-rational-cmp least-positive-double-float) (NIL T T)
+(float-rational-cmp most-negative-short-float) (NIL T T)
+(float-rational-cmp least-negative-short-float) (NIL T T)
+(float-rational-cmp most-negative-single-float) (NIL T T)
+(float-rational-cmp least-negative-single-float) (NIL T T)
+(float-rational-cmp most-negative-double-float) (NIL T T)
+(float-rational-cmp least-negative-double-float) (NIL T T)
+
+(log (ash 1 10))  6.931472f0
+(log (ash 1 100)) 69.31472f0
+(log (ash 1 1000)) 693.14716f0
+(log (ash 1 10000)) 6931.4717f0
+(log (ash 1 100000)) 69314.72f0
+(log (/ (1+ (ash 1 100000)) (ash 1 1000))) 68621.57f0
+(log (/ (ash 1 100000) (ash 1 1000))) 68621.57f0
+(log (ash 1 100000)) 69314.72f0
+(log (expt 234 108) 10) 255.8753f0
+
+(defmacro check-error (form)
+  `(block check-error
+     (handler-bind ((arithmetic-error
+                     (lambda (c)
+                       (princ-error c)
+                       (return-from check-error
+                         (cons (arithmetic-error-operation c)
+                               (arithmetic-error-operands c))))))
+       ,form)))
+CHECK-ERROR
+
+(check-error (exquo 13 4)) (EXQUO 4 13)
+(check-error (/ 0)) (/)         ; OPERANDS not available
+(check-error (ash 1 10000000)) (ASH 1 10000000)
+(check-error (float (ash 1 100000) 0d0)) (FLOAT) ; overflow
+
+(progn (symbol-cleanup 'check-xgcd)
+       (symbol-cleanup 'check-sqrt)
+       (symbol-cleanup 'check-mult)
+       (symbol-cleanup 'float-rational-cmp)
+       (symbol-cleanup 'test-function)
+       (symbol-cleanup 'check-error))
+T

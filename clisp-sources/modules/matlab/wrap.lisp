@@ -10,10 +10,7 @@
 (defun matfile-content (mf)
   "return the vector of strings naming variables in MATfile"
   (multiple-value-bind (buf num) (matGetDir mf)
-    (unwind-protect
-         (with-c-var (names `(c-ptr (c-array c-string ,num)))
-           (setf (cast names 'c-pointer) buf)
-           names)
+    (unwind-protect (memory-as buf (parse-c-type `(c-array c-string ,num)))
       (mxFree buf))))
 
 (defvar *command* ""

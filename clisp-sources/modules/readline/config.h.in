@@ -13,9 +13,57 @@
    if you don't. */
 #undef HAVE_DECL_RL_ALREADY_PROMPTED
 
+/* Define to 1 if you have the declaration of `rl_attempted_completion_over',
+   and to 0 if you don't. */
+#undef HAVE_DECL_RL_ATTEMPTED_COMPLETION_OVER
+
+/* Define to 1 if you have the declaration of
+   `rl_completion_append_character', and to 0 if you don't. */
+#undef HAVE_DECL_RL_COMPLETION_APPEND_CHARACTER
+
+/* Define to 1 if you have the declaration of `rl_completion_found_quote', and
+   to 0 if you don't. */
+#undef HAVE_DECL_RL_COMPLETION_FOUND_QUOTE
+
+/* Define to 1 if you have the declaration of `rl_completion_invoking_key',
+   and to 0 if you don't. */
+#undef HAVE_DECL_RL_COMPLETION_INVOKING_KEY
+
+/* Define to 1 if you have the declaration of
+   `rl_completion_mark_symlink_dirs', and to 0 if you don't. */
+#undef HAVE_DECL_RL_COMPLETION_MARK_SYMLINK_DIRS
+
+/* Define to 1 if you have the declaration of `rl_completion_query_items', and
+   to 0 if you don't. */
+#undef HAVE_DECL_RL_COMPLETION_QUERY_ITEMS
+
+/* Define to 1 if you have the declaration of `rl_completion_quote_character',
+   and to 0 if you don't. */
+#undef HAVE_DECL_RL_COMPLETION_QUOTE_CHARACTER
+
+/* Define to 1 if you have the declaration of `rl_completion_suppress_append',
+   and to 0 if you don't. */
+#undef HAVE_DECL_RL_COMPLETION_SUPPRESS_APPEND
+
+/* Define to 1 if you have the declaration of `rl_completion_suppress_quote',
+   and to 0 if you don't. */
+#undef HAVE_DECL_RL_COMPLETION_SUPPRESS_QUOTE
+
+/* Define to 1 if you have the declaration of `rl_completion_type', and to 0
+   if you don't. */
+#undef HAVE_DECL_RL_COMPLETION_TYPE
+
+/* Define to 1 if you have the declaration of `rl_deprep_term_function', and
+   to 0 if you don't. */
+#undef HAVE_DECL_RL_DEPREP_TERM_FUNCTION
+
 /* Define to 1 if you have the declaration of `rl_dispatching', and to 0 if
    you don't. */
 #undef HAVE_DECL_RL_DISPATCHING
+
+/* Define to 1 if you have the declaration of `rl_display_prompt', and to 0 if
+   you don't. */
+#undef HAVE_DECL_RL_DISPLAY_PROMPT
 
 /* Define to 1 if you have the declaration of `rl_done', and to 0 if you
    don't. */
@@ -37,6 +85,18 @@
    don't. */
 #undef HAVE_DECL_RL_EVENT_HOOK
 
+/* Define to 1 if you have the declaration of `rl_executing_macro', and to 0
+   if you don't. */
+#undef HAVE_DECL_RL_EXECUTING_MACRO
+
+/* Define to 1 if you have the declaration of `rl_explicit_arg', and to 0 if
+   you don't. */
+#undef HAVE_DECL_RL_EXPLICIT_ARG
+
+/* Define to 1 if you have the declaration of `rl_filename_quoting_desired',
+   and to 0 if you don't. */
+#undef HAVE_DECL_RL_FILENAME_QUOTING_DESIRED
+
 /* Define to 1 if you have the declaration of `rl_getc_function', and to 0 if
    you don't. */
 #undef HAVE_DECL_RL_GETC_FUNCTION
@@ -44,6 +104,14 @@
 /* Define to 1 if you have the declaration of `rl_gnu_readline_p', and to 0 if
    you don't. */
 #undef HAVE_DECL_RL_GNU_READLINE_P
+
+/* Define to 1 if you have the declaration of
+   `rl_ignore_completion_duplicates', and to 0 if you don't. */
+#undef HAVE_DECL_RL_IGNORE_COMPLETION_DUPLICATES
+
+/* Define to 1 if you have the declaration of `rl_inhibit_completion', and to
+   0 if you don't. */
+#undef HAVE_DECL_RL_INHIBIT_COMPLETION
 
 /* Define to 1 if you have the declaration of `rl_insert_mode', and to 0 if
    you don't. */
@@ -69,6 +137,10 @@
    don't. */
 #undef HAVE_DECL_RL_MARK
 
+/* Define to 1 if you have the declaration of `rl_numeric_arg', and to 0 if
+   you don't. */
+#undef HAVE_DECL_RL_NUMERIC_ARG
+
 /* Define to 1 if you have the declaration of `rl_num_chars_to_read', and to 0
    if you don't. */
 #undef HAVE_DECL_RL_NUM_CHARS_TO_READ
@@ -84,6 +156,10 @@
 /* Define to 1 if you have the declaration of `rl_point', and to 0 if you
    don't. */
 #undef HAVE_DECL_RL_POINT
+
+/* Define to 1 if you have the declaration of `rl_prefer_env_winsize', and to
+   0 if you don't. */
+#undef HAVE_DECL_RL_PREFER_ENV_WINSIZE
 
 /* Define to 1 if you have the declaration of `rl_pre_input_hook', and to 0 if
    you don't. */
@@ -104,6 +180,10 @@
 /* Define to 1 if you have the declaration of `rl_readline_version', and to 0
    if you don't. */
 #undef HAVE_DECL_RL_READLINE_VERSION
+
+/* Define to 1 if you have the declaration of `rl_sort_completion_matches',
+   and to 0 if you don't. */
+#undef HAVE_DECL_RL_SORT_COMPLETION_MATCHES
 
 /* Define to 1 if you have the declaration of `rl_startup_hook', and to 0 if
    you don't. */
@@ -160,6 +240,9 @@
 
 /* Define to 1 if you have the `rl_add_undo' function. */
 #undef HAVE_RL_ADD_UNDO
+
+/* Define to 1 if you have the `rl_alphabetic' function. */
+#undef HAVE_RL_ALPHABETIC
 
 /* Define to 1 if you have the `rl_begin_undo_group' function. */
 #undef HAVE_RL_BEGIN_UNDO_GROUP
@@ -230,6 +313,9 @@
 /* Define to 1 if you have the `rl_do_undo' function. */
 #undef HAVE_RL_DO_UNDO
 
+/* Define to 1 if you have the `rl_echo_signal_char' function. */
+#undef HAVE_RL_ECHO_SIGNAL_CHAR
+
 /* Define to 1 if you have the `rl_end_undo_group' function. */
 #undef HAVE_RL_END_UNDO_GROUP
 
@@ -247,6 +333,9 @@
 
 /* Define to 1 if you have the `rl_forced_update_display' function. */
 #undef HAVE_RL_FORCED_UPDATE_DISPLAY
+
+/* Define to 1 if you have the `rl_free' function. */
+#undef HAVE_RL_FREE
 
 /* Define to 1 if you have the `rl_free_undo_list' function. */
 #undef HAVE_RL_FREE_UNDO_LIST
@@ -344,6 +433,9 @@
 /* Define to 1 if you have the `rl_reset_line_state' function. */
 #undef HAVE_RL_RESET_LINE_STATE
 
+/* Define to 1 if you have the `rl_reset_screen_size' function. */
+#undef HAVE_RL_RESET_SCREEN_SIZE
+
 /* Define to 1 if you have the `rl_reset_terminal' function. */
 #undef HAVE_RL_RESET_TERMINAL
 
@@ -398,6 +490,9 @@
 /* Define to 1 if you have the `rl_variable_dumper' function. */
 #undef HAVE_RL_VARIABLE_DUMPER
 
+/* Define to 1 if you have the `rl_variable_value' function. */
+#undef HAVE_RL_VARIABLE_VALUE
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
@@ -416,8 +511,17 @@
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
+/* Define to 1 if you have the <sys/time.h> header file. */
+#undef HAVE_SYS_TIME_H
+
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
+
+/* Define to 1 if you have the `tilde_expand' function. */
+#undef HAVE_TILDE_EXPAND
+
+/* Define to 1 if you have the <time.h> header file. */
+#undef HAVE_TIME_H
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
@@ -446,6 +550,9 @@
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
@@ -459,3 +566,38 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* Define to 1 if on MINIX. */
+#undef _MINIX
+
+/* Define to 2 if the system does not provide POSIX.1 features except with
+   this defined. */
+#undef _POSIX_1_SOURCE
+
+/* Define to 1 if you need to in order for `stat' and other things to work. */
+#undef _POSIX_SOURCE
+
+/* Define to 500 only on HP-UX. */
+#undef _XOPEN_SOURCE
+
+/* Enable extensions on AIX 3, Interix.  */
+#ifndef _ALL_SOURCE
+# undef _ALL_SOURCE
+#endif
+/* Enable GNU extensions on systems that have them.  */
+#ifndef _GNU_SOURCE
+# undef _GNU_SOURCE
+#endif
+/* Enable threading extensions on Solaris.  */
+#ifndef _POSIX_PTHREAD_SEMANTICS
+# undef _POSIX_PTHREAD_SEMANTICS
+#endif
+/* Enable extensions on HP NonStop.  */
+#ifndef _TANDEM_SOURCE
+# undef _TANDEM_SOURCE
+#endif
+/* Enable general extensions on Solaris.  */
+#ifndef __EXTENSIONS__
+# undef __EXTENSIONS__
+#endif
+

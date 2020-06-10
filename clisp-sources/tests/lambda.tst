@@ -1,4 +1,4 @@
-;; -*-Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 (makunbound 'b) B
 (makunbound 'e) E
 
@@ -262,6 +262,21 @@ UNKNOWN
 (NIL NIL FOO)
 #-(or CLISP CMU SBCL OpenMCL LISPWORKS)
 UNKNOWN
+
+;;; http://sourceforge.net/tracker/index.php?func=detail&aid=1603260&group_id=1355&atid=101355
+(let ((file "lambda-tst-function-lambda-expression-test.lisp")
+      (fle (function-lambda-expression #'foo))
+      (res ()))
+  (unwind-protect
+       (progn
+         (with-open-file (out file :direction :output)
+           (write '(defun foo (x) (car x)) :stream out :readably t)
+           (terpri out))
+         (load (compile-file file))
+         (push (foo '(3)) res)
+         (push (equalp fle (function-lambda-expression #'foo)) res))
+    (post-compile-file-cleanup file)))
+(NIL 3)
 
 (fmakunbound 'foo) foo
 

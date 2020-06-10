@@ -1,6 +1,6 @@
 ;;;; Common Lisp Object System for CLISP: Generic Functions
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2004
+;;;; Sam Steingold 1998 - 2004, 2007
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -104,7 +104,7 @@
 
 ;; Preliminary.
 ;; Now we can at least print classes and generic-functions.
-(defun print-object (object stream)
+(predefun print-object (object stream)
   (cond ((potential-class-p object) (format stream "#<CLASS ~S>" (class-classname object)))
         ((funcallable-instance-p object) (print-object-<funcallable-standard-object> object stream))
         (t (write-string "#<UNKNOWN>" stream))))
@@ -192,24 +192,23 @@
     (:fixed-slot-locations t)
     (:generic-accessors nil)))
 
-(defun std-gf-undeterminedp (gf)
-  (eq (std-gf-signature gf) (sys::%unbound)))
+(defun std-gf-undeterminedp (gf) (eq (sys::%unbound) (std-gf-signature gf)))
 
 ;; Preliminary.
 ;; During bootstrapping, only <standard-generic-function> instances are used.
-(defun generic-function-methods (gf)
+(predefun generic-function-methods (gf)
   (std-gf-methods gf))
-(defun generic-function-method-class (gf)
+(predefun generic-function-method-class (gf)
   (std-gf-default-method-class gf))
-(defun generic-function-signature (gf)
+(predefun generic-function-signature (gf)
   (std-gf-signature gf))
-(defun generic-function-undeterminedp (gf)
+(predefun generic-function-undeterminedp (gf)
   (std-gf-undeterminedp gf))
-(defun generic-function-method-combination (gf)
+(predefun generic-function-method-combination (gf)
   (std-gf-method-combination gf))
-(defun generic-function-argorder (gf)
+(predefun generic-function-argorder (gf)
   (std-gf-argorder gf))
-(defun generic-function-declarations (gf)
+(predefun generic-function-declarations (gf)
   (std-gf-declspecs gf))
 
 ;; ============================================================================

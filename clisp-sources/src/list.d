@@ -2,7 +2,8 @@
  * List functions for CLISP
  * Bruno Haible 1990-2005
  * Marcus Daniels 8.4.1994
- * Sam Steingold 1999-2004
+ * Sam Steingold 1999-2009
+ * German comments and names translated into English: Reini Urban 2008-01
  */
 #include "lispbibl.c"
 
@@ -17,67 +18,67 @@ local inline maygc object cons_from_stack (void)
   return ret;
 }
 
-# UP: Kopiert eine Liste
-# copy_list(list)
-# > list: Liste
-# < ergebnis: Kopie der Liste
-# can trigger GC
-global maygc object copy_list (object old_list) {
-  # Methode: (copy-list l) = (mapcar #'identity l), mapcar vorwärts
+/* UP: Copies a list
+ copy_list(list)
+ > list: List
+ < result: Copy of the list
+ can trigger GC */
+modexp maygc object copy_list (object old_list) {
+  /* Method: (copy-list l) = (mapcar #'identity l), mapcar forwards */
   if (atomp(old_list))
     return old_list;
-  else { # Liste mit mindestens einem Element
-    var object lauf;
+  else { /* List with at least one element */
+    var object run;
     pushSTACK(old_list);
     {
       var object new_list = allocate_cons();
-      lauf = STACK_0; # lauf läuft durch die alte Liste durch
-      Car(new_list) = Car(lauf);
+      run = STACK_0; /* run runs through the old list */
+      Car(new_list) = Car(run);
       STACK_0 = new_list;
       pushSTACK(new_list);
     }
-    # Schleife: STACK_1 ist die Gesamtkopie, STACK_0 = LAST davon,
-    # lauf = das entsprechende Cons der Original-Liste.
-    while ( lauf=Cdr(lauf), consp(lauf) ) {
-      # es kommt noch ein Cons
-      pushSTACK(lauf); # lauf retten
-      var object new_cons = allocate_cons(); # neues Cons allozieren
-      lauf = popSTACK(); # lauf zurück
-      Cdr(STACK_0) = new_cons; # und als CDR des LAST einhängen
-      Car(new_cons) = Car(lauf); # CAR kopieren
-      STACK_0 = new_cons; # das ist nun das neue LAST
+    /* Loop: STACK_1 is the whole copy, STACK_0 = LAST of it, */
+    /* run = the correspondend Cons of the original list. */
+    while ( run=Cdr(run), consp(run) ) {
+      /* one more Cons */
+      pushSTACK(run); /* save run */
+      var object new_cons = allocate_cons(); /* allocate new Cons */
+      run = popSTACK(); /* run back */
+      Cdr(STACK_0) = new_cons; /* and put as CDR of the LAST */
+      Car(new_cons) = Car(run); /* copy CAR */
+      STACK_0 = new_cons; /* this is now the new LAST */
     }
-    Cdr(popSTACK()) = lauf; # selben (CDR (LAST old_list)) beibehalten
+    Cdr(popSTACK()) = run; /* keep same (CDR (LAST old_list)) */
     return popSTACK();
   }
 }
 
-# UP: Dreht eine Liste konstruktiv um.
-# reverse(list)
-# > list: Liste (x1 ... xm)
-# < ergebnis: umgedrehte Liste (xm ... x1)
-# can trigger GC
+/* UP: Reverses a list by copying
+ reverse(list)
+ > list: List (x1 ... xm)
+ < result: reversed List (xm ... x1)
+ can trigger GC */
 global maygc object reverse (object list) {
   pushSTACK(list); pushSTACK(NIL);
   while (!endp(list)) {
-    # Hier ist für r=1,...,m:
-    # STACK_0 = (xr-1 ... x1), list = (xr ... xm)
+    /* Here is for r=1,...,m: */
+    /* STACK_0 = (xr-1 ... x1), list = (xr ... xm) */
     STACK_1 = Cdr(list);
-    # Hier ist für r=1,...,m:
-    # STACK_0 = (xr-1 ... x1), STACK_1 = (xr+1 ... xm)
+    /* Here is for r=1,...,m: */
+    /* STACK_0 = (xr-1 ... x1), STACK_1 = (xr+1 ... xm) */
     pushSTACK(Car(list));
     {
       var object new_cons = allocate_cons();
-      Car(new_cons) = popSTACK(); # = xr
-      Cdr(new_cons) = STACK_0; # = (xr-1 ... x1)
-      STACK_0 = new_cons; # = (xr ... x1)
+      Car(new_cons) = popSTACK(); /* = xr */
+      Cdr(new_cons) = STACK_0; /* = (xr-1 ... x1) */
+      STACK_0 = new_cons; /* = (xr ... x1) */
     }
-    list = STACK_1; # list := (xr+1 ... xm)
+    list = STACK_1; /* list := (xr+1 ... xm) */
   }
   list = popSTACK(); skipSTACK(1); return list;
 }
 #if 0
-# andere Möglichkeit:
+/* another possibility: */
 global object reverse (object list) {
   pushSTACK(list); pushSTACK(NIL);
   while (mconsp(STACK_1)) {
@@ -96,7 +97,7 @@ global object reverse (object list) {
  > obj: object
  < len: list length
  < last: the last atom */
-global uintL llength1 (object list, object* last) {
+modexp uintL llength1 (object list, object* last) {
   var uintL count = 0;
   while (consp(list)) {
     count++; list=Cdr(list);
@@ -105,60 +106,58 @@ global uintL llength1 (object list, object* last) {
   return count;
 }
 
-# UP: Bildet eine Liste mit genau len Elementen
-# make_list(len)
-# > STACK_0: Initialisierungswert für die Elemente
-# > uintL len: gewünschte Listenlänge
-# < ergebnis: Liste mit len Elementen
-# can trigger GC
-global maygc object make_list (uintL len) {
+/* UP: Constructs a list with exactly len elements.
+ make_list(len)
+ > STACK_0: Initial value for all elements
+ > uintL len: wanted list length
+ < result: List with len elements
+ can trigger GC */
+modexp maygc object make_list (uintL len) {
   pushSTACK(NIL);
-  dotimesL(len,len, {
-    # STACK_0 = bisherige Liste, STACK_1 = Initialisierungswert
+  while (len--) {
+    /* STACK_0 = old list, STACK_1 = initial value */
     var object new_cons = allocate_cons();
     Car(new_cons) = STACK_1; Cdr(new_cons) = STACK_0;
     STACK_0 = new_cons;
-  });
+  }
   return popSTACK();
 }
 
-# UP: Dreht eine Liste destruktiv um.
-# nreverse(list)
-# > list: Liste (x1 ... xm)
-# < ergebnis: Liste (xm ... x1), EQ zur alten
-global object nreverse (object list) {
-  # Algorithm:
-  # (lambda (L)
-  #   (cond ((atom L) L)
-  #         ((atom (cdr L)) L)
-  #         ((atom (cddr L)) (rotatef (car L) (cadr L)) L)
-  #         (t (let ((L1 (cdr L)))
-  #              (do ((L3 L1 (cdr L3))
-  #                   (L2 nil (rplacd L3 L2)))
-  #                  ((atom (cdr L3))
-  #                   (setf (cdr L) L2)
-  #                   (setf (cdr L1) L3)
-  #                   (rotatef (car L) (car L3))
-  #              )   )
-  #              L
-  # ) )     )  )
-  if (consp(list)) { # (atom L) -> L
-    var object list3 = Cdr(list); # L3 := (cdr L)
-    if (!endp(list3)) { # (atom (cdr L)) -> L
+/* UP: Reverses a list in-place, destructively.
+ nreverse(list)
+ > list: List (x1 ... xm)
+ < result: List (xm ... x1), EQ to the old */
+modexp object nreverse (object list) {
+  /* Algorithm:
+     (lambda (L)
+       (cond ((atom L) L)
+             ((atom (cdr L)) L)
+             ((atom (cddr L)) (rotatef (car L) (cadr L)) L)
+             (t (let ((L1 (cdr L)))
+                  (do ((L3 L1 (cdr L3))
+                       (L2 nil (rplacd L3 L2)))
+                      ((atom (cdr L3))
+                       (setf (cdr L) L2)
+                       (setf (cdr L1) L3)
+                       (rotatef (car L) (car L3))))
+                  L)))) */
+  if (consp(list)) { /* (atom L) -> L */
+    var object list3 = Cdr(list); /* L3 := (cdr L) */
+    if (!endp(list3)) { /* (atom (cdr L)) -> L */
       if (!endp(Cdr(list3))) {
-        var object list1 = list3; # mit L1 = L3 = (cdr L)
-        var object list2 = NIL; # und L2 = NIL anfangen
+        var object list1 = list3; /* Begin with L1 = L3 = (cdr L) */
+        var object list2 = NIL; /* and L2 = NIL */
         do {
-          var object h = Cdr(list3); # (cdr L3) retten,
-          Cdr(list3) = list2; # durch L2 ersetzen,
-          list2 = list3; # L2 := altes L3
-          list3 = h; # L3 := altes (cdr L3)
-        } while (!endp(Cdr(list3))); # (atom (cdr L3)) -> beenden
-        # L3 ist das letzte und L2 das vorletzte Listen-Cons.
-        Cdr(list) = list2; # (setf (cdr L) L2)
-        Cdr(list1) = list3; # (setf (cdr L1) L3)
+          var object h = Cdr(list3); /* save (cdr L3), */
+          Cdr(list3) = list2; /* replace by L2, */
+          list2 = list3; /* L2 := old L3 */
+          list3 = h; /* L3 := old (cdr L3) */
+        } while (!endp(Cdr(list3))); /* (atom (cdr L3)) -> end */
+        /* L3 is the last and L2 the last but one list Cons. */
+        Cdr(list) = list2; /* (setf (cdr L) L2) */
+        Cdr(list1) = list3; /* (setf (cdr L1) L3) */
       }
-      # vertausche (car list) und (car list3):
+      /* exchange (car list) and (car list3): */
       var object h = Car(list);
       Car(list) = Car(list3);
       Car(list3) = h;
@@ -167,35 +166,35 @@ global object nreverse (object list) {
   return list;
 }
 
-# UP: A0 := (nreconc A0 A1)
-# nreconc(list,obj)
-# > list: Liste
-# > obj: Objekt
-# < ergebnis: (nreconc A0 A1)
+/* UP: A0 := (nreconc A0 A1)
+ nreconc(list,obj)
+ > list: List
+ > obj: Object
+ < result: (nreconc A0 A1) */
 global object nreconc (object list, object obj) {
-  if (!endp(list)) { # (atom L) -> L
-    var object list3 = Cdr(list); # L3 := (cdr L)
-    if (!endp(list3)) { # (atom (cdr L)) -> L
+  if (!endp(list)) { /* (atom L) -> L */
+    var object list3 = Cdr(list); /* L3 := (cdr L) */
+    if (!endp(list3)) { /* (atom (cdr L)) -> L */
       if (!endp(Cdr(list3))) {
-        var object list1 = list3; # mit L1 = L3 = (cdr L)
-        var object list2 = NIL; # und L2 = NIL anfangen
+        var object list1 = list3; /* Begin with L1 = L3 = (cdr L) */
+        var object list2 = NIL; /* and L2 = NIL */
         do {
-          var object h = Cdr(list3); # (cdr L3) retten,
-          Cdr(list3) = list2; # durch L2 ersetzen,
-          list2 = list3; # L2 := altes L3
-          list3 = h; # L3 := altes (cdr L3)
-        } while (!endp(Cdr(list3))); # (atom (cdr L3)) -> beenden
-        # L3 ist das letzte und L2 das vorletzte Listen-Cons.
-        Cdr(list) = list2; # (setf (cdr L) L2)
-        Cdr(list1) = list3; # (setf (cdr L1) L3)
+          var object h = Cdr(list3); /* save (cdr L3), */
+          Cdr(list3) = list2; /* replace by L2, */
+          list2 = list3; /* L2 := old L3 */
+          list3 = h; /* L3 := old (cdr L3) */
+        } while (!endp(Cdr(list3))); /* (atom (cdr L3)) -> end */
+        /* L3 is the last and L2 the last but one list Cons. */
+        Cdr(list) = list2; /* (setf (cdr L) L2) */
+        Cdr(list1) = list3; /* (setf (cdr L1) L3) */
       }
-      # vertausche (car list) und (car list3):
+      /* exchange (car list) and (car list3): */
       {
         var object h = Car(list);
         Car(list) = Car(list3);
         Car(list3) = h;
       }
-      Cdr(list3) = obj; # (setf (cdr L3) O)
+      Cdr(list3) = obj; /* (setf (cdr L3) O) */
     } else {
       Cdr(list) = obj;
     }
@@ -204,52 +203,52 @@ global object nreconc (object list, object obj) {
     return obj;
 }
 
-# UP: Bilde (delete obj (the list list) :test #'EQ)
-# deleteq(list,obj)
-# Entferne aus der Liste list alle Elemente, die EQ zu obj sind.
-# > obj: zu streichendes Element
-# > list: Liste
-# < ergebnis: modifizierte Liste
-global object deleteq (object list, object obj) {
+/* UP: Construct (delete obj (the list list) :test #'EQ)
+ deleteq(list,obj)
+ Remove from list all elements EQ to obj.
+ > obj: to be removed element
+ > list: List
+ < result: modified List */
+modexp object deleteq (object list, object obj) {
   var object list1 = list;
   var object list2 = list;
   while (!atomp(list2)) {
-    # Hier ist entweder list1=list2=list oder (cdr list1) = list2.
+    /* Here is either list1=list2=list or (cdr list1) = list2. */
     if (eq(Car(list2),obj))
-      # Streiche (car list2):
+      /* Remove (car list2): */
       if (eq(list2,list)) {
-        # noch am Listenanfang
+        /* Still at the start of the list */
         list2 = list1 = list = Cdr(list2);
       } else {
-        # weiter hinten in der Liste
+        /* advanced the start of the list */
         Cdr(list1) = list2 = Cdr(list2);
       }
     else {
-      # Nichts streichen, weiterrücken:
+      /* Remove nothing, advance: */
       list1 = list2; list2 = Cdr(list2);
     }
   }
   return list;
 }
 
-# UP: Liefert (car obj), mit Typprüfung
+/* UP: Returns (car obj), with type check */
 local object car (object obj) {
   if (consp(obj))
     return Car(obj);
   else if (nullp(obj))
     return obj;
   else
-    fehler_list(obj);
+    error_list(obj);
 }
 
-# UP: Liefert (cdr obj), mit Typprüfung
+/* UP: Returns (cdr obj), with type check */
 local object cdr (object obj) {
   if (consp(obj))
     return Cdr(obj);
   else if (nullp(obj))
     return obj;
   else
-    fehler_list(obj);
+    error_list(obj);
 }
 
 LISPFUNNR(car,1)
@@ -407,100 +406,33 @@ LISPFUN(cons,seclass_no_se,2,0,norest,nokey,0,NIL)
   VALUES1(cons_from_stack());
 }
 
-
-# Unterprogramm zum Ausführen des Tests :TEST
-# up2_test(stackptr,arg1,arg2)
-# > *(stackptr+1): die Testfunktion
-# > arg1,arg2: Argumente
-# < ergebnis: true falls der Test erfüllt ist, false sonst
-# can trigger GC
-local maygc bool up2_test (const gcv_object_t* stackptr, object arg1, object arg2) {
-  var object fun = *(stackptr STACKop 1);
-  # Special case the most frequent cases
-  if (eq(fun,L(eq)))
-    return eq(arg1,arg2);
-  if (eq(fun,L(eql)))
-    return eql(arg1,arg2);
-  if (eq(fun,L(equal)))
-    return equal(arg1,arg2);
-  pushSTACK(arg1); pushSTACK(arg2); funcall(fun,2);
-  return !nullp(value1);
-}
-
-# Unterprogramm zum Ausführen des Tests :TEST-NOT
-# up2_test_not(stackptr,arg1,arg2)
-# > *(stackptr+0): die Testfunktion
-# > arg1,arg2: Argumente
-# < ergebnis: true falls der Test erfüllt ist, false sonst
-# can trigger GC
-local maygc bool up2_test_not (const gcv_object_t* stackptr, object arg1, object arg2) {
-  pushSTACK(arg1); pushSTACK(arg2); funcall(*(stackptr STACKop 0),2);
-  return nullp(value1);
-}
-
-# UP: Überprüft die :TEST, :TEST-NOT - Argumente
-# test_test2_args(stackptr)
-# > stackptr: Pointer in den STACK
-# > *(stackptr+1): :TEST-Argument
-# > *(stackptr+0): :TEST-NOT-Argument
-# < *(stackptr+1): verarbeitetes :TEST-Argument
-# < *(stackptr+0): verarbeitetes :TEST-NOT-Argument
-# < up2_fun: Adresse einer Testfunktion, die wie folgt spezifiziert ist:
-#       > stackptr: derselbe Pointer in den Stack, arg1, arg2: Argumente
-#       < true, falls der Test erfüllt ist, false sonst.
-# up2_function_t sei der Typ der Adresse einer solchen Testfunktion:
-typedef maygc bool (*up2_function_t) (const gcv_object_t* stackptr,
-                                      object arg1, object arg2);
-local up2_function_t test_test2_args (gcv_object_t* stackptr) {
-  var object test_arg = *(stackptr STACKop 1);
-  if (!boundp(test_arg))
-    test_arg=NIL;
-  # test_arg ist das :TEST-Argument
-  var object test_not_arg = *(stackptr STACKop 0);
-  if (!boundp(test_not_arg))
-    test_not_arg=NIL;
-  # test_not_arg ist das :TEST-NOT-Argument
-  if (nullp(test_not_arg)) {
-    # :TEST-NOT wurde nicht angegeben
-    if (nullp(test_arg))
-      *(stackptr STACKop 1) = L(eql); # #'EQL als Default für :TEST
-    return &up2_test;
-  } else {
-    # :TEST-NOT wurde angegeben
-    if (nullp(test_arg))
-      return &up2_test_not;
-    else
-      fehler_both_tests();
-  }
-}
-
-# UP: Testet, ob zwei Bäume gleich sind.
-# tree_equal(stackptr,up2_fun,arg1,arg2)
-# > arg1,arg2: Bäume
-# > stackptr: Pointer in den Stack
-# > A5: Adresse einer Testfunktion, die arg1 und arg2 vergleicht und dabei auf
-#       die :TEST/:TEST-NOT-Argumente in *(stackptr+1).L bzw.
-#       *(stackprt+0).L zugreifen kann.
-# < ergebnis: true, falls gleich, false sonst
-# can trigger GC
-local maygc bool tree_equal (const gcv_object_t* stackptr, up2_function_t up2_fun,
+/* UP: Tests the equality of two trees.
+ tree_equal(stackptr,pcall_test,arg1,arg2)
+ > arg1,arg2: two trees
+ > stackptr: Pointer to the stack
+ > A5: Adress of a test function, which compares arg1 and arg2 and may access
+        the :TEST/:TEST-NOT arguments in *(stackptr+1).L resp.
+        *(stackprt+0).L
+ < result: true if equal, otherwise false
+ can trigger GC */
+local maygc bool tree_equal (const gcv_object_t* stackptr, funarg_t* pcall_test,
                              object arg1, object arg2) {
  start:
   if (atomp(arg1))
     if (atomp(arg2))
-      # arg1 und arg2 sind beide Atome
-      return up2_fun(stackptr,arg1,arg2);
+      /* arg1 and arg2 both are atoms */
+      return pcall_test(stackptr,arg1,arg2);
     else
       return false;
   else
     if (atomp(arg2))
       return false;
     else {
-      # arg1 und arg2 sind beides Conses
+      /* arg1 and arg2 both are Cons */
       check_STACK(); check_SP();
       pushSTACK(Cdr(arg1)); pushSTACK(Cdr(arg2));
-      if (tree_equal(stackptr,up2_fun,Car(arg1),Car(arg2))) { # rekursiv die CARs vergleichen
-        # falls gleich, tail-end-rekursiv die CDRs vergleichen
+      if (tree_equal(stackptr,pcall_test,Car(arg1),Car(arg2))) { /* recursive on CARs */
+        /* if equal, compare tail-recursively the CDRs */
         arg2 = popSTACK(); arg1 = popSTACK(); goto start;
       } else {
         skipSTACK(2); return false;
@@ -512,8 +444,8 @@ LISPFUN(tree_equal,seclass_default,2,0,norest,key,2, (kw(test),kw(test_not)) )
 { /* (TREE-EQUAL x y :test :test-not), CLTL p. 264 */
   var gcv_object_t* stackptr = &STACK_0;
   /* check :TEST/:TEST-NOT arguments: */
-  var up2_function_t up2_fun = test_test2_args(stackptr);
-  VALUES_IF(tree_equal(stackptr,up2_fun,STACK_3,STACK_2));
+  var funarg_t* pcall_test = check_test_args(stackptr);
+  VALUES_IF(tree_equal(stackptr,pcall_test,STACK_3,STACK_2));
   skipSTACK(4);
 }
 
@@ -523,13 +455,13 @@ LISPFUN(tree_equal,seclass_default,2,0,norest,key,2, (kw(test),kw(test_not)) )
  < result: true if obj is the list end NIL,
            false if obj is a Cons.
            error otherwise */
-global bool endp (object obj) {
+modexp bool endp (object obj) {
   if (consp(obj))
     return false;
   else if (nullp(obj))
     return true;
   else
-    fehler_proper_list_dotted(TheSubr(subr_self)->name,obj);
+    error_proper_list_dotted(TheSubr(subr_self)->name,obj);
 }
 
 LISPFUNNF(endp,1)
@@ -579,7 +511,7 @@ LISPFUNNR(list_length,1)
   if (nullp(tail))
     VALUES1(len);
   else
-    fehler_proper_list_dotted(S(list_length),tail);
+    error_proper_list_dotted(S(list_length),tail);
 }
 
 LISPFUNNR(list_length_dotted,1)
@@ -589,20 +521,77 @@ LISPFUNNR(list_length_dotted,1)
        (when ll (values ll (cdr (last l)))))) */
   var object tail = NIL;
   var object len = list_length(popSTACK(),&tail);
-  if (nullp(len)) VALUES1(NIL);
-  else VALUES2(len,tail);
+  if (nullp(len))
+    VALUES1(NIL);
+  else
+    VALUES2(len,tail);
 }
 
 LISPFUNNR(list_length_proper,1)
 { /* traverses the list just once, otherwise equivalent to
    (defun list-length-proper (l)
-     (if (proper-list-p l) (length l)
-         (error ...))) */
+     (if (proper-list-p l)
+       (length l)
+       (error ...))) */
   var object tail = NIL;
   var object len = list_length(STACK_0,&tail);
-  if (!nullp(tail)) fehler_proper_list_dotted(TheSubr(subr_self)->name,tail);
-  if (nullp(len)) fehler_proper_list_circular(TheSubr(subr_self)->name,STACK_0);
+  if (!nullp(tail)) error_proper_list_dotted(S(list_length_proper),tail);
+  if (nullp(len)) error_proper_list_circular(S(list_length_proper),STACK_0);
   VALUES1(len); skipSTACK(1);
+}
+
+LISPFUNNR(list_length_in_bounds_p,4)
+{ /* (sys::list-length-in-bounds-p obj n m restp) tests whether obj, as a list,
+     starts with at least n conses and is either a proper list with < m conses
+     or (if restp) has at least m conses or (if not restp) is a proper list with
+     exactly m conses. */
+  if (!posfixnump(STACK_2)) error_posfixnum(STACK_2);
+  if (!posfixnump(STACK_1)) error_posfixnum(STACK_1);
+  var object obj = STACK_3;
+  var uintV n = posfixnum_to_V(STACK_2);
+  var uintV i;
+  for (i = n; i > 0; i--) {
+    if (!consp(obj)) goto no;
+    obj = Cdr(obj);
+  }
+  { var uintV m = posfixnum_to_V(STACK_1);
+    if (m < n) goto no;
+    for (i = m-n; i > 0; i--) {
+      if (!consp(obj)) {
+        if (nullp(obj))
+          break;
+        else
+          goto no;
+      }
+      obj = Cdr(obj);
+    }
+  }
+  if (nullp(STACK_0) && !nullp(obj))
+    goto no;
+  VALUES1(T); skipSTACK(4); return;
+ no:
+  VALUES1(NIL); skipSTACK(4);
+}
+
+LISPFUN(proper_list_length_in_bounds_p,seclass_read,2,1,norest,nokey,0,NIL)
+{ /* (sys::proper-list-length-in-bounds-p obj n) tests whether obj is a
+     proper-list with at least n conses.
+     (sys::proper-list-length-in-bounds-p obj n m) tests whether obj is a
+     proper-list with at least n and at most m conses. */
+  if (!posfixnump(STACK_1)) error_posfixnum(STACK_1);
+  if (boundp(STACK_0) && !posfixnump(STACK_0)) error_posfixnum(STACK_0);
+  var object tail = NIL;
+  var object len = list_length(STACK_2,&tail);
+  if (nullp(tail) && !nullp(len)) {
+    var uintL l = I_to_UL(len);
+    if ((posfixnum_to_V(STACK_1) <= l)
+        && (!boundp(STACK_0) || (l <= posfixnum_to_V(STACK_0))))
+      VALUES1(T);
+    else
+      VALUES1(NIL);
+  } else
+    VALUES1(NIL);
+  skipSTACK(3);
 }
 
 /* proper_list_p(obj)
@@ -616,18 +605,14 @@ global bool proper_list_p (object obj) {
     if (atomp(fast))
       break;
     if (eq(fast,slow))
-      goto no;
+      return false;
     fast = Cdr(fast);
     slow = Cdr(slow);
   }
-  if (nullp(fast))
-    return true;
-  else {
-   no: return false;
-  }
+  return nullp(fast);
 }
 
-/* we cannot have lists longer than 1<<32 for RAM reasons
+/* We cannot have lists longer than 1<<32 for RAM reasons
  but we must accept arbitrary positive integers in NTH, LAST &c.
  Here we truncate large integers to ~0.
  can trigger GC */
@@ -713,7 +698,7 @@ LISPFUNNR(nthcdr,2)
 { /* (NTHCDR integer list), CLTL p. 267 */
   var uintL count = get_integer_truncate(STACK_1);
   var object list = STACK_0;
-  dotimesL(count,count, {
+  while (count--) {
     if (consp(list))
       /* Walk list. */
       list = Cdr(list);
@@ -721,20 +706,19 @@ LISPFUNNR(nthcdr,2)
       /* End of list reached. */
       break;
     else
-      fehler_list(list);
-  });
+      error_list(list);
+  }
   VALUES1(list);
   skipSTACK(2);
 }
 
 /* (SYS::CONSES-P n object) determines whether the object is a list
-   consisting of length n at least. Similar to
-   (if (= n 0) t (consp (nthcdr (- n 1) object)))
-   except that it is robust against dotted lists, or to
-   (if (= n 0) t (and (listp object) (>= (length object) n)))
-   except that it is robust against circular and dotted lists. */
-LISPFUNNR(conses_p,2)
-{
+ consisting of length n at least. Similar to
+ (if (= n 0) t (consp (nthcdr (- n 1) object)))
+ except that it is robust against dotted lists, or to
+ (if (= n 0) t (and (listp object) (>= (length object) n)))
+ except that it is robust against circular and dotted lists. */
+LISPFUNNR(conses_p,2) {
   var uintL count = get_integer_truncate(STACK_1);
   var object list = STACK_0;
   value1 = T;
@@ -754,13 +738,13 @@ LISPFUNNR(conses_p,2)
   skipSTACK(2);
 }
 
-/* get a replacement for the circular list
+/* Get a replacement for the circular list
  can trigger GC */
 local maygc object replace_circular_list (object list) {
   dynamic_bind(S(print_circle),T);
   pushSTACK(NIL);               /* no PLACE */
   pushSTACK(list); pushSTACK(TheSubr(subr_self)->name);
-  check_value(error,GETTEXT("~S: ~S is a circular list"));
+  check_value(error_condition,GETTEXT("~S: ~S is a circular list"));
   dynamic_unbind(S(print_circle));
   return value1;
 }
@@ -779,7 +763,7 @@ LISPFUN(last,seclass_read,1,1,norest,nokey,0,NIL)
   /* check optional integer argument: */
   var uintL count = (boundp(intarg) ? get_integer_truncate(intarg) : 1);
   var object list = check_list(popSTACK());
-  # Optimierung der beiden häufigsten Fälle count=1 und count=0:
+  /* Optimisation of the two most common cases count=1 and count=0: */
   switch (count) {
     case 0: { last_0_restart:
       var object slow = list;
@@ -798,7 +782,7 @@ LISPFUN(last,seclass_read,1,1,norest,nokey,0,NIL)
       var object list2;
       var object slow = list;
       if (consp(list)) {
-        loop {
+        while (1) {
           /* list is a Cons. */
           list2 = Cdr(list); if (atomp(list2)) break; list = list2;
           if (eq(list,slow)) {
@@ -835,22 +819,22 @@ LISPFUN(last,seclass_read,1,1,norest,nokey,0,NIL)
   VALUES1(list);
 }
 
-# UP: Bildet eine Liste mit gegebenen Elementen.
-# listof(len)
-# > uintC len: gewünschte Listenlänge
-# > auf STACK: len Objekte, erstes zuoberst
-# < ergebnis: Liste dieser Objekte
-# Erhöht STACK
-# changes STACK, can trigger GC
-global maygc object listof (uintC len) {
-  pushSTACK(NIL); # bisherige Gesamtliste
-  # die len Argumente vor diese Liste consen:
-  dotimesC(len,len, {
+/* UP: Constructs a list with given elements.
+ listof(len)
+ > uintC len: wanted list length
+ > on STACK: len Objects, first at the top
+ < result: list of these objects
+ removes len elements from the STACK
+ changes STACK, can trigger GC */
+modexp maygc object listof (uintC len) {
+  pushSTACK(NIL); /* starting with empty list */
+  /* Cons len times the arguments to the front of this list: */
+  while (len--) {
     var object new_cons = allocate_cons();
     Cdr(new_cons) = popSTACK();
     Car(new_cons) = STACK_0;
     STACK_0 = new_cons;
-  });
+  }
   return popSTACK();
 }
 
@@ -859,16 +843,16 @@ LISPFUN(list,seclass_no_se,0,0,rest,nokey,0,NIL)
   VALUES1(listof(argcount));
 }
 
-LISPFUN(liststern,seclass_no_se,1,0,rest,nokey,0,NIL)
+LISPFUN(liststar,seclass_no_se,1,0,rest,nokey,0,NIL)
 { /* (LIST* obj1 {object}), CLTL p. 267 */
-  /* bisherige Gesamtliste bereits im Stack */
-  /* die argcount restlichen Argumente vor diese Liste consen: */
-  dotimesC(argcount,argcount, {
+  /* Former list already on the stack */
+  /* Cons the argcount arguments to the front of this list: */
+  while (argcount--) {
     var object new_cons = allocate_cons();
-    Cdr(new_cons) = popSTACK(); /* nächstes Argument davor */
+    Cdr(new_cons) = popSTACK(); /* next argument before */
     Car(new_cons) = STACK_0;
     STACK_0 = new_cons;
-  });
+  }
   VALUES1(popSTACK());
 }
 
@@ -882,60 +866,60 @@ LISPFUN(make_list,seclass_no_se,1,0,norest,key,1, (kw(initial_element)) )
 
 LISPFUN(append,seclass_read,0,0,rest,nokey,0,NIL)
 { /* (APPEND {list}), CLTL p. 268 */
-    if (argcount==0) {
-      VALUES1(NIL); # keine Argumente -> NIL als Ergebnis
-    } else {
-      # Argumente aneinanderhängen. Dazu Schleife argcount-1 mal durchlaufen:
-      dotimesC(argcount,argcount-1, {
-        # STACK_0 = bisherige Gesamtliste von rechts.
-        # STACK_1 := (append STACK_1 STACK_0), STACK um 1 erhöhen:
-        var object list1;
+  if (argcount==0) {
+    VALUES1(NIL); /* no arguments -> return NIL as result */
+  } else {
+    /* Append arguments. Run the loop argcount-1 times: */
+    while (--argcount) {
+      /* STACK_0 = result list from right. */
+      /* STACK_1 := (append STACK_1 STACK_0), increase STACK by 1: */
+      var object list1;
+      {
+        var object list2 = popSTACK(); /* result list (from right) */
+        list1 = STACK_0; /* Argument to be added to the front */
+        STACK_0 = list2; /* stack resulting list */
+      }
+      /* list1 needs to be a list: */
+      if (atomp(list1))
+        if (nullp(list1))
+          ; /* if list1=NIL: (append nil x) = x, do nothing */
+        else
+          error_list(list1);
+      else {
+        /* (append list1 STACK_0), and list1 is a Cons: */
+        /* Copy list1 and keep last Cons: */
+        var object run;
+        pushSTACK(list1);
         {
-          var object list2 = popSTACK(); # bisherige Gesamtliste (von rechts)
-          list1 = STACK_0; # vorne anzuhängendes Argument
-          STACK_0 = list2; # bisherige Gesamtliste wieder stacken
+          var object new_list = allocate_cons();
+          run = STACK_0; /* run runs through the old list list1 */
+          Car(new_list) = Car(run);
+          STACK_0 = new_list;
+          pushSTACK(new_list);
         }
-        # list1 muss Liste sein:
-        if (atomp(list1))
-          if (nullp(list1))
-            ; # falls list1=NIL: (append nil x) = x, nichts tun
-          else
-            fehler_list(list1);
-        else {
-          # (append list1 STACK_0), wobei list1 ein Cons ist:
-          # Kopiere list1 und halte das letzte Cons fest:
-          var object lauf;
-          pushSTACK(list1);
-          {
-            var object new_list = allocate_cons();
-            lauf = STACK_0; # lauf läuft durch die alte Liste list1 durch
-            Car(new_list) = Car(lauf);
-            STACK_0 = new_list;
-            pushSTACK(new_list);
-          }
-          # Schleife: STACK_1 ist die Gesamtkopie, STACK_0 = LAST davon,
-          # lauf = das entsprechende Cons der Original-Liste list1.
-          while ( lauf=Cdr(lauf), !endp(lauf) ) {
-            # es kommt noch ein Cons
-            pushSTACK(lauf); # lauf retten
-            var object new_cons = allocate_cons(); # neues Cons allozieren
-            lauf = popSTACK(); # lauf zurück
-            Cdr(STACK_0) = new_cons; # und als CDR des LAST einhängen
-            Car(new_cons) = Car(lauf); # CAR kopieren
-            STACK_0 = new_cons; # das ist nun das neue LAST
-          }
-          # Kopie fertig. STACK_2 = bisherige Gesamtliste,
-          # STACK_1 = Kopie von list1, STACK_0 = LAST davon.
-          lauf = popSTACK(); # Ende der Kopie
-          list1 = popSTACK(); # ganze Kopie
-          /*if (!nullp(Cdr(lauf))) ????
-            fehler_proper_list_dotted(TheSubr(subr_self)->name,Cdr(lauf));*/
-          Cdr(lauf) = STACK_0; # bisherige Gesamtkopie einhängen
-          STACK_0 = list1; # und die Kopie ist die neue Gesamtliste
+        /* Loop: STACK_1 has the full copy, STACK_0 = LAST of it, */
+        /* run = the corresponding Cons of the original list list1. */
+        while ( run=Cdr(run), !endp(run) ) {
+          /* one more Cons */
+          pushSTACK(run); /* save run */
+          var object new_cons = allocate_cons(); /* allocate new Cons */
+          run = popSTACK(); /* put back run */
+          Cdr(STACK_0) = new_cons; /* and add as CDR of the LAST */
+          Car(new_cons) = Car(run); /* copy CAR */
+          STACK_0 = new_cons; /* this is now the new LAST */
         }
-      });
-      VALUES1(popSTACK()); # Gesamtliste als Wert
+        /* Copy ready. STACK_2 = current result list, */
+        /* STACK_1 = copy of list1, STACK_0 = LAST of it. */
+        run = popSTACK(); /* end of copy */
+        list1 = popSTACK(); /* copy finished */
+        /*if (!nullp(Cdr(run))) ????
+          error_proper_list_dotted(TheSubr(subr_self)->name,Cdr(run));*/
+        Cdr(run) = STACK_0; /* add result copy */
+        STACK_0 = list1; /* and the is the new result list */
+      }
     }
+    VALUES1(popSTACK()); /* result list as value */
+  }
 }
 
 LISPFUNNR(copy_list,1)
@@ -943,25 +927,25 @@ LISPFUNNR(copy_list,1)
   VALUES1(copy_list(check_list(popSTACK())));
 }
 
-# UP: Kopiert eine Aliste
-# copy_alist(alist)
-# > alist: Aliste
-# < ergebnis: Kopie der Aliste
-# can trigger GC
+/* UP: Copies an A-list
+  copy_alist(alist)
+  > alist: A-list
+  < result: Copy of the A-list
+  can trigger GC */
 local maygc object copy_alist (object alist) {
-  # Algorithm:
-  # Instead of
-  #   (mapcar #'(lambda (x) (if (consp x) (cons (car x) (cdr x)) x)) l)
-  # the list is first copied via copy-list, then the conses among the top
-  # level elements of the copy are replaced with conses with same CAR and CDR.
+  /* Algorithm:
+     Instead of
+       (mapcar #'(lambda (x) (if (consp x) (cons (car x) (cdr x)) x)) l)
+     the list is first copied via copy-list, then the conses among the top
+     level elements of the copy are replaced with conses with same CAR and CDR. */
   alist = copy_list(alist);
-  pushSTACK(alist); # Gesamtliste retten
-  # alist läuft durch die Gesamtliste
+  pushSTACK(alist); /* save result list */
+  /* a-list runs through to the result list */
   while (!endp(alist)) {
     if (mconsp(Car(alist))) {
-      pushSTACK(alist); # alist retten
-      var object new_cons = allocate_cons(); # neues Cons
-      alist = popSTACK(); # alist zurück
+      pushSTACK(alist); /* save a-list */
+      var object new_cons = allocate_cons(); /* new Cons */
+      alist = popSTACK(); /* a-list back */
       {
         var object old_cons = Car(alist);
         Car(new_cons) = Car(old_cons); Cdr(new_cons) = Cdr(old_cons);
@@ -976,19 +960,19 @@ local maygc object copy_alist (object alist) {
 LISPFUNNR(copy_alist,1) /* (COPY-ALIST alist), CLTL p. 268 */
 { VALUES1(copy_alist(popSTACK())); }
 
-# UP: Kopiert einen Baum.
+/* UP: Copies a tree. */
 local object copy_tree (object tree) {
   if (atomp(tree))
-    return tree; # Atome unverändert zurückgeben
+    return tree; /* Return atom unchanged  */
   else {
     check_STACK(); check_SP();
-    pushSTACK(Cdr(tree)); # CDR retten
+    pushSTACK(Cdr(tree)); /* Save CDR */
     {
-      var object temp = copy_tree(Car(tree)); # den CAR rekursiv kopieren
+      var object temp = copy_tree(Car(tree)); /* Copy the CAR recursively */
       tree = STACK_0;
-      STACK_0 = temp; # CAR-Kopie retten
-      temp = copy_tree(tree); # den CDR rekursiv kopieren
-      pushSTACK(temp); # CDR-Kopie retten
+      STACK_0 = temp; /* Save CAR copy */
+      temp = copy_tree(tree); /* Copy the CDR recursively */
+      pushSTACK(temp); /* Save CDR copy */
     }
     return cons_from_stack();
   }
@@ -1000,61 +984,60 @@ LISPFUNNR(copy_tree,1) /* (COPY-TREE tree), CLTL p. 269 */
 LISPFUNNR(revappend,2)
 { /* (REVAPPEND list object), CLTL p. 269 */
   while (!endp(STACK_1)) {
-    var object new_cons = allocate_cons(); # neues Cons
-    Car(new_cons) = Car(STACK_1); Cdr(new_cons) = STACK_0; # (cons (car list) object)
-    STACK_0 = new_cons; # das ist das neue, verlängerte object
-    STACK_1 = Cdr(STACK_1); # list verkürzen
+    var object new_cons = allocate_cons(); /* new Cons */
+    Car(new_cons) = Car(STACK_1); Cdr(new_cons) = STACK_0; /* (cons (car list) object) */
+    STACK_0 = new_cons; /* This is the new, longer object */
+    STACK_1 = Cdr(STACK_1); /* Shorten list */
   }
   VALUES1(popSTACK());
   skipSTACK(1);
 }
 
-LISPFUN(nconc,seclass_default,0,0,rest,nokey,0,NIL) # (NCONC {list}), CLTL S. 269
-  {
-    if (argcount==0) {
-      VALUES1(NIL); # keine Argumente -> NIL als Ergebnis
-    } else {
-      # Argumente aneinanderhängen. Dazu Schleife argcount-1 mal durchlaufen:
-      dotimesC(argcount,argcount-1, {
-        # STACK_0 = bisherige Gesamtliste von rechts.
-        # STACK_1 := (nconc STACK_1 STACK_0), STACK um 1 erhöhen:
-        if (matomp(STACK_1))
-          if (nullp(STACK_1)) {
-            STACK_1 = STACK_0; skipSTACK(1); # Gesamtliste bleibt, Argument vergessen
-          } else
-            fehler_list(STACK_1);
-        else {
-          # Gesamtliste in (cdr (last STACK_1)) einhängen:
-          var object list1 = STACK_1;
-          var object list2;
-          loop {
-            # Hier ist list1 ein Cons.
-            list2 = Cdr(list1);
-            if (atomp(list2))
-              break;
-            list1 = list2;
-          }
-          # list1 ist das letzte Cons des Arguments STACK_1
-          Cdr(list1) = popSTACK(); # bisherige Gesamtliste einhängen
-          # STACK_0 = neue Gesamtliste
+LISPFUN(nconc,seclass_default,0,0,rest,nokey,0,NIL)
+{ /* (NCONC {list}), CLTL p. 269 */
+  if (argcount==0) {
+    VALUES1(NIL); /* no arguments -> return NIL as result */
+  } else {
+    /* Append arguments. Run the loop for argcount-1 times: */
+    while (--argcount) {
+      /* STACK_0 = current result list from right. */
+      /* STACK_1 := (nconc STACK_1 STACK_0), increase STACK by 1: */
+      if (matomp(STACK_1))
+        if (nullp(STACK_1)) {
+          STACK_1 = STACK_0; skipSTACK(1); /* result list stays, skip argument */
+        } else
+          error_list(STACK_1);
+      else {
+        /* Add result list to (cdr (last STACK_1)): */
+        var object list1 = STACK_1;
+        var object list2;
+        while (1) {
+          /* Here list1 is a Cons. */
+          list2 = Cdr(list1);
+          if (atomp(list2))
+            break;
+          list1 = list2;
         }
-      });
-      VALUES1(popSTACK());
+        /* list1 is the last Cons of the argument STACK_1 */
+        Cdr(list1) = popSTACK(); /* Add current result list */
+        /* STACK_0 = new result list */
+      }
     }
+    VALUES1(popSTACK());
   }
+}
 
-LISPFUNN(nreconc,2)             /* (NRECONC list1 list2), CLTL S. 269 */
+LISPFUNN(nreconc,2)             /* (NRECONC list1 list2), CLTL p. 269 */
 {
   var object list1 = check_list(STACK_1);
   var object list2 = STACK_0; skipSTACK(2);
   VALUES1(nreconc(list1,list2));
 }
 
-LISPFUNN(list_nreverse,1) # (SYS::LIST-NREVERSE list)
-# wie (NREVERSE list), wenn list eine Liste ist.
-  {
-    VALUES1(nreverse(popSTACK()));
-  }
+LISPFUNN(list_nreverse,1) /* (SYS::LIST-NREVERSE list) */
+{ /* as (NREVERSE list), if list is a list. */
+  VALUES1(nreverse(popSTACK()));
+}
 
 /* check that the argument is a non-circular list and return its length
  can trigger GC */
@@ -1072,7 +1055,7 @@ local inline maygc uintL check_list_length (gcv_object_t *list_) {
 }
 
 LISPFUN(butlast,seclass_read,1,1,norest,nokey,0,NIL)
-{ /* (BUTLAST list [integer]), CLTL S. 271 */
+{ /* (BUTLAST list [integer]), CLTL p. 271 */
   var object intarg = popSTACK();
   /* check optional integer argument: */
   var uintL count = (boundp(intarg) ? get_integer_truncate(intarg) : 1);
@@ -1081,15 +1064,15 @@ LISPFUN(butlast,seclass_read,1,1,norest,nokey,0,NIL)
     VALUES1(NIL); skipSTACK(1); /* length(list)<=count -> return NIL */
   } else {
     var uintL new_len = len - count; /* >0 */
-    # Liefere eine Kopie der ersten new_len Conses der Liste STACK_0:
-    var object new_list = make_list(new_len); # neue Liste allozieren
-    # Listenelemente einzeln kopieren, bis new_list voll ist:
-    var object new_lauf = new_list; # läuft durch die neue Liste
-    var object old_lauf = popSTACK(); # läuft durch die alte Liste
+    /* Creates a copy of the first new_len conses of the list STACK_0: */
+    var object new_list = make_list(new_len); /* allocate new list */
+    /* Copy list elements one by one, until new_list is full: */
+    var object new_run = new_list; /* runs through the new list */
+    var object old_run = popSTACK(); /* runs through the old list */
     do {
-      Car(new_lauf) = Car(old_lauf);
-      old_lauf = Cdr(old_lauf); new_lauf = Cdr(new_lauf);
-    } while (!atomp(new_lauf));
+      Car(new_run) = Car(old_run);
+      old_run = Cdr(old_run); new_run = Cdr(new_run);
+    } while (!atomp(new_run));
     VALUES1(new_list);
   }
 }
@@ -1103,50 +1086,50 @@ LISPFUN(nbutlast,seclass_default,1,1,norest,nokey,0,NIL)
   if (len<=count) {
     VALUES1(NIL); skipSTACK(1); /* length(list)<=count -> return NIL */
   } else {
-    var uintL new_len = len - count; # >0
-    var object lauf = STACK_0; # läuft durch die Liste
-    # new_len-1 mal den CDR nehmen und dann den CDR auf NIL setzen:
-    dotimesL(new_len,new_len-1, { lauf = Cdr(lauf); } );
-    Cdr(lauf) = NIL;
+    var uintL new_len = len - count; /* >0 */
+    var object run = STACK_0; /* runs through the list */
+    /* take new_len-1 times the CDR and then set the CDR to NIL: */
+    while (--new_len) run = Cdr(run);
+    Cdr(run) = NIL;
     VALUES1(popSTACK()); /* return list */
   }
 }
 
 LISPFUNNR(ldiff,2)
 { /* (LDIFF list sublist), CLTL p. 272 */
-    var object sublist = popSTACK();
-    # Suche, wo sublist in list beginnt:
-    var uintL new_len = 0;
-    var bool found_p = false;
-    {
-      var object listr = STACK_0;
-      #ifndef X3J13_175
-      until ((found_p = eql(listr,sublist)) || endp(listr)) {
-        listr = Cdr(listr); new_len++;
-      }
-      #else
-      if (!listp(listr))
-        fehler_list(listr);
-      until ((found_p = eql(listr,sublist)) || atomp(listr)) {
-        listr = Cdr(listr); new_len++;
-      }
-      #endif
+  var object sublist = popSTACK();
+  /* Search where sublist begins in list: */
+  var uintL new_len = 0;
+  var bool found_p = false;
+  {
+    var object listr = STACK_0;
+   #ifndef X3J13_175
+    while (!((found_p = eql(listr,sublist)) || endp(listr))) {
+      listr = Cdr(listr); new_len++;
     }
-    # Liefere eine Kopie der ersten new_len Conses der Liste STACK_0:
-    var object new_list = make_list(new_len); # neue Liste allozieren
-    # Listenelemente einzeln kopieren, bis new_list voll ist:
-    var object new_lauf = new_list; # läuft durch die neue Liste
-    var object old_lauf = popSTACK(); # läuft durch die alte Liste
-    if (consp(new_lauf)) loop { # loop!
-      Car(new_lauf) = Car(old_lauf);
-      if (atomp(Cdr(new_lauf))) {
-        if (!found_p)
-          Cdr(new_lauf) = Cdr(old_lauf);
-        break;
-      }
-      old_lauf = Cdr(old_lauf); new_lauf = Cdr(new_lauf);
+   #else
+    if (!listp(listr))
+      error_list(listr);
+    while (!((found_p = eql(listr,sublist)) || atomp(listr))) {
+      listr = Cdr(listr); new_len++;
     }
-    VALUES1(new_list);
+   #endif
+  }
+  /* Return a copy of the first new_len conses of the list STACK_0: */
+  var object new_list = make_list(new_len); /* allocate new list */
+  /* Copy list elements one by one, until new_list is full: */
+  var object new_run = new_list; /* runs through the new list */
+  var object old_run = popSTACK(); /* runs through the old list */
+  if (consp(new_run)) while (1) {  /* loop! */
+    Car(new_run) = Car(old_run);
+    if (atomp(Cdr(new_run))) {
+      if (!found_p)
+        Cdr(new_run) = Cdr(old_run);
+      break;
+    }
+    old_run = Cdr(old_run); new_run = Cdr(new_run);
+  }
+  VALUES1(new_list);
 }
 
 /* check_cons(obj)
@@ -1170,7 +1153,7 @@ local inline maygc object check_cons (object obj) {
   return obj;
 }
 
-LISPFUNN(rplaca,2)              /* (RPLACA cons object), CLTL S. 272 */
+LISPFUNN(rplaca,2)              /* (RPLACA cons object), CLTL p. 272 */
 {
   var object arg1 = check_cons(STACK_1);
   var object arg2 = STACK_0;
@@ -1188,7 +1171,7 @@ LISPFUNN(prplaca,2)             /* (SYS::%RPLACA cons object) */
   VALUES1(arg2);
 }
 
-LISPFUNN(rplacd,2)              /* (RPLACD cons object), CLTL S. 272 */
+LISPFUNN(rplacd,2)              /* (RPLACD cons object), CLTL p. 272 */
 {
   var object arg1 = check_cons(STACK_1);
   var object arg2 = STACK_0;
@@ -1206,169 +1189,45 @@ LISPFUNN(prplacd,2)             /* (SYS::%RPLACD cons object) */
   VALUES1(arg2);
 }
 
-# Unterprogramm zum Ausführen des Tests :TEST
-# up_test(stackptr,x)
-# > *(stackptr+1): die Testfunktion
-# > *(stackptr+3): das zu vergleichende Item
-# > x: Argument
-# < ergebnis: true falls der Test erfüllt ist, false sonst
-# can trigger GC
-local maygc bool up_test (const gcv_object_t* stackptr, object x) {
-  # nach CLTL S. 247 ein (funcall testfun item x) ausführen:
-  var object item = *(stackptr STACKop 3);
-  var object fun = *(stackptr STACKop 1);
-  # Special case the most frequent cases,
-  if (eq(fun,L(eq)))
-    return eq(item,x);
-  if (eq(fun,L(eql)))
-    return eql(item,x);
-  if (eq(fun,L(equal)))
-    return equal(item,x);
-  pushSTACK(item);
-  pushSTACK(x); # x
-  funcall(fun,2);
-  return !nullp(value1);
-}
+/* (funcall TESTFUN ...) */
+#define CALL_TEST(p)  (*pcall_test)(p,*(p STACKop 3),value1)
 
-# Unterprogramm zum Ausführen des Tests :TEST-NOT
-# up_test_not(stackptr,x)
-# > *(stackptr+0): die Testfunktion
-# > *(stackptr+3): das zu vergleichende Item
-# > x: Argument
-# < ergebnis: true falls der Test erfüllt ist, false sonst
-# can trigger GC
-local maygc bool up_test_not (const gcv_object_t* stackptr, object x) {
-  # nach CLTL S. 247 ein (not (funcall testfun item x)) ausführen:
-  pushSTACK(*(stackptr STACKop 3)); # item
-  pushSTACK(x); # x
-  funcall(*(stackptr STACKop 0),2);
-  return nullp(value1);
-}
-
-# Unterprogramm zum Ausführen des Tests -IF
-# up_if(stackptr,x)
-# > *(stackptr+1): das Testprädikat
-# > x: Argument
-# < ergebnis: true falls der Test erfüllt ist, false sonst
-# can trigger GC
-local maygc bool up_if (const gcv_object_t* stackptr, object x) {
-  # nach CLTL S. 247 ein (funcall predicate x) ausführen:
-  pushSTACK(x); funcall(*(stackptr STACKop 1),1);
-  return !nullp(value1);
-}
-
-# Unterprogramm zum Ausführen des Tests -IF-NOT
-# up_if_not(stackptr,x)
-# > *(stackptr+1): das Testprädikat
-# > x: Argument
-# < ergebnis: true falls der Test erfüllt ist, false sonst
-# can trigger GC
-local maygc bool up_if_not (const gcv_object_t* stackptr, object x) {
-  # nach CLTL S. 247 ein (not (funcall predicate x)) ausführen:
-  pushSTACK(x); funcall(*(stackptr STACKop 1),1);
-  return nullp(value1);
-}
-
-# UP: Überprüft das :KEY-Argument
-# test_key_arg()
-# > STACK_0: optionales Argument
-# < STACK_0: korrekte KEY-Funktion
-local void test_key_arg (void) {
-  var object key_arg = STACK_0;
-  if (missingp(key_arg))
-    STACK_0 = L(identity); # #'IDENTITY als Default für :KEY
-}
-
-# Applies a :KEY argument.
-# funcall_key(key,item);
-# > key: value of the :KEY argument
-# > item: object being considered
-# < value1: (FUNCALL key item)
-#define funcall_key(key,item)                     \
-  {                                               \
-    var object _key = (key);                      \
-    var object _item = (item);                    \
-    # shortcut for :KEY #'IDENTITY, very frequent \
-    if (!eq(_key,L(identity))) {                  \
-      pushSTACK(_item); funcall(_key,1);          \
-    } else {                                      \
-      value1 = _item;                             \
-    }                                             \
-  }
-
-# UP: Überprüft die :TEST, :TEST-NOT - Argumente
-# test_test_args()
-# > stackptr:=&STACK_1 : Pointer in den STACK
-# > STACK_2: :TEST-Argument
-# > STACK_1: :TEST-NOT-Argument
-# < STACK_2: verarbeitetes :TEST-Argument
-# < STACK_1: verarbeitetes :TEST-NOT-Argument
-# < up_fun: Adresse einer Testfunktion, die wie folgt spezifiziert ist:
-#       > stackptr: derselbe Pointer in den Stack, *(stackptr+3) = item,
-#         *(stackptr+1) = :test-Argument, *(stackptr+0) = :test-not-Argument,
-#       > x: Argument
-#       < true, falls der Test erfüllt ist, false sonst.
-  # up_function_t sei der Typ der Adresse einer solchen Testfunktion:
-typedef maygc bool (*up_function_t) (const gcv_object_t* stackptr, object x);
-local up_function_t test_test_args (void) {
-  var object test_arg = STACK_2;
-  if (!boundp(test_arg))
-    test_arg=NIL;
-  # test_arg ist das :TEST-Argument
-  var object test_not_arg = STACK_1;
-  if (!boundp(test_not_arg))
-    test_not_arg=NIL;
-  # test_not_arg ist das :TEST-NOT-Argument
-  if (nullp(test_not_arg)) {
-    # :TEST-NOT wurde nicht angegeben
-    if (nullp(test_arg))
-      STACK_2 = L(eql); # #'EQL als Default für :TEST
-    return &up_test;
-  } else {
-    # :TEST-NOT wurde angegeben
-    if (nullp(test_arg))
-      return &up_test_not;
-    else
-      fehler_both_tests();
-  }
-}
-
-# UP: Ersetzt im Baum tree alle x, deren KEY der TESTFUNktion genügen,
-# durch NEW. Konstruktiv.
-# subst(tree,stackptr,up_fun)
-# > tree: Baum
-# > stackptr: *(stackptr-2) = NEW, *(stackptr-1) = KEY
-# > up_fun: TESTFUN = Adresse der Testfunktion,
-#       wird selbem stackptr und mit (KEY x) als Argument angesprungen.
-#       Sie liefert true, falls der Test erfüllt ist, false sonst.
-# < ergebnis: (evtl. neuer) Baum
-# can trigger GC
-local maygc object subst (object tree, gcv_object_t* stackptr, up_function_t up_fun) {
-  # erst (KEY tree) berechnen und TESTFUN aufrufen:
-  pushSTACK(tree); # tree retten
-  funcall_key(*(stackptr STACKop -1),tree); # (KEY tree)
-  if (up_fun(stackptr,value1)) { # TESTFUN aufrufen
-    # Test erfüllt
-    skipSTACK(1); return *(stackptr STACKop -2); # NEW als Wert
-  } else
-    # Test nicht erfüllt
+/* UP: Replaces in the tree all elements x, which KEY passes the TESTFUNction,
+ by NEW. Construktively (copying).
+ subst(tree,stackptr,up_fun)
+ > tree: the Tree
+ > stackptr: *(stackptr-2) = NEW, *(stackptr-1) = KEY
+ > up_fun: TESTFUN = Adress of the test function,
+        called with same stackptr and with (KEY x) as argument.
+        Returns true or false.
+ < result: (evtl. newer) tree
+ can trigger GC */
+local maygc object subst (object tree, gcv_object_t* stackptr,
+                          funarg_t* pcall_test) {
+  /* First calculate (KEY tree) and call TESTFUN: */
+  pushSTACK(tree); /* save tree */
+  funcall_key(*(stackptr STACKop -1),tree); /* (KEY tree) */
+  if (CALL_TEST(stackptr)) { /* (funcall TESTFUN ...) */
+    /* Test ok */
+    skipSTACK(1); return *(stackptr STACKop -2); /* return NEW as value */
+  } else /* Test not ok */
     if (matomp(STACK_0)) {
-      # Argument Atom -> unverändert lassen
+      /* Argument is an atom -> keep it unchanged */
       return popSTACK();
     } else {
-      # Argument ist ein Cons -> SUBST rekursiv aufrufen:
+      /* Argument is a Cons -> call SUBST recursively: */
       check_STACK(); check_SP();
-      # rekursiv für den CDR aufrufen:
-      var object new_cdr = subst(Cdr(STACK_0),stackptr,up_fun);
-      pushSTACK(new_cdr); # CDR-Ergebnis retten
-      # rekursiv für den CAR aufrufen:
-      var object new_car = subst(Car(STACK_1),stackptr,up_fun);
+      /* call recursively for the CDR: */
+      var object new_cdr = subst(Cdr(STACK_0),stackptr,pcall_test);
+      pushSTACK(new_cdr); /* Save CDR result */
+      /* call recursively for the CAR: */
+      var object new_car = subst(Car(STACK_1),stackptr,pcall_test);
       if (eq(new_car,Car(STACK_1)) && eq(STACK_0,Cdr(STACK_1))) {
-        # beides unverändert
-        skipSTACK(1); # CDR-Ergebnis vergessen
+        /* both unchanged */
+        skipSTACK(1); /* skip CDR result */
         return popSTACK();
       } else {
-        STACK_1 = new_car; # CAR-Ergebnis retten
+        STACK_1 = new_car; /* save CAR result */
         return cons_from_stack();
       }
     }
@@ -1377,95 +1236,93 @@ local maygc object subst (object tree, gcv_object_t* stackptr, up_function_t up_
 LISPFUN(subst,seclass_default,3,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
 { /* (SUBST new old tree :test :test-not :key), CLTL p. 273 */
-  test_key_arg(); /* :KEY-Argument in STACK_0 */
-  var up_function_t up_fun = test_test_args(); /* :TEST/:TEST-NOT-Arguments in STACK_2,STACK_1 */
-  { var object newobj = STACK_5; pushSTACK(newobj); }
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  var funarg_t* pcall_test = check_test_args(&STACK_1); /* :TEST/:TEST-NOT arguments on STACK_2,STACK_1 */
+  pushSTACK(STACK_5); /* newobj */
   /* stack layout: new, old, tree, test, test_not, key, new. */
-  VALUES1(subst(STACK_4,&STACK_2,up_fun)); /* do the substitution */
+  VALUES1(subst(STACK_4,&STACK_2,pcall_test)); /* do the substitution */
   skipSTACK(7);
 }
 
 LISPFUN(subst_if,seclass_default,3,0,norest,key,1, (kw(key)) )
 { /* (SUBST-IF new pred tree :key), CLTL p. 273 */
-  test_key_arg(); /* :KEY-Argument in STACK_0 */
-  { var object newobj = STACK_3; pushSTACK(newobj); }
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  pushSTACK(STACK_3); /* newobj */
   /* stack layout: new, pred, tree, key, new. */
-  VALUES1(subst(STACK_2,&STACK_2,&up_if)); /* do the substitution */
+  VALUES1(subst(STACK_2,&STACK_2,&call_if)); /* do the substitution */
   skipSTACK(5);
 }
 
 LISPFUN(subst_if_not,seclass_default,3,0,norest,key,1, (kw(key)) )
-{ /* (SUBST-IF-NOT new pred tree :key), CLTL S. 273 */
-  test_key_arg(); /* :KEY-Argument in STACK_0 */
-  { var object newobj = STACK_3; pushSTACK(newobj); }
+{ /* (SUBST-IF-NOT new pred tree :key), CLTL p. 273 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  pushSTACK(STACK_3); /* newobj */
   /* stack layout: new, pred, tree, key, new. */
-  VALUES1(subst(STACK_2,&STACK_2,&up_if_not)); /* do the substitution */
+  VALUES1(subst(STACK_2,&STACK_2,&call_if_not)); /* do the substitution */
   skipSTACK(5);
 }
 
-# UP: Ersetzt im Baum tree alle x, deren KEY der TESTFUNktion genügen,
-# durch NEW. Destruktiv.
-# nsubst(tree,stackptr,up_fun)
-# > tree: Baum
-# > stackptr: *(stackptr-2) = NEW, *(stackptr-1) = KEY
-# > up_fun: TESTFUN = Adresse der Testfunktion,
-#       wird selbem stackptr und mit (KEY x) als Argument angesprungen.
-#       Sie liefert true, falls der Test erfüllt ist, false sonst.
-# < ergebnis: Baum
-# can trigger GC
-local maygc object nsubst (object tree, gcv_object_t* stackptr, up_function_t up_fun) {
-  # erst (KEY tree) berechnen und TESTFUN aufrufen:
-  pushSTACK(tree); # tree retten
-  funcall_key(*(stackptr STACKop -1),tree); # (KEY tree)
-  if (up_fun(stackptr,value1)) { # TESTFUN aufrufen
-    # Test erfüllt
-    skipSTACK(1); return *(stackptr STACKop -2); # NEW als Wert
-  } else {
-    # Test nicht erfüllt
+/* UP: Replaces in the tree all elements x, which KEY passes the TESTFUNction,
+ by NEW. Destructively (in-place).
+ nsubst(tree,stackptr,up_fun)
+ > tree: the Tree
+ > stackptr: *(stackptr-2) = NEW, *(stackptr-1) = KEY
+ > up_fun: TESTFUN = Adress of the test function,
+        called with same stackptr and with (KEY x) as argument.
+        Returns true or false.
+ < result: same tree CAR
+ can trigger GC */
+local maygc object nsubst (object tree, gcv_object_t* stackptr,
+                           funarg_t* pcall_test) {
+  /* First calculate (KEY tree) and call TESTFUN: */
+  pushSTACK(tree); /* save tree */
+  funcall_key(*(stackptr STACKop -1),tree); /* (KEY tree) */
+  if (CALL_TEST(stackptr)) { /* (funcall TESTFUN ...) */
+    /* Test ok */
+    skipSTACK(1); return *(stackptr STACKop -2); /* NEW as value */
+  } else { /* Test not ok */
     if (mconsp(STACK_0)) {
-      # Argument ist ein Cons -> NSUBST rekursiv aufrufen:
+      /* Argument is a Cons -> call NSUBST recursively: */
       check_STACK(); check_SP();
-      # rekursiv für den CDR aufrufen:
-      {
-        var object modified_cdr = nsubst(Cdr(STACK_0),stackptr,up_fun);
+      { /* call recursively for the CDR: */
+        var object modified_cdr = nsubst(Cdr(STACK_0),stackptr,pcall_test);
         Cdr(STACK_0) = modified_cdr;
       }
-      # rekursiv für den CAR aufrufen:
-      {
-        var object modified_car = nsubst(Car(STACK_0),stackptr,up_fun);
+      { /* call recursively for the CAR: */
+        var object modified_car = nsubst(Car(STACK_0),stackptr,pcall_test);
         Car(STACK_0) = modified_car;
       }
     }
-    return popSTACK(); # ursprünglicher Baum zurück
+    return popSTACK(); /* return original tree address */
   }
 }
 
 LISPFUN(nsubst,seclass_default,3,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
 { /* (NSUBST new old tree :test :test-not :key), CLTL p. 274 */
-  test_key_arg(); /* :KEY-Argument in STACK_0 */
-  var up_function_t up_fun = test_test_args(); /* :TEST/:TEST-NOT-Argumente in STACK_2,STACK_1 */
-  { var object newobj = STACK_5; pushSTACK(newobj); }
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  var funarg_t* pcall_test = check_test_args(&STACK_1); /* :TEST/:TEST-NOT arguments on STACK_2,STACK_1 */
+  pushSTACK(STACK_5); /* newobj */
   /* stack layout: new, old, tree, test, test_not, key, new. */
-  VALUES1(nsubst(STACK_4,&STACK_2,up_fun)); /* do the substitution */
+  VALUES1(nsubst(STACK_4,&STACK_2,pcall_test)); /* do the substitution */
   skipSTACK(7);
 }
 
 LISPFUN(nsubst_if,seclass_default,3,0,norest,key,1, (kw(key)) )
 { /* (NSUBST-IF new pred tree :key), CLTL p. 274 */
-  test_key_arg(); /* :KEY-Argument in STACK_0 */
-  { var object newobj = STACK_3; pushSTACK(newobj); }
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  pushSTACK(STACK_3); /* newobj */
   /* stack layout: new, pred, tree, key, new. */
-  VALUES1(nsubst(STACK_2,&STACK_2,&up_if)); /* do the substitution */
+  VALUES1(nsubst(STACK_2,&STACK_2,&call_if)); /* do the substitution */
   skipSTACK(5);
 }
 
 LISPFUN(nsubst_if_not,seclass_default,3,0,norest,key,1, (kw(key)) )
 { /* (NSUBST-IF-NOT new pred tree :key), CLTL p. 274 */
-  test_key_arg(); /* :KEY-Argument in STACK_0 */
-  { var object newobj = STACK_3; pushSTACK(newobj); }
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  pushSTACK(STACK_3); /* newobj */
   /* stack layout: new, pred, tree, key, new. */
-  VALUES1(nsubst(STACK_2,&STACK_2,&up_if_not)); /* do the substitution */
+  VALUES1(nsubst(STACK_2,&STACK_2,&call_if_not)); /* do the substitution */
   skipSTACK(5);
 }
 
@@ -1505,13 +1362,13 @@ local maygc object sublis_assoc (gcv_object_t* stackptr)
          *(stackptr-3) (an adress!), called on u and the
          value in *(stackptr-2), returns true: */
       var bool erg = /* 2-argument test function, called on (KEY x) and u */
-        (*(up2_function_t)TheMachineCode(*(stackptr STACKop -3)))
+        (*(funarg_t*)TheMachineCode(*(stackptr STACKop -3)))
         ( stackptr, *(stackptr STACKop -2), Car(head) );
       if (erg) /* test passed ==> return x = (u . v) = (CAR alist) */
         return Car(popSTACK());
       /* test failed */
     } else if (!nullp(head))
-      fehler_list(head);
+      error_list(head);
     STACK_0 = Cdr(STACK_0); /* tail recursion */
   }
   skipSTACK(1); /* forget alist */
@@ -1519,43 +1376,41 @@ local maygc object sublis_assoc (gcv_object_t* stackptr)
   return NIL;
 }
 
-# UP: Ersetzt im Baum tree alle x durch ihr ALIST-Abbild (mittels ASSOC):
-# x wird durch das erste v ersetzt, so dass (u . v) in ALIST vorkommt und
-# (KEY x) und u der TESTFUNktion genügen. Konstruktiv.
-# sublis(tree,stackptr)
-# > tree: Baum
-# > stackptr: *(stackptr-1) = KEY, *(stackptr+3) = ALIST,
-#             *(stackptr-2) ist frei für (KEY x)
-# < ergebnis: (evtl. neuer) Baum
-# can trigger GC
+/* UP: Replaces in tree all x by its A-LIST representation (by ASSOC):
+ x is replaced by the first v, so that (u . v) is a member in ALIST and
+ (KEY x) and u pass the TESTFUNction. Constructively (copying).
+ sublis(tree,stackptr)
+ > tree: the Tree
+ > stackptr: *(stackptr-1) = KEY, *(stackptr+3) = ALIST,
+             *(stackptr-2) is free for (KEY x)
+ < result: (evtl. newer) Tree
+ can trigger GC */
 local maygc object sublis (object tree, gcv_object_t* stackptr) {
-  # erst (KEY tree) berechnen und ASSOC aufrufen:
-  pushSTACK(tree); # tree retten
-  funcall_key(*(stackptr STACKop -1),tree); # (KEY tree)
-  *(stackptr STACKop -2) = value1; # retten für sublis_assoc
+  /* First calculate (KEY tree) and call ASSOC: */
+  pushSTACK(tree); /* save tree */
+  funcall_key(*(stackptr STACKop -1),tree); /* (KEY tree) */
+  *(stackptr STACKop -2) = value1; /* save for sublis_assoc */
   var object assoc_erg = sublis_assoc(stackptr);
-  if (consp(assoc_erg)) {
-    # Test erfüllt
-    skipSTACK(1); return Cdr(assoc_erg); # (CDR (ASSOC ...)) als Wert
-  } else
-    # Test nicht erfüllt
+  if (consp(assoc_erg)) { /* Test ok */
+    skipSTACK(1); return Cdr(assoc_erg); /* (CDR (ASSOC ...)) as value */
+  } else /* Test not ok */
     if (matomp(STACK_0)) {
-      # Argument Atom -> unverändert lassen
+      /* Argument is an atom -> keep unchanged */
       return popSTACK();
     } else {
-      # Argument ist ein Cons -> SUBLIS rekursiv aufrufen:
+      /* Argument is a Cons -> call SUBLIS recursively: */
       check_STACK(); check_SP();
-      # rekursiv für den CDR aufrufen:
+      /* call recursively for the CDR: */
       var object new_cdr = sublis(Cdr(STACK_0),stackptr);
-      pushSTACK(new_cdr); # CDR-Ergebnis retten
-      # rekursiv für den CAR aufrufen:
+      pushSTACK(new_cdr); /* save CDR result */
+      /* call recursively for the CAR: */
       var object new_car = sublis(Car(STACK_1),stackptr);
       if (eq(new_car,Car(STACK_1)) && eq(STACK_0,Cdr(STACK_1))) {
-        # beides unverändert
-        skipSTACK(1); # CDR-Ergebnis vergessen
+        /* both unchanged */
+        skipSTACK(1); /* skip CDR result */
         return popSTACK();
       } else {
-        STACK_1 = new_car; # CAR-Ergebnis retten
+        STACK_1 = new_car; /* save CAR result */
         return cons_from_stack();
       }
     }
@@ -1563,93 +1418,85 @@ local maygc object sublis (object tree, gcv_object_t* stackptr) {
 
 LISPFUN(sublis,seclass_default,2,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
-  # (SUBLIS alist tree :test :test-not :key), CLTL S. 274
-  {
-    test_key_arg(); # :KEY-Argument in STACK_0
-    var gcv_object_t* stackptr = &STACK_1;
-    var up2_function_t up2_fun = test_test2_args(stackptr); # :TEST/:TEST-NOT-Argumente in STACK_2,STACK_1
-    # up2_fun = Testfunktion, wird mit stackptr und (KEY x) und u als
-    # Argumenten angesprungen. Sie liefert true, falls der Test erfüllt ist.
-    if (nullp(STACK_4)) { # shortcut: nothing to do if alist = ()
-      VALUES1(STACK_3);
-      skipSTACK(5);
-    } else {
-      pushSTACK(NIL); # Dummy
-      pushSTACK(make_machine_code(up2_fun)); # Testfunktion, wegen Typinfo=machine_type GC-sicher!
-      # stack layout: alist, tree, test, test_not, key, dummy, up2_fun.
-      VALUES1(sublis(STACK_5,stackptr)); /* do the substitution */
-      skipSTACK(7);
-    }
-  }
-
-# UP: Ersetzt im Baum tree alle x durch ihr ALIST-Abbild (mittels ASSOC):
-# x wird durch das erste v ersetzt, so dass (u . v) in ALIST vorkommt und
-# (KEY x) und u der TESTFUNktion genügen. Destruktiv.
-# nsublis(tree,stackptr)
-# > tree: Baum
-# > stackptr: *(stackptr-1) = KEY, *(stackptr+3) = ALIST,
-#             *(stackptr-2) ist frei für (KEY x)
-# < ergebnis: Baum
-# can trigger GC
-local maygc object nsublis (object tree, gcv_object_t* stackptr) {
-  # erst (KEY tree) berechnen und ASSOC aufrufen:
-  pushSTACK(tree); # tree retten
-  funcall_key(*(stackptr STACKop -1),tree); # (KEY tree)
-  *(stackptr STACKop -2) = value1; # retten für sublis_assoc
-  var object assoc_erg = sublis_assoc(stackptr);
-  if (consp(assoc_erg)) {
-    # Test erfüllt
-    skipSTACK(1); return Cdr(assoc_erg); # (CDR (ASSOC ...)) als Wert
+{ /* (SUBLIS alist tree :test :test-not :key), CLTL p. 274 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  var gcv_object_t* stackptr = &STACK_1;
+  var funarg_t* pcall_test = check_test_args(stackptr); /* Call with :TEST/:TEST-NOT arguments */
+  /* on STACK_2,STACK_1 arguments. Returns true or false. */
+  if (nullp(STACK_4)) { /* shortcut: nothing to do if alist = () */
+    VALUES1(STACK_3);
+    skipSTACK(5);
   } else {
-    # Test nicht erfüllt
+    pushSTACK(NIL); /* Dummy */
+    pushSTACK(make_machine_code(pcall_test)); /* Testfunction, because of Typeinfo=machine_type GC-safe! */
+    /* stack layout: alist, tree, test, test_not, key, dummy, pcall_test. */
+    VALUES1(sublis(STACK_5,stackptr)); /* do the substitution */
+    skipSTACK(7);
+  }
+}
+
+/* UP: Replaces in tree all x by its A-LIST representation (by ASSOC):
+ x is replaced by the first v, so that (u . v) is a member in ALIST and
+ (KEY x) and u pass the TESTFUNction. Destructively (in-place).
+ sublis(tree,stackptr)
+ > tree: the Tree
+ > stackptr: *(stackptr-1) = KEY, *(stackptr+3) = ALIST,
+             *(stackptr-2) is free for (KEY x)
+ < result: same Tree CAR
+ can trigger GC */
+local maygc object nsublis (object tree, gcv_object_t* stackptr) {
+  /* First calculate (KEY tree) and call ASSOC: */
+  pushSTACK(tree); /* save tree */
+  funcall_key(*(stackptr STACKop -1),tree); /* (KEY tree) */
+  *(stackptr STACKop -2) = value1; /* save for sublis_assoc */
+  var object assoc_erg = sublis_assoc(stackptr);
+  if (consp(assoc_erg)) { /* Test ok */
+    skipSTACK(1); return Cdr(assoc_erg); /* (CDR (ASSOC ...)) as value */
+  } else { /* Test not ok */
     if (mconsp(STACK_0)) {
-      # Argument ist ein Cons -> NSUBLIS rekursiv aufrufen:
+      /* Argument is a Cons -> call NSUBLIS recursively: */
       check_STACK(); check_SP();
-      # rekursiv für den CDR aufrufen:
-      {
+      { /* call recursively for the CDR: */
         var object modified_cdr = nsublis(Cdr(STACK_0),stackptr);
         Cdr(STACK_0) = modified_cdr;
       }
-      # rekursiv für den CAR aufrufen:
-      {
+      { /* call recursively for the CAR: */
         var object modified_car = nsublis(Car(STACK_0),stackptr);
         Car(STACK_0) = modified_car;
       }
     }
-    return popSTACK(); # ursprünglicher Baum zurück
+    return popSTACK(); /* return original tree address */
   }
 }
 
 LISPFUN(nsublis,seclass_default,2,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
-  # (NSUBLIS alist tree :test :test-not :key), CLTL S. 275
-  {
-    test_key_arg(); # :KEY-Argument in STACK_0
-    var gcv_object_t* stackptr = &STACK_1;
-    var up2_function_t up2_fun = test_test2_args(stackptr); # :TEST/:TEST-NOT-Argumente in STACK_2,STACK_1
-    # up2_fun = Testfunktion, wird mit stackptr und (KEY x) und u als
-    # Argumenten angesprungen. Sie liefert true, falls der Test erfüllt ist.
-    if (nullp(STACK_4)) { # shortcut: nothing to do if alist = ()
-      VALUES1(STACK_3);
-      skipSTACK(5);
-    } else {
-      pushSTACK(NIL); # Dummy
-      pushSTACK(make_machine_code(up2_fun)); # Testfunktion, wegen Typinfo=machine_type GC-sicher!
-      # Stackaufbau: alist, tree, test, test_not, key, dummy, up2_fun.
-      VALUES1(nsublis(STACK_5,stackptr)); /* do the substitution */
-      skipSTACK(7);
-    }
+{ /* (NSUBLIS alist tree :test :test-not :key), CLTL p. 275 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  var gcv_object_t* stackptr = &STACK_1;
+  var funarg_t* pcall_test = check_test_args(stackptr); /* Call with :TEST/:TEST-NOT arguments */
+                                       /* on STACK_2,STACK_1 arguments. Returns true or false. */
+  if (nullp(STACK_4)) { /* shortcut: nothing to do if alist = () */
+    VALUES1(STACK_3);
+    skipSTACK(5);
+  } else {
+    pushSTACK(NIL); /* Dummy */
+    pushSTACK(make_machine_code(pcall_test)); /* Testfunction, because of Typeinfo=machine_type GC-safe! */
+    /* Stackaufbau: alist, tree, test, test_not, key, dummy, pcall_test. */
+    VALUES1(nsublis(STACK_5,stackptr)); /* do the substitution */
+    skipSTACK(7);
   }
+}
 
-# UP: find OBJ in LIS: (MEMBER OBJ LIS :TEST #'EQ)
-global object memq (const object obj, const object lis) {
+/*  UP: find OBJ in LIS: (MEMBER OBJ LIS :TEST #'EQ) */
+modexp object memq (const object obj, const object lis) {
   var object l = lis;
   while (consp(l)) {
     if (eq(Car(l),obj)) return l;
     l = Cdr(l);
   }
   if (!nullp(l))
-    fehler_proper_list_dotted(TheSubr(subr_self)->name,l);
+    error_proper_list_dotted(TheSubr(subr_self)->name,l);
   return NIL;
 }
 
@@ -1660,122 +1507,117 @@ LISPFUNNR(memq,2) {
   VALUES1(memq(obj,lis));
 }
 
-# UP: Liefert den Listenrest ab dem Listenelement, das der TESTFUNktion
-# genügt.
-# member(list,stackptr,up_fun)
-# > list: Liste
-# > stackptr: *(stackptr-1) = KEY
-# > up_fun: TESTFUN = Adresse der Testfunktion,
-#       wird selbem stackptr und mit (KEY x) als Argument angesprungen.
-#       Sie liefert true, falls der Test erfüllt ist, false sonst.
-# < ergebnis: Listenrest
-# can trigger GC
-local maygc object member (object list, gcv_object_t* stackptr, up_function_t up_fun) {
+/* UP: Returns the rest of the list starting with the list element,
+   which satisfies the TESTFUNction.
+ member(list,stackptr,up_fun)
+ > list: List
+ > stackptr: *(stackptr-1) = KEY
+ > up_fun: TESTFUN = Address of the test function,
+        Called with same stackptr and with (KEY x) as argument.
+        Returns true or false.
+ < result: rest of list
+ can trigger GC */
+local maygc object member (object list, gcv_object_t* stackptr,
+                           funarg_t* pcall_test) {
   while (!endp(list)) {
-    pushSTACK(list); # Listenrest retten
-    funcall_key(*(stackptr STACKop -1),Car(list)); # (KEY x)
+    pushSTACK(list); /* save rest of list */
+    funcall_key(*(stackptr STACKop -1),Car(list)); /* (KEY x) */
     {
-      var bool erg = up_fun(stackptr,value1); # TESTFUN aufrufen
+      var bool erg = CALL_TEST(stackptr); /* (funcall TESTFUN ...) */
       list = popSTACK();
       if (erg)
-        return list; # Test erfüllt -> list als Ergebnis
+        return list; /* Test ok -> list as result */
     }
-    # Test nicht erfüllt -> (member ... (cdr list)) aufrufen:
-    list = Cdr(list); # tail-end-rekursiv
+    /* Test not ok -> call (member ... (cdr list)): */
+    list = Cdr(list); /* tail-end-recursively */
   }
-  return list; # NIL als Ergebnis
+  return list; /* NIL as result */
 }
 
 LISPFUN(member,seclass_default,2,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
-  # (MEMBER item list :test :test-not :key), CLTL S. 275
-  {
-    test_key_arg(); # :KEY-Argument in STACK_0
-    var up_function_t up_fun = test_test_args(); # :TEST/:TEST-NOT-Argumente in STACK_2,STACK_1
-    VALUES1(member(STACK_3,&STACK_1,up_fun)); /* do the search */
-    skipSTACK(5);
-  }
+{ /* (MEMBER item list :test :test-not :key), CLTL p. 275 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  var funarg_t* pcall_test = check_test_args(&STACK_1); /* :TEST/:TEST-NOT arguments on STACK_2,STACK_1 */
+  VALUES1(member(STACK_3,&STACK_1,pcall_test)); /* do the search */
+  skipSTACK(5);
+}
 
 LISPFUN(member_if,seclass_default,2,0,norest,key,1, (kw(key)) )
-  # (MEMBER-IF pred list :key), CLTL S. 275
-  {
-    test_key_arg(); # :KEY-Argument in STACK_0
-    VALUES1(member(STACK_1,&STACK_1,&up_if)); /* do the search */
-    skipSTACK(3);
-  }
+{ /* (MEMBER-IF pred list :key), CLTL p. 275 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  VALUES1(member(STACK_1,&STACK_1,&call_if)); /* do the search */
+  skipSTACK(3);
+}
 
 LISPFUN(member_if_not,seclass_default,2,0,norest,key,1, (kw(key)) )
-  # (MEMBER-IF-NOT pred list :key), CLTL S. 275
-  {
-    test_key_arg(); # :KEY-Argument in STACK_0
-    VALUES1(member(STACK_1,&STACK_1,&up_if_not)); /* do the search */
-    skipSTACK(3);
-  }
+{ /* (MEMBER-IF-NOT pred list :key), CLTL p. 275 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  VALUES1(member(STACK_1,&STACK_1,&call_if_not)); /* do the search */
+  skipSTACK(3);
+}
 
-LISPFUNNR(tailp,2) # (TAILP sublist list), CLTL S. 275
+LISPFUNNR(tailp,2) /* (TAILP sublist list), CLTL p. 275 */
+#ifndef X3J13_175
+/* (defun tailp (sublist list)
+     (do ((l list (rest l)))
+         ((endp l) (null sublist))
+       (when (eq l sublist) (return t)))) */
+#else
+/* (defun tailp (sublist list)
+     (loop
+       (when (eql sublist list) (return t))
+       (when (atom list) (return nil))
+       (setq list (cdr list)))) */
+#endif
+{
+  var object list = popSTACK();
+  var object sublist = popSTACK();
   #ifndef X3J13_175
-  # (defun tailp (sublist list)
-  #   (do ((l list (rest l)))
-  #       ((endp l) (null sublist))
-  #     (when (eq l sublist) (return t))
-  # ) )
-  #else
-  # (defun tailp (sublist list)
-  #   (loop
-  #     (when (eql sublist list) (return t))
-  #     (when (atom list) (return nil))
-  #     (setq list (cdr list))
-  # ) )
-  #endif
-  {
-    var object list = popSTACK();
-    var object sublist = popSTACK();
-    #ifndef X3J13_175
-    while (!endp(list)) {
-      if (eq(list,sublist))
-        goto yes;
-      list = Cdr(list);
-    }
-    if (nullp(sublist))
+  while (!endp(list)) {
+    if (eq(list,sublist))
       goto yes;
-    #else
-    loop {
-      if (eql(list,sublist))
-        goto yes;
-      if (atomp(list))
-        break;
-      list = Cdr(list);
-    }
-    #endif
-    VALUES1(NIL); return; # NIL als Wert
-   yes:
-    VALUES1(T); return; # T als Wert
+    list = Cdr(list);
   }
+  if (nullp(sublist))
+    goto yes;
+  #else
+  while (1) {
+    if (eql(list,sublist))
+      goto yes;
+    if (atomp(list))
+      break;
+    list = Cdr(list);
+  }
+  #endif
+  VALUES1(NIL); return; /* NIL as value */
+ yes:
+  VALUES1(T); return; /* T as value */
+}
 
 LISPFUN(adjoin,seclass_default,2,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
-  # (ADJOIN item list :test :test-not :key), CLTL S. 276
+{ /* (ADJOIN item list :test :test-not :key), CLTL p. 276 */
+  /* first test on (MEMBER (key item) list :test :test-not :key): */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  var funarg_t* pcall_test = check_test_args(&STACK_1); /* :TEST/:TEST-NOT arguments on STACK_2,STACK_1 */
   {
-    # erst Test auf (MEMBER (key item) list :test :test-not :key):
-    test_key_arg(); # :KEY-Argument in STACK_0
-    var up_function_t up_fun = test_test_args(); # :TEST/:TEST-NOT-Argumente in STACK_2,STACK_1
-    {
-      var object item = STACK_4;
-      pushSTACK(item); # item retten
-      funcall_key(STACK_1,item); STACK_5 = value1; # item := (funcall key item)
-    }
-    # Stackaufbau: (key item), list, test, test-not, key, item
-    if (nullp(member(STACK_4,&STACK_2,up_fun))) { # Suche durchführen
-      # item noch nicht in list gefunden: muss consen
-      var object new_cons = allocate_cons();
-      Cdr(new_cons) = STACK_4; # = list
-      Car(new_cons) = STACK_0; # = item
-      VALUES1(new_cons);
-    } else {
-      VALUES1(STACK_4); # list als Wert
-    }
-    skipSTACK(6); return;
+    var object item = STACK_4;
+    pushSTACK(item); /* save item */
+    funcall_key(STACK_1,item); STACK_5 = value1; /* item := (funcall key item) */
   }
+  /* stack layout: (key item), list, test, test-not, key, item */
+  if (nullp(member(STACK_4,&STACK_2,pcall_test))) { /* do search */
+    /* item not yet found in list: must cons */
+    var object new_cons = allocate_cons();
+    Cdr(new_cons) = STACK_4; /* = list */
+    Car(new_cons) = STACK_0; /* = item */
+    VALUES1(new_cons);
+  } else {
+    VALUES1(STACK_4); /* list as value */
+  }
+  skipSTACK(6); return;
+}
 
 LISPFUN(acons,seclass_no_se,3,0,norest,nokey,0,NIL)
 { /* (ACONS key val alist) = (CONS (CONS key val) alist), CLTL p. 279 */
@@ -1795,152 +1637,148 @@ LISPFUN(pairlis,seclass_read,2,1,norest,nokey,0,NIL)
     STACK_0=NIL; /* ALIST defaults to NIL */
   pushSTACK(STACK_2);     /* keys */
   pushSTACK(STACK_(1+1)); /* data */
-  loop { /* stack layout: keys, data, alist, keysr, datar. */
+  while (1) { /* stack layout: keys, data, alist, keysr, datar. */
     if (endp(STACK_0)) /* data is over? */
-      if (endp(STACK_1)) /* keys is over? */
+      if (endp(STACK_1)) /* keys are over? */
         goto end;
       else
-        goto fehler_lengths;
+        goto error_lengths;
     else
-      if (endp(STACK_1)) /* keys is over? */
-        goto fehler_lengths;
+      if (endp(STACK_1)) /* keys are over? */
+        goto error_lengths;
       else {
         var object new_cons = allocate_cons();
-        Car(new_cons) = Car(STACK_1); # nächstes key als CAR
-        Cdr(new_cons) = Car(STACK_0); # nächstes data als CDR
-        STACK_1 = Cdr(STACK_1); # keys verkürzen
-        STACK_0 = Cdr(STACK_0); # data verkürzen
+        Car(new_cons) = Car(STACK_1); /* next key as CAR */
+        Cdr(new_cons) = Car(STACK_0); /* next data as CDR */
+        STACK_1 = Cdr(STACK_1); /* shorten keys */
+        STACK_0 = Cdr(STACK_0); /* shorten data */
         pushSTACK(new_cons);
-        new_cons = allocate_cons(); # weiteres neues Cons
-        Car(new_cons) = popSTACK(); # mit (key . data) als CAR
-        Cdr(new_cons) = STACK_2; # und alist als CDR
-        STACK_2 = new_cons; # ergibt neues alist
+        new_cons = allocate_cons(); /* one more new Cons */
+        Car(new_cons) = popSTACK(); /* with (key . data) as CAR */
+        Cdr(new_cons) = STACK_2; /* and a-list as CDR */
+        STACK_2 = new_cons; /* results in new a-list */
       }
   }
- fehler_lengths:
+ error_lengths:
   skipSTACK(3);
   {
     var object data_list = popSTACK();
     var object keys_list = popSTACK();
     pushSTACK(data_list); pushSTACK(keys_list);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: lists ~S and ~S are not of same length"));
+    error(error_condition,GETTEXT("~S: lists ~S and ~S are not of same length"));
   }
  end:
-  VALUES1(STACK_2); skipSTACK(5); # alist als Wert
+  VALUES1(STACK_2); skipSTACK(5); /* a-list as value */
 }
 
-# UP: Liefert das erste Listenelement, dessen CAR der TESTFUNktion genügt.
-# assoc(alist,stackptr)
-# > alist: Aliste
-# > stackptr: *(stackptr-1) = KEY
-# > up_fun: TESTFUN = Adresse der Testfunktion, wird für alle Listenelemente
-#       (u . v) mit selbem stackptr und mit (KEY u) als Argument angesprungen.
-#       Sie liefert true, falls der Test erfüllt ist, false sonst.
-# < ergebnis: Listenelement (ein Cons) oder NIL
-# can trigger GC
-local maygc object assoc (object alist, gcv_object_t* stackptr, up_function_t up_fun)
-{
+/* UP: Returns the first list element, which CAR satisfies the TESTFUNction.
+ assoc(alist,stackptr)
+ > alist: A-list
+ > stackptr: *(stackptr-1) = KEY
+ > up_fun: TESTFUN = Address of the test function. Called for list elements
+        (u . v) with same stackptr and with (KEY u) as argument.
+        Returns true or false.
+ < result: List element (a Cons) or NIL
+ can trigger GC */
+local maygc object assoc (object alist, gcv_object_t* stackptr,
+                          funarg_t* pcall_test) {
  start:
   if (endp(alist)) /* end of alist ==> NIL */
     return NIL;
   else {
     var object head = Car(alist);
-    if (mconsp(head)) { # atomare Listenelemente überspringen
-      pushSTACK(alist); # Listenrest ((u . v) ...) retten
-      funcall_key(*(stackptr STACKop -1),Car(head)); # (KEY u)
-      var bool erg = up_fun(stackptr,value1); # TESTFUN aufrufen
+    if (mconsp(head)) { /* skip atomic list elements */
+      pushSTACK(alist); /* save rest of list ((u . v) ...) */
+      funcall_key(*(stackptr STACKop -1),Car(head)); /* (KEY u) */
+      var bool erg = CALL_TEST(stackptr); /* (funcall TESTFUN ...) */
       alist = popSTACK();
       if (erg)
-        # Test erfüllt -> x = (u . v) = (CAR alist) als Ergebnis
+        /* Test ok -> x = (u . v) = (CAR alist) as result */
         return Car(alist);
-      # Test nicht erfüllt
+      /* Test not ok */
     } else if (!nullp(head))
-      fehler_list(head);
-    # tail-end-rekursiv (assoc ... (cdr alist)) aufrufen:
+      error_list(head);
+    /* call tail-recursively (assoc ... (cdr alist)) */
     alist = Cdr(alist); goto start;
   }
 }
 
 LISPFUN(assoc,seclass_default,2,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
-  # (ASSOC item alist :test :test-not :key), CLTL S. 280
-  {
-    test_key_arg(); # :KEY-Argument in STACK_0
-    var up_function_t up_fun = test_test_args(); # :TEST/:TEST-NOT-Argumente in STACK_2,STACK_1
-    VALUES1(assoc(STACK_3,&STACK_1,up_fun)); /* do the search */
-    skipSTACK(5);
-  }
+{ /* (ASSOC item alist :test :test-not :key), CLTL p. 280 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  var funarg_t* pcall_test = check_test_args(&STACK_1); /* :TEST/:TEST-NOT arguments on STACK_2,STACK_1 */
+  VALUES1(assoc(STACK_3,&STACK_1,pcall_test)); /* do the search */
+  skipSTACK(5);
+}
 
 LISPFUN(assoc_if,seclass_default,2,0,norest,key,1, (kw(key)) )
-  # (ASSOC-IF pred alist :key), CLTL S. 280
-  {
-    test_key_arg(); # :KEY-Argument in STACK_0
-    VALUES1(assoc(STACK_1,&STACK_1,&up_if)); /* do the search */
-    skipSTACK(3);
-  }
+{ /* (ASSOC-IF pred alist :key), CLTL p. 280 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  VALUES1(assoc(STACK_1,&STACK_1,&call_if)); /* do the search */
+  skipSTACK(3);
+}
 
 LISPFUN(assoc_if_not,seclass_default,2,0,norest,key,1, (kw(key)) )
-  # (ASSOC-IF-NOT pred alist :key), CLTL S. 280
-  {
-    test_key_arg(); # :KEY-Argument in STACK_0
-    VALUES1(assoc(STACK_1,&STACK_1,&up_if_not)); /* do the search */
-    skipSTACK(3);
-  }
+{ /* (ASSOC-IF-NOT pred alist :key), CLTL p. 280 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  VALUES1(assoc(STACK_1,&STACK_1,&call_if_not)); /* do the search */
+  skipSTACK(3);
+}
 
-# UP: Liefert das erste Listenelement, dessen CDR der TESTFUNktion genügt.
-# rassoc(alist,stackptr)
-# > alist: Aliste
-# > stackptr: *(stackptr-1) = KEY
-# > up_fun: TESTFUN = Adresse der Testfunktion, wird für alle Listenelemente
-#       (u . v) mit selbem stackptr und mit (KEY v) als Argument angesprungen.
-#       Sie liefert true, falls der Test erfüllt ist, false sonst.
-# < ergebnis: Listenelement (ein Cons) oder NIL
-# can trigger GC
+/* UP: Returns the first list element, which CDR satisfies the TESTFUNction.
+ rassoc(alist,stackptr)
+ > alist: A-list
+ > stackptr: *(stackptr-1) = KEY
+ > up_fun: TESTFUN = Address of the test function. Called for list elements
+        (u . v) with same stackptr and with (KEY v) as argument.
+        Returns true or false.
+ < result: List element (a Cons) or NIL
+ can trigger GC */
 local maygc object rassoc (object alist, gcv_object_t* stackptr,
-                           up_function_t up_fun)
-{
+                           funarg_t* pcall_test) {
  start:
   if (endp(alist)) /* end of alist ==> NIL */
     return NIL;
   else {
     var object head = Car(alist);
-    if (mconsp(head)) { # atomare Listenelemente überspringen
-      pushSTACK(alist); # Listenrest ((u . v) ...) retten
-      funcall_key(*(stackptr STACKop -1),Cdr(head)); # (KEY v)
-      var bool erg = up_fun(stackptr,value1); # TESTFUN aufrufen
+    if (mconsp(head)) { /* skip atomic list elements */
+      pushSTACK(alist); /* save rest of list ((u . v) ...) */
+      funcall_key(*(stackptr STACKop -1),Cdr(head)); /* (KEY v) */
+      var bool erg = CALL_TEST(stackptr); /* (funcall TESTFUN ...) */
       alist = popSTACK();
       if (erg)
-        # Test erfüllt -> x = (u . v) = (CAR alist) als Ergebnis
+        /* Test ok -> x = (u . v) = (CAR alist) as result */
         return Car(alist);
-      # Test nicht erfüllt
+      /* Test not ok */
     } else if (!nullp(head))
-      fehler_list(head);
-    # tail-end-rekursiv (rassoc ... (cdr alist)) aufrufen:
+      error_list(head);
+    /* Call tail-recursively (rassoc ... (cdr alist)) */
     alist = Cdr(alist); goto start;
   }
 }
 
 LISPFUN(rassoc,seclass_default,2,0,norest,key,3,
         (kw(test),kw(test_not),kw(key)) )
-{ /* (RASSOC item alist :test :test-not :key), CLTL S. 281 */
-  test_key_arg(); # :KEY-Argument in STACK_0
-  var up_function_t up_fun = test_test_args(); # :TEST/:TEST-NOT-Argumente in STACK_2,STACK_1
-  VALUES1(rassoc(STACK_3,&STACK_1,up_fun)); /* do the search */
+{ /* (RASSOC item alist :test :test-not :key), CLTL p. 281 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  var funarg_t* pcall_test = check_test_args(&STACK_1); /* :TEST/:TEST-NOT arguments on STACK_2,STACK_1 */
+  VALUES1(rassoc(STACK_3,&STACK_1,pcall_test)); /* do the search */
   skipSTACK(5);
 }
 
 LISPFUN(rassoc_if,seclass_default,2,0,norest,key,1, (kw(key)) )
-{ /* (RASSOC-IF pred alist :key), CLTL S. 281 */
-  test_key_arg(); # :KEY-Argument in STACK_0
-  VALUES1(rassoc(STACK_1,&STACK_1,&up_if)); /* do the search */
+{ /* (RASSOC-IF pred alist :key), CLTL p. 281 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  VALUES1(rassoc(STACK_1,&STACK_1,&call_if)); /* do the search */
   skipSTACK(3);
 }
 
 LISPFUN(rassoc_if_not,seclass_default,2,0,norest,key,1, (kw(key)) )
-{ /* (RASSOC-IF-NOT pred alist :key), CLTL S. 281 */
-  test_key_arg(); # :KEY-Argument in STACK_0
-  VALUES1(rassoc(STACK_1,&STACK_1,&up_if_not)); /* do the search */
+{ /* (RASSOC-IF-NOT pred alist :key), CLTL p. 281 */
+  check_key_arg(&STACK_0); /* :KEY argument on STACK_0 */
+  VALUES1(rassoc(STACK_1,&STACK_1,&call_if_not)); /* do the search */
   skipSTACK(3);
 }
 
@@ -1981,11 +1819,11 @@ LISPFUNN(list_access_set,3)
  elt_up(seq,index)
  > seq
  > index
- < ergebnis: list element at this index */
+ < result: list element at this index */
 local object elt_up (object seq, object index) {
   var object l = seq;
   var object n = Fixnum_0;
-  loop {
+  while (1) {
     if (atomp(l))
       goto index_too_large;
     if (eq(n,index))
@@ -2004,14 +1842,14 @@ local object elt_up (object seq, object index) {
     tmp = listof(1); pushSTACK(tmp); tmp = listof(3);
     STACK_3 = tmp;              /* TYPE-ERROR slot EXPECTED-TYPE */
   }
-  fehler(type_error,GETTEXT("~S: index ~S too large for ~S"));
+  error(type_error,GETTEXT("~S: index ~S too large for ~S"));
 }
 
 LISPFUNN(list_elt,2)
 { /* (lambda (seq index)
        (do ((L seq (cdr L)) (N 0 (1+ N)))
            (nil)
-         (if (atom L) (error "Zu großer Index in ELT: ~S" index))
+         (if (atom L) (error "index ~S too large for ~S" index seq))
          (if (= N index) (return (car L))))) */
   var object index = popSTACK();
   var object seq = popSTACK();
@@ -2022,7 +1860,7 @@ LISPFUNN(list_set_elt,3)
 { /* (lambda (seq index value)
        (do ((L seq (cdr L)) (N 0 (1+ N)))
            (nil)
-         (if (atom L) (error "Zu großer Index in ELT: ~S" index))
+         (if (atom L) (error "index ~S too large for ~S" index seq))
          (if (= N index) (return (rplaca L value))))) */
   var object nthcdr = elt_up(STACK_2,STACK_1);
   VALUES1(Car(nthcdr) = popSTACK());
@@ -2033,7 +1871,7 @@ LISPFUNN(list_init_start,2)
 { /* (lambda (seq index)
        (do ((L seq (cdr L)) (N 0 (1+ N)))
            ((= N index) (return L))
-         (if (atom L) (error "Unzulässiger :START - Index : ~S" index)))) */
+         (if (atom L) (error "start index ~S too large for ~S" index seq)))) */
   var object index = popSTACK();
   var object seq = popSTACK();
   var object l = seq;
@@ -2056,7 +1894,7 @@ LISPFUNN(list_init_start,2)
   pushSTACK(STACK_2);           /* seq */
   pushSTACK(STACK_2);           /* index */
   pushSTACK(S(list_init_start));
-  fehler(type_error,GETTEXT("~S: start index ~S too large for ~S"));
+  error(type_error,GETTEXT("~S: start index ~S too large for ~S"));
 }
 
 LISPFUNN(list_fe_init_end,2)
@@ -2067,13 +1905,13 @@ LISPFUNN(list_fe_init_end,2)
                (i index (1- i)))
               ((zerop i) L1)
            (if (atom L2)
-             (error "Unzulässiger :END - Index : ~S" index)))
-         (error "Unzulässiger :END - Index : ~S" index))) */
+             (error "end index ~S too large for ~S" index seq)))
+         (error "end index ~S too large for ~S" index seq))) */
   /* index is known to be an Integer >=0. */
   pushSTACK(NIL);                               /* L1 := nil */
   { var object seq = STACK_2; pushSTACK(seq); } /* L2 := seq */
   pushSTACK(Fixnum_0);                          /* i := 0 */
-  loop {
+  while (1) {
     /* stack layout: seq, index, L1, L2, i */
     if (eq(STACK_0,STACK_3))    /* i=index ? */
       goto end;
@@ -2081,8 +1919,8 @@ LISPFUNN(list_fe_init_end,2)
       goto index_too_large;
     var object new_cons = allocate_cons();      /* new Cons */
     var object L2 = STACK_1; STACK_1 = Cdr(L2); /* (pop L2) */
-    Car(new_cons) = Car(L2);                    /* als CAR */
-    Cdr(new_cons) = STACK_2;                    /* L1 als CDR */
+    Car(new_cons) = Car(L2);                    /* as CAR */
+    Cdr(new_cons) = STACK_2;                    /* L1 as CDR */
     STACK_2 = new_cons;                         /* L1 := new Cons */
     STACK_0 = fixnum_inc(STACK_0,1);            /* i := i+1 */
   }
@@ -2093,10 +1931,11 @@ LISPFUNN(list_fe_init_end,2)
     pushSTACK(S(integer)); pushSTACK(Fixnum_0); pushSTACK(STACK_(0+3));
     tmp = listof(3); pushSTACK(tmp); /* TYPE-ERROR slot EXPECTED-TYPE */
   }
-  pushSTACK(STACK_(4+2));
-  pushSTACK(STACK_(3+3));
-  pushSTACK(S(list_fe_init_end));
-  fehler(type_error,GETTEXT("~S: end index ~S too large for ~S"));
+  { pushSTACK(STACK_(4+2));
+    pushSTACK(STACK_(3+3));
+    pushSTACK(S(list_fe_init_end));
+    error(type_error,GETTEXT("~S: end index ~S too large for ~S"));
+  }
  end:
   VALUES1(STACK_2); /* return L1 */
   skipSTACK(5);

@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 2004-2005 Free Software Foundation, Inc.
+dnl Copyright (C) 2004-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -11,8 +11,7 @@ dnl From Bruno Haible.
 AC_PREREQ(2.57)
 
 AC_DEFUN([CL_POLL],
-[AC_REQUIRE([CL_OPENFLAGS])dnl
-AC_CHECK_FUNC(poll,
+[AC_CHECK_FUNC(poll,
   [# Check whether poll() works on special files (like /dev/null)
    # and ttys (like /dev/tty). On MacOS X 10.4.0, it doesn't.
    AC_TRY_RUN([
@@ -62,9 +61,6 @@ AC_TRY_RUN([
 #include <poll.h>
 /* Declare open(). */
 #include <fcntl.h>
-#ifdef OPEN_NEEDS_SYS_FILE_H
-#include <sys/file.h>
-#endif
 /* Declare lseek(). */
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>

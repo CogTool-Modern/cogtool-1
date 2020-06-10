@@ -1,7 +1,7 @@
 ;; CLISP disassembler
 ;; Sam Steingold: converted to CLOS 2001-06-16
 
-(in-package "COMPILER")
+(in-package "SYS")
 
 (defun orig-fundef (object)
   (unless (fboundp object)
@@ -76,7 +76,7 @@ if QUALIFIERS or SPECIALIZERS is given, OBJECT should be a generic function.")
 #+UNIX
 (defun disassemble-machine-code (program-name pid function address)
   ;; This uses gdb.
-  (unless (= (shell "gdb --version > /dev/null 2>&1") 0)
+  (when (shell "gdb --version > /dev/null 2>&1") ; failed
     (when function
       ;; Show at least some basic information about the function.
       (describe function))

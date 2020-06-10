@@ -1,7 +1,8 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; some tests for Berkeley-DB
-;; clisp -K full -E 1:1 -q -norc -i ../tests/tests -x '(run-test "berkeley-db/test")'
+;; clisp -E 1:1 -q -norc -i ../tests/tests -x '(run-test "berkeley-db/test")'
 
+(list (require "bdb")) (#-Berkeley-DB T #+Berkeley-DB NIL)
 (listp (show (multiple-value-list (ext:module-info "bdb" t)) :pretty t)) T
 
 (multiple-value-bind (ve ma mi pa subsystems) (bdb:db-version t)
@@ -9,23 +10,6 @@
 NIL
 
 ;;; --- helpers ---
-(defun kill-down (name)
-  (dolist (f (directory (ext:string-concat name "**")))
-    (format t "~&removing ~S~%" f)
-    (if (pathname-name f)
-        (delete-file f)
-        (ext:delete-dir f))))
-kill-down
-(defun rmrf (name)
-  (ext:dir (ext:string-concat name "**"))
-  (kill-down name)
-  (format t "~&removing ~S~%" name)
-  (ext:delete-dir name))
-rmrf
-(defun prepare-dir (name)
-  (ensure-directories-exist name :verbose t)
-  (kill-down name))
-prepare-dir
 (defun show-db (db)
   (let* ((*print-pretty* t) (stat (bdb:db-stat db))
          (file (and (eq :RECNO (bdb:db-stat-type stat))
@@ -43,17 +27,6 @@ show-db
                    (list :messages (bdb:dbe-messages dbe))))))
   nil)
 show-dbe
-(defun show-file (file)
-  (with-open-file (st file :direction :input)
-    (format t "~&~S: ~:D byte~:P:~%" file (file-length st))
-    (loop :for l = (read-line st nil nil) :while l
-      :do (format t "--> ~S~%" l))))
-show-file
-(defun finish-file (file)
-  (when (probe-file file) (show-file file))
-  (delete-file file)
-  (probe-file file))
-finish-file
 (progn
   (defmethod close :before ((h bdb:bdb-handle) &key abort)
     (declare (ignore abort))
@@ -68,8 +41,8 @@ nil
 
 ;;; preparations
 
-(prepare-dir "bdb-home/") NIL
-(prepare-dir "bdb-data/") NIL
+(prepare-directory "bdb-home/") NIL
+(prepare-directory "bdb-data/") NIL
 (progn (delete-file "bdb-errors") (delete-file "bdb-msg") NIL) NIL
 
 ;;; creation
@@ -85,6 +58,8 @@ NIL
 
 (bdb:dbe-get-options *dbe* :errpfx) "zot"
 
+(bdb:dbe-get-options *dbe* :db-gid-size) 128
+
 (bdb:dbe-open *dbe* :home "bdb-home/" :create t
               :init-mpool t :init-txn t :init-lock t :init-log t)
 NIL
@@ -92,6 +67,8 @@ NIL
 (show-dbe *dbe*) NIL
 
 (defvar *db* (let ((*print-pretty* t)) (show (bdb:db-create *dbe*)))) *db*
+
+(bdb:db-set-options *db*) NIL
 
 ;; the actual file goes to ./bdb-data/bazonk.db !
 (bdb:db-open *db* "bazonk.db" :type :BTREE :create t) NIL
@@ -176,23 +153,23 @@ NIL
 
 ;; locks - will NOT be automatically closed by DBE-CLOSE
 (defparameter *locker* (show (bdb:lock-id *dbe*))) *locker*
-(defparameter *lock* (show (bdb:lock-get *dbe* "foo" *locker* :READ)))
-*lock*
+(defparameter *lock* (show (bdb:lock-get *dbe* "foo" *locker* :READ))) *lock*
 
 (close *dbe*) T
 
 (block nil
   (handler-bind ((bdb:bdb-error
                   (lambda (c)
-                    (format t "~&~A~%" c)
-                    (return (integerp (bdb:bdb-error-number c))))))
+                    (princ-error c)
+                    (return (typep (bdb:bdb-error-code c)
+                                   '(or integer symbol))))))
     (close *lock*)))
 T
 
 (ext:dir "bdb-home/**") NIL
 (ext:dir "bdb-data/**") NIL
-(finish-file "bdb-errors") NIL
-(finish-file "bdb-msg") NIL
+(finish-file "bdb-errors") 2    ; just the two "start" and "stop" messages
+(finish-file "bdb-msg") 2
 
 ;;; access
 
@@ -349,7 +326,7 @@ nil
 (close *dbe*)    T
 (bdb:dbe-remove (show (bdb:dbe-create)) :home "bdb-home/") NIL
 
-(finish-file "bdb-errors") NIL
-(finish-file "bdb-msg") NIL
-(rmrf "bdb-home/") T
-(rmrf "bdb-data/") T
+(finish-file "bdb-errors") 2    ; just the two start and stop messages
+(finish-file "bdb-msg") 2
+(rmrf "bdb-home/") NIL
+(rmrf "bdb-data/") NIL

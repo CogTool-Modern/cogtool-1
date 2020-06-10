@@ -25,7 +25,7 @@ esac
 
 # We do the compile and load twice, to ensure that the second time, which is the one from 
 # which we save the memory image, contains no compilation spoor.
-cmd0="./clisp/$platform/base/$exefile -M clisp/$platform/base/lispinit.mem -i actr6.lisp"
+cmd0="./clisp/$platform/base/$exefile -i actr6.lisp"
 cmd="$cmd0 -x '(ext:quit)'"
 echo $cmd 
 eval $cmd

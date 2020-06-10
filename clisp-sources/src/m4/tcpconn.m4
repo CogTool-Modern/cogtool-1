@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2004 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2004, 2007-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -37,8 +37,8 @@ AC_CHECK_FUNCS(inet_pton inet_ntop inet_addr setsockopt getsockopt)
 AC_CHECK_HEADERS(netinet/in.h arpa/inet.h)dnl
 if test $ac_cv_func_inet_addr = yes; then
 CL_PROTO([inet_addr], [
-for x in '' 'const'; do
-for y in 'struct in_addr' 'unsigned long' 'unsigned int'; do
+for x in CONST_VARIANTS; do
+for y in SIZE_VARIANTS; do
 if test -z "$have_inet_addr"; then
 CL_PROTO_TRY([
 #ifdef HAVE_UNISTD_H
@@ -53,7 +53,7 @@ CL_PROTO_TRY([
 #include <sys/socket.h>
 #include <netdb.h>
 #endif
-], [$y inet_addr ($x char *);], [$y inet_addr();], [
+], [$y inet_addr ($x char *);], [
 cl_cv_proto_inet_addr_ret="$y"
 cl_cv_proto_inet_addr_arg1="$x"
 have_inet_addr=1])
@@ -61,10 +61,7 @@ fi
 done
 done
 if test -z "$have_inet_addr"; then
-  echo "*** Missing autoconfiguration support for this platform." 1>&2
-  echo "*** Please report this as a bug to the CLISP developers." 1>&2
-  echo "*** When doing this, please also show your system's inet_addr() declaration." 1>&2
-  exit 1
+CL_PROTO_MISSING(inet_addr)
 fi
 ], [extern $cl_cv_proto_inet_addr_ret inet_addr ($cl_cv_proto_inet_addr_arg1 char*);])
 AC_DEFINE_UNQUOTED(RET_INET_ADDR_TYPE,$cl_cv_proto_inet_addr_ret,[return type of inet_addr()])
@@ -83,14 +80,14 @@ dnl AIX 4 requires <netinet/in.h> to be included before <netinet/tcp.h>.
 ])
 if test $ac_cv_func_setsockopt = yes; then
 CL_PROTO([setsockopt], [
-for z in 'int' 'unsigned int' 'size_t'; do
+for z in SIZE_VARIANTS; do
 for y in 'char*' 'void*'; do
-for x in '' 'const'; do
+for x in CONST_VARIANTS; do
 if test -z "$have_setsockopt_decl"; then
 CL_PROTO_TRY([
 #include <sys/types.h>
 #include <sys/socket.h>
-], [int setsockopt (int, int, int, $x $y, $z);], [int setsockopt ();], [
+], [int setsockopt (int, int, int, $x $y, $z);], [
 cl_cv_proto_setsockopt_const="$x"
 cl_cv_proto_setsockopt_arg_t="$y"
 cl_cv_proto_setsockopt_optlen_t="$z"
@@ -100,10 +97,7 @@ done
 done
 done
 if test -z "$have_setsockopt_decl"; then
-  echo "*** Missing autoconfiguration support for this platform." 1>&2
-  echo "*** Please report this as a bug to the CLISP developers." 1>&2
-  echo "*** When doing this, please also show your system's setsockopt() declaration." 1>&2
-  exit 1
+CL_PROTO_MISSING(setsockopt)
 fi
 ], [extern int setsockopt (int, int, int, $cl_cv_proto_setsockopt_const $cl_cv_proto_setsockopt_arg_t, $cl_cv_proto_setsockopt_optlen_t);])
 AC_DEFINE_UNQUOTED(SETSOCKOPT_CONST,$cl_cv_proto_setsockopt_const,[declaration of setsockopt() needs const])

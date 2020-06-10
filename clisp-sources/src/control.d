@@ -1,7 +1,7 @@
 /*
  * Special Forms, Control Structures, Evaluator Related Stuff for CLISP
  * Bruno Haible 1990-2005
- * Sam Steingold 1998-2005
+ * Sam Steingold 1998-2009
  * German comments translated into English: Stefan Kain 2002-09-28
  */
 
@@ -84,32 +84,16 @@ LISPSPECFORM(function, 1,1,nobody)
   skipSTACK(2);
 }
 
-/* error-message, if a symbol has no value.
- > symbol: symbol
- < value1: bound value
- can trigger GC */
-local maygc void check_global_symbol_value (object symbol) {
-  value1 = Symbol_value(symbol);
-  if (!boundp(value1)) {
-    do {
-      pushSTACK(symbol); /* save */
-      pushSTACK(symbol); /* PLACE */
-      pushSTACK(symbol); /* CELL-ERROR Slot NAME */
-      pushSTACK(symbol);
-      pushSTACK(TheSubr(subr_self)->name);
-      check_value(unbound_variable,GETTEXT("~S: ~S has no dynamic value"));
-      symbol = popSTACK(); /* restore */
-    } while (!boundp(value1));
-    if (!nullp(value2)) /* STORE-VALUE */
-      Symbol_value(symbol) = value1;
-  }
-}
-
 LISPFUNNR(symbol_value,1)
 { /* (SYMBOL-VALUE symbol), CLTL p. 90 */
-  var object symbol = check_symbol(popSTACK());
-  check_global_symbol_value(symbol); /* value1 <- Symbol_value */
-  mv_count=1;
+  STACK_0 = check_symbol(STACK_0);
+  value1 = Symbol_value(STACK_0);
+  if (!boundp(value1)) {
+    check_variable_value_replacement(&STACK_0,true); /* sets value1 */
+    if (eq(T,value2)) /* STORE-VALUE */
+      Symbol_value(STACK_0) = value1;
+  }
+  skipSTACK(1); mv_count = 1;
 }
 
 LISPFUNNR(symbol_function,1)
@@ -133,7 +117,7 @@ local maygc object funname_to_symbol (object symbol) {
   return symbol;
 }
 
-LISPFUNNR(fdefinition,1)
+LISPFUNNS(fdefinition,1)
 { /* (FDEFINITION funname), CLTL2 p. 120 */
   var object symbol = funname_to_symbol(STACK_0);
   if (!symbolp(symbol))
@@ -184,21 +168,16 @@ local maygc bool check_setq_body (object caller) {
     STACK_0 = Cdr(STACK_0);
     if (atomp(STACK_0)) {
       if (!nullp(STACK_0))
-        goto fehler_dotted;
+        error_dotted_form(STACK_1,TheFsubr(subr_self)->name);
       /* STACK_0 == SOURCE-PROGRAM-ERROR slot DETAIL */
       pushSTACK(STACK_1); pushSTACK(TheFsubr(subr_self)->name);
-      fehler(source_program_error,
-             GETTEXT("~S: odd number of arguments: ~S"));
+      error(source_program_error,GETTEXT("~S: odd number of arguments: ~S"));
     }
     STACK_0 = Cdr(STACK_0);
   }
   /* body is finished. */
-  if (!nullp(STACK_0)) {
-   fehler_dotted: /* The whole body is still in STACK_0. */
-    /* STACK_0 == SOURCE-PROGRAM-ERROR slot DETAIL */
-    pushSTACK(STACK_1); pushSTACK(TheFsubr(subr_self)->name);
-    fehler(source_program_error,GETTEXT("dotted list given to ~S : ~S"));
-  }
+  if (!nullp(STACK_0))
+    error_dotted_form(STACK_1,TheFsubr(subr_self)->name);
   skipSTACK(1); /* drop body */
   return false;
 }
@@ -290,17 +269,17 @@ LISPFUNN(fmakunbound,1)
     if (fsubrp(obj)) {
       pushSTACK(symbol);
       pushSTACK(S(fmakunbound));
-      fehler(error,GETTEXT("~S: the special operator definition of ~S must not be removed"));
+      error(error_condition,GETTEXT("~S: the special operator definition of ~S must not be removed"));
     }
   }
-  Symbol_function(symbol) = unbound;
+  { Symbol_function(symbol) = unbound; }
  undef:
   VALUES1(funname);
 }
 
 LISPFUN(apply,seclass_default,2,0,rest,nokey,0,NIL)
 { /* (APPLY function {arg} arglist), CLTL p. 107 */
-  BEFORE(rest_args_pointer);
+  rest_args_pointer skipSTACKop 1; /* BEFORE */
   apply(Before(rest_args_pointer), /* function */
         argcount, /* number of {arg} on the stack */
         popSTACK()); /* arglist */
@@ -351,9 +330,10 @@ LISPSPECFORM(prog2, 2,0,body)
  parse_doc_decl(body);
  > body: whole Body
  can trigger GC */
-local maygc bool parse_doc_decl (object body, bool permit_doc_string) {
+local maygc object parse_doc_decl (object body, bool permit_doc_string) {
+  pushSTACK(NIL);               /* place for (COMPILE name) */
   pushSTACK(body);
-  var bool to_compile = parse_dd(body);
+  STACK_1 = parse_dd(body);
   if (!permit_doc_string && !nullp(value3)) {
     pushSTACK(value1); pushSTACK(value2); pushSTACK(value3); /* save */
     pushSTACK(NIL); pushSTACK(STACK_(0+3+1));
@@ -362,12 +342,13 @@ local maygc bool parse_doc_decl (object body, bool permit_doc_string) {
     value3 = popSTACK(); value2 = popSTACK(); value1 = popSTACK();
   }
   skipSTACK(1);
-  return to_compile;
+  return popSTACK();
 }
 
 /* get the 5 environment objects to the stack
- adds 5 elements to the STACK */
-local inline void aktenv_to_stack (void) {
+ adds 5 elements to the STACK
+ can trigger GC */
+local maygc inline void aktenv_to_stack (void) {
   /* nest current environment, push on STACK */
   var gcv_environment_t* stack_env = nest_aktenv();
  #if !defined(STACK_UP)
@@ -388,18 +369,28 @@ local inline void aktenv_to_stack (void) {
 
 /* UP for LET, LET*, LOCALLY, MULTIPLE-VALUE-BIND, SYMBOL-MACROLET:
  Compiles the current form and executes it in compiled state.
- compile_form()
+ compile_eval_form()
  > in STACK: EVAL-frame with the form
+ > closure_name: name or unbound
  < mv_count/mv_space: Values
  can trigger GC */
-local maygc Values compile_eval_form (void)
+local maygc Values compile_eval_form (object closure_name)
 { /* execute (SYS::COMPILE-FORM form venv fenv benv genv denv) :
      get the whole form from the EVAL-frame in the stack: */
-  pushSTACK(STACK_(frame_form)); /* as first argument */
+  var object form = STACK_(frame_form);
+  var gcv_object_t *closure_name_ = /* save closure_name */
+    boundp(closure_name) ? (pushSTACK(closure_name),&STACK_0) : NULL;
+  pushSTACK(form); /* as first argument */
   aktenv_to_stack();
-  funcall(S(compile_form),6);
+  var uintC argcount = 6;
+  if (NULL != closure_name_) {
+    pushSTACK(*closure_name_);
+    argcount = 7;
+  }
+  funcall(S(compile_form),argcount);
   /* call the freshly compiled closure with 0 arguments: */
   funcall(value1,0);
+  if (NULL != closure_name_) skipSTACK(1); /* drop closure_name_ */
 }
 
 /* signal a correctable error for a broken LET variable spec
@@ -418,26 +409,26 @@ local maygc object check_varspec (object varspec, object caller) {
    and the actual value (added when processing bindings).
  here we activate the SPECDECL bindings:
  Find the SPECDECL binding for the symbol
- > spec_pointer & spec_anz are returned by make_variable_frame()
+ > spec_pointer & spec_count are returned by make_variable_frame()
  < return the pointer to the flags (or symbol+flags)
  i.e., something suitable to SET_BIT,
  or NULL if no such binding is found */
 global gcv_object_t* specdecled_ (object symbol, gcv_object_t* spec_pointer,
-                                  uintL spec_anz) {
+                                  uintL spec_count) {
   do {
-    NEXT(spec_pointer);
+    spec_pointer skipSTACKop -1; /* NEXT */
    #ifdef NO_symbolflags
     if (eq(NEXT(spec_pointer),symbol)) {
       if (eq(NEXT(spec_pointer),Fixnum_0))
         return &Before(spec_pointer);
     } else {
-      NEXT(spec_pointer);
+      (void)NEXT(spec_pointer);
     }
    #else
-    if (eq(NEXT(spec_pointer),symbol))
+    if (eq(NEXT(spec_pointer),symbol_without_flags(symbol)))
       return &Before(spec_pointer);
    #endif
-  } while (--spec_anz);
+  } while (--spec_count);
   return NULL;
 }
 
@@ -454,7 +445,7 @@ global gcv_object_t* specdecled_ (object symbol, gcv_object_t* spec_pointer,
  < uintC bind_count: number of "genuine" bindings.
  < gcv_object_t* spec_ptr: pointer to the first SPECDECL binding.
  < uintC spec_count: number of SPECDECL bindings.
- changes STACK
+ changes STACK (STACK_0<-value1=({form}) + bindings requiring 2 unwind calls)
  can trigger GC */
 local /*maygc*/ void make_variable_frame
 (object caller, object varspecs, gcv_object_t** bind_ptr_, uintC* bind_count_,
@@ -467,7 +458,7 @@ local /*maygc*/ void make_variable_frame
     /* first store the special-declared variables from
        declarations in the stack: */
     var gcv_object_t* spec_pointer = args_end_pointer;
-    var uintL spec_anz = 0; /* number of SPECIAL-references */
+    var uintL spec_count = 0; /* number of SPECIAL-references */
     {
       var object declspecs = declarations;
       while (consp(declspecs)) {
@@ -489,19 +480,35 @@ local /*maygc*/ void make_variable_frame
             /* store special-declared symbol in stack: */
             pushSTACK(specdecl); /* SPECDECL as "value" */
             pushSTACK_symbolwithflags(declsym,0); /* Symbol inactive */
+          #if defined(MULTITHREAD)
+            /* this is locally declared special variable. make it per thread
+               if not already.*/
+            if (TheSymbol(declsym)->tls_index == SYMBOL_TLS_INDEX_NONE) {
+              /* this call is may gc now */
+              pushSTACK(value1); pushSTACK(value2);          /* save */
+              pushSTACK(caller); pushSTACK(varspecs);        /* save */
+              pushSTACK(declarations); pushSTACK(declspecs); /* save */
+              pushSTACK(declspec);                           /* save */
+              add_per_thread_special_var(declsym);
+              declspec = popSTACK();
+              declspecs = popSTACK(); declarations = popSTACK(); /* restore */
+              varspecs = popSTACK(); caller = popSTACK();        /* restore */
+              value2 = popSTACK(); value1 = popSTACK();          /* restore */
+            }
+          #endif
             check_STACK();
-            spec_anz++;
+            spec_count++;
           }
         }
         declspecs = Cdr(declspecs);
       }
-      *spec_count_ = spec_anz;
+      *spec_count_ = spec_count;
       *spec_ptr_ = spec_pointer;
     }
     *bind_ptr_ = args_end_pointer; /* pointer to first "genuine" binding */
     { /* Then store the "genuine" variable bindings (the variable
          and its unevaluated init at a time) in the stack: */
-      var uintL var_anz = 0; /* number of variable bindings */
+      var uintL var_count = 0; /* number of variable bindings */
       {
         while (consp(varspecs)) {
           var object varspec = Car(varspecs); /* next varspec */
@@ -538,19 +545,17 @@ local /*maygc*/ void make_variable_frame
           check_STACK();
           /* determine, if static or dynamic binding: */
           var bool specdecled = /* variable is declared special? */
-            (specdecled_p(symbol,spec_pointer,spec_anz) != NULL);
+            (specdecled_p(symbol,spec_pointer,spec_count) != NULL);
           if (eq(caller,S(symbol_macrolet))) {
             if (special_var_p(TheSymbol(symbol))) {
               pushSTACK(symbol);
               pushSTACK(caller);
-              fehler(program_error,
-                     GETTEXT("~S: symbol ~S has been declared SPECIAL and may not be re-defined as a SYMBOL-MACRO"));
+              error(program_error,GETTEXT("~S: symbol ~S has been declared SPECIAL and may not be re-defined as a SYMBOL-MACRO"));
             }
             if (specdecled) {
               pushSTACK(symbol); /* SOURCE-PROGRAM-ERROR slot DETAIL */
               pushSTACK(symbol); pushSTACK(caller);
-              fehler(source_program_error,
-                     GETTEXT("~S: symbol ~S must not be declared SPECIAL and defined a SYMBOL-MACRO at the same time"));
+              error(source_program_error,GETTEXT("~S: symbol ~S must not be declared SPECIAL and defined a SYMBOL-MACRO at the same time"));
             }
             /* static binding */
           } else {
@@ -577,21 +582,21 @@ local /*maygc*/ void make_variable_frame
             }
           }
           varspecs = Cdr(varspecs);
-          var_anz++;
+          var_count++;
         }
       }
-      *bind_count_ = var_anz;
-      var_anz += spec_anz; /* total number of symbol/value pairs */
+      *bind_count_ = var_count;
+      var_count += spec_count; /* total number of symbol/value pairs */
      #ifndef UNIX_DEC_ULTRIX_GCCBUG
-      if (var_anz > (uintC)(~(uintC)0)) { /* does it fit into a uintC ? */
+      if (var_count > (uintC)(~(uintC)0)) { /* does it fit into a uintC ? */
         pushSTACK(unbound);     /* SOURCE-PROGRAM-ERROR slot DETAIL */
         pushSTACK(caller);
-        fehler(source_program_error,
-               GETTEXT("~S: too many variables and/or declarations"));
+        error(source_program_error,
+              GETTEXT("~S: too many variables and/or declarations"));
       }
      #endif
       pushSTACK(aktenv.var_env); /* current VAR_ENV as NEXT_ENV */
-      pushSTACK(fake_gcv_object(var_anz)); /* number of bindings */
+      pushSTACK(fake_gcv_object(var_count)); /* number of bindings */
       finish_frame(VAR);
     }
   }
@@ -640,8 +645,8 @@ local void activate_bindings (gcv_object_t* frame_pointer, uintC count) {
     if (as_oint(*markptr) & wbit(dynam_bit_o)) { /* binding dynamic? */
       var object symbol = *(markptr STACKop varframe_binding_sym); /* variable */
       var object newval = *(markptr STACKop varframe_binding_value); /* new value */
-      *(markptr STACKop varframe_binding_value) = TheSymbolflagged(symbol)->symvalue; /* save old value in frame */
-      TheSymbolflagged(symbol)->symvalue = newval; /* new value */
+      *(markptr STACKop varframe_binding_value) = Symbolflagged_value(symbol); /* save old value in frame */
+      Symbolflagged_value(symbol) = newval; /* new value */
     }
     *markptr = SET_BIT(*markptr,active_bit_o); /* activate binding */
   } while (--count);
@@ -658,9 +663,10 @@ global void activate_specdecls (gcv_object_t* spec_ptr, uintC spec_count) {
 LISPSPECFORM(let, 1,0,body)
 { /* (LET ({varspec}) {decl} {form}), CLTL p. 110 */
   /* separate {decl} {form}: */
-  if (parse_doc_decl(STACK_0,false)) { /* declaration (COMPILE) ? */
+  var object compile_name = parse_doc_decl(STACK_0,false);
+  if (!eq(Fixnum_0,compile_name)) { /* declaration (COMPILE) ? */
     /* yes -> compile form: */
-    skipSTACK(2); return_Values compile_eval_form();
+    skipSTACK(2); return_Values compile_eval_form(compile_name);
   } else {
     skipSTACK(1);
     /* build variable binding frame, extend VAR_ENV : */
@@ -690,18 +696,19 @@ LISPSPECFORM(let, 1,0,body)
   }
 }
 
-LISPSPECFORM(letstern, 1,0,body)
+LISPSPECFORM(letstar, 1,0,body)
 { /* (LET* ({varspec}) {decl} {form}), CLTL p. 111 */
   /* separate {decl} {form} : */
-  if (parse_doc_decl(STACK_0,false)) { /* declaration (COMPILE) ? */
+  var object compile_name = parse_doc_decl(STACK_0,false);
+  if (!eq(Fixnum_0,compile_name)) { /* declaration (COMPILE) ? */
     /* yes -> compile form: */
-    skipSTACK(2); return_Values compile_eval_form();
+    skipSTACK(2); return_Values compile_eval_form(compile_name);
   } else {
     skipSTACK(1);
     /* build variable binding frame, extend VAR_ENV : */
     var gcv_object_t *bind_ptr, *spec_ptr;
     var uintC bind_count, spec_count;
-    make_variable_frame(S(letstern),popSTACK(),&bind_ptr,&bind_count,
+    make_variable_frame(S(letstar),popSTACK(),&bind_ptr,&bind_count,
                         &spec_ptr,&spec_count);
     /* Then, evaluate the initialization forms and activate the bindings */
     if (bind_count > 0) {
@@ -715,8 +722,8 @@ LISPSPECFORM(letstern, 1,0,body)
         var object newval = (!boundp(init) ? NIL : (eval(init),value1)); /* evaluate, NIL as default */
         if (as_oint(*markptr) & wbit(dynam_bit_o)) { /* binding dynamic? */
           var object symbol = *(markptr STACKop varframe_binding_sym); /* variable */
-          *initptr = TheSymbolflagged(symbol)->symvalue; /* save old value in frame */
-          TheSymbolflagged(symbol)->symvalue = newval; /* new value */
+          *initptr = Symbolflagged_value(symbol); /* save old value in frame */
+          Symbolflagged_value(symbol) = newval; /* new value */
           activate_specdecl(symbol,spec_ptr,spec_count);
         } else {
           *initptr = newval; /* new value into the frame */
@@ -733,22 +740,35 @@ LISPSPECFORM(letstern, 1,0,body)
   }
 }
 
+/* call make_variable_frame + activate_bindings + activate_specdecls
+ Analyzes the variables and declarations, builds up a variable binding-
+ frame and extends VENV and poss. also DENV by a frame.
+ make_vframe_activate(void)
+ call it after parse_doc_decl, then the inputs are correct:
+ > object value2: list of declaration-specifiers
+ > object value1: list ({form}) of forms
+ changes STACK (STACK_0<-value1=({form}) + 2 bindings requiring 2 unwind calls)
+ can trigger GC */
+local /*maygc*/ void make_vframe_activate (void) {
+  GCTRIGGER2(value1,value2);
+  var gcv_object_t *bind_ptr, *spec_ptr;
+  var uintC bind_count, spec_count;
+  make_variable_frame(TheFsubr(subr_self)->name,NIL,&bind_ptr,&bind_count,
+                      &spec_ptr,&spec_count);
+  if (bind_count) activate_bindings(bind_ptr,bind_count);
+  if (spec_count) activate_specdecls(spec_ptr,spec_count);
+}
+
 LISPSPECFORM(locally, 0,0,body)
 { /* (LOCALLY {decl} {form}), CLTL2 p. 221 */
   /* separate {decl} {form} : */
-  var bool to_compile = parse_doc_decl(STACK_0,false);
+  var object compile_name = parse_doc_decl(STACK_0,false);
   skipSTACK(1);
-  if (to_compile) { /* declaration (COMPILE) ? */
+  if (!eq(Fixnum_0,compile_name)) { /* declaration (COMPILE) ? */
     /* yes -> compile form: */
-    return_Values compile_eval_form();
-  } else {
-    /* build variable binding frame, extend VAR_ENV : */
-    var gcv_object_t *bind_ptr, *spec_ptr;
-    var uintC bind_count, spec_count;
-    make_variable_frame(S(locally),NIL,&bind_ptr,&bind_count,
-                        &spec_ptr,&spec_count);
-    if (bind_count) activate_bindings(bind_ptr,bind_count);
-    if (spec_count) activate_specdecls(spec_ptr,spec_count);
+    return_Values compile_eval_form(compile_name);
+  } else { /* build variable binding frame, extend VAR_ENV : */
+    make_vframe_activate();
     /* interpret body: */
     implicit_progn(popSTACK(),NIL);
     /* unwind frames: */
@@ -803,7 +823,7 @@ LISPSPECFORM(compiler_let, 1,0,body)
       var object varspec = Car(varspecs);
       if (consp(varspec))
           varspec = Car(varspec);
-      pushSTACK(Symbol_value(varspec)); /* old value of the variables */
+      pushSTACK(Symbol_thread_value(varspec)); /* old value of the variables */
       pushSTACK(varspec); /* variable */
       varspecs = Cdr(varspecs);
     }
@@ -817,7 +837,7 @@ LISPSPECFORM(compiler_let, 1,0,body)
       var object varspec = Car(varspecs);
       if (consp(varspec))
         varspec = Car(varspec);
-      Symbol_value(varspec) = NEXT(valptr); /* assign new value to the variables */
+      Symbol_thread_value(varspec) = NEXT(valptr); /* assign new value to the variables */
         varspecs = Cdr(varspecs);
     }
   }
@@ -847,32 +867,27 @@ LISPSPECFORM(progv, 2,0,body)
 /* error-message at FLET/LABELS, if there is no function specification.
  > caller: Caller, a symbol
  > obj: erroneous function specification */
-nonreturning_function(local, fehler_funspec, (object caller, object obj)) {
+nonreturning_function(local, error_funspec, (object caller, object obj)) {
   pushSTACK(obj);               /* SOURCE-PROGRAM-ERROR slot DETAIL */
   pushSTACK(obj); pushSTACK(caller);
-  fehler(source_program_error,GETTEXT("~S: ~S is not a function specification"));
-}
-
-/* skip all declarations from the body:
- descructively modifies BODY to remove (DECLARE ...)
- statements from its beginning */
-local void skip_declarations (object* body) {
-  while (consp(*body) && consp(Car(*body)) && eq(S(declare),Car(Car(*body))))
-    *body = Cdr(*body);
+  error(source_program_error,GETTEXT("~S: ~S is not a function specification"));
 }
 
 /* UP: Finishes a FLET/MACROLET.
- finish_flet(top_of_frame,body);
+ finish_flet(top_of_frame,body,ignore_declarations);
  > stack layout: [top_of_frame] def1 name1 ... defn namen [STACK]
  > top_of_frame: pointer to frame
  > body: list of forms
+ > accept_declarations: flag: if true, declarations are respected
+     (for FLET & MACROLET), otherwise C_declare barfs (for FUNCTION-MACRO-LET)
  < mv_count/mv_space: values
  can trigger GC */
-local maygc Values finish_flet (gcv_object_t* top_of_frame, object body) {
+local maygc Values finish_flet (gcv_object_t* top_of_frame, object body,
+                                bool accept_declarations) {
   {
     var uintL bindcount = /* number of bindings */
       STACK_item_count(STACK,top_of_frame) / 2;
-      pushSTACK(aktenv.fun_env); /* current FUN_ENV as NEXT_ENV */
+    pushSTACK(aktenv.fun_env); /* current FUN_ENV as NEXT_ENV */
     pushSTACK(fake_gcv_object(bindcount));
     finish_frame(FUN);
   }
@@ -888,9 +903,17 @@ local maygc Values finish_flet (gcv_object_t* top_of_frame, object body) {
     aktenv.fun_env = make_framepointer(top_of_frame);
   }
   /* allow declarations, as per ANSI CL */
-  skip_declarations(&body);
+  if (accept_declarations) {
+    parse_doc_decl(body,false); /* ignore to_compile */
+    make_vframe_activate();
+    body = popSTACK();
+  }
   /* execute forms: */
   implicit_progn(body,NIL);
+  if (accept_declarations) {
+    unwind(); /* unwind VENV-binding frame */
+    unwind(); /* unwind variable binding frame */
+  }
   unwind(); /* unwind FENV binding frame */
   unwind(); /* unwind function binding frame */
 }
@@ -907,8 +930,8 @@ LISPSPECFORM(flet, 1,0,body)
     funspecs = Car(funspecs); /* next funspec = (name . lambdabody) */
     /* should be a cons, whose CAR is a symbol and whose CDR is a cons: */
     if (!consp(funspecs)) {
-     fehler_spec:
-      fehler_funspec(S(flet),funspecs);
+     error_spec:
+      error_funspec(S(flet),funspecs);
     }
     var object name = Car(funspecs);
     if (!funnamep(name)) {
@@ -918,7 +941,7 @@ LISPSPECFORM(flet, 1,0,body)
     }
     var object lambdabody = Cdr(funspecs);
     if (!consp(lambdabody))
-      goto fehler_spec;
+      goto error_spec;
     pushSTACK(name); /* save name */
     /* turn lambdabody into a closure: */
     var object fun = get_closure(lambdabody,name,true,&aktenv);
@@ -929,7 +952,7 @@ LISPSPECFORM(flet, 1,0,body)
     pushSTACK(fun); /* as "value" the closure */
     pushSTACK(name); /* name, binding is automatically active */
   }
-  return_Values finish_flet(top_of_frame,body);
+  return_Values finish_flet(top_of_frame,body,true);
 }
 
 LISPSPECFORM(labels, 1,0,body)
@@ -947,8 +970,8 @@ LISPSPECFORM(labels, 1,0,body)
       var object funspec = Car(STACK_0);
       /* should be a cons, whose CAR is a symbol and whose CDR is a cons: */
       if (!consp(funspec)) {
-       fehler_spec:
-        fehler_funspec(S(labels),funspec);
+       error_spec:
+        error_funspec(S(labels),funspec);
       }
       var object name = Car(funspec);
       if (!funnamep(name)) {
@@ -958,7 +981,7 @@ LISPSPECFORM(labels, 1,0,body)
       }
       var object lambdabody = Cdr(funspec);
       if (!consp(lambdabody))
-        goto fehler_spec;
+        goto error_spec;
       STACK_0 = Cdr(STACK_0);
       veclength += 2;
     }
@@ -1001,11 +1024,13 @@ LISPSPECFORM(labels, 1,0,body)
     }
   }
   skipSTACK(1); /* forget vector */
-  body = popSTACK();
   /* allow declarations, as per ANSI CL */
-  skip_declarations(&body);
+  parse_doc_decl(popSTACK(),false); /* ignore to_compile */
+  make_vframe_activate();
   /* execute forms: */
-  implicit_progn(body,NIL);
+  implicit_progn(popSTACK(),NIL);
+  unwind(); /* unwind VENV-binding frame */
+  unwind(); /* unwind variable binding frame */
   unwind(); /* unwind FENV binding frame */
 }
 
@@ -1021,21 +1046,21 @@ LISPSPECFORM(macrolet, 1,0,body)
     macrodefs = Car(macrodefs); /* next macrodef = (name . lambdabody) */
     /* should be a cons, whose CAR is a symbol and whose CDR is a cons: */
     if (!consp(macrodefs)) {
-     fehler_spec:
+     error_spec:
       pushSTACK(macrodefs);     /* SOURCE-PROGRAM-ERROR slot DETAIL */
       pushSTACK(macrodefs); pushSTACK(S(macrolet));
-      fehler(source_program_error,
-             GETTEXT("~S: ~S is not a macro specification"));
+      error(source_program_error,
+            GETTEXT("~S: ~S is not a macro specification"));
     }
     var object name = Car(macrodefs);
     if (!symbolp(name)) {
       pushSTACK(name);          /* SOURCE-PROGRAM-ERROR slot DETAIL */
       pushSTACK(name); pushSTACK(S(macrolet));
-      fehler(source_program_error,
-             GETTEXT("~S: macro name ~S should be a symbol"));
+      error(source_program_error,
+            GETTEXT("~S: macro name ~S should be a symbol"));
     }
     if (!mconsp(Cdr(macrodefs)))
-      goto fehler_spec;
+      goto error_spec;
     pushSTACK(name); /* save */
     /* build macro-expander: (SYSTEM::MAKE-MACRO-EXPANDER macrodef nil env) */
     pushSTACK(macrodefs);
@@ -1063,7 +1088,7 @@ LISPSPECFORM(macrolet, 1,0,body)
     pushSTACK(value1); /* as "value" the cons with the expander */
     pushSTACK(name); /* name, binding is automatically active */
   }
-  return_Values finish_flet(top_of_frame,body);
+  return_Values finish_flet(top_of_frame,body,true);
 }
 
 LISPSPECFORM(function_macro_let, 1,0,body)
@@ -1083,24 +1108,24 @@ LISPSPECFORM(function_macro_let, 1,0,body)
        a list of length 3, whose CAR is a symbol
        and whose further list elements are conses: */
     if (!consp(funmacspecs)) {
-     fehler_spec:
+     error_spec:
       pushSTACK(funmacspecs);   /* SOURCE-PROGRAM-ERROR slot DETAIL */
       pushSTACK(funmacspecs); pushSTACK(S(function_macro_let));
-      fehler(source_program_error,
-             GETTEXT("~S: ~S is not a function and macro specification"));
+      error(source_program_error,
+            GETTEXT("~S: ~S is not a function and macro specification"));
     }
     var object name = Car(funmacspecs);
     if (!symbolp(name)) {
       pushSTACK(name);          /* SOURCE-PROGRAM-ERROR slot DETAIL */
       pushSTACK(name); pushSTACK(S(function_macro_let));
-      fehler(source_program_error,
-             GETTEXT("~S: function and macro name ~S should be a symbol"));
+      error(source_program_error,
+            GETTEXT("~S: function and macro name ~S should be a symbol"));
     }
     if (!(mconsp(Cdr(funmacspecs)) && mconsp(Car(Cdr(funmacspecs)))
           && mconsp(Cdr(Cdr(funmacspecs)))
           && mconsp(Car(Cdr(Cdr(funmacspecs))))
           && nullp(Cdr(Cdr(Cdr(funmacspecs))))))
-      goto fehler_spec;
+      goto error_spec;
     pushSTACK(name); /* save name */
     pushSTACK(Car(Cdr(funmacspecs))); /* fun-lambdabody */
     pushSTACK(Car(Cdr(Cdr(funmacspecs)))); /* macro-full-lambdabody */
@@ -1121,15 +1146,16 @@ LISPSPECFORM(function_macro_let, 1,0,body)
     pushSTACK(value1); /* as "value" the FunctionMacro */
     pushSTACK(name); /* name, binding is automatically active */
   }
-  return_Values finish_flet(top_of_frame,body);
+  return_Values finish_flet(top_of_frame,body,false);
 }
 
 LISPSPECFORM(symbol_macrolet, 1,0,body)
 { /* (SYMBOL-MACROLET ({(var expansion)}) {decl} {form}), CLTL2 p. 155 */
   /* separate {decl} {form} : */
-  if (parse_doc_decl(STACK_0,false)) { /* declaration (COMPILE) ? */
+  var object compile_name = parse_doc_decl(STACK_0,false);
+  if (!eq(Fixnum_0,compile_name)) { /* declaration (COMPILE) ? */
     /* yes -> compile form: */
-    skipSTACK(2); return_Values compile_eval_form();
+    skipSTACK(2); return_Values compile_eval_form(compile_name);
   } else {
     skipSTACK(1);
     /* build variable binding frame, extend VAR_ENV : */
@@ -1209,7 +1235,7 @@ LISPSPECFORM(cond, 0,0,body)
     if (!consp(clause)) { /* should be a cons */
       pushSTACK(clause);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
       pushSTACK(clause); pushSTACK(S(cond));
-      fehler(source_program_error,GETTEXT("~S: clause ~S should be a list"));
+      error(source_program_error,GETTEXT("~S: clause ~S should be a list"));
     }
     pushSTACK(Cdr(clause)); /* save clause rest */
     eval(Car(clause)); /* evaluate condition */
@@ -1239,7 +1265,7 @@ LISPSPECFORM(case, 1,0,body)
     if (!consp(clause)) { /* should be a cons */
       pushSTACK(clause);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
       pushSTACK(clause); pushSTACK(S(case));
-      fehler(source_program_error,GETTEXT("~S: missing key list: ~S"));
+      error(source_program_error,GETTEXT("~S: missing key list: ~S"));
     }
     var object keys = Car(clause);
     if (eq(keys,T) || eq(keys,S(otherwise))) {
@@ -1247,8 +1273,8 @@ LISPSPECFORM(case, 1,0,body)
         goto eval_clause;
       pushSTACK(clauses);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
       pushSTACK(keys); pushSTACK(S(case));
-      fehler(source_program_error,
-             GETTEXT("~S: the ~S clause must be the last one"));
+      error(source_program_error,
+            GETTEXT("~S: the ~S clause must be the last one"));
     } else {
       if (listp(keys)) {
         while (consp(keys)) {
@@ -1297,13 +1323,12 @@ LISPSPECFORM(block, 1,0,body)
 }
 
 /* error-message, if a block has already been left.
- fehler_block_left(name);
+ error_block_left(name);
  > name: block-name */
-nonreturning_function(global, fehler_block_left, (object name)) {
+nonreturning_function(global, error_block_left, (object name)) {
   pushSTACK(name);
   pushSTACK(S(return_from));
-  fehler(control_error,
-         GETTEXT("~S: the block named ~S has already been left"));
+  error(control_error,GETTEXT("~S: the block named ~S has already been left"));
 }
 
 LISPSPECFORM(return_from, 1,1,nobody)
@@ -1329,18 +1354,18 @@ LISPSPECFORM(return_from, 1,1,nobody)
     if (eq(Car(block_cons),name)) {
       env = Cdr(block_cons);
       if (eq(env,disabled)) /* block still active? */
-        fehler_block_left(name);
+        error_block_left(name);
       goto found;
       }
     env = Cdr(env);
   }
-  /* env is done. */
-  pushSTACK(name);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
-  pushSTACK(name); pushSTACK(S(return_from));
-  fehler(source_program_error,
-         GETTEXT("~S: no block named ~S is currently visible"));
-  /* found block-frame: env */
- found:
+  { /* env is done. */
+    pushSTACK(name);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
+    pushSTACK(name); pushSTACK(S(return_from));
+    error(source_program_error,
+          GETTEXT("~S: no block named ~S is currently visible"));
+  }
+ found: /* found block-frame: env */
   FRAME = uTheFramepointer(env); /* pointer to that frame */
   /* produce values, with which the block will be left: */
   var object result = popSTACK();
@@ -1348,7 +1373,7 @@ LISPSPECFORM(return_from, 1,1,nobody)
   if (boundp(result)) { /* result supplied? */
     eval(result);
   } else {
-      VALUES1(NIL);
+    VALUES1(NIL);
   }
   /* jump to the found block-frame and unwind it: */
   unwind_upto(FRAME);
@@ -1363,7 +1388,7 @@ local inline void set_last_inplace (object list) {
   else Cdr(STACK_0) = list; /* insert as (cdr (last totallist)) */
   if (consp(list)) {
     var object list1;
-    loop { /* list is a cons */
+    while (1) { /* list is a cons */
       list1 = Cdr(list);
       if (atomp(list1)) break;
       list = list1;
@@ -1415,13 +1440,13 @@ local inline maygc void set_last_copy (object list) {
     pushSTACK(NIL); /* start of the result list */                      \
    {var gcv_object_t* ergptr = &STACK_0; /* pointer to it */            \
     /* traverse all lists in parallel: */                               \
-    loop { var gcv_object_t* argptr = args_pointer;                     \
+    while (1) { var gcv_object_t* argptr = args_pointer;                \
       var object fun = NEXT(argptr);                                    \
       var uintC count = argcount;                                       \
       do {                                                              \
         var gcv_object_t* next_list_ = &NEXT(argptr);                   \
         var object next_list = *next_list_;                             \
-        if (endp(next_list)) goto fertig; /* a list ended -> done */    \
+        if (endp(next_list)) goto done; /* a list ended -> done */      \
         pushSTACK(listaccess(next_list)); /* as argument on the stack */ \
         *next_list_ = Cdr(next_list); /* shorten list */                \
       } while (--count);                                                \
@@ -1431,7 +1456,7 @@ local inline maygc void set_last_copy (object list) {
       Car(new_cons) = popSTACK(); Cdr(new_cons) = STACK_0;              \
       STACK_0 = new_cons; /* lengthen the result list */                \
      }}                                                                 \
-    fertig:                                                             \
+    done:                                                               \
     VALUES1(nreverse(*ergptr)); /* reverse result list */               \
     set_args_end_pointer(args_pointer); /* clean up STACK */            \
    }}
@@ -1449,13 +1474,13 @@ local inline maygc void set_last_copy (object list) {
     pushSTACK(NIL); /* (last totallist) */                              \
    {var gcv_object_t *ret=&STACK_1; /* remember the total list*/        \
     /* traverse all lists in parallel: */                               \
-    loop { var gcv_object_t* argptr = args_pointer;                     \
+    while (1) { var gcv_object_t* argptr = args_pointer;                \
       var object fun = NEXT(argptr);                                    \
       var uintC count = argcount;                                       \
       do {                                                              \
         var gcv_object_t* next_list_ = &NEXT(argptr);                   \
         var object next_list = *next_list_;                             \
-        if (endp(next_list)) goto fertig; /* a list ended -> done */    \
+        if (endp(next_list)) goto done; /* a list ended -> done */      \
         pushSTACK(listaccess(next_list)); /* as argument on the stack */ \
         *next_list_ = Cdr(next_list); /* shorten list */                \
       } while (--count);                                                \
@@ -1466,7 +1491,7 @@ local inline maygc void set_last_copy (object list) {
       if (nullp(STACK_1)) STACK_1 = STACK_0 = new_cons; /* init */      \
       else { Cdr(STACK_0) = new_cons; STACK_0 = new_cons; } /* append */ \
     }}                                                                  \
-   fertig:                                                              \
+   done:                                                                \
     VALUES1(*ret); /* result list-cons */                               \
     set_args_end_pointer(args_pointer); /* clean up STACK */            \
    }}
@@ -1482,19 +1507,19 @@ local inline maygc void set_last_copy (object list) {
     pushSTACK(BEFORE(rest_args_pointer)); /* save first list argument */ \
    {var gcv_object_t* ergptr = &STACK_0; /* pointer to it */            \
     /* traverse all lists in parallel: */                               \
-    loop { var gcv_object_t* argptr = args_pointer;                     \
+    while (1) { var gcv_object_t* argptr = args_pointer;                \
       var object fun = NEXT(argptr);                                    \
       var uintC count = argcount;                                       \
       do {                                                              \
         var gcv_object_t* next_list_ = &NEXT(argptr);                   \
         var object next_list = *next_list_;                             \
-        if (endp(next_list)) goto fertig; /* a list ended -> done */    \
+        if (endp(next_list)) goto done; /* a list ended -> done */      \
         pushSTACK(listaccess(next_list)); /* as argument on the stack */ \
         *next_list_ = Cdr(next_list); /* shorten list */                \
       } while (--count);                                                \
       funcall(fun,argcount); /* call function */                        \
     }                                                                   \
-    fertig:                                                             \
+   done:                                                                \
     VALUES1(*ergptr); /* first list as value */                         \
     set_args_end_pointer(args_pointer); /* clean up STACK */            \
    }}
@@ -1514,20 +1539,20 @@ local inline maygc void set_last_copy (object list) {
     pushSTACK(NIL); /* (last totallist) */                              \
    {var gcv_object_t *ret=&STACK_1; /* remember the total list*/        \
     /* traverse all lists in parallel: */                               \
-    loop { var gcv_object_t* argptr = args_pointer;                     \
+    while (1) { var gcv_object_t* argptr = args_pointer;                \
       var object fun = NEXT(argptr);                                    \
       var uintC count = argcount;                                       \
       do {                                                              \
         var gcv_object_t* next_list_ = &NEXT(argptr);                   \
         var object next_list = *next_list_;                             \
-        if (endp(next_list)) goto fertig; /* a list ended -> done */    \
+        if (endp(next_list)) goto done; /* a list ended -> done */      \
         pushSTACK(listaccess(next_list)); /* as argument on the stack */ \
         *next_list_ = Cdr(next_list); /* shorten list */                \
       } while (--count);                                                \
       funcall(fun,argcount); /* call function */                        \
       append_function(value1);                                          \
     }                                                                   \
-    fertig:                                                             \
+   done:                                                                \
     VALUES1(*ret); /* result list */                                    \
     set_args_end_pointer(args_pointer); /* clean up STACK */            \
    }}
@@ -1595,8 +1620,7 @@ LISPSPECFORM(tagbody, 0,0,body)
         } else {
           pushSTACK(item);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
           pushSTACK(item); pushSTACK(S(tagbody));
-          fehler(source_program_error,
-                 GETTEXT("~S: ~S is neither tag nor form"));
+          error(source_program_error,GETTEXT("~S: ~S is neither tag nor form"));
         }
       }
     }
@@ -1606,7 +1630,7 @@ LISPSPECFORM(tagbody, 0,0,body)
     pushSTACK(aktenv.go_env); /* current GO_ENV as NEXT_ENV */
     finish_entry_frame(ITAGBODY,returner,, goto go_entry; );
     /* extend GO_ENV: */
-    aktenv.go_env = make_framepointer(STACK);
+    { aktenv.go_env = make_framepointer(STACK); }
     if (false) {
      go_entry: /* we jump to this label, if this frame has caught a GO. */
       body = value1; /* the formlist is passed as value1. */
@@ -1634,11 +1658,12 @@ LISPSPECFORM(tagbody, 0,0,body)
 
 LISPSPECFORM(go, 1,0,nobody)
 { /* (GO tag), CLTL p. 133 */
+  GC_SAFE_POINT(); /* in case of infinite loops we need a way to break */
   var object tag = popSTACK();
   if (!(numberp(tag) || symbolp(tag))) {
     pushSTACK(tag);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
     pushSTACK(tag); pushSTACK(S(go));
-    fehler(source_program_error,GETTEXT("~S: illegal tag ~S"));
+    error(source_program_error,GETTEXT("~S: illegal tag ~S"));
   }
   /* peruse GO_ENV: */
   var object env = aktenv.go_env; /* current GO_ENV */
@@ -1675,8 +1700,8 @@ LISPSPECFORM(go, 1,0,nobody)
         if (eq(env,disabled)) { /* tagbody still active? */
           pushSTACK(tag);
           pushSTACK(S(go));
-          fehler(control_error,
-                 GETTEXT("~S: tagbody for tag ~S has already been left"));
+          error(control_error,
+                GETTEXT("~S: tagbody for tag ~S has already been left"));
         }
         FRAME = uTheFramepointer(env); /* pointer to the (still active!) frame */
         value1 = FRAME_(frame_bindings+2*index+1); /* formlist */
@@ -1686,38 +1711,38 @@ LISPSPECFORM(go, 1,0,nobody)
     } while (--count);
     env = Cdr(env);
   }
-  /* env is finished. */
-  pushSTACK(tag);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
-  pushSTACK(tag); pushSTACK(S(go));
-  fehler(source_program_error,
-         GETTEXT("~S: no tag named ~S is currently visible"));
-  /* tagbody-frame found. FRAME is pointing to it (without typeinfo),
-     value1 is the liste of the forms to be executed. */
- found:
+  { /* env is finished. */
+    pushSTACK(tag);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
+    pushSTACK(tag); pushSTACK(S(go));
+    error(source_program_error,
+          GETTEXT("~S: no tag named ~S is currently visible"));
+  }
+ found: /* tagbody-frame found. FRAME is pointing to it (without typeinfo),
+           value1 is the liste of the forms to be executed. */
   mv_count=1; /* formlist value1 is passed */
   /* jump to the found tagbody-frame and continue there: */
   unwind_upto(FRAME);
 }
 
 /* error-message, when there are too many values
- fehler_mv_zuviel(caller);
+ error_mv_toomany(caller);
  > caller: Caller, a symbol */
-nonreturning_function(global, fehler_mv_zuviel, (object caller)) {
+nonreturning_function(modexp, error_mv_toomany, (object caller)) {
   pushSTACK(caller);
-  fehler(error,GETTEXT("~S: too many values"));
+  error(error_condition,GETTEXT("~S: too many return values"));
 }
 
 LISPFUN(values,seclass_no_se,0,0,rest,nokey,0,NIL)
 { /* (VALUES {arg}), CLTL p. 134
      [not foldable, in order to avoid infinite loop!]*/
   if (argcount >= mv_limit)
-    fehler_mv_zuviel(S(values));
+    error_mv_toomany(S(values));
   STACK_to_mv(argcount);
 }
 
 LISPFUNNR(values_list,1)
 { /* (VALUES-LIST list), CLTL p. 135 */
-  list_to_mv(popSTACK(), fehler_mv_zuviel(S(values_list)); );
+  list_to_mv(popSTACK(), error_mv_toomany(S(values_list)); );
 }
 
 LISPSPECFORM(multiple_value_list, 1,0,nobody)
@@ -1741,11 +1766,8 @@ LISPSPECFORM(multiple_value_call, 1,0,body)
     argcount += (uintL)mv_count;
     mv_to_STACK();
   }
-  if (((uintL)~(uintL)0 > ca_limit_1) && (argcount > ca_limit_1)) {
-    pushSTACK(*fun_);
-    pushSTACK(S(multiple_value_call));
-    fehler(program_error,GETTEXT("~S: too many arguments to ~S"));
-  }
+  if (((uintL)~(uintL)0 > ca_limit_1) && (argcount > ca_limit_1))
+    error_too_many_args(S(multiple_value_call),*fun_,argcount,ca_limit_1);
   funcall(*fun_,argcount); /* call function */
   skipSTACK(1);
 }
@@ -1764,9 +1786,10 @@ LISPSPECFORM(multiple_value_prog1, 1,0,body)
 LISPSPECFORM(multiple_value_bind, 2,0,body)
 { /* (MULTIPLE-VALUE-BIND ({var}) values-form {decl} {form}), CLTL p. 136 */
   /* separate {decl} {form} : */
-  if (parse_doc_decl(STACK_0,false)) { /* declaration (COMPILE) ? */
+  var object compile_name = parse_doc_decl(STACK_0,false);
+  if (!eq(Fixnum_0,compile_name)) { /* declaration (COMPILE) ? */
     /* yes -> compile form: */
-    skipSTACK(3); return_Values compile_eval_form();
+    skipSTACK(2); return_Values compile_eval_form(compile_name);
   } else {
     var object varlist = STACK_2;
     STACK_2 = STACK_1;
@@ -1789,8 +1812,8 @@ LISPSPECFORM(multiple_value_bind, 2,0,body)
      {var gcv_object_t* markptr = &Before(frame_pointer);               \
        if (as_oint(*markptr) & wbit(dynam_bit_o)) { /* dynamic binding: */ \
         var object sym = *(markptr STACKop varframe_binding_sym); /* var */ \
-        *valptr = TheSymbolflagged(sym)->symvalue; /* old val into the frame */ \
-        TheSymbolflagged(sym)->symvalue = (value); /* new value into the value cell */ \
+        *valptr = Symbolflagged_value(sym); /* old val into the frame */ \
+        Symbolflagged_value(sym) = (value); /* new value into the value cell */ \
         activate_specdecl(sym,spec_ptr,spec_count);                     \
       } else /* static binding : */                                     \
         *valptr = (value); /* new value into the frame */               \
@@ -1817,7 +1840,7 @@ LISPSPECFORM(multiple_value_bind, 2,0,body)
       mv_pointer = &mv_space[1];
      #endif
       /* still min(r,s)>0 values to bind: */
-      loop {
+      while (1) {
         bind_next_var(*mv_pointer++);
         if (--r == 0) goto ok; /* no more variables? */
         if (--s == 0) goto fill; /* no more values? */
@@ -1962,7 +1985,7 @@ LISPSPECFORM(throw, 2,0,nobody)
   /* failed. */
   pushSTACK(tag);
   pushSTACK(S(throw));
-  fehler(control_error,GETTEXT("~S: there is no CATCHer for tag ~S"));
+  error(control_error,GETTEXT("~S: there is no CATCHer for tag ~S"));
 }
 
 LISPFUNN(driver,1)
@@ -1973,7 +1996,7 @@ LISPFUNN(driver,1)
   var sp_jmp_buf returner; /* remember entry point */
   finish_entry_frame(DRIVER,returner,,;);
   /* this is the entry point. */
-  loop { funcall(STACK_(0+2),0); } /* call fun, endless loop */
+  while (1) { funcall(STACK_(0+2),0); } /* call fun, endless loop */
 }
 
 LISPFUNN(unwind_to_driver,1)
@@ -2059,8 +2082,7 @@ LISPSPECFORM(declare, 0,0,body)
 { /* (DECLARE {decl-spec}), CLTL p. 153 */
   /* ({decl-spec}) already in STACK_0 */
   pushSTACK(STACK_0);  /* SOURCE-PROGRAM-ERROR slot DETAIL */
-  fehler(source_program_error,
-         GETTEXT("declarations ~S are not allowed here"));
+  error(source_program_error,GETTEXT("declarations ~S are not allowed here"));
 }
 
 LISPSPECFORM(the, 2,0,nobody)
@@ -2074,17 +2096,18 @@ LISPSPECFORM(the, 2,0,nobody)
   pushSTACK(STACK_(2+1)); funcall(S(type_for_discrimination),1);
   pushSTACK(value1);
   funcall(S(pthe),2);
-  if (nullp(value1)) {
-    /* type-check failed */
-    pushSTACK(STACK_(2+0)); /* value-type */
-    pushSTACK(STACK_(0+1)); /* values */
-    pushSTACK(STACK_(1+2)); /* form */
+  if (nullp(value1)) { /* type-check failed */
+    pushSTACK(STACK_0);     /* TYPE-ERROR slot DATUM */
+    pushSTACK(STACK_(2+1)); /* TYPE-ERROR slot EXPECTED-TYPE */
+    pushSTACK(STACK_(2+2)); /* value-type */
+    pushSTACK(STACK_(0+3)); /* values */
+    pushSTACK(STACK_(1+4)); /* form */
     pushSTACK(S(the));
-    fehler(error, /* type_error ?? */
-           GETTEXT("~S: ~S evaluated to the values ~S, not of type ~S"));
+    error(type_error,
+          GETTEXT("~S: ~S evaluated to the values ~S, not of type ~S"));
   }
   /* type-check OK -> return values: */
-  list_to_mv(popSTACK(), { fehler_mv_zuviel(S(the)); } );
+  list_to_mv(popSTACK(), { error_mv_toomany(S(the)); } );
   skipSTACK(2);
 }
 
@@ -2092,22 +2115,21 @@ LISPFUNN(proclaim,1)
 { /* (PROCLAIM decl-spec) */
   if (!consp(STACK_0/*declspec*/)) {
     pushSTACK(S(proclaim));
-    fehler(error,GETTEXT("~S: bad declaration ~S"));
+    error(error_condition,GETTEXT("~S: bad declaration ~S"));
   }
   var object decltype = Car(STACK_0/*declspec*/); /* declaration type */
   if (eq(decltype,S(special))) { /* SPECIAL */
     while (!endp( STACK_0/*declspec*/ = Cdr(STACK_0/*declspec*/) )) {
-      var object symbol = check_symbol(Car(STACK_0/*declspec*/));
-      if (symmacro_var_p(TheSymbol(symbol))) {
-        /* HyperSpec/Body/mac_define-symbol-macro.html says that making a
-           global symbol-macro special is undefined. */
-        pushSTACK(S(special)); pushSTACK(symbol); pushSTACK(TheSubr(subr_self)->name);
-        fehler(program_error,
-               GETTEXT("~S: attempting to turn ~S into a ~S variable, but it is already a global symbol-macro."));
-      }
+      var object symbol =
+        check_symbol_not_symbol_macro(Car(STACK_0/*declspec*/));
       if (!keywordp(symbol))
         clear_const_flag(TheSymbol(symbol));
       set_special_flag(TheSymbol(symbol));
+      #if defined(MULTITHREAD)
+       /* MT: add to the threads (empty) if not already there */
+       if (TheSymbol(symbol)->tls_index == SYMBOL_TLS_INDEX_NONE)
+         add_per_thread_special_var(symbol);
+      #endif
     }
   } else if (eq(decltype,S(notspecial))) { /* NOTSPECIAL */
     while (!endp( STACK_0/*declspec*/ = Cdr(STACK_0/*declspec*/) )) {
@@ -2117,7 +2139,9 @@ LISPFUNN(proclaim,1)
     }
   } else if (eq(decltype,S(declaration))) { /* DECLARATION */
     while (!endp( STACK_0/*declspec*/ = Cdr(STACK_0/*declspec*/) )) {
-      var object symbol = check_symbol(Car(STACK_0/*declspec*/));
+      pushSTACK(Car(STACK_0/*declspec*/)); pushSTACK(TheSubr(subr_self)->name);
+      funcall(S(check_not_type),2);
+      var object symbol = value1;
       /* (PUSHNEW symbol (cdr declaration-types)) : */
       if (nullp(memq(symbol,Cdr(O(declaration_types))))) {
         pushSTACK(symbol);
@@ -2191,7 +2215,7 @@ local void test_optional_env_arg (environment_t* env5) {
     env5->go_env    = TheSvector(env)->data[3];
     env5->decl_env  = TheSvector(env)->data[4];
   } else
-    fehler_environment(env);
+    error_environment(env);
 }
 
 LISPFUN(evalhook,seclass_default,3,1,norest,nokey,0,NIL)
@@ -2233,9 +2257,10 @@ LISPFUN(applyhook,seclass_default,4,1,norest,nokey,0,NIL)
   aktenv.block_env = env5.block_env;
   aktenv.go_env    = env5.go_env   ;
   aktenv.decl_env  = env5.decl_env ;
-  { /* save fun: */
-    pushSTACK(fun);
-    var gcv_object_t* fun_ = &STACK_0;
+  { /* save fun & args: */
+    pushSTACK(fun); pushSTACK(args);
+    var gcv_object_t* fun_ = &STACK_1;
+    var gcv_object_t* args_ = &STACK_0;
     /* evaluate each argument and store on the stack: */
     var uintC argcount = 0;
     while (consp(args)) {
@@ -2243,11 +2268,9 @@ LISPFUN(applyhook,seclass_default,4,1,norest,nokey,0,NIL)
       eval_no_hooks(Car(args)); /* evaluate next arg */
       args = STACK_0; STACK_0 = value1; /* store value in stack */
       argcount++;
-      if (argcount==0) { /* overflow? */
-        pushSTACK(*fun_);
-        pushSTACK(S(applyhook));
-        fehler(program_error,GETTEXT("~S: too many arguments given to ~S"));
-      }
+      if (argcount==0) /* overflow? */
+        error_too_many_args(S(applyhook),*fun_,llength(*args_),
+                            (uintC)~(uintC)0);
     }
     funcall(*fun_,argcount); /* apply function */
     skipSTACK(1);
@@ -2276,7 +2299,7 @@ local bool form_constant_p (object form) {
     if ((cclosurep(fdef) && (Cclosure_seclass(fdef) == seclass_foldable))
         || (subrp(fdef) && (TheSubr(fdef)->seclass == seclass_foldable))) {
       check_SP();
-      loop {
+      while (1) {
         form = Cdr(form);
         if (nullp(form)) return true;  /* list is over */
         if (!consp(form)) return false;  /* invalid form */
@@ -2372,14 +2395,16 @@ LISPFUNN(check_symbol,2)
 
 LISPFUN(parse_body,seclass_default,1,1,norest,nokey,0,NIL)
 { /* (SYS::PARSE-BODY body [docstring-allowed])
- parses body, recognizes declarations, returns three values:
- 1. body-rest, all forms after the declarations,
+ parses body, recognizes declarations, returns four values:
+ 1. body-rest, all forms after the declarations
  2. list of occurred declspecs
- 3. docstring (only if docstring-allowed=T ) or NIL.
+ 3. docstring (only if docstring-allowed=T ) or NIL
+ 4. (COMPILE name) -> name; (COMPILE) -> Fixnum_1; none -> Fixnum_0
  (docstring-allowed should be = NIL or T) */
-  parse_doc_decl(STACK_1/*body*/,!missingp(STACK_0));
+  value4 = parse_doc_decl(STACK_1/*body*/,!missingp(STACK_0));
+  if (!boundp(value4)) value4 = Fixnum_1;
   /* got 3 values from parse_dd(): ({form}), declspecs, doc */
-  mv_count = 3;
+  mv_count = 4;
   skipSTACK(2);
 }
 
@@ -2395,15 +2420,15 @@ LISPFUNN(keyword_test,2)
     if (argcount % 2) {
       pushSTACK(arglist);
       /* ANSI CL 3.5.1.6. wants a PROGRAM-ERROR here. */
-      fehler(program_error,
-             GETTEXT("keyword argument list ~S has an odd length"));
+      error(program_error,
+            GETTEXT("keyword argument list ~S has an odd length"));
     }
   }
   { /* search, if there is :ALLOW-OTHER-KEYS : */
     var object arglistr = arglist;
     while (consp(arglistr)) {
       if (eq(Car(arglistr),S(Kallow_other_keys)) && !nullp(Car(Cdr(arglistr))))
-        goto fertig;
+        goto done;
       arglistr = Cdr(Cdr(arglistr));
     }
   }
@@ -2414,7 +2439,7 @@ LISPFUNN(keyword_test,2)
       var object val = Car(arglistr); arglistr = Cdr(arglistr);
       if (eq(key,S(Kallow_other_keys))) {
         if (nullp(val)) break;  /* need check */
-        else goto fertig;       /* no check */
+        else goto done;         /* no check */
       }
     }
     for (arglistr = arglist; consp(arglistr); ) {
@@ -2432,13 +2457,13 @@ LISPFUNN(keyword_test,2)
           Car(type) = S(member); Cdr(type) = STACK_(0+5);
           STACK_3 = type;
         }
-        fehler(keyword_error,
-               GETTEXT("Illegal keyword/value pair ~S, ~S in argument list.\n"
-                       "The allowed keywords are ~S"));
+        error(keyword_error,
+              GETTEXT("Illegal keyword/value pair ~S, ~S in argument list.\n"
+                      "The allowed keywords are ~S"));
       }
     }
   }
- fertig:
+ done:
   skipSTACK(2);
   VALUES1(NIL);
 }
@@ -2449,7 +2474,7 @@ LISPSPECFORM(and, 0,0,body)
   if (atomp(body)) {
     VALUES1(T); /* (AND) -> T */
   } else {
-    loop {
+    while (1) {
       pushSTACK(Cdr(body));
       eval(Car(body)); /* evaluate form */
       body = popSTACK();
@@ -2468,7 +2493,7 @@ LISPSPECFORM(or, 0,0,body)
   if (atomp(body)) {
     VALUES1(NIL); /* (OR) -> NIL */
   } else {
-    loop {
+    while (1) {
       pushSTACK(Cdr(body));
       eval(Car(body)); /* evaluate form */
       body = popSTACK();
