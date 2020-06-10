@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+	<title>Publications – cogtool</title>
+<link rel="dns-prefetch" href="//s.w.org">
+
+
+<link rel="stylesheet" id="wp-block-library-css" href="http://cogtool-modern.github.io/cogtool/wp-includes/css/dist/block-library/style.min.css" media="all">
+<link rel="stylesheet" id="wp-block-library-theme-css" href="http://cogtool-modern.github.io/cogtool/wp-includes/css/dist/block-library/theme.min.css" media="all">
+<link rel="stylesheet" id="twentynineteen-style-css" href="http://cogtool-modern.github.io/cogtool/wp-content/themes/twentynineteen/style.css" media="all">
+<link rel="stylesheet" id="twentynineteen-print-style-css" href="http://cogtool-modern.github.io/cogtool/wp-content/themes/twentynineteen/print.css" media="print">
+
+
+<meta name="generator" content="WordPress 5.4.1">
+
+
+
+
+
+	<style type="text/css" id="custom-theme-colors">
+		
+		/*
+		 * Set background for:
+		 * - featured image :before
+		 * - featured image :before
+		 * - post thumbmail :before
+		 * - post thumbmail :before
+		 * - Submenu
+		 * - Sticky Post
+		 * - buttons
+		 * - WP Block Button
+		 * - Blocks
+		 */
+		.image-filters-enabled .site-header.featured-image .site-featured-image:before,
+		.image-filters-enabled .site-header.featured-image .site-featured-image:after,
+		.image-filters-enabled .entry .post-thumbnail:before,
+		.image-filters-enabled .entry .post-thumbnail:after,
+		.main-navigation .sub-menu,
+		.sticky-post,
+		.entry .entry-content .wp-block-button .wp-block-button__link:not(.has-background),
+		.entry .button, button, input[type="button"], input[type="reset"], input[type="submit"],
+		.entry .entry-content > .has-primary-background-color,
+		.entry .entry-content > *[class^="wp-block-"].has-primary-background-color,
+		.entry .entry-content > *[class^="wp-block-"] .has-primary-background-color,
+		.entry .entry-content > *[class^="wp-block-"].is-style-solid-color,
+		.entry .entry-content > *[class^="wp-block-"].is-style-solid-color.has-primary-background-color,
+		.entry .entry-content .wp-block-file .wp-block-file__button {
+			background-color: hsl( 35, 100%, 33% ); /* base: #0073a8; */
+		}
+
+		/*
+		 * Set Color for:
+		 * - all links
+		 * - main navigation links
+		 * - Post navigation links
+		 * - Post entry meta hover
+		 * - Post entry header more-link hover
+		 * - main navigation svg
+		 * - comment navigation
+		 * - Comment edit link hover
+		 * - Site Footer Link hover
+		 * - Widget links
+		 */
+		a,
+		a:visited,
+		.main-navigation .main-menu > li,
+		.main-navigation ul.main-menu > li > a,
+		.post-navigation .post-title,
+		.entry .entry-meta a:hover,
+		.entry .entry-footer a:hover,
+		.entry .entry-content .more-link:hover,
+		.main-navigation .main-menu > li > a + svg,
+		.comment .comment-metadata > a:hover,
+		.comment .comment-metadata .comment-edit-link:hover,
+		#colophon .site-info a:hover,
+		.widget a,
+		.entry .entry-content .wp-block-button.is-style-outline .wp-block-button__link:not(.has-text-color),
+		.entry .entry-content > .has-primary-color,
+		.entry .entry-content > *[class^="wp-block-"] .has-primary-color,
+		.entry .entry-content > *[class^="wp-block-"].is-style-solid-color blockquote.has-primary-color,
+		.entry .entry-content > *[class^="wp-block-"].is-style-solid-color blockquote.has-primary-color p {
+			color: hsl( 35, 100%, 33% ); /* base: #0073a8; */
+		}
+
+		/*
+		 * Set border color for:
+		 * wp block quote
+		 * :focus
+		 */
+		blockquote,
+		.entry .entry-content blockquote,
+		.entry .entry-content .wp-block-quote:not(.is-large),
+		.entry .entry-content .wp-block-quote:not(.is-style-large),
+		input[type="text"]:focus,
+		input[type="email"]:focus,
+		input[type="url"]:focus,
+		input[type="password"]:focus,
+		input[type="search"]:focus,
+		input[type="number"]:focus,
+		input[type="tel"]:focus,
+		input[type="range"]:focus,
+		input[type="date"]:focus,
+		input[type="month"]:focus,
+		input[type="week"]:focus,
+		input[type="time"]:focus,
+		input[type="datetime"]:focus,
+		input[type="datetime-local"]:focus,
+		input[type="color"]:focus,
+		textarea:focus {
+			border-color: hsl( 35, 100%, 33% ); /* base: #0073a8; */
+		}
+
+		.gallery-item > div > a:focus {
+			box-shadow: 0 0 0 2px hsl( 35, 100%, 33% ); /* base: #0073a8; */
+		}
+
+		/* Hover colors */
+		a:hover, a:active,
+		.main-navigation .main-menu > li > a:hover,
+		.main-navigation .main-menu > li > a:hover + svg,
+		.post-navigation .nav-links a:hover,
+		.post-navigation .nav-links a:hover .post-title,
+		.author-bio .author-description .author-link:hover,
+		.entry .entry-content > .has-secondary-color,
+		.entry .entry-content > *[class^="wp-block-"] .has-secondary-color,
+		.entry .entry-content > *[class^="wp-block-"].is-style-solid-color blockquote.has-secondary-color,
+		.entry .entry-content > *[class^="wp-block-"].is-style-solid-color blockquote.has-secondary-color p,
+		.comment .comment-author .fn a:hover,
+		.comment-reply-link:hover,
+		.comment-navigation .nav-previous a:hover,
+		.comment-navigation .nav-next a:hover,
+		#cancel-comment-reply-link:hover,
+		.widget a:hover {
+			color: hsl( 35, 100%, 23% ); /* base: #005177; */
+		}
+
+		.main-navigation .sub-menu > li > a:hover,
+		.main-navigation .sub-menu > li > a:focus,
+		.main-navigation .sub-menu > li > a:hover:after,
+		.main-navigation .sub-menu > li > a:focus:after,
+		.main-navigation .sub-menu > li > .menu-item-link-return:hover,
+		.main-navigation .sub-menu > li > .menu-item-link-return:focus,
+		.main-navigation .sub-menu > li > a:not(.submenu-expand):hover,
+		.main-navigation .sub-menu > li > a:not(.submenu-expand):focus,
+		.entry .entry-content > .has-secondary-background-color,
+		.entry .entry-content > *[class^="wp-block-"].has-secondary-background-color,
+		.entry .entry-content > *[class^="wp-block-"] .has-secondary-background-color,
+		.entry .entry-content > *[class^="wp-block-"].is-style-solid-color.has-secondary-background-color {
+			background-color: hsl( 35, 100%, 23% ); /* base: #005177; */
+		}
+
+		/* Text selection colors */
+		::selection {
+			background-color: hsl( 35, 50%, 90% ); /* base: #005177; */
+		}
+		::-moz-selection {
+			background-color: hsl( 35, 50%, 90% ); /* base: #005177; */
+		}	</style>
+	</head>
+
+<body class="page-template-default page page-id-29 wp-embed-responsive singular image-filters-enabled">
+<div id="page" class="site">
+	<a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+
+		<header id="masthead" class="site-header">
+
+			<div class="site-branding-container">
+				<div class="site-branding">
+
+								<p class="site-title"><a href="http://cogtool-modern.github.io/cogtool/" rel="home">cogtool</a></p>
+			
+				<p class="site-description">
+				Predictive human performance modeling for UI design			</p>
+				<nav id="site-navigation" class="main-navigation" aria-label="Top Menu">
+			<div class="menu-primary-container"><ul id="menu-primary" class="main-menu"><li id="menu-item-15" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-home menu-item-15"><a href="http://cogtool-modern.github.io/cogtool/">Home</a></li>
+<li id="menu-item-17" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-17"><a href="http://cogtool-modern.github.io/cogtool/blog/">Blog</a></li>
+<li id="menu-item-32" class="menu-item menu-item-type-post_type menu-item-object-page current-menu-item page_item page-item-29 current_page_item menu-item-32"><a href="http://cogtool-modern.github.io/cogtool/publications/" aria-current="page">Publications</a></li>
+<li id="menu-item-40" class="menu-item menu-item-type-post_type menu-item-object-page menu-item-40"><a href="http://cogtool-modern.github.io/cogtool/faqs/">FAQs</a></li>
+</ul></div>
+			<div class="main-menu-more">
+				<ul class="main-menu">
+					<li class="menu-item menu-item-has-children">
+						<button class="submenu-expand main-menu-more-toggle is-empty" tabindex="-1" aria-label="More" aria-haspopup="true" aria-expanded="false"><svg class="svg-icon" width="24" height="24" aria-hidden="true" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><path d="M0 0h24v24H0z"></path><path fill="currentColor" fill-rule="nonzero" d="M12 2c5.52 0 10 4.48 10 10s-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2zM6 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm6 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm6 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></g></svg>
+						</button>
+						<ul class="sub-menu hidden-links">
+							<li class="mobile-parent-nav-menu-item">
+								<button class="menu-item-link-return"><svg class="svg-icon" width="24" height="24" aria-hidden="true" role="img" focusable="false" viewbox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path><path d="M0 0h24v24H0z" fill="none"></path></svg>Back
+								</button>
+							</li>
+						</ul>
+					</li>
+				</ul>
+			</div>		</nav>
+				<nav class="social-navigation" aria-label="Social Links Menu">
+			<div class="menu-social-links-menu-container"><ul id="menu-social-links-menu" class="social-links-menu"><li id="menu-item-48" class="menu-item menu-item-type-custom menu-item-object-custom menu-item-48"><a href="https://github.com/cogtool"><span class="screen-reader-text">GitHub</span><svg class="svg-icon" width="26" height="26" aria-hidden="true" role="img" focusable="false" viewbox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><path d="M12,2C6.477,2,2,6.477,2,12c0,4.419,2.865,8.166,6.839,9.489c0.5,0.09,0.682-0.218,0.682-0.484 c0-0.236-0.009-0.866-0.014-1.699c-2.782,0.602-3.369-1.34-3.369-1.34c-0.455-1.157-1.11-1.465-1.11-1.465 c-0.909-0.62,0.069-0.608,0.069-0.608c1.004,0.071,1.532,1.03,1.532,1.03c0.891,1.529,2.341,1.089,2.91,0.833 c0.091-0.647,0.349-1.086,0.635-1.337c-2.22-0.251-4.555-1.111-4.555-4.943c0-1.091,0.39-1.984,1.03-2.682 C6.546,8.54,6.202,7.524,6.746,6.148c0,0,0.84-0.269,2.75,1.025C10.295,6.95,11.15,6.84,12,6.836 c0.85,0.004,1.705,0.114,2.504,0.336c1.909-1.294,2.748-1.025,2.748-1.025c0.546,1.376,0.202,2.394,0.1,2.646 c0.64,0.699,1.026,1.591,1.026,2.682c0,3.841-2.337,4.687-4.565,4.935c0.359,0.307,0.679,0.917,0.679,1.852 c0,1.335-0.012,2.415-0.012,2.741c0,0.269,0.18,0.579,0.688,0.481C19.138,20.161,22,16.416,22,12C22,6.477,17.523,2,12,2z"></path></svg></a></li>
+</ul></div>		</nav>
+	</div>
+			</div>
+
+					</header>
+
+	<div id="content" class="site-content">
+
+	<div id="primary" class="content-area">
+		<main id="main" class="site-main">
+
+			
+<article id="post-29" class="post-29 page type-page status-publish hentry entry">
+		<header class="entry-header">
+		
+<h1 class="entry-title">Publications</h1>
+	</header>
+	
+	<div class="entry-content">
+		
+<p><strong>2013</strong></p>
+
+
+
+<h4><a href="http://dl.acm.org/citation.cfm?id=2468419">An open source approach to information scent</a></h4>
+
+
+
+<p>Bonnie E John, Calvin Swart, Rachel KE Bellamy, Marilyn Hughes Blackmon, Richard Brown<br><em>CHI’13 Extended Abstracts on Human Factors in Computing Systems</em>, <em>pp. 355–360</em>, 2013</p>
+
+
+
+<h4><a href="http://dl.acm.org/citation.cfm?id=2486809">Human performance regression testing</a></h4>
+
+
+
+<p>Amanda Swearngin, Myra B Cohen, Bonnie E John, Rachel KE Bellamy<br><em>Proceedings of the 2013 International Conference on Software Engineering</em>, <em>pp. 152–161</em></p>
+
+
+
+<p><strong>2012</strong></p>
+
+
+
+<h4><a href="http://pro.sagepub.com/content/56/1/985.short">Tools for Predicting the Duration and Variability of Skilled Performance without Skilled Performers</a></h4>
+
+
+
+<p>B.E. John, E.W. Patton, W.D. Gray, D.F. Morrison<br><em>Proceedings of the Human Factors and Ergonomics Society Annual Meeting</em>, <em>pp. 985–989</em>, 2012</p>
+
+
+
+<h4><a href="http://dl.acm.org/citation.cfm?id=2208415">Easing the generation of predictive human performance models from legacy systems</a></h4>
+
+
+
+<p>A. Swearngin, M. Cohen, B. John, R. Bellamy<br><em>Proceedings of the 2012 ACM annual conference on Human Factors in Computing Systems</em>, <em>pp. 2489–2498</em></p>
+
+
+
+<h4><a href="http://dl.acm.org/citation.cfm?id=2212821">Experiences with collaborative, distributed predictive human performance modeling</a></h4>
+
+
+
+<p>B. John, S. Starr, B. Utesch<br><em>Proceedings of the 2012 ACM annual conference extended abstracts on Human Factors in Computing Systems Extended Abstracts</em>, <em>pp. 437–452</em></p>
+
+
+
+<h4><a href="http://dl.acm.org/citation.cfm?id=2384938">Understanding the role of age and fluid intelligence in information search</a></h4>
+
+
+
+<p>S Trewin, J Richards, V Hanson, D Sloan, B John, C Swart, J Thomas<br><em>Proc. 14th International ACM SIGACCESS Conference on Computers and Accessibility</em>, <em>pp. 119-126</em>, ACM, 2012</p>
+
+
+
+<h4><a href="http://dl.acm.org/citation.cfm?id=2223787">Age-specific predictive models of human performance</a></h4>
+
+
+
+<p>S Trewin, B John, J Richards, D Sloan, V Hanson, R Bellamy, J Thomas, C Swart<br><em>Proceedings of the 2012 annual conference extended abstracts on Human factors in computing systems</em>, <em>pp. 2267–2272</em></p>
+
+
+
+<h4><a href="http://dl.acm.org/citation.cfm?id=2208414">CogTool-Explorer: a model of goal-directed user exploration that considers information layout</a></h4>
+
+
+
+<p>L.H. Teo, B. John, M. Blackmon<br><em>Proceedings of the 2012 ACM annual conference on Human Factors in Computing Systems</em>, <em>pp. 2479–2488</em></p>
+
+
+
+<h4><a href="http://pro.sagepub.com/content/56/1/1005.short">Automated CPM-GOMS modeling from human data</a></h4>
+
+
+
+<p>E.W. Patton, W.D. Gray, B.E. John<br><em>Proceedings of the Human Factors and Ergonomics Society Annual Meeting</em>, <em>pp. 1005–1009</em>, 2012</p>
+
+
+
+<p><strong>2011</strong></p>
+
+
+
+<h4><a href="http://dl.acm.org/citation.cfm?id=2167180">Festschrift panel in honor of Stuart K. Card</a></h4>
+
+
+
+<p>E. Chi, P. Pirolli, B. John, J. Olson, D. Russel, T. Moran<br><em>Proceedings of the 2011 annual conference on Human factors in computing systems</em></p>
+
+
+
+<h4><a href="http://link.springer.com/chapter/10.1007/978-3-642-21672-5_17">Extending predictive models of exploratory behavior to broader populations</a></h4>
+
+
+
+<p>Shari Trewin, John Richards, Rachel Bellamy, Bonnie E John, Cal Swart, David Sloan<br><em>Universal Access in Human-Computer Interaction. Design for All and eInclusion</em>, <em>pp. 149–158</em>, Springer, 2011</p>
+
+
+
+<h4><a href="http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=6032510">Deploying CogTool: Integrating quantitative usability assessment into real-world software development</a></h4>
+
+
+
+<p>R. Bellamy, B. John, S. Kogan<br><em>Software Engineering (ICSE), 2011 33rd International Conference on</em>, <em>pp. 691–700</em>, ACM</p>
+
+
+
+<h4><a href="http://www.hcii2011.org/index.php?module=webpage&id=46">Cognitive Crash Dummies: Predicting Performance from Early Prototypes (Tutorial)</a></h4>
+
+
+
+<p>Bonnie E. John<br><em>HCI International</em>, 2011</p>
+
+
+
+<h4><img src="https://i0.wp.com/researcher.watson.ibm.com/researcher/images/square.png" srcset="https://i0.wp.com/researcher.watson.ibm.com/researcher/images/square.png?zoom=2 2x" alt="" width="6" height="6">Cognitive Crash Dummies: Predictive Human Performance Modeling for Interactive System Design (Tutorial)</h4>
+
+
+
+<p>Bonnie E. John<br><em>2011 Annual Conference on Human Factors in Computing Systems (CHI2011)</em>, ACM</p>
+
+
+
+<h4><a href="http://www.computer.org/portal/web/csdl/doi/10.1109/CSEET.2011.5876143">A Quantitative Usability Assessment Method for Inclusion in Software Engineering Courses (Tutorial)</a></h4>
+
+
+
+<p>B E John<br><em>24th IEEE-CS Conference on Software Engineering Education and Training</em>, 2011</p>
+
+
+
+<h4><a href="http://portal.acm.org/citation.cfm?id=1979088">Using predictive human performance models to inspire and support UI design recommendations</a></h4>
+
+
+
+<p>B E John<br><em>Proceedings of the 2011 Annual Conference on Human Factors in Computing Systems (CHI2011)</em>, <em>pp. 983–986</em></p>
+
+
+
+<h4><a href="http://onlinelibrary.wiley.com/doi/10.1111/j.1756-8765.2010.01128.x/abstract">The Evolution of a Goal-Directed Exploration Model: Effects of Information Scent and GoBack Utility on Successful Exploration</a></h4>
+
+
+
+<p>Leonghwee Teo, Bonnie E. John<br><em>Topics in Cognitive Science</em> <em>3</em>(<em>1</em>), 154-165, Wiley Online Library, 2011</p>
+
+
+
+<p><strong>2010</strong></p>
+
+
+
+<h4><a href="http://dl.acm.org/citation.cfm?id=1878811">Towards a Tool for Keystroke Level Modeling of Skilled Screen Reading</a></h4>
+
+
+
+<p>S Trewin, B.E. John, J Richards, C Swart, J Brezin, and J Thomas<br><em>ASSETS ’10: Proc. 12th International ACM SIGACCESS Conference on Computers and Accessibility</em>, <em>pp. 27–34</em>, 2010</p>
+
+
+
+<h4><a href="http://ecs.victoria.ac.nz/twiki/pub/Events/PLATEAU/Program/plateau10-bellamy.pdf">Using CogTool to Model Programming Tasks</a></h4>
+
+
+
+<p>John Richards, Rachel Bellamy, Bonnie John, Cal Swart, John Thomas<br><em>Psychology of Programming Interest Group: Work in Progress</em>, <em>pp. 1</em>, 2010</p>
+
+
+
+<h4><a href="http://doi.acm.org/10.1145/1878803.1878811">Towards a tool for keystroke level modeling of skilled screen reading</a></h4>
+
+
+
+<p>Shari Trewin, Bonnie E John, John Richards, Cal Swart, Jonathan Brezin, Rachel Bellamy, John Thomas<br><em>Proceedings of the 12th international ACM SIGACCESS conference on Computers and accessibility</em>, <em>pp. 27–34</em>, ACM, 2010</p>
+
+
+
+<h4><a href="http://iccm2010.cs.drexel.edu/proceedings/papers/Teo.pdf">The evolution of a goal-directed exploration model: Effects of information scent and go-back utility on successful exploration</a></h4>
+
+
+
+<p>L Teo, B E John<br><em>Proceedings of the 10th International Conference on Cognitive Modeling</em>, <em>pp. 253–258</em>, 2010</p>
+
+
+
+<h4><a href="http://iccm2010.cs.drexel.edu/proceedings/papers/John.pdf">Exploration of costs and benefits of predictive human performance modeling for design</a></h4>
+
+
+
+<p>B E John, T S Jastrzembski<br><em>Proceedings of the 10th International Conference on Cognitive Modeling</em>, <em>pp. 115–120</em>, 2010</p>
+
+
+
+<h4><a href="http://doi.acm.org/10.1145/1937117.1937118">Using CogTool to model programming tasks</a></h4>
+
+
+
+<p>Rachel Bellamy, Bonnie John, John Richards, John Thomas<br><em>Evaluation and Usability of Programming Languages and Tools</em>, <em>pp. 1:1–1:6</em>, ACM, 2010</p>
+
+
+
+<h4><a href="http://brimsconference.org/archives/2010/papers/5%20-%20John.pdf">Reducing the Variability between Novice Modelers: Results of a Tool for Human Performance Modeling Produced through Human-Centered Design</a></h4>
+
+
+
+<p>B E John<br><em>Behavior Representation in Modeling and Simulation (BRIMS)</em>, 2010</p>
+
+
+
+<h4><a href="http://portal.acm.org/citation.cfm?id=1805993">Designing for auditory web access: accessibility and cellphone users</a></h4>
+
+
+
+<p>Shari Trewin, Rachel Bellamy, John Thomas, Jonathan Brezin, John Richards, Cal Swart, Bonnie E John<br><em>W4A ’10: Proceedings of the 2010 International Cross Disciplinary Conference on Web Accessibility (W4A)</em>, <em>pp. 1–4</em>, ACM</p>
+
+
+
+<h4><a href="http://doi.acm.org/10.1145/1753846.1754005">Human performance modeling for all: importing UI prototypes into cogtool</a></h4>
+
+
+
+<p>Brett N Harris, Bonnie E John, Jonathan Brezin<br><em>Proceedings of the 28th of the international conference extended abstracts on Human factors in computing systems</em>, <em>pp. 3481–3486</em>, ACM, 2010</p>
+
+
+
+<h4><a href="http://portal.acm.org/citation.cfm?id=1753846.1754088">Toward modeling auditory information seeking strategies on the web</a></h4>
+
+
+
+<p>Shari Trewin, John Richards, Rachel Bellamy, Bonnie E John, John Thomas, Cal Swart, Jonathan Brezin<br><em>CHI EA ’10: Proceedings of the 28th of the international conference extended abstracts on Human factors in computing systems</em>, <em>pp. 3973–3978</em>, ACM, 2010</p>
+
+
+
+<p><strong>2009</strong></p>
+
+
+
+<h4><a href="http://www.springerlink.com/index/B41G1X85660N07K5.pdf">Toward Cognitive Modeling for Predicting Usability</a></h4>
+
+
+
+<p>B John, S Suzuki<br><em>Human-Computer Interaction. New Trends</em>, 267–276, Springer, 2009</p>
+
+
+
+<p><strong>2008</strong></p>
+
+
+
+<h4><a href="http://www.ingentaconnect.com/content/hfes/hfproc/2008/00000052/00000013/art00001">Models of Motor Control and Performance</a></h4>
+
+
+
+<p>W D Gray, D A Rosenbaum, B J Martin, M D Byrne, B E John, U Raschke<br><em>Human Factors and Ergonomics Society Annual Meeting Proceedings</em>, <em>pp. 903–906</em>, 2008</p>
+
+
+
+<h4><a href="http://portal.acm.org/citation.cfm?id=1358763">Cogtool-explorer: towards a tool for predicting user interaction</a></h4>
+
+
+
+<p>L Teo, B E John<br><em>CHI’08 extended abstracts on Human factors in computing systems</em>, <em>pp. 2793–2798</em>, 2008</p>
+
+
+
+<h4><a href="http://www.ingentaconnect.com/content/hfes/hfproc/2008/00000052/00000013/art00011">Towards a tool for predicting goal-directed exploratory behavior</a></h4>
+
+
+
+<p>L Teo, B E John<br><em>Human Factors and Ergonomics Society Annual Meeting Proceedings</em>, <em>pp. 950–954</em>, 2008</p>
+
+
+
+<p><strong>2007</strong></p>
+
+
+
+<h4><a href="http://portal.acm.org/citation.cfm?id=1240866.1241063">Towards a tool for predicting user exploration</a></h4>
+
+
+
+<p>L Teo, B E John, P Pirolli<br><em>CHI’07 extended abstracts on Human factors in computing systems</em>, <em>pp. 2692</em>, 2007</p>
+
+
+
+<p><strong>2006</strong></p>
+
+
+
+<h4><a href="http://portal.acm.org/citation.cfm?id=1125713">Comparisons of keystroke-level model predictions to observed data</a></h4>
+
+
+
+<p>L Teo, B E John<br><em>CHI’06 extended abstracts on Human factors in computing systems</em>, <em>pp. 1426</em>, 2006</p>
+
+
+
+<h4><a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.79.5123&rep=rep1&type=pdf">High-level behavior representation languages revisited</a></h4>
+
+
+
+<p>F E Ritter, S R Haynes, M Cohen, A Howes, B John, B Best, C Lebiere, R M Jones, J Crossman, R L Lewis, others<br><em>Proceedings of ICCM-2006-Seventh International Conference on Cognitive Modeling</em>, <em>pp. 404–407</em></p>
+
+
+
+<p><strong>2005</strong></p>
+
+
+
+<h4><a href="http://www.ingentaconnect.com/content/hfes/hfproc/2005/00000049/00000012/art00012">Cognitive Human Performance Modeling by Demonstration</a></h4>
+
+
+
+<p>B E John<br><em>Human Factors and Ergonomics Society Annual Meeting Proceedings</em>, <em>pp. 1153–1156</em>, 2005</p>
+
+
+
+<h4><a href="http://www.informaworld.com/index/784766461.pdf">Automating human-performance modeling at the millisecond level</a></h4>
+
+
+
+<p>A H Vera, B E John, R Remington, M Matessa, M A Freed<br><em>Human-Computer Interaction</em> <em>20</em>(<em>3</em>), 225–265, Taylor & Francis, 2005</p>
+
+
+
+<h4><img src="https://i2.wp.com/researcher.watson.ibm.com/researcher/images/v17extlink.png" srcset="https://i2.wp.com/researcher.watson.ibm.com/researcher/images/v17extlink.png?zoom=2 2x" alt="" width="13" height="8"><a href="http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=1541965&url=http%3A%2F%2Fieeexplore.ieee.org%2Fxpls%2Fabs_all.jsp%3Farnumber%3D1541965" target="_blank" rel="noreferrer noopener">Multipurpose prototypes for assessing user interfaces in pervasive computing systems</a></h4>
+
+
+
+<p>BE John, DD Salvucci<br><em>IEEE pervasive computing</em> <em>4</em>(<em>4</em>), 27–34, 2005</p>
+
+
+
+<h4><a href="http://portal.acm.org/citation.cfm?id=1056977">Predicting task execution time on handheld devices using the keystroke-level model</a></h4>
+
+
+
+<p>L Luo, B E John<br><em>CHI’05 extended abstracts on Human factors in computing systems</em>, <em>pp. 1608</em>, 2005</p>
+
+
+
+<p><strong>2004</strong></p>
+
+
+
+<h4><a href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.70.8062&rep=rep1&type=pdf">Integrating models and tools in the context of driving and in-vehicle devices</a></h4>
+
+
+
+<p><a href="http://researcher.watson.ibm.com/researcher/view.php?person=us-bejohn">B E John</a>, D D Salvucci, P Centgraf, K Prevas<br><em>Proceedings of the Sixth International Conference on Cognitive Modeling</em>, <em>pp. 130–135</em>, 2004</p>
+
+
+
+<h4><a href="http://portal.acm.org/citation.cfm?id=985692.985750">Predictive human performance modeling made easy</a></h4>
+
+
+
+<p><a href="http://researcher.watson.ibm.com/researcher/view.php?person=us-bejohn">B E John</a>, K Prevas, D D Salvucci, K Koedinger<br><em>Proceedings of the SIGCHI conference on Human factors in computing systems</em>, <em>pp. 462</em>, 2004</p>
+	</div>
+
+	</article>
+
+		</main>
+	</div>
+
+
+	</div>
+
+	<footer id="colophon" class="site-footer">
+				<div class="site-info">
+										<a class="site-name" href="http://cogtool-modern.github.io/cogtool/" rel="home">cogtool</a>,
+						<a href="https://wordpress.org/" class="imprint">
+				Proudly powered by WordPress.			</a>
+								</div>
+	</footer>
+
+</div>
+
+<script src="http://cogtool-modern.github.io/cogtool/wp-content/themes/twentynineteen/js/priority-menu.js"></script>
+<script src="http://cogtool-modern.github.io/cogtool/wp-content/themes/twentynineteen/js/touch-keyboard-navigation.js"></script>
+	<script>
+	/(trident|msie)/i.test(navigator.userAgent)&&document.getElementById&&window.addEventListener&&window.addEventListener("hashchange",function(){var t,e=location.hash.substring(1);/^[A-z0-9_-]+$/.test(e)&&(t=document.getElementById(e))&&(/^(?:a|select|input|button|textarea)$/i.test(t.tagName)||(t.tabIndex=-1),t.focus())},!1);
+	</script>
+	
+</body>
+</html>
