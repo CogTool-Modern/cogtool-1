@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2005 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2009 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -11,7 +11,7 @@ dnl From Bruno Haible, Marcus Daniels, Sam Steingold.
 AC_PREREQ(2.57)
 
 AC_DEFUN([CL_MPROTECT],
-[AC_REQUIRE([CL_GETPAGESIZE])dnl
+[AC_REQUIRE([gl_FUNC_GETPAGESIZE])dnl
 AC_REQUIRE([CL_MMAP])dnl
 AC_CHECK_FUNCS(mprotect)dnl
 if test $ac_cv_func_mprotect = yes; then
@@ -30,11 +30,7 @@ mprotect_prog='
 #define getpagesize() PAGESIZE
 #else
 ]AC_LANG_EXTERN[
-#if defined(__STDC__) || defined(__cplusplus)
-RETGETPAGESIZETYPE getpagesize (void);
-#else
-RETGETPAGESIZETYPE getpagesize();
-#endif
+int getpagesize (void);
 #endif
 char foo;
 int main () {
@@ -55,8 +51,7 @@ AC_TRY_RUN(GL_NOCRASH[$mprotect_prog
   nocrash_init();
   if (mprotect(page_align(fault_address),pagesize,PROT_NONE) < 0) exit(0);
   foo = *fault_address; /* this should cause an exception or signal */
-  exit(0); }],
-  no_mprotect=1, ,
+  exit(0); }], no_mprotect=1, ,
 : # When cross-compiling, don't assume anything.
 )
 fi
@@ -65,8 +60,7 @@ AC_TRY_RUN(GL_NOCRASH[$mprotect_prog
   nocrash_init();
   if (mprotect(page_align(fault_address),pagesize,PROT_NONE) < 0) exit(0);
   *fault_address = 'z'; /* this should cause an exception or signal */
-  exit(0); }],
-  no_mprotect=1, ,
+  exit(0); }], no_mprotect=1, ,
 : # When cross-compiling, don't assume anything.
 )
 fi
@@ -75,8 +69,7 @@ AC_TRY_RUN(GL_NOCRASH[$mprotect_prog
   nocrash_init();
   if (mprotect(page_align(fault_address),pagesize,PROT_READ) < 0) exit(0);
   *fault_address = 'z'; /* this should cause an exception or signal */
-  exit(0); }],
-  no_mprotect=1, ,
+  exit(0); }], no_mprotect=1, ,
 : # When cross-compiling, don't assume anything.
 )
 fi

@@ -710,15 +710,15 @@ Here are some more examples of setf and related functions.
 
 > (setf a (make-array 1))       ;setf on a variable is equivalent to setq
 #(NIL)
-> (push 5 (aref a 1))           ;push can act like setf
+> (push 5 (aref a 0))           ;push can act like setf
 (5)
-> (pop (aref a 1))              ;so can pop
+> (pop (aref a 0))              ;so can pop
 5
-> (setf (aref a 1) 5)
+> (setf (aref a 0) 5)
 5
-> (incf (aref a 1))             ;incf reads from a place, increments,
+> (incf (aref a 0))             ;incf reads from a place, increments,
 6                               ;and writes back
-> (aref a 1)
+> (aref a 0)
 6
 
 

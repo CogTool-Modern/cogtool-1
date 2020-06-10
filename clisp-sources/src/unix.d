@@ -1,7 +1,7 @@
 /*
  * The include file for the UNIX version of CLISP
- * Bruno Haible 1990-2005
- * Sam Steingold 1998-2003
+ * Bruno Haible 1990-2008
+ * Sam Steingold 1998-2009
  */
 
 /* control character constants: */
@@ -15,19 +15,13 @@
 #define stderr_handle  2  /* the file handle for the standard error */
 
 /* Declaration of types of I/O parameters of operating system functions */
-#ifdef STDC_HEADERS
-  #include <stdlib.h>
-#endif
+#include <stdlib.h>
 #include <sys/types.h>  /* declares pid_t, uid_t */
-#if defined(TIME_WITH_SYS_TIME)
+#ifdef HAVE_SYS_TIME_H
  #include <sys/time.h>
+#endif
+#ifdef HAVE_TIME_H
  #include <time.h>
-#else
- #if defined(HAVE_SYS_TIME_H)
-  #include <sys/time.h>
- #elif defined(HAVE_TIME_H)
-  #include <time.h>
- #endif
 #endif
 #ifdef HAVE_UNISTD_H
   #include <unistd.h>
@@ -58,16 +52,6 @@ extern_C char* strerror (int errnum);
 #endif
 /* used by ERROR, SPVW, STREAM, PATHNAME */
 
-/* Make the main memory available */
-#ifdef HAVE_GETPAGESIZE
-  extern_C RETGETPAGESIZETYPE getpagesize (void); /* getpagesize(2) */
-#endif
-/* malloc(), free(), realloc() are defined in <stdlib.h> */
-#ifdef UNIX_NEXTSTEP
-  /* ignore the contents of libposix.a, since it is not documented */
-  #undef HAVE_MMAP
-  #undef HAVE_MUNMAP
-#endif
 #ifdef UNIX_RHAPSODY
 /* Ignore mmap and friends, because the configure test says no working mmap. */
   #undef HAVE_MMAP
@@ -81,7 +65,7 @@ extern_C char* strerror (int errnum);
     #define MAP_ANON MAP_ANONYMOUS
     #define HAVE_MMAP_ANON
   #endif
-  #if defined(UNIX_SUNOS4) || defined(UNIX_SUNOS5)
+  #ifdef UNIX_SUNOS5
     /* for SINGLEMAP_MEMORY: */
     #if defined(HAVE_MMAP_DEVZERO_SUN4_29) && defined(SUN4_29) && !defined(HAVE_MMAP_DEVZERO)
       /* On the assumption of the SUN4_29-type code distribution
@@ -97,35 +81,12 @@ extern_C char* strerror (int errnum);
       memory at addresses >= 0x06000000 or more than 6 times to attach,
       we must use SINGLEMAP_MEMORY */
   #endif
-  #ifdef HAVE_MSYNC
-    #ifdef MS_INVALIDATE
-      /* tested only on UNIX_LINUX, not UNIX_SUNOS4, not UNIX_SUNOS5,
-         not UNIX_FREEBSD. ?? */
-      /* for MULTIMAP_MEMORY_VIA_FILE: */
-      /* extern_C int msync (void* addr, size_t len, int flags); */
-    #else
-      /* NetBSD has a 2-argument msync(), unusable for our purposes. */
-      #undef HAVE_MSYNC
-    #endif
-  #endif
-  /* for MULTIMAP_MEMORY_VIA_FILE: */
-  #if defined(UNIX_SUNOS4) || defined(UNIX_LINUX) || defined(UNIX_FREEBSD)
-    #if HAVE_SYS_STATVFS_H
-      #include <sys/statvfs.h>
-    #elif HAVE_SYS_STATFS_H
-      #include <sys/statfs.h>
-    #else
-      /* Old BSDs define struct statfs in <sys/mount.h>. */
-      #include <sys/param.h>
-      #include <sys/mount.h>
-    #endif
-  #endif
 #endif
 #ifdef HAVE_MACH_VM /* vm_allocate(), task_self(), ... available */
   /* the headers for UNIX_NEXTSTEP must look indescribable ... */
   #undef local
   #include <mach/mach_interface.h>
-  #if defined(UNIX_NEXTSTEP) || defined(UNIX_RHAPSODY)
+  #ifdef UNIX_RHAPSODY
     #include <mach/mach_init.h>
   #endif
   #ifdef UNIX_OSF
@@ -174,14 +135,8 @@ extern_C char* strerror (int errnum);
   #ifdef UNIX_AUX
     #include <sys/mmu.h> /* for SHMLBA */
   #endif
-  #ifdef UNIX_LINUX
+  #if defined(UNIX_LINUX) && !defined(UNIX_GNU)
     #include <asm/page.h> /* for SHMLBA on Linux 2.0 */
-  #endif
-  #if defined(UNIX_SUNOS4) || defined(UNIX_SUNOS5)
-    #define SHMMAX  0x100000 /* maximum shared memory segment size = 1 MB */
-  #endif
-  #ifndef SHMMAX
-    #define SHMMAX  0xFFFFFFFFUL /* maximum shared memory segment size accepted to mean infinite */
   #endif
 /* <sys/shm.h> declares shmget(), shmat(), shmdt(), shmctl() */
 #endif
@@ -195,34 +150,20 @@ extern_C char* strerror (int errnum);
 /* use madvise() ?? */
 /* used by SPVW */
 
-/* make stack large enough */
-#ifdef UNIX_NEXTSTEP
-  extern_C int getrlimit (RLIMIT_RESOURCE_T resource, struct rlimit * rlim); /* GETRLIMIT(2) */
-  extern_C int setrlimit (RLIMIT_RESOURCE_T resource, SETRLIMIT_CONST struct rlimit * rlim); /* SETRLIMIT(2) */
-#endif
-/* used by SPVW */
-
 /* normal program end */
 nonreturning_function(extern_C, _exit, (int status)); /* EXIT(2V) */
 nonreturning_function(extern_C, exit, (int status)); /* EXIT(2V) */
 /* used by SPVW, PATHNAME, STREAM */
 
 /* Immediate abnormal termination, jump into the debugger */
-extern_C ABORT_VOLATILE RETABORTTYPE abort (void); /* ABORT(3) */
+/* #include <stdlib.h> - see above */
+/* extern_C [volatile] void abort (void); */ /* ABORT(3) */
 /* used by SPVW, DEBUG, EVAL, IO */
 
 /* signal handling */
 #include <signal.h>
 /* a signal handler is a non-returning function. */
-#ifdef __cplusplus
-  #ifdef SIGTYPE_DOTS
-    typedef RETSIGTYPE (*signal_handler_t) (...);
-  #else
-    typedef RETSIGTYPE (*signal_handler_t) (int);
-  #endif
-#else
-  typedef RETSIGTYPE (*signal_handler_t) ();
-#endif
+typedef void (*signal_handler_t) (int);
 /* install a signal cleanly: */
 extern_C signal_handler_t signal (int sig, signal_handler_t handler); /* SIGNAL(3V) */
 #if defined(SIGNAL_NEED_UNBLOCK_OTHERS) && defined(HAVE_SIGACTION)
@@ -233,34 +174,18 @@ extern_C signal_handler_t signal (int sig, signal_handler_t handler); /* SIGNAL(
 #endif
 extern signal_handler_t install_signal_handler (int sig, signal_handler_t handler);
 #define SIGNAL(sig,handler)  install_signal_handler(sig,handler)
-/* a signal block and release: */
-#if defined(SIGNALBLOCK_POSIX)
-  /* extern_C int sigprocmask (int how, const sigset_t* set, sigset_t* oset); */ /* SIGPROCMASK(2V) */
-  /* extern_C int sigemptyset (sigset_t* set); */ /* SIGSETOPS(3V) */
-  /* extern_C int sigaddset (sigset_t* set, int signo); */ /* SIGSETOPS(3V) */
-  #define signalblock_on(sig)  \
-      { var sigset_t sigblock_mask;                                 \
-        sigemptyset(&sigblock_mask); sigaddset(&sigblock_mask,sig); \
-        sigprocmask(SIG_BLOCK,&sigblock_mask,NULL);
-  #define signalblock_off(sig)  \
-        sigprocmask(SIG_UNBLOCK,&sigblock_mask,NULL); \
-      }
-#elif defined(SIGNALBLOCK_SYSV)
-  extern_C int sighold (int sig);
-  extern_C int sigrelse (int sig);
-  #define signalblock_on(sig)  sighold(sig);
-  #define signalblock_off(sig)  sigrelse(sig);
-#elif defined(SIGNALBLOCK_BSD)
-  extern_C int sigblock (int mask); /* SIGBLOCK(2) */
-  extern_C int sigsetmask (int mask); /* SIGSETMASK(2) */
-  #define signalblock_on(sig)  \
-      { var int old_sigblock_mask = sigblock(sigmask(sig));
-  #define signalblock_off(sig)  \
-        sigsetmask(old_sigblock_mask); \
-      }
-#else
-  #error "How does one block a signal?"
-#endif
+/* Block and unblock (= delay and reenable) a signal: */
+#define SIGNALBLOCK_POSIX /* all Unix systems support the POSIX API for signal blocking */
+/* extern_C int sigprocmask (int how, const sigset_t* set, sigset_t* oset); */ /* SIGPROCMASK(2V) */
+/* extern_C int sigemptyset (sigset_t* set); */ /* SIGSETOPS(3V) */
+/* extern_C int sigaddset (sigset_t* set, int signo); */ /* SIGSETOPS(3V) */
+#define signalblock_on(sig)  \
+  { var sigset_t sigblock_mask;                                 \
+    sigemptyset(&sigblock_mask); sigaddset(&sigblock_mask,sig); \
+    sigprocmask(SIG_BLOCK,&sigblock_mask,NULL);
+#define signalblock_off(sig)  \
+    sigprocmask(SIG_UNBLOCK,&sigblock_mask,NULL); \
+  }
 /* deliver a signal some time later: */
 /* extern_C {unsigned|} int alarm ({unsigned|} int seconds); / * ALARM(3V) */
 #if !defined(HAVE_UALARM) && defined(HAVE_SETITIMER)
@@ -302,7 +227,7 @@ extern signal_handler_t install_signal_handler (int sig, signal_handler_t handle
 #ifdef EINTR
   extern_C int siginterrupt (int sig, int flag); /* SIGINTERRUPT(3V) */
   #ifndef HAVE_SIGINTERRUPT
-    /* siginterrupt() can be implemented with sigaction() or sigvec() */
+    /* siginterrupt() can be implemented with sigaction() */
     #define NEED_OWN_SIGINTERRUPT
   #endif
 #else
@@ -318,9 +243,7 @@ extern signal_handler_t install_signal_handler (int sig, signal_handler_t handle
    and not into possibly mprotect-protected ranges. */
 #endif
 /* raise a signal. */
-#ifdef HAVE_RAISE
 extern_C int raise (int sig);
-#endif
 /* used by SPVW */
 
 /* check environment variables:
@@ -344,13 +267,17 @@ extern_C int raise (int sig);
 #include <sys/param.h>
 /* maximum path length (incl. terminating NULL), returned by getwd(): */
 #ifndef MAXPATHLEN
-  #define MAXPATHLEN  1024  /* <sys/param.h> */
+  #ifdef PATH_MAX
+    #define MAXPATHLEN  PATH_MAX  /* <sys/param.h> */
+  #else
+    #define MAXPATHLEN  4096
+  #endif
 #endif
 #ifdef HAVE_GETCWD
-extern_C char* getcwd (char* buf, GETCWD_SIZE_T bufsize);
+/* getcwd(3) - declared in <unistd.h> */
 #define getwd(buf)  getcwd(buf,MAXPATHLEN)
 #else
-extern_C char* getwd (char* pathname); /* GETWD(3) */
+/* getwd(3) - declared in <unistd.h> */
 #endif
 /* used by PATHNAME */
 
@@ -368,11 +295,6 @@ extern_C char* getwd (char* pathname); /* GETWD(3) */
 
 /* get information about a file: */
 #include <sys/stat.h>
-#ifdef STAT_MACROS_BROKEN
-  #undef S_ISDIR
-  #undef S_ISLNK
-  #undef S_ISREG
-#endif
 /* extern/extern_C int stat (const char* path, struct stat * buf); */ /* STAT(2V) */
 #ifdef HAVE_LSTAT
   /* extern/extern_C int lstat (const char* path, struct stat * buf); */ /* STAT(2V) */
@@ -403,12 +325,10 @@ struct file_id {              /* Unique ID for a file on this machine */
   uintL inode;
 #endif
 };
-/* if file NAMESTRING exists, fill file_id and call function on it,
-   otherwise return NULL */
-extern void* with_file_id (char *namestring, void *data,
-                           void* (*func) (struct file_id *fid, void*data));
-/* fill FI for an existing file handle */
 typedef int errno_t;
+/* fill FI for an exiting namestring */
+extern errno_t namestring_file_id (char *namestring, struct file_id *fi);
+/* fill FI for an existing file handle */
 extern errno_t handle_file_id (int fd, struct file_id *fi);
 /* if the file IDs are identical, return 1, otherwise return 0 */
 extern int file_id_eq (struct file_id *fi1, struct file_id *fi2);
@@ -417,26 +337,8 @@ extern int file_id_eq (struct file_id *fi1, struct file_id *fi2);
 /* rename() - declared in <stdio.h>; used by PATHNAME, UNIXAUX */
 
 /* directory search: */
-#if defined(DIRENT) || defined(_POSIX_VERSION)
-  #include <dirent.h>
-  #define SDIRENT  struct dirent
-#else
-  #ifdef SYSNDIR
-    #include <sys/ndir.h>
-  #else
-    #ifdef SYSDIR
-      #include <sys/dir.h>
-    #else
-      #ifdef NDIR
-        #include <ndir.h>
-      #else
-        #include <dir.h>
-      #endif
-    #endif
-  #endif
-  #define SDIRENT  struct direct
-#endif
-/* declared in one of the above includes: opendir(), readdir(), closedir() */
+#include <dirent.h>
+/* declared in <dirent.h>: opendir(), readdir(), closedir() */
 #ifdef VOID_CLOSEDIR
   #define CLOSEDIR(dirp)  (closedir(dirp),0)
 #else
@@ -453,11 +355,8 @@ extern int file_id_eq (struct file_id *fi1, struct file_id *fi2);
 /* used by PATHNAME */
 
 /* work with open files: */
-#include <fcntl.h>
-/* declares open() */
-#if defined(ACCESS_NEEDS_SYS_FILE_H) || defined(OPEN_NEEDS_SYS_FILE_H)
-  #include <sys/file.h>
-#endif
+#include <fcntl.h> /* declares open(), O_RDWR etc. */
+/* #include <unistd.h> - declares R_OK, W_OK, X_OK - included above */
 /* Only a few Unices (like UNIX_CYGWIN32) have O_TEXT and O_BINARY.
    BeOS 5 has them, but they have no effect. */
 #ifdef UNIX_BEOS
@@ -470,7 +369,7 @@ extern int file_id_eq (struct file_id *fi1, struct file_id *fi2);
 #define Handle  int  /* the type of a file descriptor */
 #define INVALID_HANDLE  -1
 extern_C off_t lseek (int fd, off_t offset, int whence); /* LSEEK(2V) */
-#ifndef SEEK_SET /* e.g., UNIX_NEXTSTEP */
+#ifndef SEEK_SET /* old platforms */
   /* position modes, see <unistd.h> : */
   #define SEEK_SET  0
   #define SEEK_CUR  1
@@ -578,7 +477,7 @@ extern_C int isatty (int fd); /* TTYNAME(3V) */
     #define NCCS  sizeof(((struct termio *)0)->c_cc)
   #endif
 #elif defined(HAVE_SGTTY_H)
-  /* compatibel to V7 or 4BSD, TIOC form ioctls.... */
+  /* compatible with V7 or 4BSD, TIOC form ioctls.... */
   #define UNIX_TERM_SGTTY
   #include <sgtty.h>
   #include <sys/ioctl.h> /* TTY(4) */
@@ -672,43 +571,14 @@ extern_C const char* tgetstr (const char* id, char** area); /* TERMCAP(3X) */
 #endif
 /* used by SPVW, STREAM */
 
-/* process date/time of day: */
-#if defined(HAVE_GETTIMEOFDAY)
-  #ifdef GETTIMEOFDAY_DOTS
-    extern_C int gettimeofday (struct timeval * tp, ...); /* GETTIMEOFDAY(2) */
-  #else
-    extern_C int gettimeofday (struct timeval * tp, GETTIMEOFDAY_TZP_T tzp); /* GETTIMEOFDAY(2) */
-  #endif
-  #ifdef UNIX_CYGWIN32
-    /* gettimeofday() always returns 1. Let it return 0. */
-    #define gettimeofday(tv,tz)  ((gettimeofday)(tv,tz), 0)
-  #endif
-#elif defined(HAVE_FTIME)
-  #include <sys/timeb.h>
-  extern_C int ftime (struct timeb * tp); /* TIME(3V) */
-  /* emulate gettimeofday() in unixaux.d: */
-  #define NEED_OWN_GETTIMEOFDAY
-  #ifndef _EMUL_SYS_TIME_H
-    #define _EMUL_SYS_TIME_H
-    struct timeval { long tv_sec; long tv_usec; };
-    struct timezone { int tz_minuteswest; int tz_dsttime; };
-  #endif
-  extern int gettimeofday (struct timeval * tp, struct timezone * tzp); /* see unixaux.d */
-#elif defined(HAVE_TIMES_CLOCK)
-  #include <sys/times.h>
-  extern_C clock_t times (struct tms * buffer); /* TIMES(3V) */
-  extern_C time_t time (time_t* tloc); /* TIME(3V) */
-#else
-  #error "Cannot access real time with resolution finer than 1 second."
-#endif
-/* used by SPVW, MISC */
+/* process date/time of day:
+ get gettimeofday() from gnulib */
 
 /* inquire used time of the process: */
 #if defined(HAVE_GETRUSAGE)
   extern_C int getrusage (RUSAGE_WHO_T who, struct rusage * rusage); /* GETRUSAGE(2) */
   /* prototype useless, there 'struct rusage' /= 'struct rusage' */
 #elif defined(HAVE_SYS_TIMES_H)
-  #include <sys/param.h> /* define HZ, unit is 1/HZ seconds */
   #include <sys/times.h>
   extern_C clock_t times (struct tms * buffer); /* TIMES(3V) */
 #endif
@@ -726,13 +596,13 @@ extern_C int pipe (int fd[2]); /* PIPE(2V) */
 #endif
 /* vfork() declared in <vfork.h> or <unistd.h> */
 extern_C int dup2 (int oldfd, int newfd); /* DUP(2V) */
-#if defined(HAVE_SETPGID)
+#if defined(HAVE_SETSID)
+  extern_C pid_t setsid (void); /* SETSID(2V), TERMIO(4) */
+  #define SETSID()  setsid()
+#elif defined(HAVE_SETPGID)
   extern_C pid_t getpid (void); /* GETPID(2V) */
   extern_C int setpgid (pid_t pid, pid_t pgid); /* SETPGID(2V), SETSID(2V), TERMIO(4) */
   #define SETSID()  { register pid_t pid = getpid(); setpgid(pid,pid); }
-#elif defined(HAVE_SETSID)
-  extern_C pid_t setsid (void); /* SETSID(2V), TERMIO(4) */
-  #define SETSID()  setsid()
 #else
   #define SETSID()
 #endif
@@ -760,7 +630,6 @@ extern int wait2 (PID_T pid); /* see unixaux.d */
 /* determine MACHINE-TYPE and MACHINE-VERSION and MACHINE-INSTANCE: */
 #ifdef HAVE_SYS_UTSNAME_H
   #include <sys/utsname.h>
-  extern_C int uname (struct utsname * buf); /* UNAME(2V) */
 #endif
 /* used by MISC */
 
@@ -769,16 +638,12 @@ extern int wait2 (PID_T pid); /* see unixaux.d */
   /* extern_C int gethostname (char* name, size_t namelen); */ /* GETHOSTNAME(2) */
 #endif
 #ifdef HAVE_GETHOSTBYNAME
-  #ifdef HAVE_NETDB_H
-    #include <sys/socket.h>
-    #include <netdb.h>
-  #else
-    #include <sun/netdb.h>
-  #endif
+  #include <sys/socket.h>
+  #include <netdb.h>
 /* gethostbyname() is declared in the above files */
 #endif
 #ifndef MAXHOSTNAMELEN
-  #define MAXHOSTNAMELEN 64 /* see <sys/param.h> */
+  #define MAXHOSTNAMELEN 256    /* see <sys/param.h> */
 #endif
 /* used by MISC */
 
@@ -852,6 +717,7 @@ extern int wait2 (PID_T pid); /* see unixaux.d */
 #ifdef UNIX_CYGWIN32
   #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
+  #undef WIN32
   extern long time_t_from_filetime (const FILETIME * ptr);
   extern void time_t_to_filetime (time_t time_in, FILETIME * out);
 #endif
@@ -859,16 +725,5 @@ extern int wait2 (PID_T pid); /* see unixaux.d */
 /* close all file descriptors before exec() */
 global void close_all_fd (void);
 
-/* CLISP as a NeXTstep-GUI-Application: */
-#ifdef NEXTAPP
-/* Terminal-Stream, as nxterminal.m over the class LispServer implements it. */
-  extern void nxterminal_send_output (void);
-  extern void nxterminal_write_char (unsigned char ch);
-  extern void nxterminal_write_string (unsigned char * string);
-  extern unsigned char nxterminal_read_char (int* linepos);
-  extern int nxterminal_unread_char (void);
-  extern int nxterminal_listen (void);
-  extern int nxterminal_init (void);
-  extern int nxterminal_exit (void);
-  extern int nxterminal_line_length;
-#endif
+/* remove the effects of the setuid bit on the executable */
+global void drop_privileges (void);

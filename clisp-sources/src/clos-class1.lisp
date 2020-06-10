@@ -2,7 +2,7 @@
 ;;;; Class metaobjects
 ;;;; Part 1: Class definitions, preliminary accessors.
 ;;;; Bruno Haible 2004-05-25
-;;;; Sam Steingold 2005
+;;;; Sam Steingold 2005-2006
 
 (in-package "CLOS")
 
@@ -94,8 +94,7 @@
     (when (eq situation 't) ; called from initialize-instance?
       (setf (class-direct-subclasses-table class) nil)))
   (when (or (eq situation 't) name-p)
-    ; No need to check the name: any name is valid.
-    (setf (class-classname class) name))
+    (setf (class-classname class) (check-symbol name '(setf class-name))))
   class)
 
 ;;; ===========================================================================
@@ -314,7 +313,7 @@
   (when (or (eq situation 't) direct-superclasses-p)
     ; Check the direct-superclasses.
     (unless (proper-list-p direct-superclasses)
-      (error #1=(TEXT "(~S ~S) for class ~S: The ~S argument should be a proper list, not ~S")
+      (error (TEXT "(~S ~S) for class ~S: The ~S argument should be a proper list, not ~S")
              (if (eq situation 't) 'initialize-instance 'shared-initialize)
              'class name ':direct-superclasses direct-superclasses))
     (unless (every #'(lambda (x)
@@ -337,7 +336,8 @@
   (when (or (eq situation 't) direct-slots-as-lists-p)
     ; Check the direct-slots.
     (unless (proper-list-p direct-slots-as-lists)
-      (error #1# (if (eq situation 't) 'initialize-instance 'shared-initialize)
+      (error (TEXT "(~S ~S) for class ~S: The ~S argument should be a proper list, not ~S")
+             (if (eq situation 't) 'initialize-instance 'shared-initialize)
              'class name ':direct-slots direct-slots-as-lists))
     (dolist (sl direct-slots-as-lists)
       (unless (canonicalized-slot-p sl)
@@ -347,7 +347,8 @@
   (when (or (eq situation 't) direct-default-initargs-p)
     ; Check the direct-default-initargs.
     (unless (proper-list-p direct-default-initargs)
-      (error #1# (if (eq situation 't) 'initialize-instance 'shared-initialize)
+      (error (TEXT "(~S ~S) for class ~S: The ~S argument should be a proper list, not ~S")
+             (if (eq situation 't) 'initialize-instance 'shared-initialize)
              'class name ':direct-default-initargs direct-default-initargs))
     (dolist (definitarg direct-default-initargs)
       (unless (canonicalized-default-initarg-p definitarg)

@@ -1,7 +1,7 @@
 /*
  * Predicates for equality and type tests, types, classes in CLISP
  * Bruno Haible 1990-2005
- * Sam Steingold 1998-2004
+ * Sam Steingold 1998-2009
  * German comments translated into English: Stefan Kain 2002-09-15
  */
 
@@ -12,7 +12,7 @@
  eql(obj1,obj2)
  > obj1,obj2: Lisp objects
  < result: true, if objects are eql */
-global bool eql (object obj1, object obj2)
+modexp bool eql (object obj1, object obj2)
 {
  start:
   if (eq(obj1,obj2))
@@ -116,7 +116,7 @@ global bool eql (object obj1, object obj2)
  equal(obj1,obj2)
  > obj1,obj2: Lisp objects
  < result: true, if objects are EQUAL */
-global bool equal (object obj1, object obj2)
+modexp bool equal (object obj1, object obj2)
 {
  start:
   if (eql(obj1,obj2))
@@ -701,7 +701,7 @@ local bool elt_compare (object dv1, uintL index1,
         case Array_type_snilvector: /* (VECTOR NIL) */
           /* One can argue that comparing nonexistent elements should yield
              an error, not false. */
-          /*fehler_nilarray_retrieve();*/
+          /*error_nilarray_retrieve();*/
           return false;
         default: NOTREACHED;
       }
@@ -726,7 +726,7 @@ local bool elt_compare (object dv1, uintL index1,
         case Array_type_snilvector: /* (VECTOR NIL) */
           /* One can argue that comparing nonexistent elements should yield
              an error, not false. */
-          /*fehler_nilarray_retrieve();*/
+          /*error_nilarray_retrieve();*/
           return false;
         default: NOTREACHED;
       }
@@ -751,7 +751,7 @@ local bool elt_compare (object dv1, uintL index1,
         case Array_type_snilvector: /* (VECTOR NIL) */
           /* One can argue that comparing nonexistent elements should yield
              an error, not false. */
-          /*fehler_nilarray_retrieve();*/
+          /*error_nilarray_retrieve();*/
           return false;
         default: NOTREACHED;
       }
@@ -776,7 +776,7 @@ local bool elt_compare (object dv1, uintL index1,
         case Array_type_snilvector: /* (VECTOR NIL) */
           /* One can argue that comparing nonexistent elements should yield
              an error, not false. */
-          /*fehler_nilarray_retrieve();*/
+          /*error_nilarray_retrieve();*/
           return false;
         default: NOTREACHED;
       }
@@ -801,7 +801,7 @@ local bool elt_compare (object dv1, uintL index1,
         case Array_type_snilvector: /* (VECTOR NIL) */
           /* One can argue that comparing nonexistent elements should yield
              an error, not false. */
-          /*fehler_nilarray_retrieve();*/
+          /*error_nilarray_retrieve();*/
           return false;
         default: NOTREACHED;
       }
@@ -826,7 +826,7 @@ local bool elt_compare (object dv1, uintL index1,
         case Array_type_snilvector: /* (VECTOR NIL) */
           /* One can argue that comparing nonexistent elements should yield
              an error, not false. */
-          /*fehler_nilarray_retrieve();*/
+          /*error_nilarray_retrieve();*/
           return false;
         default: NOTREACHED;
       }
@@ -851,7 +851,7 @@ local bool elt_compare (object dv1, uintL index1,
         case Array_type_snilvector: /* (VECTOR NIL) */
           /* One can argue that comparing nonexistent elements should yield
              an error, not false. */
-          /*fehler_nilarray_retrieve();*/
+          /*error_nilarray_retrieve();*/
           return false;
         default: NOTREACHED;
       }
@@ -871,7 +871,7 @@ local bool elt_compare (object dv1, uintL index1,
         case Array_type_snilvector: /* (VECTOR NIL) */
           /* One can argue that comparing nonexistent elements should yield
              an error, not false. */
-          /*fehler_nilarray_retrieve();*/
+          /*error_nilarray_retrieve();*/
           return false;
         default: NOTREACHED;
       }
@@ -887,7 +887,7 @@ local bool elt_compare (object dv1, uintL index1,
         case Array_type_sstring: /* Simple-String */
           /* One can argue that comparing nonexistent elements should yield
              an error, not false. */
-          /*fehler_nilarray_retrieve();*/
+          /*error_nilarray_retrieve();*/
           return false;
         case Array_type_snilvector: /* (VECTOR NIL) */
           /* One can argue that comparing nonexistent elements should yield
@@ -928,7 +928,7 @@ local bool hash_table_equalp (object ht1, object ht2)
   if (!eq(hash_table_weak_type(ht1),hash_table_weak_type(ht2)))
     return false;
   /* have to traverse keys */
-  { # Look whether ht1 is contained in ht2.
+  { /* Look whether ht1 is contained in ht2. */
     var uintL index = posfixnum_to_V(TheHashtable(ht1)->ht_maxcount);
     var gcv_object_t* KVptr = TheHashedAlist(TheHashtable(ht1)->ht_kvtable)->hal_data;
     for (; index > 0; KVptr += 3, index--)
@@ -938,7 +938,7 @@ local bool hash_table_equalp (object ht1, object ht2)
           return false;
       }
   }
-  { # Look whether ht2 is contained in ht1.
+  { /* Look whether ht2 is contained in ht1. */
     var uintL index = posfixnum_to_V(TheHashtable(ht2)->ht_maxcount);
     var gcv_object_t* KVptr = TheHashedAlist(TheHashtable(ht2)->ht_kvtable)->hal_data;
     for (; index > 0; KVptr += 3, index--)
@@ -951,7 +951,7 @@ local bool hash_table_equalp (object ht1, object ht2)
   return true;
 }
 /* Now EQUALP itself. */
-global bool equalp (object obj1, object obj2)
+modexp bool equalp (object obj1, object obj2)
 {
  start:
   if (eq(obj1,obj2))
@@ -972,7 +972,7 @@ global bool equalp (object obj1, object obj2)
   } else if (numberp(obj1)) {
     if (!numberp(obj2)) return false;
     /* compare numbers via = */
-    return number_gleich(obj1,obj2);
+    return number_equal(obj1,obj2);
   } else {
    #ifdef TYPECODES
     switch (typecode(obj1))
@@ -1139,22 +1139,22 @@ global bool equalp (object obj1, object obj2)
   }
 }
 
-LISPFUNNF(eq,2)
+LISPFUN(eq,SECFC(seclass_foldable,fastcmp_eq),2,0,norest,nokey,0,NIL)
 { /* (EQ obj1 obj2), CLTL p. 77 */
   VALUES_IF(eq(STACK_0,STACK_1)); skipSTACK(2);
 }
 
-LISPFUNNF(eql,2)
+LISPFUN(eql,SECFC(seclass_foldable,fastcmp_eql),2,0,norest,nokey,0,NIL)
 { /* (EQL obj1 obj2), CLTL p. 78 */
   VALUES_IF(eql(STACK_0,STACK_1)); skipSTACK(2);
 }
 
-LISPFUNNR(equal,2)
+LISPFUN(equal,SECFC(seclass_read,fastcmp_equal),2,0,norest,nokey,0,NIL)
 { /* (EQUAL obj1 obj2), CLTL p. 80 */
   VALUES_IF(equal(STACK_0,STACK_1)); skipSTACK(2);
 }
 
-LISPFUNNR(equalp,2)
+LISPFUN(equalp,SECFC(seclass_read,fastcmp_equalp),2,0,norest,nokey,0,NIL)
 { /* (EQUALP obj1 obj2), CLTL p. 81 */
   VALUES_IF(equalp(STACK_0,STACK_1)); skipSTACK(2);
 }
@@ -1227,6 +1227,11 @@ LISPFUNNF(listp,1)
 LISPFUNNR(proper_list_p,1)
 {
   VALUES_IF(proper_list_p(STACK_0)); skipSTACK(1);
+}
+
+LISPFUNNF(bytep,1)
+{ /* (SYS::BYTEP object) */
+  VALUES_IF(bytep(STACK_0)); skipSTACK(1);
 }
 
 LISPFUNNF(integerp,1)
@@ -1416,143 +1421,138 @@ LISPFUNNR(type_of,1)
  #endif
   {
     case_cons: /* Cons -> CONS */
-      value1 = S(cons); break;
-    case_symbol: /* Symbol -> SYMBOL or NULL or BOOLEAN or KEYWORD */
+      { value1 = S(cons); break; }
+    case_symbol: { /* Symbol -> SYMBOL or NULL or BOOLEAN or KEYWORD */
       value1 = (nullp(arg) ? S(null) :
                 eq(arg,T) ? S(boolean) :
                 eq(Symbol_package(arg),O(keyword_package)) ? S(keyword) :
                 S(symbol));
-      break;
+    } break;
     case_machine: /* machine pointer -> ADDRESS */
         /* (If not TYPECODES, ADDRESS and FRAME-POINTER
            are not distinguishable.) */
-      value1 = S(address); break;
+      { value1 = S(address); break; }
     case_sbvector: /* Simple-Bit-Vector -> (SIMPLE-BIT-VECTOR dim0) */
-      pushSTACK(S(simple_bit_vector)); goto vectors;
+      { pushSTACK(S(simple_bit_vector)); goto vectors; }
     case_obvector: /* Bit-Vector -> (BIT-VECTOR dim0) */
-      pushSTACK(S(bit_vector)); goto vectors;
+      { pushSTACK(S(bit_vector)); goto vectors; }
     case_sstring: /* Simple-String -> (SIMPLE-[BASE-]STRING dim0) */
      #if (base_char_code_limit == char_code_limit)
-      pushSTACK(S(simple_base_string)); goto vectors;
+      { pushSTACK(S(simple_base_string)); goto vectors; }
      #else
-      pushSTACK(S(simple_string)); goto vectors;
+      { pushSTACK(S(simple_string)); goto vectors; }
      #endif
     case_svector: /* Simple-Vector -> (SIMPLE-VECTOR dim0) */
-      pushSTACK(S(simple_vector)); goto vectors;
-    case_ostring: /* other string */
+      { pushSTACK(S(simple_vector)); goto vectors; }
+    case_ostring: { /* other string */
       /* -> ([BASE-]STRING dim0) or (VECTOR NIL dim0) or (SIMPLE-ARRAY NIL (dim0)) */
-      {
-        var bool simple =
-          ((Iarray_flags(arg)
-            & (bit(arrayflags_adjustable_bit)
-               | bit(arrayflags_fillp_bit)
-               | bit(arrayflags_displaced_bit)
-               | bit(arrayflags_dispoffset_bit) ))
-           == 0);
-        switch (Iarray_flags(arg) & arrayflags_atype_mask) {
-          case Atype_NIL:
-            pushSTACK(array_dimensions(arg)); /* list of dimensions */
-            if (simple) {
-              {
-                var object new_cons = allocate_cons();
-                Cdr(new_cons) = NIL; Car(new_cons) = popSTACK();
-                pushSTACK(new_cons);
-              }
-              {
-                var object new_cons = allocate_cons();
-                Cdr(new_cons) = popSTACK(); Car(new_cons) = NIL;
-                pushSTACK(new_cons);
-              }
-              {
-                var object new_cons = allocate_cons();
-                Cdr(new_cons) = popSTACK(); Car(new_cons) = S(simple_array);
-                value1 = new_cons;
-              }
-            } else {
-              {
-                var object new_cons = allocate_cons();
-                Cdr(new_cons) = popSTACK(); Car(new_cons) = NIL;
-                pushSTACK(new_cons);
-              }
-              {
-                var object new_cons = allocate_cons();
-                Cdr(new_cons) = popSTACK(); Car(new_cons) = S(vector);
-                value1 = new_cons;
-              }
+      var bool simple =
+        ((Iarray_flags(arg)
+          & (bit(arrayflags_adjustable_bit)
+             | bit(arrayflags_fillp_bit)
+             | bit(arrayflags_displaced_bit)
+             | bit(arrayflags_dispoffset_bit) ))
+         == 0);
+      switch (Iarray_flags(arg) & arrayflags_atype_mask) {
+        case Atype_NIL: {
+          pushSTACK(array_dimensions(arg)); /* list of dimensions */
+          if (simple) {
+            {
+              var object new_cons = allocate_cons();
+              Cdr(new_cons) = NIL; Car(new_cons) = popSTACK();
+              pushSTACK(new_cons);
             }
-            break;
-          case Atype_Char:
-            ASSERT(!simple);
-           #if (base_char_code_limit == char_code_limit)
-            pushSTACK(S(base_string)); goto vectors;
-           #else
-            pushSTACK(S(string)); goto vectors;
-           #endif
-          default: NOTREACHED;
+            {
+              var object new_cons = allocate_cons();
+              Cdr(new_cons) = popSTACK(); Car(new_cons) = NIL;
+              pushSTACK(new_cons);
+            }
+            {
+              var object new_cons = allocate_cons();
+              Cdr(new_cons) = popSTACK(); Car(new_cons) = S(simple_array);
+              value1 = new_cons;
+            }
+          } else {
+            {
+              var object new_cons = allocate_cons();
+              Cdr(new_cons) = popSTACK(); Car(new_cons) = NIL;
+              pushSTACK(new_cons);
+            }
+            {
+              var object new_cons = allocate_cons();
+              Cdr(new_cons) = popSTACK(); Car(new_cons) = S(vector);
+              value1 = new_cons;
+            }
+          }
+        } break;
+        case Atype_Char: {
+          ASSERT(!simple);
+         #if (base_char_code_limit == char_code_limit)
+          pushSTACK(S(base_string)); goto vectors;
+         #else
+          pushSTACK(S(string)); goto vectors;
+         #endif
         }
+        default: NOTREACHED;
       }
-      break;
-    vectors: /* type of the vector in STACK_0 */
+    } break;
+    vectors: { /* type of the vector in STACK_0 */
       pushSTACK(array_dimensions(arg)); /* list of dimensions */
-      {
-        var object new_cons = allocate_cons();
-        Cdr(new_cons) = popSTACK(); Car(new_cons) = popSTACK();
-        value1 = new_cons;
-      }
-      break;
-    case_ovector: /* other general-vector */
+      var object new_cons = allocate_cons();
+      Cdr(new_cons) = popSTACK(); Car(new_cons) = popSTACK();
+      value1 = new_cons;
+    } break;
+    case_ovector: { /* other general-vector */
       /* -> (SIMPLE-ARRAY T (dim0)) or (VECTOR T dim0) */
-      {
-        var bool simple =
-          ((Iarray_flags(arg)
-            & (bit(arrayflags_adjustable_bit)
-               | bit(arrayflags_fillp_bit)
-               | bit(arrayflags_displaced_bit)
-               | bit(arrayflags_dispoffset_bit) ))
-           == 0);
-        pushSTACK(array_dimensions(arg)); /* list of dimensions */
-        if (simple) {
-          {
-            var object new_cons = allocate_cons();
-            Cdr(new_cons) = NIL; Car(new_cons) = popSTACK();
-            pushSTACK(new_cons);
-          }
-          {
-            var object new_cons = allocate_cons();
-            Cdr(new_cons) = popSTACK(); Car(new_cons) = T;
-            pushSTACK(new_cons);
-          }
-          {
-            var object new_cons = allocate_cons();
-            Cdr(new_cons) = popSTACK(); Car(new_cons) = S(simple_array);
-            value1 = new_cons;
-          }
-        } else {
-          {
-            var object new_cons = allocate_cons();
-            Cdr(new_cons) = popSTACK(); Car(new_cons) = T;
-            pushSTACK(new_cons);
-          }
-          {
-            var object new_cons = allocate_cons();
-            Cdr(new_cons) = popSTACK(); Car(new_cons) = S(vector);
-            value1 = new_cons;
-          }
+      var bool simple =
+        ((Iarray_flags(arg)
+          & (bit(arrayflags_adjustable_bit)
+             | bit(arrayflags_fillp_bit)
+             | bit(arrayflags_displaced_bit)
+             | bit(arrayflags_dispoffset_bit) ))
+         == 0);
+      pushSTACK(array_dimensions(arg)); /* list of dimensions */
+      if (simple) {
+        {
+          var object new_cons = allocate_cons();
+          Cdr(new_cons) = NIL; Car(new_cons) = popSTACK();
+          pushSTACK(new_cons);
+        }
+        {
+          var object new_cons = allocate_cons();
+          Cdr(new_cons) = popSTACK(); Car(new_cons) = T;
+          pushSTACK(new_cons);
+        }
+        {
+          var object new_cons = allocate_cons();
+          Cdr(new_cons) = popSTACK(); Car(new_cons) = S(simple_array);
+          value1 = new_cons;
+        }
+      } else {
+        {
+          var object new_cons = allocate_cons();
+          Cdr(new_cons) = popSTACK(); Car(new_cons) = T;
+          pushSTACK(new_cons);
+        }
+        {
+          var object new_cons = allocate_cons();
+          Cdr(new_cons) = popSTACK(); Car(new_cons) = S(vector);
+          value1 = new_cons;
         }
       }
-      break;
+    } break;
     case_sb2vector: /* simple Byte-Vector -> (SIMPLE-ARRAY (UNSIGNED-BYTE n) (dim0)) */
     case_sb4vector:
     case_sb8vector:
     case_sb16vector:
     case_sb32vector:
-      pushSTACK(S(simple_array)); goto arrays;
+      { pushSTACK(S(simple_array)); goto arrays; }
     case_ob2vector: /* other Byte-Vector -> ([SIMPLE-]ARRAY (UNSIGNED-BYTE n) (dim0)) */
     case_ob4vector:
     case_ob8vector:
     case_ob16vector:
     case_ob32vector:
-    case_mdarray: /* other Array -> ([SIMPLE-]ARRAY eltype dims) */
+    case_mdarray: { /* other Array -> ([SIMPLE-]ARRAY eltype dims) */
       pushSTACK( ((Iarray_flags(arg)
                    & (  bit(arrayflags_adjustable_bit)
                       | bit(arrayflags_fillp_bit)
@@ -1561,44 +1561,43 @@ LISPFUNNR(type_of,1)
                   == 0)
                  ? S(simple_array)
                  : S(array));
-      goto arrays;
-    arrays:
+    } goto arrays;
+    arrays: {
       pushSTACK(arg);
       pushSTACK(array_dimensions(arg)); /* list of dimensions */
       STACK_1 = array_element_type(STACK_1); /* eltype */
       value1 = listof(3);
-      break;
-    case_closure: /* Closure */
+    } break;
+    case_closure: { /* Closure */
       /* -> COMPILED-FUNCTION or FUNCTION or a subclass of
             FUNCALLABLE-STANDARD-OBJECT */
       if (Closure_instancep(arg))
         goto instances;
       if (simple_bit_vector_p(Atype_8Bit,TheClosure(arg)->clos_codevec)) {
-        # compiled Closure
+        /* compiled Closure */
         value1 = S(compiled_function);
       } else {
-        # interpreted Closure
+        /* interpreted Closure */
         value1 = S(function);
       }
-      break;
+    } break;
     case_structure: { /* Structure -> type of the Structure */
-        var object type = TheStructure(arg)->structure_types;
-        /* (name_1 ... name_i-1 name_i). type is name_1. */
-        value1 = Car(type);
-      }
-      break;
+      var object type = TheStructure(arg)->structure_types;
+      /* (name_1 ... name_i-1 name_i). type is name_1. */
+      value1 = Car(type);
+    } break;
     case_stream: /* Stream -> STREAM or according to Stream-type */
-      switchu (TheStream(arg)->strmtype) {
-        case strmtype_file:     value1 = S(file_stream); break;
-        case strmtype_synonym:  value1 = S(synonym_stream); break;
-        case strmtype_broad:    value1 = S(broadcast_stream); break;
-        case strmtype_concat:   value1 = S(concatenated_stream); break;
-        case strmtype_twoway:   value1 = S(two_way_stream); break;
-        case strmtype_echo:     value1 = S(echo_stream); break;
+      switch (TheStream(arg)->strmtype) {
+        case strmtype_file:     { value1 = S(file_stream); break; }
+        case strmtype_synonym:  { value1 = S(synonym_stream); break; }
+        case strmtype_broad:    { value1 = S(broadcast_stream); break; }
+        case strmtype_concat:   { value1 = S(concatenated_stream); break; }
+        case strmtype_twoway:   { value1 = S(two_way_stream); break; }
+        case strmtype_echo:     { value1 = S(echo_stream); break; }
         case strmtype_str_in:
         case strmtype_str_out:
-        case strmtype_str_push: value1 = S(string_stream); break;
-        default:                value1 = S(stream); break;
+        case strmtype_str_push: { value1 = S(string_stream); break; }
+        default:                { value1 = S(stream); break; }
       }
       break;
     case_orecord: case_lrecord: /* OtherRecord -> PACKAGE, ... */
@@ -1633,87 +1632,92 @@ LISPFUNNR(type_of,1)
         case_Rectype_Complex_above;
         case_Rectype_Subr_above;
         case Rectype_Hashtable: /* Hash-Table */
-          value1 = S(hash_table); break;
+          { value1 = S(hash_table); break; }
         case Rectype_Package: /* Package */
-          value1 = S(package); break;
+          { value1 = S(package); break; }
         case Rectype_Readtable: /* Readtable */
-          value1 = S(readtable); break;
+          { value1 = S(readtable); break; }
         case Rectype_Pathname: /* Pathname */
-          value1 = S(pathname); break;
+          { value1 = S(pathname); break; }
        #ifdef LOGICAL_PATHNAMES
         case Rectype_Logpathname: /* Logical Pathname */
-          value1 = S(logical_pathname); break;
+          { value1 = S(logical_pathname); break; }
        #endif
         case Rectype_Random_State: /* Random-State */
-          value1 = S(random_state); break;
+          { value1 = S(random_state); break; }
         case Rectype_Byte: /* Byte */
-          value1 = S(byte); break;
+          { value1 = S(byte); break; }
         case Rectype_Fsubr: /* Fsubr -> SPECIAL-OPERATOR */
-          value1 = S(special_operator); break;
+          { value1 = S(special_operator); break; }
         case Rectype_Loadtimeeval: /* Load-Time-Eval */
-          value1 = S(load_time_eval); break;
+          { value1 = S(load_time_eval); break; }
         case Rectype_Symbolmacro: /* Symbol-Macro */
-          value1 = S(symbol_macro); break;
+          { value1 = S(symbol_macro); break; }
         case Rectype_GlobalSymbolmacro: /* Global-Symbol-Macro */
-          value1 = S(global_symbol_macro); break;
+          { value1 = S(global_symbol_macro); break; }
         case Rectype_Macro: /* Macro */
-          value1 = S(macro); break;
+          { value1 = S(macro); break; }
         case Rectype_FunctionMacro: /* FunctionMacro */
-          value1 = S(function_macro); break;
+          { value1 = S(function_macro); break; }
         case Rectype_BigReadLabel: /* BigReadLabel -> READ-LABEL */
-          value1 = S(read_label); break;
+          { value1 = S(read_label); break; }
         case Rectype_Encoding: /* Encoding */
-          value1 = S(encoding); break;
+          { value1 = S(encoding); break; }
        #ifdef FOREIGN
         case Rectype_Fpointer: /* Foreign-Pointer-wrapping */
-          value1 = S(foreign_pointer); break;
+          { value1 = S(foreign_pointer); break; }
        #endif
        #ifdef DYNAMIC_FFI
         case Rectype_Faddress: /* Foreign-Address */
-          value1 = S(foreign_address); break;
+          { value1 = S(foreign_address); break; }
         case Rectype_Fvariable: /* Foreign-Variable */
-          value1 = S(foreign_variable); break;
+          { value1 = S(foreign_variable); break; }
         case Rectype_Ffunction: /* Foreign-Function */
-          value1 = S(foreign_function); break;
+          { value1 = S(foreign_function); break; }
        #endif
         case Rectype_Weakpointer: /* Weak-Pointer */
-          value1 = S(weak_pointer); break;
+          { value1 = S(weak_pointer); break; }
         case Rectype_MutableWeakList: /* mutable Weak-List */
-          value1 = S(weak_list); break;
+          { value1 = S(weak_list); break; }
         case Rectype_MutableWeakAlist: /* mutable Weak-Alist */
-          value1 = S(weak_alist); break;
+          { value1 = S(weak_alist); break; }
         case Rectype_Weakmapping: /* Weak-Mapping */
-          value1 = S(weak_mapping); break;
+          { value1 = S(weak_mapping); break; }
         case Rectype_Finalizer: /* Finalizer (should not occur) */
-          value1 = S(finalizer); break;
+          { value1 = S(finalizer); break; }
        #ifdef SOCKET_STREAMS
         case Rectype_Socket_Server: /* Socket-Server */
-          value1 = S(socket_server); break;
+          { value1 = S(socket_server); break; }
+       #endif
+       #ifdef MULTITHREAD
+        case Rectype_Thread: { value1 = S(thread); break; }
+        case Rectype_Mutex: { value1 = S(mutex); break; }
+        case Rectype_Exemption: { value1 = S(exemption); break; }
        #endif
        #ifdef YET_ANOTHER_RECORD
         case Rectype_Yetanother: /* Yetanother -> YET-ANOTHER */
-          value1 = S(yet_another); break;
+          { value1 = S(yet_another); break; }
        #endif
         case Rectype_WeakList: /* Weak-List */
-          value1 = S(internal_weak_list); break;
+          { value1 = S(internal_weak_list); break; }
         case Rectype_WeakAnd: /* Weak-And-Relation */
-          value1 = S(weak_and_relation); break;
+          { value1 = S(weak_and_relation); break; }
         case Rectype_WeakOr: /* Weak-Or-Relation */
-          value1 = S(weak_or_relation); break;
+          { value1 = S(weak_or_relation); break; }
         case Rectype_WeakAndMapping: /* Weak-And-Mapping */
-          value1 = S(weak_and_mapping); break;
+          { value1 = S(weak_and_mapping); break; }
         case Rectype_WeakOrMapping: /* Weak-Or-Mapping */
-          value1 = S(weak_or_mapping); break;
+          { value1 = S(weak_or_mapping); break; }
         case Rectype_WeakAlist_Key:
         case Rectype_WeakAlist_Value:
         case Rectype_WeakAlist_Either:
         case Rectype_WeakAlist_Both: /* Weak-Alist */
-          value1 = S(internal_weak_alist); break;
+          { value1 = S(internal_weak_alist); break; }
         case Rectype_WeakHashedAlist_Key:
         case Rectype_WeakHashedAlist_Value:
         case Rectype_WeakHashedAlist_Either:
         case Rectype_WeakHashedAlist_Both: /* Weak-Hashed-Alist */
-          value1 = S(internal_weak_hashed_alist); break;
+          { value1 = S(internal_weak_hashed_alist); break; }
         default: goto unknown;
       }
       break;
@@ -1743,7 +1747,7 @@ LISPFUNNR(type_of,1)
         value1 = S(base_char);
       break;
     case_subr: /* SUBR -> COMPILED-FUNCTION */
-      value1 = S(compiled_function); break;
+      { value1 = S(compiled_function); break; }
    #ifdef TYPECODES
     case_system: /* -> FRAME-POINTER, READ-LABEL, SYSTEM-INTERNAL */
       if (!wbit_test(as_oint(arg),0+oint_addr_shift))
@@ -1756,9 +1760,9 @@ LISPFUNNR(type_of,1)
       break;
    #else
     case_small_read_label: /* -> READ-LABEL */
-      value1 = S(read_label); break;
+      { value1 = S(read_label); break; }
     case_system: /* -> SYSTEM-INTERNAL */
-      value1 = S(system_internal); break;
+      { value1 = S(system_internal); break; }
    #endif
       /* due to the rule 1 in
          <http://www.lisp.org/HyperSpec/Body/fun_type-of.html>,
@@ -1768,29 +1772,30 @@ LISPFUNNR(type_of,1)
          if X is a FIXNUM or a BIGNUM and Y is UNSIGNED-BYTE,
          this means that TYPE-OF must distinguish between positive
          and negative integers: */
-    case_fixnum: /* Fixnum -> BIT or FIXNUM+ or FIXNUM- */
+    case_fixnum: { /* Fixnum -> BIT or FIXNUM+ or FIXNUM- */
       value1 = (eq(arg,Fixnum_0) || eq(arg,Fixnum_1) ? (object)S(bit)
                 : positivep(arg) ? (object)O(type_posfixnum)
                 : (object)O(type_negfixnum));
-      break;
-    case_bignum: /* Bignum -> BIGNUM+ or BIGNUM- */
-      value1 = positivep(arg) ? O(type_posbignum) : O(type_negbignum); break;
+    } break;
+    case_bignum: { /* Bignum -> BIGNUM+ or BIGNUM- */
+      value1 = positivep(arg) ? O(type_posbignum) : O(type_negbignum);
+    } break;
     case_ratio: /* Ratio -> RATIO */
-      value1 = S(ratio); break;
+      { value1 = S(ratio); break; }
     case_sfloat: /* Short-Float -> SHORT-FLOAT */
-      value1 = S(short_float); break;
+      { value1 = S(short_float); break; }
     case_ffloat: /* Single-Float -> SINGLE-FLOAT */
-      value1 = S(single_float); break;
+      { value1 = S(single_float); break; }
     case_dfloat: /* Double-Float -> DOUBLE-FLOAT */
-      value1 = S(double_float); break;
+      { value1 = S(double_float); break; }
     case_lfloat: /* Long-Float -> LONG-FLOAT */
-      value1 = S(long_float); break;
+      { value1 = S(long_float); break; }
     case_complex: /* Complex -> COMPLEX */
-      value1 = S(complex); break;
+      { value1 = S(complex); break; }
     default:
     unknown: /* unknown type */
       pushSTACK(S(type_of));
-      fehler(serious_condition,GETTEXT("~S: unidentifiable type!!!"));
+      error(serious_condition,GETTEXT("~S: unidentifiable type!!!"));
   }
   mv_count=1;
 }
@@ -1877,46 +1882,46 @@ LISPFUNNR(class_of,1)
       while (consp(type)) {
         var object name = Car(type);
         var object clas = get(name,S(closclass)); /* (GET name 'CLOS::CLOSCLASS) */
-        if_defined_class_p(clas, { value1 = clas; goto fertig; }, ; );
+        if_defined_class_p(clas, { value1 = clas; goto done; }, ; );
         type = Cdr(type);
       }
-    }
       value1 = O(class_t); break;
+    }
     case_cons: /* Cons -> <cons> */
-      value1 = O(class_cons); break;
+      { value1 = O(class_cons); break; }
     case_symbol: /* Symbol -> <symbol> or <null> */
-      value1 = (nullp(arg) ? O(class_null) : O(class_symbol)); break;
+      { value1 = (nullp(arg) ? O(class_null) : O(class_symbol)); break; }
     case_sstring: case_ostring: /* String -> <string> */
-      value1 = O(class_string); break;
+      { value1 = O(class_string); break; }
     case_sbvector: case_obvector: /* Bit-Vector -> <bit-vector> */
-      value1 = O(class_bit_vector); break;
+      { value1 = O(class_bit_vector); break; }
     case_sb2vector: case_ob2vector: /* Byte-Vector -> <vector> */
     case_sb4vector: case_ob4vector:
     case_sb8vector: case_ob8vector:
     case_sb16vector: case_ob16vector:
     case_sb32vector: case_ob32vector:
     case_svector: case_ovector: /* General-Vector -> <vector> */
-      value1 = O(class_vector); break;
+      { value1 = O(class_vector); break; }
     case_mdarray: /* other Array -> <array> */
-      value1 = O(class_array); break;
+      { value1 = O(class_array); break; }
     case_closure: /* Closure -> <function> or a subclass of
                      <funcallable-standard-object> */
       if (Closure_instancep(arg))
         goto instances;
     case_subr: /* SUBR -> <function> */
-      value1 = O(class_function); break;
+      { value1 = O(class_function); break; }
     case_stream: /* Stream -> <stream> or according to Stream-type */
-      switchu (TheStream(arg)->strmtype) {
-        case strmtype_file:     value1 = O(class_file_stream); break;
-        case strmtype_synonym:  value1 = O(class_synonym_stream); break;
-        case strmtype_broad:    value1 = O(class_broadcast_stream); break;
-        case strmtype_concat:   value1 = O(class_concatenated_stream); break;
-        case strmtype_twoway:   value1 = O(class_two_way_stream); break;
-        case strmtype_echo:     value1 = O(class_echo_stream); break;
+      switch (TheStream(arg)->strmtype) {
+        case strmtype_file:     { value1 = O(class_file_stream); break; }
+        case strmtype_synonym:  { value1 = O(class_synonym_stream); break; }
+        case strmtype_broad:    { value1 = O(class_broadcast_stream); break; }
+        case strmtype_concat: { value1 = O(class_concatenated_stream); break; }
+        case strmtype_twoway:   { value1 = O(class_two_way_stream); break; }
+        case strmtype_echo:     { value1 = O(class_echo_stream); break; }
         case strmtype_str_in:
         case strmtype_str_out:
-        case strmtype_str_push: value1 = O(class_string_stream); break;
-        default:                value1 = O(class_stream); break;
+        case strmtype_str_push: { value1 = O(class_string_stream); break; }
+        default:                { value1 = O(class_stream); break; }
       }
       break;
     case_orecord: case_lrecord: /* OtherRecord -> <package>, ... */
@@ -1949,19 +1954,19 @@ LISPFUNNR(class_of,1)
         case_Rectype_Complex_above;
         case_Rectype_Subr_above;
         case Rectype_Hashtable: /* Hash-Table */
-          value1 = O(class_hash_table); break;
+          { value1 = O(class_hash_table); break; }
         case Rectype_Package: /* Package */
-          value1 = O(class_package); break;
+          { value1 = O(class_package); break; }
         case Rectype_Readtable: /* Readtable */
-          value1 = O(class_readtable); break;
+          { value1 = O(class_readtable); break; }
         case Rectype_Pathname: /* Pathname */
-          value1 = O(class_pathname); break;
+          { value1 = O(class_pathname); break; }
        #ifdef LOGICAL_PATHNAMES
         case Rectype_Logpathname: /* Logical Pathname */
-          value1 = O(class_logical_pathname); break;
+          { value1 = O(class_logical_pathname); break; }
        #endif
         case Rectype_Random_State: /* Random-State */
-          value1 = O(class_random_state); break;
+          { value1 = O(class_random_state); break; }
         case Rectype_Byte: /* Byte -> <t> */
         case Rectype_Fsubr: /* Fsubr -> <t> */
         case Rectype_Loadtimeeval: /* Load-Time-Eval -> <t> */
@@ -1986,14 +1991,13 @@ LISPFUNNR(class_of,1)
        #ifdef SOCKET_STREAMS
         case Rectype_Socket_Server: /* Socket-Server -> <t> */
        #endif
-          value1 = O(class_t); break;
-       #ifdef DYNAMIC_FFI
-        case Rectype_Ffunction: /* Foreign-Function -> <function> */
-          value1 = O(class_function); break;
+       #ifdef MULTITHREAD
+        case Rectype_Thread: /* Thread -> <t> */
+        case Rectype_Mutex: /* Mutex -> <t> */
+        case Rectype_Exemption: /* Exemption -> <t> */
        #endif
        #ifdef YET_ANOTHER_RECORD
         case Rectype_Yetanother: /* Yetanother -> <t> */
-          value1 = O(class_t); break;
        #endif
         case Rectype_WeakList: /* Weak-List -> <t> */
         case Rectype_WeakAnd: /* Weak-And-Relation -> <t> */
@@ -2008,34 +2012,39 @@ LISPFUNNR(class_of,1)
         case Rectype_WeakHashedAlist_Value: /* Weak-Hashed-Alist -> <t> */
         case Rectype_WeakHashedAlist_Either: /* Weak-Hashed-Alist -> <t> */
         case Rectype_WeakHashedAlist_Both: /* Weak-Hashed-Alist -> <t> */
-          value1 = O(class_t); break;
+          { value1 = O(class_t); break; }
+       #ifdef DYNAMIC_FFI
+        case Rectype_Ffunction: /* Foreign-Function -> <function> */
+          { value1 = O(class_function); break; }
+       #endif
         default: goto unknown;
       }
       break;
     case_char: /* Character -> <character> */
-      value1 = O(class_character); break;
+      { value1 = O(class_character); break; }
     case_machine: /* machine pointer -> <t> */
     case_system: /* -> <t> */
-      value1 = O(class_t); break;
+      { value1 = O(class_t); break; }
     case_integer: /* Integer -> <integer> */
-      value1 = O(class_integer); break;
+      { value1 = O(class_integer); break; }
     case_ratio: /* Ratio -> <ratio> */
-      value1 = O(class_ratio); break;
+      { value1 = O(class_ratio); break; }
     case_float: /* Float -> <float> */
-      value1 = O(class_float); break;
+      { value1 = O(class_float); break; }
     case_complex: /* Complex -> <complex> */
-      value1 = O(class_complex); break;
+      { value1 = O(class_complex); break; }
     default:
     unknown: /* unknown type */
       pushSTACK(S(class_of));
-      fehler(serious_condition,GETTEXT("~S: unidentifiable type!!!"));
+      error(serious_condition,GETTEXT("~S: unidentifiable type!!!"));
   }
   if_defined_class_p(value1, ; , {
     pushSTACK(value1);
     pushSTACK(S(class_of));
-    fehler(error,GETTEXT("~S: type ~S does not correspond to a class"));
+    error(error_condition,
+          GETTEXT("~S: type ~S does not correspond to a class"));
   });
- fertig:
+ done:
   mv_count=1;
 }
 
@@ -2061,7 +2070,7 @@ LISPFUN(find_class,seclass_default,1,2,norest,nokey,0,NIL)
     if (!nullp(STACK_1)) {
       pushSTACK(STACK_2);
       pushSTACK(S(find_class));
-      fehler(error,GETTEXT("~S: ~S does not name a class"));
+      error(error_condition,GETTEXT("~S: ~S does not name a class"));
     }
     value1 = NIL;
   });
@@ -2074,7 +2083,7 @@ LISPFUN(find_class,seclass_default,1,2,norest,nokey,0,NIL)
  > clas: a class object
  < true if the object is an instance of the class, false otherwise
  clobbers value1, mv_count */
-global bool typep_class (object obj, object clas) {
+modexp bool typep_class (object obj, object clas) {
   pushSTACK(obj); C_class_of();
   var object objclass = value1;
   /* Look whether clas is a superclass of objclass.
@@ -2107,12 +2116,12 @@ global bool typep_class (object obj, object clas) {
   #endif
 }
 
-# (CLOS::TYPEP-CLASS object class)
-# == (TYPEP object class) == (CLOS::SUBCLASSP (CLASS-OF object) class)
+/* (CLOS::TYPEP-CLASS object class)
+ == (TYPEP object class) == (CLOS::SUBCLASSP (CLASS-OF object) class) */
 LISPFUNN(typep_class,2)
 {
   var object clas = popSTACK();
-  if_defined_class_p(clas, ; , fehler_class(clas); );
+  if_defined_class_p(clas, ; , error_class(clas); );
   VALUES_IF(typep_class(popSTACK(),clas));
 }
 
@@ -2121,7 +2130,7 @@ LISPFUNN(typep_class,2)
  > classname: a symbol expected to name a class with "proper name" classname
  < true if the object is an instance of the class, false otherwise
  clobbers value1, mv_count */
-global bool typep_classname (object obj, object classname) {
+modexp bool typep_classname (object obj, object classname) {
   pushSTACK(obj); C_class_of();
   var object objclass = value1;
   /* Look whether classname names a superclass of objclass.
@@ -2180,7 +2189,7 @@ global maygc object expand_deftype (object type_spec, bool once_p) {
   else { /* too many nested DEFTYPEs */
     /* type_spec is already on the stack */
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: type definition for ~S exceeds depth limit, maybe recursive"));
+    error(error_condition,GETTEXT("~S: type definition for ~S exceeds depth limit, maybe recursive"));
   }
   if (symbolp(type_spec)) { /* (GET type-spec 'DEFTYPE-EXPANDER) */
     var object expander = get(type_spec,S(deftype_expander));
@@ -2235,7 +2244,7 @@ local maygc Values coerce_sequence_check (object type, object result_type) {
   }
 }
 
-LISPFUNNR(coerce,2)
+LISPFUNNS(coerce,2)
 /* (COERCE object result-type), CLTL p. 51
  Method:
  (TYPEP object result-type) -> return object
@@ -2280,7 +2289,7 @@ LISPFUNNR(coerce,2)
   if_defined_class_p(STACK_0, { STACK_0 = TheClass(STACK_0)->classname; },);
   /* stack layout: object, result-type. */
   if (matomp(STACK_0)) {
-    if (!symbolp(STACK_0)) goto fehler_type;
+    if (!symbolp(STACK_0)) goto error_type;
     /* result-type is a symbol */
     var object result_type = STACK_0;
     if (eq(result_type,T)) /* result-type = T ? */
@@ -2295,7 +2304,7 @@ LISPFUNNR(coerce,2)
       if (nullp(as_char)) {
         pushSTACK(STACK_1); /* TYPE-ERROR slot DATUM */
         pushSTACK(O(type_designator_character)); /* TYPE-ERROR slot EXPECTED-TYPE */
-        goto fehler_object;
+        goto error_object;
       }
       VALUES1(as_char); skipSTACK(2); return;
     }
@@ -2306,7 +2315,7 @@ LISPFUNNR(coerce,2)
       if (!base_char_p(as_char)) {
         pushSTACK(STACK_1); /* TYPE-ERROR slot DATUM */
         pushSTACK(O(type_designator_base_char)); /* TYPE-ERROR slot EXPECTED-TYPE */
-        goto fehler_object;
+        goto error_object;
       }
       VALUES1(as_char); skipSTACK(2); return;
     }
@@ -2324,7 +2333,7 @@ LISPFUNNR(coerce,2)
       if (!numberp(STACK_1)) { /* object must be a number */
         pushSTACK(STACK_1); /* TYPE-ERROR slot DATUM */
         pushSTACK(S(number)); /* TYPE-ERROR slot EXPECTED-TYPE */
-        goto fehler_object;
+        goto error_object;
       }
       if (!N_floatp(STACK_1))
         goto return_object;
@@ -2347,7 +2356,7 @@ LISPFUNNR(coerce,2)
       if (!(consp(fun) && eq(Car(fun),S(lambda)))) { /* object must be a lambda expression */
         pushSTACK(fun); /* TYPE-ERROR slot DATUM */
         pushSTACK(O(type_designator_function)); /* TYPE-ERROR slot EXPECTED-TYPE */
-        goto fehler_object;
+        goto error_object;
       }
       /* empty environment for get_closure: */
       var gcv_environment_t* env;
@@ -2388,14 +2397,14 @@ LISPFUNNR(coerce,2)
     if (eq(value1,nullobj)) { /* failed! */
       pushSTACK(STACK_1);     /* TYPE-ERROR slot DATUM (object) */
       pushSTACK(STACK_(0+1)); /* TYPE-ERROR slot EXPECTED-TYPE (result-type) */
-      goto fehler_object;
+      goto error_object;
     }
     skipSTACK(2); return;
   } else {
     /* result-type is a cons */
     var object result_type = STACK_0;
     var object type = Car(result_type);
-    if (!symbolp(type)) goto fehler_type; /* must be a symbol */
+    if (!symbolp(type)) goto error_type; /* must be a symbol */
     if (eq(type,S(and))) { /* (AND ...) ? */
       if (matomp(Cdr(result_type))) /* (AND) */
         goto return_object; /* treat like T */
@@ -2409,7 +2418,7 @@ LISPFUNNR(coerce,2)
       if (nullp(value1)) {
         /* STACK_0 = new-object, TYPE-ERROR slot DATUM */
         pushSTACK(STACK_(0+1)); /* TYPE-ERROR slot EXPECTED-TYPE */
-        goto fehler_object;
+        goto error_object;
       } else {
         VALUES1(STACK_0); skipSTACK(3); return; /* new-object */
       }
@@ -2420,16 +2429,16 @@ LISPFUNNR(coerce,2)
         || eq(type,S(double_float)) /* DOUBLE-FLOAT ? */
         || eq(type,S(long_float)) /* LONG-FLOAT ? */
        ) { /* convert object to float */
-      value1 = coerce_float(STACK_1,result_type);
+      value1 = coerce_float(STACK_1,type);
       goto check_return; /* and check against result-type */
     }
     if (eq(type,S(complex))) { /* COMPLEX ? */
       if (!numberp(STACK_1)) { /* object must be a number */
         pushSTACK(STACK_1); /* TYPE-ERROR slot DATUM */
         pushSTACK(S(number)); /* TYPE-ERROR slot EXPECTED-TYPE */
-        goto fehler_object;
+        goto error_object;
       }
-      if (!mconsp(Cdr(result_type))) goto fehler_type; /* (rest result-type) must be a cons */
+      if (!mconsp(Cdr(result_type))) goto error_type; /* (rest result-type) must be a cons */
       result_type = Cdr(result_type);
       var object rtype = Car(result_type); /* type of Re */
       var object itype = /* type of Im, defaults to rtype */
@@ -2461,10 +2470,12 @@ LISPFUNNR(coerce,2)
       if (eq(type,S(array)) || eq(type,S(simple_array))
           || eq(type,S(vector))) { /* [SIMPLE-]ARRAY or VECTOR ? */
         var object type2 = Cdr(result_type);
-        if (nullp(type2))
-          goto adjust_eltype;
-        if (!consp(type2)) goto fehler_type;
-        if (eq(Car(type2),S(mal))) { /* element-type = * (unspecified) ? */
+        if (nullp(type2)) goto adjust_eltype;
+        if (!consp(type2)) goto error_type;
+        /* avoid error: jump to label 'adjust_eltype' crosses initialization
+           in g++ 4.2 */
+        var bool type2_star; { type2_star = eq(Car(type2),S(star)); }
+        if (type2_star) { /* element-type = * (unspecified) ? */
           type2 = Cdr(type2);
          adjust_eltype: /* here type2 = (cddr result-type) */
           /* replace with a suitable element type: */
@@ -2489,22 +2500,23 @@ LISPFUNNR(coerce,2)
          and we cannot do the coersion. */
       pushSTACK(STACK_1);     /* TYPE-ERROR slot DATUM (object) */
       pushSTACK(STACK_(0+1)); /* TYPE-ERROR slot EXPECTED-TYPE (result-type) */
-      goto fehler_object;
+      goto error_object;
     }
     skipSTACK(2); return;
   }
- fehler_type:
-  /* due to the TYPEP call which checks result-type this should never happen
-     result-type in STACK_0 */
-  pushSTACK(S(coerce));
-  fehler(error,GETTEXT("~S: invalid type specification ~S"));
- fehler_object:
+ error_type: {
+    /* due to the TYPEP call which checks result-type this should never
+       happen result-type in STACK_0 */
+    pushSTACK(S(coerce));
+    error(error_condition,GETTEXT("~S: invalid type specification ~S"));
+  }
+ error_object:
   /* stack layout: object, result-type, type-error-datum,
      type-error-expected-type. */
   pushSTACK(STACK_2); /* result-type */
   pushSTACK(STACK_(3+1)); /* object */
   pushSTACK(S(coerce));
-  fehler(type_error,GETTEXT("~S: ~S cannot be coerced to type ~S"));
+  error(type_error,GETTEXT("~S: ~S cannot be coerced to type ~S"));
 }
 
 /* =========================================================================
@@ -2625,6 +2637,11 @@ enum { /* The values of this enumeration are 0,1,2,...
   enum_hs_finalizer,
  #ifdef SOCKET_STREAMS
   enum_hs_socket_server,
+ #endif
+ #ifdef MULTITHREAD
+  enum_hs_thread,
+  enum_hs_mutex,
+  enum_hs_exemption,
  #endif
  #ifdef YET_ANOTHER_RECORD
   enum_hs_yetanother,
@@ -2867,7 +2884,7 @@ local void heap_statistics_mapper (void* arg, object obj, uintM bytelen)
       pighole = &locals->builtins[(int)enum_hs_function];
       break;
     case_stream: /* Stream */
-      switchu (TheStream(obj)->strmtype) {
+      switch (TheStream(obj)->strmtype) {
         case strmtype_file:
           pighole = &locals->builtins[(int)enum_hs_file_stream]; break;
         case strmtype_synonym:
@@ -2976,6 +2993,14 @@ local void heap_statistics_mapper (void* arg, object obj, uintM bytelen)
        #ifdef SOCKET_STREAMS
         case Rectype_Socket_Server: /* Socket-Server */
           pighole = &locals->builtins[(int)enum_hs_socket_server]; break;
+       #endif
+       #ifdef MULTITHREAD
+        case Rectype_Thread:
+          pighole = &locals->builtins[(int)enum_hs_thread]; break;
+        case Rectype_Mutex:
+          pighole = &locals->builtins[(int)enum_hs_mutex]; break;
+        case Rectype_Exemption:
+          pighole = &locals->builtins[(int)enum_hs_exemption]; break;
        #endif
        #ifdef YET_ANOTHER_RECORD
         case Rectype_Yetanother: /* Yetanother */
@@ -3131,7 +3156,7 @@ LISPFUNN(gc_statistics,0)
  with_gc_statistics(fun);
  > fun: function, that triggers a GC */
 global void with_gc_statistics (gc_function_t* fun) {
-  var object flag = Symbol_value(S(gc_statistics_stern));
+  var object flag = Symbol_value(S(gc_statistics_star));
   if (!posfixnump(flag)) {
     /* No need to do statistics, throw old ones away. */
     O(gc_statistics_list) = NIL; fun();
@@ -3150,7 +3175,7 @@ global void with_gc_statistics (gc_function_t* fun) {
     /* Now do the GC. */
     fun();
    #ifdef DEBUG_SPVW
-    fprintf(stderr,"done [%d]\n",free_space());
+    fprintf(stderr,"done [%ld]\n",(long)free_space());
    #endif
     /* Walk through memory again, this time decrementing. */
     locals.decrementing = true;
@@ -3169,7 +3194,7 @@ global void with_gc_statistics (gc_function_t* fun) {
     if (posfixnum_to_V(Symbol_value(S(recurse_count_gc_statistics))) > 3) {
       /* recursion depth too big. */
       danger = true;
-      dynamic_bind(S(gc_statistics_stern),Fixnum_0);
+      dynamic_bind(S(gc_statistics_star),Fixnum_0);
     }
     /* Allocate and fill result vector. */
     heap_statistics_result(&locals);
@@ -3179,7 +3204,7 @@ global void with_gc_statistics (gc_function_t* fun) {
       O(gc_statistics_list) = new_cons;
     }
     /* Done. */
-    if (danger) { dynamic_unbind(S(gc_statistics_stern)); }
+    if (danger) { dynamic_unbind(S(gc_statistics_star)); }
     dynamic_unbind(S(recurse_count_gc_statistics));
     skipSTACK(locals.structure_classes.count + locals.standard_classes.count);
     done_hs_locals(locals);

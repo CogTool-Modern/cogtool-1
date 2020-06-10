@@ -15,13 +15,12 @@
 (defun room (&optional (kind :default))
   (unless (or (eq kind 'nil) (eq kind ':default) (eq kind 't))
     (error (TEXT "~S: argument must be ~S, ~S or ~S, not ~S")
-           'room 'nil 't ':default kind
-  ) )
-  ; Get the figures now, because (heap-statistics) causes heap allocation.
-  (multiple-value-bind (used room static) (sys::%room)
+           'room 'nil 't ':default kind))
+  ;; Get the figures now, because (heap-statistics) causes heap allocation.
+  (multiple-value-bind (used room static gc-count gc-space gc-time) (sys::%room)
     (when (eq kind 't)
       (let ((stat (heap-statistics)))
-        ; stat = #( ... (classname num-instances . num-bytes) ...)
+        ;; stat = #( ... (classname num-instances . num-bytes) ...)
         (setq stat (sort stat #'> :key #'cddr))
         (let* ((localinfo (localized 'room-format))
                (header-line (first localinfo))
@@ -42,27 +41,28 @@
                 (prin1 classname)
                 (format t data-line midcol
                           instances bytes
-                          (/ (float bytes 0d0) instances)
-                )
+                          (/ (float bytes 0d0) instances))
                 (incf total-instances instances)
-                (incf total-bytes bytes)
-          ) ) )
+                (incf total-bytes bytes))))
           (format t separator-line midcol)
-          (write-string (TEXT "Total")
-          )
+          (write-string (TEXT "Total"))
           (format t data-line midcol
                     total-instances total-bytes
-                    (/ (float total-bytes 0d0) total-instances)
-          )
-    ) ) )
+                    (/ (float total-bytes 0d0) total-instances)))))
+    (terpri)
     (unless (eq kind 'nil)
-      (terpri)
-      (format t (TEXT "Bytes permanently allocated:   ~9D~%Bytes currently in use:        ~9D~%Bytes available until next GC: ~9D")
-                static used room)
-      (terpri)
-    )
-    (values used room)
-) )
+      (format t (TEXT "Number of garbage collections: ~16:D~%~
+                       Bytes freed by GC:             ~16:D~%~
+                       Time spent in GC:              ~16F sec")
+              gc-count gc-space
+              (float (/ gc-time internal-time-units-per-second)))
+      (terpri))
+    (format t (TEXT "Bytes permanently allocated:   ~16:D~%~
+                     Bytes currently in use:        ~16:D~%~
+                     Bytes available until next GC: ~16:D")
+            static used room)
+    (terpri)
+    (values used room static gc-count gc-space gc-time)))
 
 ;;-----------------------------------------------------------------------------
 ;; SPACE

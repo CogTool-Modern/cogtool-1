@@ -1108,6 +1108,36 @@
          (<= (car Grenzen) Jahresstunde (cdr Grenzen))
    ) ) )
   )
+  (declare (ignorable
+            #'no-DST-p
+            ;; Europe:
+            #'GB-Eire-DST-p
+            #'West-Europe-DST-p
+            #'Mid-Europe-DST-p
+            #'East-Europe-DST-p
+            ;; Asia:
+            #'Israel-DST-p
+            #'Iran-DST-p
+            #'ROK-DST-p
+            ;; Australia:
+            #'Australia-Oz-DST-p
+            #'Australia-Victoria-DST-p
+            #'Australia-NSW-DST-p
+            #'NZ-DST-p
+            ;; Africa:
+            #'Egypt-DST-p
+            #'Libya-DST-p
+            ;; North America:
+            #'Canada-DST-p
+            #'Cuba-DST-p
+            #'Mexico-DST-p
+            #'US-DST-p
+            #'US-Michigan-DST-p
+            #'US-Pacific-New-DST-p
+            #'SystemV-DST-p
+            ;; South America:
+            #'Brazil-DST-p
+            #'Chile-DST-p))
   (labels
     (;; ==================== LIST OF AVAILABLE TIME ZONES ====================
      (Australia-LHI () (values -21/2 #'Australia-NSW-DST-p))
@@ -1233,6 +1263,43 @@
      (WET () (values 0 #'West-Europe-DST-p))
      (Zulu () (GMT))
     )
+    (declare (ignorable
+              #'Australia-LHI #'Australia-NSW #'Australia-North #'Australia-Queensland #'Australia-South #'Australia-Tasmania #'Australia-Victoria #'Australia-West #'Australia-Yancowinna
+              #'Brazil-Acre #'Brazil-DeNoronha #'Brazil-East #'Brazil-West
+              #'CET
+              #'Canada-Atlantic #'Canada-Central #'Canada-East-Saskatchewan #'Canada-Eastern #'Canada-Mountain #'Canada-Newfoundland #'Canada-Pacific #'Canada-Yukon
+              #'Chile-Continental #'Chile-EasterIsland
+              #'Cuba
+              #'EET
+              #'Egypt
+              #'Factory
+              #'GB-Eire
+              #'GMT #'GMT+0 #'GMT+1 #'GMT+2 #'GMT+3 #'GMT+4 #'GMT+5 #'GMT+6 #'GMT+7 #'GMT+8 #'GMT+9 #'GMT+10 #'GMT+11 #'GMT+12 #'GMT+13 #'GMT-0 #'GMT-1 #'GMT-2 #'GMT-3 #'GMT-4 #'GMT-5 #'GMT-6 #'GMT-7 #'GMT-8 #'GMT-9 #'GMT-10 #'GMT-11 #'GMT-12 #'GMT0 #'GMT1 #'GMT2 #'GMT3 #'GMT4 #'GMT5 #'GMT6 #'GMT7 #'GMT8 #'GMT9 #'GMT10 #'GMT11 #'GMT12 #'GMT13
+              #'Greenwich
+              #'Hongkong
+              #'Iceland
+              #'Iran
+              #'Israel
+              #'Jamaica
+              #'Japan
+              #'Libya
+              #'MET
+              #'Mexico-BajaNorte #'Mexico-BajaSur #'Mexico-General
+              #'NZ
+              #'Navajo
+              #'PRC
+              #'Poland
+              #'ROC
+              #'ROK
+              #'Singapore
+              #'SystemV-AST4 #'SystemV-AST4ADT #'SystemV-CST6 #'SystemV-CST6CDT #'SystemV-EST5 #'SystemV-EST5EDT #'SystemV-HST10 #'SystemV-MST7 #'SystemV-MST7MDT #'SystemV-PST8 #'SystemV-PST8PDT #'SystemV-YST9 #'SystemV-YST9YDT
+              #'Turkey
+              #'UCT
+              #'US-Alaska #'US-Aleutian #'US-Arizona #'US-Central #'US-East-Indiana #'US-Eastern #'US-Hawaii #'US-Michigan #'US-Mountain #'US-Pacific #'US-Pacific-New #'US-Samoa
+              #'UTC #'Universal
+              #'W-SU
+              #'WET
+              #'Zulu))
     (macrolet ((timezone (form)
                  `(MULTIPLE-VALUE-SETQ (*DEFAULT-TIME-ZONE* *DEFAULT-DST-CHECK*)
                                        ,form

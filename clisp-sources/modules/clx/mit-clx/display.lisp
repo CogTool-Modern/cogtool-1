@@ -70,20 +70,23 @@
 		 (dotimes (k length)
 		   (setf (aref vector k) (read-byte stream)))
 		 vector))))
-    (let ((family (read-short stream nil)))
-      (if (null family)
+    (let ((family-id (read-short stream nil)))
+      (if (null family-id)
 	(list nil nil nil nil nil)
 	(let* ((address (read-short-length-vector stream))
 	       (number (parse-integer (read-short-length-string stream)))
 	       (name (read-short-length-string stream))
 	       (data (read-short-length-vector stream))
-	       (family (or (car (rassoc family *protocol-families*)) family)))
-	  (list
-	   family
-	   (ecase family
-	     (:local (map 'string #'code-char address))
-	     (:internet (coerce address 'list)))
-	   number name data))))))
+	       (family (car (rassoc family-id *protocol-families*))))
+	  (unless family
+              (return-from read-xauth-entry
+                (list family-id nil nil nil nil)))
+	  (let ((address
+		 (case family
+		   (:local (map 'string #'code-char address))
+		   ((:internet :internet6) (coerce address 'list))
+		   (t nil))))
+	    (list family address number name data)))))))
 
 (defun get-best-authorization (host display protocol)
   ;; parse .Xauthority, extract the cookie for DISPLAY on HOST.
@@ -337,6 +340,15 @@
       (get-default-display)
     (declare (ignore screen))
     (open-display host :display display :protocol protocol)))
+
+(defmacro with-open-display ((display &rest options) &body body)
+  "Open a DISPLAY, execute BODY, close the DISPLAY."
+  `(let ((,display ,(if options
+                        `(open-display ,@options)
+                        `(open-default-display))))
+     (unwind-protect (progn ,@body)
+       (when ,display
+         (close-display ,display)))))
 
 (defun open-display (host &key (display 0) protocol authorization-name authorization-data)
   ;; Implementation specific routine to setup the buffer for a specific host and display.

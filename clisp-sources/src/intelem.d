@@ -3,58 +3,69 @@
 /* conversion routines digit-sequence-part <--> longword:
  get_32_Dptr(ptr)
    fetches the next 32 bits from the 32/intDsize digits starting at ptr.
- set_32_Dptr(ptr,wert);
-   stores the value wert (32 bits) in the 32/intDsize digits starting at ptr.
+ set_32_Dptr(ptr,value);
+   stores value (32 bits) in the 32/intDsize digits starting at ptr.
  get_max32_Dptr(count,ptr)
    fetches the next count bits from the ceiling(count/intDsize) digits at ptr.
- set_max32_Dptr(count,ptr,wert)
-   stores wert (count bits) in the ceiling(count/intDsize) digits at ptr.
+ set_max32_Dptr(count,ptr,value)
+   stores value (count bits) in the ceiling(count/intDsize) digits at ptr.
  each time: ptr a variable of type uintD*,
-            wert a variable of type uint32,
+            value a variable of type uint32,
             count a variable or constant-expression with value >=0, <=32. */
 #if (intDsize==32)
   #define get_32_Dptr(ptr)  ((uint32)((ptr)[0]))
-  #define set_32_Dptr(ptr,wert)  ((ptr)[0] = (uintD)(wert))
+  #define set_32_Dptr(ptr,value)  ((ptr)[0] = (uintD)(value))
   #define get_max32_Dptr(count,ptr)  \
     ((count)==0 ? 0 : (uint32)((ptr)[0]))
-  #define set_max32_Dptr(count,ptr,wert)  \
-    ((count)==0 ? 0 : ((ptr)[0] = (uintD)(wert)))
+  #define set_max32_Dptr(count,ptr,value)  \
+    do { if ((count) != 0) (ptr)[0] = (uintD)(value);} while(0)
 #endif
 #if (intDsize==16)
-  # define get_32_Dptr(ptr)  (((uint32)((ptr)[0])<<16) | ((uint32)((ptr)[1])))
+  /* #define get_32_Dptr(ptr)  (((uint32)((ptr)[0])<<16) | ((uint32)((ptr)[1]))) */
   #define get_32_Dptr(ptr)  highlow32_at(ptr)
-  # define set_32_Dptr(ptr,wert)  ((ptr)[0] = (uintD)((wert)>>16), (ptr)[1] = (uintD)(wert))
-  #define set_32_Dptr(ptr,wert)  set_highlow32_at(ptr,wert)
+  /* #define set_32_Dptr(ptr,value)  ((ptr)[0] = (uintD)((value)>>16), (ptr)[1] = (uintD)(value)) */
+  #define set_32_Dptr(ptr,value)  set_highlow32_at(ptr,value)
   #define get_max32_Dptr(count,ptr)  \
     ((count)==0 ? 0 :                   \
      (count)<=16 ? (uint32)((ptr)[0]) : highlow32_at(ptr))
-  #define set_max32_Dptr(count,ptr,wert)  \
-    ((count)==0 ? 0 :                           \
-     (count)<=16 ? ((ptr)[0] = (uintD)(wert)) : \
-                   set_highlow32_at(ptr,wert))
+  #define set_max32_Dptr(count,ptr,value)               \
+    do { if ((count) != 0) {                            \
+      if ((count)<=16) (ptr)[0] = (uintD)(value);       \
+      else set_highlow32_at(ptr,value);                 \
+    }} while(0)
 #endif
 #if (intDsize==8)
   #define get_32_Dptr(ptr)  (((((( (uint32)((ptr)[0]) <<8) | (uint32)((ptr)[1])) <<8) | (uint32)((ptr)[2])) <<8) | (uint32)((ptr)[3]))
-  #define set_32_Dptr(ptr,wert)  ((ptr)[0] = (uintD)((wert)>>24), (ptr)[1] = (uintD)((wert)>>16), (ptr)[2] = (uintD)((wert)>>8), (ptr)[3] = (uintD)(wert))
+  #define set_32_Dptr(ptr,value)  ((ptr)[0] = (uintD)((value)>>24), (ptr)[1] = (uintD)((value)>>16), (ptr)[2] = (uintD)((value)>>8), (ptr)[3] = (uintD)(value))
   #define get_max32_Dptr(count,ptr)  \
     ((count)==0 ? 0 : \
      (count)<=8 ? (uint32)((ptr)[0]) : \
      (count)<=16 ? (( (uint32)((ptr)[0]) <<8) | (uint32)((ptr)[1])) : \
      (count)<=24 ? (((( (uint32)((ptr)[0]) <<8) | (uint32)((ptr)[1])) <<8) | (uint32)((ptr)[2])) : \
                    (((((( (uint32)((ptr)[0]) <<8) | (uint32)((ptr)[1])) <<8) | (uint32)((ptr)[2])) <<8) | (uint32)((ptr)[3])))
-  #define set_max32_Dptr(count,ptr,wert)  \
-    ((count)==0 ? 0 : \
-     (count)<=8 ? ((ptr)[0] = (uintD)(wert)) : \
-     (count)<=16 ? ((ptr)[0] = (uintD)((wert)>>8), (ptr)[1] = (uintD)(wert)) : \
-     (count)<=24 ? ((ptr)[0] = (uintD)((wert)>>16), (ptr)[1] = (uintD)((wert)>>8), (ptr)[2] = (uintD)(wert)) : \
-                   ((ptr)[0] = (uintD)((wert)>>24), (ptr)[1] = (uintD)((wert)>>16), (ptr)[2] = (uintD)((wert)>>8), (ptr)[3] = (uintD)(wert)))
+  #define set_max32_Dptr(count,ptr,value)               \
+    do { if ((count) != 0) {                            \
+      if ((count)<=8) (ptr)[0] = (uintD)(value);        \
+      else if ((count)<=16) {                           \
+        (ptr)[0] = (uintD)((value)>>8);                 \
+        (ptr)[1] = (uintD)(value);                      \
+      } else if ((count)<=24) {                         \
+        (ptr)[0] = (uintD)((value)>>16);                \
+        (ptr)[1] = (uintD)((value)>>8);                 \
+        (ptr)[2] = (uintD)(value);                      \
+      } else {                                          \
+        (ptr)[0] = (uintD)((value)>>24);                \
+        (ptr)[1] = (uintD)((value)>>16);                \
+        (ptr)[2] = (uintD)((value)>>8);                 \
+        (ptr)[3] = (uintD)(value);                      \
+      }}} while(0)
 #endif
 
 /* conversion routines digit-sequence-part <--> longword:
  get_maxV_Dptr(count,ptr)
    fetches the next count bits from the ceiling(count/intDsize) digits at ptr.
  ptr a variable of type uintD*,
- wert a variable of type uintV,
+ value a variable of type uintV,
  count a variable or constant-expression with value >=0, <=intVsize. */
 #if (intVsize==32)
   #define get_maxV_Dptr  get_max32_Dptr
@@ -171,7 +182,7 @@ local sint64 FN_to_Q (object obj);
  I_to_UL(obj)
  > obj: an object, should be an integer >=0, <2^32
  < result: the value of the integer as 32-bit-number. */
-global uint32 I_to_UL (object obj)
+modexp uint32 I_to_UL (object obj)
 {
  #ifdef TYPECODES
   switch (typecode(obj))
@@ -218,7 +229,7 @@ global uint32 I_to_UL (object obj)
      pushSTACK(obj); /* TYPE-ERROR slot DATUM */
      pushSTACK(O(type_uint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
      pushSTACK(obj);
-     fehler(type_error,GETTEXT("not a 32-bit integer: ~S"));
+     error(type_error,GETTEXT("not a 32-bit integer: ~S"));
   }
 }
 
@@ -226,7 +237,7 @@ global uint32 I_to_UL (object obj)
  I_to_L(obj)
  > obj: an object, should be an integer >=-2^31, <2^31
  < result: the value of the integer as 32-bit-number. */
-global sint32 I_to_L (object obj)
+modexp sint32 I_to_L (object obj)
 {
  #ifdef TYPECODES
   switch (typecode(obj))
@@ -246,18 +257,18 @@ global sint32 I_to_L (object obj)
  #endif
   {
    case_posfixnum: { /* fixnum >=0 */
-    var sintV wert = posfixnum_to_V(obj);
+    var sintV value = posfixnum_to_V(obj);
    #if (intVsize>intLsize)
-    if ((uintV)wert >= vbit(intLsize-1)) goto bad;
+    if ((uintV)value >= vbit(intLsize-1)) goto bad;
    #else
-    if ((oint_data_len+1 > intLsize) && (wert < 0)) goto bad;
+    if ((oint_data_len+1 > intLsize) && (value < 0)) goto bad;
    #endif
-    return wert;
+    return value;
    }
    case_posbignum: { /* bignum >0 */
     var Bignum bn = TheBignum(obj);
     var uintC len = bignum_length(bn);
-    #define IF_LENGTH(i)                                                 \
+    #define IF_LENGTH(i)                                                  \
       if (bn_minlength <= i) /* exactly i digits possible at all? */      \
         if (len == i) /* exactly i digits? */                             \
           /* 2^((i-1)*intDsize-1) <= obj < 2^(i*intDsize-1) */            \
@@ -278,18 +289,18 @@ global sint32 I_to_L (object obj)
     goto bad;
    }
    case_negfixnum: { /* fixnum <0 */
-    var sintV wert = negfixnum_to_V(obj);
+    var sintV value = negfixnum_to_V(obj);
    #if (intVsize>intLsize)
-    if ((uintV)wert < (uintV)minus_vbit(intLsize-1)) goto bad;
+    if ((uintV)value < (uintV)minus_vbit(intLsize-1)) goto bad;
    #else
-    if ((oint_data_len+1 > intLsize) && (wert >= 0)) goto bad;
+    if ((oint_data_len+1 > intLsize) && (value >= 0)) goto bad;
    #endif
-    return wert;
+    return value;
    }
    case_negbignum: { /* bignum <0 */
     var Bignum bn = TheBignum(obj);
     var uintC len = bignum_length(bn);
-    #define IF_LENGTH(i)                                                    \
+    #define IF_LENGTH(i)                                                  \
       if (bn_minlength <= i) /* exactly i digits possible at all? */      \
         if (len == i) /* exactly i digits? */                             \
           /* - 2^(i*intDsize-1) <= obj < - 2^((i-1)*intDsize-1) */        \
@@ -314,17 +325,17 @@ global sint32 I_to_L (object obj)
      pushSTACK(obj); /* TYPE-ERROR slot DATUM */
      pushSTACK(O(type_sint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
      pushSTACK(obj);
-     fehler(type_error,GETTEXT("not a 32-bit integer: ~S"));
+     error(type_error,GETTEXT("not a 32-bit integer: ~S"));
   }
 }
 
-#if defined(HAVE_LONGLONG)
+#if defined(HAVE_LONG_LONG_INT)
 
 /* converts integer >=0 into unsigned quadword.
  I_to_UQ(obj)
  > obj: an object, should be an integer >=0, <2^64
  < result: the value of the integer as 64-bit-number. */
-global uint64 I_to_UQ (object obj)
+modexp uint64 I_to_UQ (object obj)
 {
  #ifdef TYPECODES
   switch (typecode(obj))
@@ -342,7 +353,7 @@ global uint64 I_to_UQ (object obj)
    case_posbignum: { /* bignum >0 */
       var Bignum bn = TheBignum(obj);
       var uintC len = bignum_length(bn);
-      #define IF_LENGTH(i)                                               \
+      #define IF_LENGTH(i)                                                \
         if (bn_minlength <= i) /* exactly i digits possible at all? */    \
           if (len == i) /* exactly i digits? */                           \
             /* 2^((i-1)*intDsize-1) <= obj < 2^(i*intDsize-1) */          \
@@ -398,19 +409,19 @@ global uint64 I_to_UQ (object obj)
       pushSTACK(obj); /* TYPE-ERROR slot DATUM */
       pushSTACK(O(type_uint64)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(obj);
-      fehler(type_error,GETTEXT("not a 64-bit integer: ~S"));
+      error(type_error,GETTEXT("not a 64-bit integer: ~S"));
   }
 }
 
 #endif
 
-#if defined(HAVE_LONGLONG)
+#if defined(HAVE_LONG_LONG_INT)
 
 /* converts integer into signed quadword.
  I_to_Q(obj)
  > obj: an object, should be an integer >=-2^63, <2^63
  < result: the value of the integer as 64-bit-number. */
-global sint64 I_to_Q (object obj)
+modexp sint64 I_to_Q (object obj)
 {
  #ifdef TYPECODES
   switch (typecode(obj))
@@ -536,65 +547,65 @@ global sint64 I_to_Q (object obj)
       pushSTACK(obj); /* TYPE-ERROR slot DATUM */
       pushSTACK(O(type_sint64)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(obj);
-      fehler(type_error,GETTEXT("not a 64-bit integer: ~S"));
+      error(type_error,GETTEXT("not a 64-bit integer: ~S"));
   }
 }
 
 #endif
 
 /* converts longword into fixnum.
- L_to_FN(wert)
- > wert: value of the fixnum, a signed 32-bit-integer
+ L_to_FN(value)
+ > value: value of the fixnum, a signed 32-bit-integer
          >= -2^oint_data_len, < 2^oint_data_len
  < result: fixnum with this value.
- wert should be a variable. */
+ value should be a variable. */
 #if (oint_data_shift <= sign_bit_o)
-  #define L_to_FN(wert)                                                   \
-    as_object((( (soint)(sint32)(wert)                                      \
+  #define L_to_FN(value)                                                     \
+    as_object((( (soint)(sint32)(value)                                      \
                  & (FN_value_vz_mask>>oint_data_shift) /* mask the unneeded */ \
-                 ) << oint_data_shift)                                  \
+                 ) << oint_data_shift)                                      \
               | ((oint)fixnum_type<<oint_type_shift)) /* store typeinfo instead */
 #else /* (oint_data_shift > sign_bit_o) */
-  #define L_to_FN(wert)                                                   \
-    as_object((( (soint)(sint32)(wert) << oint_data_shift )                 \
-               & FN_value_mask /* mask the unneeded */)                 \
-              | ((soint)(sint32)sign_of_sint32((sint32)(wert)) & bit(sign_bit_o)) \
+  #define L_to_FN(value)                                                     \
+    as_object((( (soint)(sint32)(value) << oint_data_shift )                 \
+               & FN_value_mask /* mask the unneeded */)                     \
+              | ((soint)(sint32)sign_of_sint32((sint32)(value)) & bit(sign_bit_o)) \
               | ((oint)fixnum_type<<oint_type_shift)) /* store typeinfo instead */
 #endif
 
 /* converts longword into integer.
- L_to_I(wert)
- > wert: value of the integer, a signed 32-bit-integer.
+ L_to_I(value)
+ > value: value of the integer, a signed 32-bit-integer.
  < result: integer with this value.
  can trigger GC */
-global maygc object L_to_I (sint32 wert);
+modexp maygc object L_to_I (sint32 value);
 #if (oint_data_len+1 >= intLsize)
-global maygc object L_to_I (sint32 wert)
-{ return L_to_FN(wert); }
-#define L_to_I(wert)  L_to_FN(wert)
+modexp maygc object L_to_I (sint32 value)
+{ return L_to_FN(value); }
+#define L_to_I(value)  L_to_FN(value)
 #else
-global maygc object L_to_I (sint32 wert)
+modexp maygc object L_to_I (sint32 value)
 {
   {
-    var uint32 test = wert & (uint32)(~(FN_value_mask >> oint_data_shift));
+    var uint32 test = value & (uint32)(~(FN_value_mask >> oint_data_shift));
     /* test contains the bits, that do not fit into the Fixnum-value. */
     if (test == (uint32)0) /* all =0 ? */
-      return as_object(((oint)fixnum_type<<oint_type_shift) | ((oint)wert<<oint_data_shift));
+      return as_object(((oint)fixnum_type<<oint_type_shift) | ((oint)value<<oint_data_shift));
     if (test == (uint32)(~(FN_value_mask >> oint_data_shift))) /* alle =1 ? */
-      return as_object(((((oint)fixnum_vz_type<<oint_type_shift)+FN_value_mask) & ((oint)wert<<oint_data_shift))
+      return as_object(((((oint)fixnum_vz_type<<oint_type_shift)+FN_value_mask) & ((oint)value<<oint_data_shift))
                        |(((oint)fixnum_vz_type<<oint_type_shift) & (wbit(oint_data_shift)-1)));
   }
   /* create bignum:
      (its length  bn_minlength <= n <= ceiling(32/intDsize)  ) */
   if (bn_minlength == ceiling(32,intDsize)) {
    #if (intDsize==8)
-    if (wert >= 0) goto pos4; else goto neg4; /* bignum with 32/intDsize = 4 digits */
+    if (value >= 0) goto pos4; else goto neg4; /* bignum with 32/intDsize = 4 digits */
    #endif
    #if (intDsize==16)
-    if (wert >= 0) goto pos2; else goto neg2; /* bignum with 32/intDsize = 2 digits */
+    if (value >= 0) goto pos2; else goto neg2; /* bignum with 32/intDsize = 2 digits */
    #endif
    #if (intDsize==32)
-    if (wert >= 0) goto pos1; else goto neg1; /* bignum with 32/intDsize = 1 digit */
+    if (value >= 0) goto pos1; else goto neg1; /* bignum with 32/intDsize = 1 digit */
    #endif
   } else {
     #define FILL_1_DIGIT(from)  \
@@ -611,19 +622,19 @@ global maygc object L_to_I (sint32 wert)
       *ptr-- = (uintD)from; from = from >> intDsize; \
       *ptr-- = (uintD)from; from = from >> intDsize; \
       *ptr-- = (uintD)from;
-    #define FILL_1  FILL_1_DIGIT(wert);
-    #define FILL_2  FILL_2_DIGITS(wert);
-    #define FILL_3  FILL_3_DIGITS(wert);
-    #define FILL_4  FILL_4_DIGITS(wert);
+    #define FILL_1  FILL_1_DIGIT(value);
+    #define FILL_2  FILL_2_DIGITS(value);
+    #define FILL_3  FILL_3_DIGITS(value);
+    #define FILL_4  FILL_4_DIGITS(value);
     #define OK  return newnum;
-    if (wert >= 0) {
+    if (value >= 0) {
       #define ALLOC(i)  \
         var object newnum = allocate_bignum(i,0); \
         var uintD* ptr = &TheBignum(newnum)->data[i-1];
       #define IF_LENGTH(i)  \
         if ((bn_minlength <= i) && (i*intDsize <= 32))       \
           if (!((i+1)*intDsize <= 32)                        \
-              || ((uint32)wert < (uint32)bitc(i*intDsize-1)))
+              || ((uint32)value < (uint32)bitc(i*intDsize-1)))
      #if (intDsize <= 32)
       IF_LENGTH(1)
         pos1: { ALLOC(1); FILL_1; OK; } /* bignum with 1 digit */
@@ -647,7 +658,7 @@ global maygc object L_to_I (sint32 wert)
       #define IF_LENGTH(i)  \
         if ((bn_minlength <= i) && (i*intDsize <= 32))           \
           if (!((i+1)*intDsize <= 32)                            \
-              || ((uint32)wert >= (uint32)(-bitc(i*intDsize-1))) \
+              || ((uint32)value >= (uint32)(-bitc(i*intDsize-1))) \
              )
      #if (intDsize <= 32)
       IF_LENGTH(1)
@@ -680,72 +691,72 @@ global maygc object L_to_I (sint32 wert)
 #endif
 
 /* converts unsigned longword in integer >=0 .
- UL_to_I(wert)
- > wert: value of the integer, an unsigned 32-bit-integer.
+ UL_to_I(value)
+ > value: value of the integer, an unsigned 32-bit-integer.
  < result: integer with this value.
  can trigger GC */
 #if !(intLsize<=oint_data_len) /* if not already defined in lispbibl.d */
-global maygc object UL_to_I (uint32 wert)
+modexp maygc object UL_to_I (uint32 value)
 {
-  if ((wert & ~ (FN_value_mask >> oint_data_shift)) == 0)
+  if ((value & ~ (FN_value_mask >> oint_data_shift)) == 0)
     /* all bits, that do not fit into the fixnum-value, =0 ? */
-    return as_object(((oint)fixnum_type<<oint_type_shift) | (wert<<oint_data_shift));
+    return as_object(((oint)fixnum_type<<oint_type_shift) | (value<<oint_data_shift));
   /* create bignum:
      (its length  bn_minlength <= n <= ceiling((32+1)/intDsize)  ) */
  #define UL_maxlength  ceiling(32+1,intDsize)
  #if (bn_minlength <= 1) && (UL_maxlength >= 1)
   if ((1*intDsize-1 < 32)
-      ? (wert <= (uint32)(bitc(1*intDsize-1)-1))
+      ? (value <= (uint32)(bitc(1*intDsize-1)-1))
       : true) { /* bignum with 1 digit */
     var object newnum = allocate_bignum(1,0);
-    TheBignum(newnum)->data[0] = (uintD)wert;
+    TheBignum(newnum)->data[0] = (uintD)value;
     return newnum;
   }
  #endif
  #if (bn_minlength <= 2) && (UL_maxlength >= 2)
   if ((2*intDsize-1 < 32)
-      ? (wert <= (uint32)(bitc(2*intDsize-1)-1))
+      ? (value <= (uint32)(bitc(2*intDsize-1)-1))
       : true) { /* bignum with 2 digits */
     var object newnum = allocate_bignum(2,0);
     var uintD* ptr = &TheBignum(newnum)->data[1];
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value;
    #if (intDsize>=32)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
  #endif
  #if (bn_minlength <= 3) && (UL_maxlength >= 3)
   if ((3*intDsize-1 < 32)
-      ? (wert <= (uint32)(bitc(3*intDsize-1)-1))
+      ? (value <= (uint32)(bitc(3*intDsize-1)-1))
       : true) { /* bignum with 3 digits */
     var object newnum = allocate_bignum(3,0);
     var uintD* ptr = &TheBignum(newnum)->data[2];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (2*intDsize>=32)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
  #endif
  #if (bn_minlength <= 4) && (UL_maxlength >= 4)
   if ((4*intDsize-1 < 32)
-      ? (wert <= (uint32)(bitc(4*intDsize-1)-1))
+      ? (value <= (uint32)(bitc(4*intDsize-1)-1))
       : true) { /* bignum with 4 digits */
     var object newnum = allocate_bignum(4,0);
     var uintD* ptr = &TheBignum(newnum)->data[3];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (3*intDsize>=32)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
@@ -754,14 +765,14 @@ global maygc object UL_to_I (uint32 wert)
   if (true) { /* bignum with 5 digits */
     var object newnum = allocate_bignum(5,0);
     var uintD* ptr = &TheBignum(newnum)->data[4];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (4*intDsize>=32)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
@@ -770,25 +781,25 @@ global maygc object UL_to_I (uint32 wert)
 #endif
 
 /* converts double-longword in integer.
- L2_to_I(wert_hi,wert_lo)
- > wert_hi|wert_lo: value of the integer, a signed 64-bit-integer.
+ L2_to_I(value_hi,value_lo)
+ > value_hi|value_lo: value of the integer, a signed 64-bit-integer.
  < result: integer with this value.
  can trigger GC */
 #if !(intVsize>32) /* if not already defined in lispbibl.d */
-global maygc object L2_to_I (sint32 wert_hi, uint32 wert_lo)
+modexp maygc object L2_to_I (sint32 value_hi, uint32 value_lo)
 {
-  if (wert_hi == 0) {
-    if ((wert_lo & (uint32)(~(FN_value_mask >> oint_data_shift))) /* bits of wert_lo, that do not fit into the fixnum-value */
+  if (value_hi == 0) {
+    if ((value_lo & (uint32)(~(FN_value_mask >> oint_data_shift))) /* bits of value_lo, that do not fit into the fixnum-value */
         == (uint32)0) /* all =0 ? */
-      return as_object(((oint)fixnum_type<<oint_type_shift) | ((oint)wert_lo<<oint_data_shift));
-  } else if (wert_hi == ~(uintL)0) {
-    if ((wert_lo & (uint32)(~(FN_value_mask >> oint_data_shift))) /* bits of wert_lo, that do not fit into the fixnum-value */
+      return as_object(((oint)fixnum_type<<oint_type_shift) | ((oint)value_lo<<oint_data_shift));
+  } else if (value_hi == ~(uintL)0) {
+    if ((value_lo & (uint32)(~(FN_value_mask >> oint_data_shift))) /* bits of value_lo, that do not fit into the fixnum-value */
         == (uint32)(~(FN_value_mask >> oint_data_shift))) /* all =1 ? */
      #ifndef WIDE
-      return as_object(((((oint)fixnum_vz_type<<oint_type_shift)+FN_value_mask) & (wert_lo<<oint_data_shift))
+      return as_object(((((oint)fixnum_vz_type<<oint_type_shift)+FN_value_mask) & (value_lo<<oint_data_shift))
                        |(((oint)fixnum_vz_type<<oint_type_shift) & (wbit(oint_data_shift)-1)));
      #else
-      return as_object(((oint)fixnum_vz_type<<oint_type_shift) | ((oint)(wert_lo & (uint32)(FN_value_mask >> oint_data_shift)) << oint_data_shift));
+      return as_object(((oint)fixnum_vz_type<<oint_type_shift) | ((oint)(value_lo & (uint32)(FN_value_mask >> oint_data_shift)) << oint_data_shift));
      #endif
   }
   /* create bignum:
@@ -808,8 +819,8 @@ global maygc object L2_to_I (sint32 wert_hi, uint32 wert_lo)
     *ptr-- = (uintD)from; from = from >> intDsize; \
     *ptr-- = (uintD)from;
   #if (32/intDsize==1)
-    #define FILL_1  FILL_1_DIGIT(wert_lo);
-    #define FILL_2  FILL_1_DIGIT(wert_lo); FILL_1_DIGIT(wert_hi);
+    #define FILL_1  FILL_1_DIGIT(value_lo);
+    #define FILL_2  FILL_1_DIGIT(value_lo); FILL_1_DIGIT(value_hi);
     #define FILL_3
     #define FILL_4
     #define FILL_5
@@ -818,27 +829,27 @@ global maygc object L2_to_I (sint32 wert_hi, uint32 wert_lo)
     #define FILL_8
   #endif
   #if (32/intDsize==2)
-    #define FILL_1  FILL_1_DIGIT(wert_lo);
-    #define FILL_2  FILL_2_DIGITS(wert_lo);
-    #define FILL_3  FILL_2_DIGITS(wert_lo); FILL_1_DIGIT(wert_hi);
-    #define FILL_4  FILL_2_DIGITS(wert_lo); FILL_2_DIGITS(wert_hi);
+    #define FILL_1  FILL_1_DIGIT(value_lo);
+    #define FILL_2  FILL_2_DIGITS(value_lo);
+    #define FILL_3  FILL_2_DIGITS(value_lo); FILL_1_DIGIT(value_hi);
+    #define FILL_4  FILL_2_DIGITS(value_lo); FILL_2_DIGITS(value_hi);
     #define FILL_5
     #define FILL_6
     #define FILL_7
     #define FILL_8
   #endif
   #if (32/intDsize==4)
-    #define FILL_1  FILL_1_DIGIT(wert_lo);
-    #define FILL_2  FILL_2_DIGITS(wert_lo);
-    #define FILL_3  FILL_3_DIGITS(wert_lo);
-    #define FILL_4  FILL_4_DIGITS(wert_lo);
-    #define FILL_5  FILL_4_DIGITS(wert_lo); FILL_1_DIGIT(wert_hi);
-    #define FILL_6  FILL_4_DIGITS(wert_lo); FILL_2_DIGITS(wert_hi);
-    #define FILL_7  FILL_4_DIGITS(wert_lo); FILL_3_DIGITS(wert_hi);
-    #define FILL_8  FILL_4_DIGITS(wert_lo); FILL_4_DIGITS(wert_hi);
+    #define FILL_1  FILL_1_DIGIT(value_lo);
+    #define FILL_2  FILL_2_DIGITS(value_lo);
+    #define FILL_3  FILL_3_DIGITS(value_lo);
+    #define FILL_4  FILL_4_DIGITS(value_lo);
+    #define FILL_5  FILL_4_DIGITS(value_lo); FILL_1_DIGIT(value_hi);
+    #define FILL_6  FILL_4_DIGITS(value_lo); FILL_2_DIGITS(value_hi);
+    #define FILL_7  FILL_4_DIGITS(value_lo); FILL_3_DIGITS(value_hi);
+    #define FILL_8  FILL_4_DIGITS(value_lo); FILL_4_DIGITS(value_hi);
   #endif
   #define OK  return newnum;
-  if (wert_hi >= 0) {
+  if (value_hi >= 0) {
     #define ALLOC(i)  \
       var object newnum = allocate_bignum(i,0); \
       var uintD* ptr = &TheBignum(newnum)->data[i-1];
@@ -846,8 +857,8 @@ global maygc object L2_to_I (sint32 wert_hi, uint32 wert_lo)
       if ((bn_minlength <= i) && (i*intDsize <= 64))                         \
         if (!((i+1)*intDsize <= 64)                                          \
             || (i*intDsize-1 < 32                                            \
-                ? ((wert_hi == 0) && (wert_lo < (uint32)bitc(i*intDsize-1))) \
-                : ((uint32)wert_hi < (uint32)bitc(i*intDsize-1-32))))
+                ? ((value_hi == 0) && (value_lo < (uint32)bitc(i*intDsize-1))) \
+                : ((uint32)value_hi < (uint32)bitc(i*intDsize-1-32))))
     IF_LENGTH(1)
       { ALLOC(1); FILL_1; OK; } /* bignum with 1 digit */
     IF_LENGTH(2)
@@ -874,8 +885,8 @@ global maygc object L2_to_I (sint32 wert_hi, uint32 wert_lo)
       if ((bn_minlength <= i) && (i*intDsize <= 64))                    \
         if (!((i+1)*intDsize <= 64)                                     \
             || (i*intDsize-1 < 32                                       \
-                ? ((wert_hi == ~(uint32)0) && (wert_lo >= (uint32)(-bitc(i*intDsize-1)))) \
-                : ((uint32)wert_hi >= (uint32)(-bitc(i*intDsize-1-32)))))
+                ? ((value_hi == ~(uint32)0) && (value_lo >= (uint32)(-bitc(i*intDsize-1)))) \
+                : ((uint32)value_hi >= (uint32)(-bitc(i*intDsize-1-32)))))
     IF_LENGTH(1)
       { ALLOC(1); FILL_1; OK; } /* bignum with 1 digit */
     IF_LENGTH(2)
@@ -912,17 +923,17 @@ global maygc object L2_to_I (sint32 wert_hi, uint32 wert_lo)
 #endif
 
 /* converts an unsigned doppel-longword into an integer.
- UL2_to_I(wert_hi,wert_lo)
- > wert_hi|wert_lo: value of the integer, an unsigned 64-bit-integer.
+ UL2_to_I(value_hi,value_lo)
+ > value_hi|value_lo: value of the integer, an unsigned 64-bit-integer.
  < result: integer with this value.
  can trigger GC */
 #if !(intVsize>32) /* if not already defined in lispbibl.d */
-global maygc object UL2_to_I (uint32 wert_hi, uint32 wert_lo)
+modexp maygc object UL2_to_I (uint32 value_hi, uint32 value_lo)
 {
-  if ((wert_hi == 0)
-      && ((wert_lo & (uint32)(~(FN_value_mask >> oint_data_shift))) /* bits of wert_lo, that do not fit into the fixnum-value */
+  if ((value_hi == 0)
+      && ((value_lo & (uint32)(~(FN_value_mask >> oint_data_shift))) /* bits of value_lo, that do not fit into the fixnum-value */
           == (uint32)0)) /* all =0 ? */
-    return as_object(((oint)fixnum_type<<oint_type_shift) | ((oint)wert_lo<<oint_data_shift));
+    return as_object(((oint)fixnum_type<<oint_type_shift) | ((oint)value_lo<<oint_data_shift));
   /* create bignum:
      (its length bn_minlength <= n <= ceiling((64+1)/intDsize) ) */
   #define UL2_maxlength  ceiling(64+1,intDsize)
@@ -941,8 +952,8 @@ global maygc object UL2_to_I (uint32 wert_hi, uint32 wert_lo)
     *ptr-- = (uintD)from; from = from >> intDsize; \
     *ptr-- = (uintD)from;
   #if (32/intDsize==1)
-    #define FILL_1  FILL_1_DIGIT(wert_lo);
-    #define FILL_2  FILL_1_DIGIT(wert_lo); FILL_1_DIGIT(wert_hi);
+    #define FILL_1  FILL_1_DIGIT(value_lo);
+    #define FILL_2  FILL_1_DIGIT(value_lo); FILL_1_DIGIT(value_hi);
     #define FILL_3  FILL_2 *ptr-- = 0;
     #define FILL_4
     #define FILL_5
@@ -952,10 +963,10 @@ global maygc object UL2_to_I (uint32 wert_hi, uint32 wert_lo)
     #define FILL_9
   #endif
   #if (32/intDsize==2)
-    #define FILL_1  FILL_1_DIGIT(wert_lo);
-    #define FILL_2  FILL_2_DIGITS(wert_lo);
-    #define FILL_3  FILL_2_DIGITS(wert_lo); FILL_1_DIGIT(wert_hi);
-    #define FILL_4  FILL_2_DIGITS(wert_lo); FILL_2_DIGITS(wert_hi);
+    #define FILL_1  FILL_1_DIGIT(value_lo);
+    #define FILL_2  FILL_2_DIGITS(value_lo);
+    #define FILL_3  FILL_2_DIGITS(value_lo); FILL_1_DIGIT(value_hi);
+    #define FILL_4  FILL_2_DIGITS(value_lo); FILL_2_DIGITS(value_hi);
     #define FILL_5  FILL_4 *ptr-- = 0;
     #define FILL_6
     #define FILL_7
@@ -963,14 +974,14 @@ global maygc object UL2_to_I (uint32 wert_hi, uint32 wert_lo)
     #define FILL_9
   #endif
   #if (32/intDsize==4)
-    #define FILL_1  FILL_1_DIGIT(wert_lo);
-    #define FILL_2  FILL_2_DIGITS(wert_lo);
-    #define FILL_3  FILL_3_DIGITS(wert_lo);
-    #define FILL_4  FILL_4_DIGITS(wert_lo);
-    #define FILL_5  FILL_4_DIGITS(wert_lo); FILL_1_DIGIT(wert_hi);
-    #define FILL_6  FILL_4_DIGITS(wert_lo); FILL_2_DIGITS(wert_hi);
-    #define FILL_7  FILL_4_DIGITS(wert_lo); FILL_3_DIGITS(wert_hi);
-    #define FILL_8  FILL_4_DIGITS(wert_lo); FILL_4_DIGITS(wert_hi);
+    #define FILL_1  FILL_1_DIGIT(value_lo);
+    #define FILL_2  FILL_2_DIGITS(value_lo);
+    #define FILL_3  FILL_3_DIGITS(value_lo);
+    #define FILL_4  FILL_4_DIGITS(value_lo);
+    #define FILL_5  FILL_4_DIGITS(value_lo); FILL_1_DIGIT(value_hi);
+    #define FILL_6  FILL_4_DIGITS(value_lo); FILL_2_DIGITS(value_hi);
+    #define FILL_7  FILL_4_DIGITS(value_lo); FILL_3_DIGITS(value_hi);
+    #define FILL_8  FILL_4_DIGITS(value_lo); FILL_4_DIGITS(value_hi);
     #define FILL_9  FILL_8 *ptr-- = 0;
   #endif
   #define OK  return newnum;
@@ -981,8 +992,8 @@ global maygc object UL2_to_I (uint32 wert_hi, uint32 wert_lo)
     if ((bn_minlength <= i) && (UL2_maxlength >= i))                       \
       if ((i*intDsize >= 64+1)                                             \
           || (i*intDsize-1 < 32                                            \
-              ? ((wert_hi == 0) && (wert_lo < (uint32)bitc(i*intDsize-1))) \
-              : (wert_hi < (uint32)bitc(i*intDsize-1-32))))
+              ? ((value_hi == 0) && (value_lo < (uint32)bitc(i*intDsize-1))) \
+              : (value_hi < (uint32)bitc(i*intDsize-1-32))))
   IF_LENGTH(1)
     { ALLOC(1); FILL_1; OK; } /* bignum with 1 digit */
   IF_LENGTH(2)
@@ -1022,19 +1033,19 @@ global maygc object UL2_to_I (uint32 wert_hi, uint32 wert_lo)
 
 #if defined(intQsize) || (intVsize>32)
 /* converts quadword into integer.
- Q_to_I(wert)
- > wert: value of the integer, a signed 64-bit-integer.
+ Q_to_I(value)
+ > value: value of the integer, a signed 64-bit-integer.
  < result: integer with this value.
  can trigger GC */
-global maygc object Q_to_I (sint64 wert)
+modexp maygc object Q_to_I (sint64 value)
 {
   {
-    var uint64 test = wert & ~(uint64)(FN_value_mask >> oint_data_shift);
+    var uint64 test = value & ~(uint64)(FN_value_mask >> oint_data_shift);
     /* test contains the bits, that do not fit into the fixnum-value. */
     if (test == (uint64)0) /* all =0 ? */
-      return as_object(((oint)fixnum_type<<oint_type_shift) | ((oint)wert<<oint_data_shift));
+      return as_object(((oint)fixnum_type<<oint_type_shift) | ((oint)value<<oint_data_shift));
     if (test == ~(uint64)(FN_value_mask >> oint_data_shift)) /* all =1 ? */
-      return as_object(((((oint)fixnum_vz_type<<oint_type_shift)+FN_value_mask) & ((oint)wert<<oint_data_shift))
+      return as_object(((((oint)fixnum_vz_type<<oint_type_shift)+FN_value_mask) & ((oint)value<<oint_data_shift))
                        |(((oint)fixnum_vz_type<<oint_type_shift) & (wbit(oint_data_shift)-1)));
   }
   /* create bignum:
@@ -1044,17 +1055,17 @@ global maygc object Q_to_I (sint64 wert)
   #define FILL_2_DIGITS(from)  \
     *ptr-- = (uintD)from; from = from >> intDsize; \
     *ptr-- = (uintD)from;
-  #define FILL_1  FILL_1_DIGIT(wert);
-  #define FILL_2  FILL_2_DIGITS(wert);
+  #define FILL_1  FILL_1_DIGIT(value);
+  #define FILL_2  FILL_2_DIGITS(value);
   #define OK  return newnum;
-  if (wert >= 0) {
+  if (value >= 0) {
     #define ALLOC(i)  \
       var object newnum = allocate_bignum(i,0); \
       var uintD* ptr = &TheBignum(newnum)->data[i-1];
     #define IF_LENGTH(i)  \
       if ((bn_minlength <= i) && (i*intDsize <= 64))        \
         if (!((i+1)*intDsize <= 64)                         \
-            || ((uint64)wert < (uint64)wbitc(i*intDsize-1)) \
+            || ((uint64)value < (uint64)wbitc(i*intDsize-1)) \
            )
     IF_LENGTH(1)
       { ALLOC(1); FILL_1; OK; } /* bignum with 1 digit */
@@ -1069,7 +1080,7 @@ global maygc object Q_to_I (sint64 wert)
     #define IF_LENGTH(i)  \
       if ((bn_minlength <= i) && (i*intDsize <= 64))          \
         if (!((i+1)*intDsize <= 64)                           \
-            || ((uint64)wert >= -(uint64)wbitc(i*intDsize-1)) \
+            || ((uint64)value >= -(uint64)wbitc(i*intDsize-1)) \
            )
     IF_LENGTH(1)
       { ALLOC(1); FILL_1; OK; } /* bignum with 1 digit */
@@ -1088,149 +1099,149 @@ global maygc object Q_to_I (sint64 wert)
 
 #if defined(intQsize) || (intVsize>32) || defined(WIDE_HARD) || (SIZEOF_OFF_T > 4) || (SIZEOF_INO_T > 4)
 /* converts unsigned quadword into integer >=0 .
- UQ_to_I(wert)
- > wert: value of the integer, an unsigned 64-bit-integer.
+ UQ_to_I(value)
+ > value: value of the integer, an unsigned 64-bit-integer.
  < result: integer with this value.
  can trigger GC */
-global maygc object UQ_to_I (uint64 wert)
+modexp maygc object UQ_to_I (uint64 value)
 {
-  if ((wert & ~(uint64)(FN_value_mask >> oint_data_shift)) == 0)
+  if ((value & ~(uint64)(FN_value_mask >> oint_data_shift)) == 0)
     /* all bits, that do not fit into the fixnum-value, =0 ? */
-    return as_object(((oint)fixnum_type<<oint_type_shift) | (oint)(wert<<oint_data_shift));
+    return as_object(((oint)fixnum_type<<oint_type_shift) | (oint)(value<<oint_data_shift));
   /* create bignum:
      (its length bn_minlength <= n <= ceiling((64+1)/intDsize) ) */
  #define UQ_maxlength  ceiling(64+1,intDsize)
  #if (bn_minlength <= 1) && (UQ_maxlength >= 1)
   if ((1*intDsize-1 < 64)
-      ? (wert <= (uint64)(wbitc(1*intDsize-1)-1))
+      ? (value <= (uint64)(wbitc(1*intDsize-1)-1))
       : true) { /* bignum with 1 digit */
     var object newnum = allocate_bignum(1,0);
-    TheBignum(newnum)->data[0] = (uintD)wert;
+    TheBignum(newnum)->data[0] = (uintD)value;
     return newnum;
   }
  #endif
  #if (bn_minlength <= 2) && (UQ_maxlength >= 2)
   if ((2*intDsize-1 < 64)
-      ? (wert <= (uint64)(wbitc(2*intDsize-1)-1))
+      ? (value <= (uint64)(wbitc(2*intDsize-1)-1))
       : true) { /* bignum with 2 digits */
     var object newnum = allocate_bignum(2,0);
     var uintD* ptr = &TheBignum(newnum)->data[1];
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value;
    #if (intDsize>=64)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
  #endif
  #if (bn_minlength <= 3) && (UQ_maxlength >= 3)
   if ((3*intDsize-1 < 64)
-      ? (wert <= (uint64)(wbitc(3*intDsize-1)-1))
+      ? (value <= (uint64)(wbitc(3*intDsize-1)-1))
       : true) { /* bignum with 3 digits */
     var object newnum = allocate_bignum(3,0);
     var uintD* ptr = &TheBignum(newnum)->data[2];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (2*intDsize>=64)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
  #endif
  #if (bn_minlength <= 4) && (UQ_maxlength >= 4)
   if ((4*intDsize-1 < 64)
-      ? (wert <= (uint64)(wbitc(4*intDsize-1)-1))
+      ? (value <= (uint64)(wbitc(4*intDsize-1)-1))
       : true) { /* bignum with 4 digits */
     var object newnum = allocate_bignum(4,0);
     var uintD* ptr = &TheBignum(newnum)->data[3];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (3*intDsize>=64)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
  #endif
  #if (bn_minlength <= 5) && (UQ_maxlength >= 5)
   if ((5*intDsize-1 < 64)
-      ? (wert <= (uint64)(wbitc(5*intDsize-1)-1))
+      ? (value <= (uint64)(wbitc(5*intDsize-1)-1))
       : true) { /* bignum with 5 digits */
     var object newnum = allocate_bignum(5,0);
     var uintD* ptr = &TheBignum(newnum)->data[4];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (4*intDsize>=64)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
  #endif
  #if (bn_minlength <= 6) && (UQ_maxlength >= 6)
   if ((6*intDsize-1 < 64)
-      ? (wert <= (uint64)(wbitc(6*intDsize-1)-1))
+      ? (value <= (uint64)(wbitc(6*intDsize-1)-1))
       : true) { /* bignum with 6 digits */
     var object newnum = allocate_bignum(6,0);
     var uintD* ptr = &TheBignum(newnum)->data[5];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (5*intDsize>=64)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
  #endif
  #if (bn_minlength <= 7) && (UQ_maxlength >= 7)
   if ((7*intDsize-1 < 64)
-      ? (wert <= (uint64)(wbitc(7*intDsize-1)-1))
+      ? (value <= (uint64)(wbitc(7*intDsize-1)-1))
       : true) { /* bignum with 7 digits */
     var object newnum = allocate_bignum(7,0);
     var uintD* ptr = &TheBignum(newnum)->data[6];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (6*intDsize>=64)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
  #endif
  #if (bn_minlength <= 8) && (UQ_maxlength >= 8)
   if ((8*intDsize-1 < 64)
-      ? (wert <= (uint64)(wbitc(8*intDsize-1)-1))
+      ? (value <= (uint64)(wbitc(8*intDsize-1)-1))
       : true) { /* bignum with 8 digits */
     var object newnum = allocate_bignum(8,0);
     var uintD* ptr = &TheBignum(newnum)->data[7];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (7*intDsize>=64)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
@@ -1239,18 +1250,18 @@ global maygc object UQ_to_I (uint64 wert)
   if (true) { /* bignum with 9 digits */
     var object newnum = allocate_bignum(9,0);
     var uintD* ptr = &TheBignum(newnum)->data[8];
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert; wert = wert >> intDsize;
-    *ptr-- = (uintD)wert;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value; value = value >> intDsize;
+    *ptr-- = (uintD)value;
    #if (8*intDsize>=64)
     *ptr = 0;
    #else
-    wert = wert >> intDsize; *ptr = (uintD)wert;
+    value = value >> intDsize; *ptr = (uintD)value;
    #endif
     return newnum;
   }
@@ -1284,37 +1295,37 @@ local maygc object NDS_to_I (const uintD* MSDptr, uintC len)
       /* 0 digits */
       return Fixnum_0;
    #if !(defined(intQsize) || (intVsize>32))
-    var sint32 wert;
+    var sint32 value;
     if (bn_minlength>2 ? (len==1) : true) { /* 1 digit */
-     len_1: wert = get_sint1D_Dptr(MSDptr);
+     len_1: value = get_sint1D_Dptr(MSDptr);
     } else if (bn_minlength>3 ? (len==2) : true) { /* 2 digits */
-     len_2: wert = get_sint2D_Dptr(MSDptr);
+     len_2: value = get_sint2D_Dptr(MSDptr);
     } else if (bn_minlength>4 ? (len==3) : true) { /* 3 digits */
-     len_3: wert = get_sint3D_Dptr(MSDptr);
+     len_3: value = get_sint3D_Dptr(MSDptr);
     } else if (true) { /* 4 digits */
-     len_4: wert = get_sint4D_Dptr(MSDptr);
+     len_4: value = get_sint4D_Dptr(MSDptr);
     } else if (false) { /* 5 digits */
-     len_5: wert = get_sint4D_Dptr(&MSDptr[1]); }
+     len_5: value = get_sint4D_Dptr(&MSDptr[1]); }
    #else /* (defined(intQsize) || (intVsize>32)) && (intDsize==32) */
-    var sint64 wert;
+    var sint64 value;
     if (true) { /* 1 digit */
-     len_1: wert = (sint64)(sintD)MSDptr[0];
+     len_1: value = (sint64)(sintD)MSDptr[0];
     } else if (true) { /* 2 digits */
      len_2:
-      wert = ((sint64)(sintD)MSDptr[0] << intDsize) | (uint64)(uintD)MSDptr[1];
+      value = ((sint64)(sintD)MSDptr[0] << intDsize) | (uint64)(uintD)MSDptr[1];
     }
    #endif
     return
      #if (oint_data_shift <= sign_bit_o) && ((oint_data_len+1 <= intLsize) || defined(intQsize))
-      as_object((( (soint)wert
+      as_object((( (soint)value
                    & (FN_value_vz_mask>>oint_data_shift) /* mask the unneeded */
                    ) << oint_data_shift
                  )
                 | ((oint)fixnum_type<<oint_type_shift) /* store typeinfo instead */
                 )
      #else
-      /* if (oint_data_shift > sign_bit_o) or if the sign bit is not in wert */
-      as_object((( (soint)wert << oint_data_shift )
+      /* if (oint_data_shift > sign_bit_o) or if the sign bit is not in value */
+      as_object((( (soint)value << oint_data_shift )
                  & FN_value_mask /* mask the unneeded */
                  )
                 | ((soint)(sint32)sign_of_sintD(MSDptr[0]) & wbit(sign_bit_o))
@@ -1354,7 +1365,9 @@ local maygc object NDS_to_I (const uintD* MSDptr, uintC len)
 
 /* report Bignum-overflow: */
 nonreturning_function(local, BN_ueberlauf, (void)) {
-  fehler(arithmetic_error,GETTEXT("bignum overflow"));
+  pushSTACK(TheSubr(subr_self)->name); /* slot :OPERATION */
+  pushSTACK(NIL);               /* slot :OPERANDS not available */
+  error(arithmetic_error,GETTEXT("bignum overflow"));
 }
 
 /* Normalized Unsigned Digit Sequence to Integer
@@ -1380,7 +1393,7 @@ local maygc object NUDS_to_I (uintD* MSDptr, uintC len)
  convert UDS MSDptr/len/.. into Integer >=0 .
  there must be room for 1 digit below of MSDptr.
  can trigger GC */
-global maygc object UDS_to_I (uintD* MSDptr, uintC len)
+modexp maygc object UDS_to_I (uintD* MSDptr, uintC len)
 {
   while ( (len!=0) && (MSDptr[0]==0) ) { /* so long as len>0 and MSD = 0, */
     MSDptr++; len--; /* discard null-digit */
@@ -1401,7 +1414,7 @@ global maygc object UDS_to_I (uintD* MSDptr, uintC len)
  DS_to_I(MSDptr,len)
  convert DS MSDptr/len/.. into Integer.
  can trigger GC */
-global maygc object DS_to_I (const uintD* MSDptr, uintC len)
+modexp maygc object DS_to_I (const uintD* MSDptr, uintC len)
 {
   /* first normalize. poss. increase MSDptr and decrease len: */
   if (len!=0) { /* empty DS is normalized */
@@ -1500,17 +1513,17 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
  { FN_to_NDS_nocopy(obj, MSDptr=,len=,LSDptr=); ... }
  > obj: a fixnum
  < MSDptr/len/LSDptr: normalized digit sequence, in machine stack */
-#define FN_to_NDS_nocopy(obj,MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung) \
+#define FN_to_NDS_nocopy(obj,MSDptr_assignment,len_assignment,LSDptr_assignment) \
   var uintD CONCAT(FN_to_NDS_room_,__LINE__)[FN_maxlength];             \
-  FN_to_NDS_nocopy_(obj,CONCAT(FN_to_NDS_room_,__LINE__),_EMA_ MSDptr_zuweisung,len_zuweisung,_EMA_ LSDptr_zuweisung)
+  FN_to_NDS_nocopy_(obj,CONCAT(FN_to_NDS_room_,__LINE__),_EMA_ MSDptr_assignment,len_assignment,_EMA_ LSDptr_assignment)
 
 /* Fixnum to Normalized Digit sequence
  FN_to_NDS(obj, MSDptr=,len=,LSDptr=);
  > obj: a fixnum
  < MSDptr/len/LSDptr: normalized digit sequence, may be modified.
  num_stack is decreased. */
-#define FN_to_NDS(obj,MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung)  \
-  FN_to_NDS_(copy,obj,_EMA_ MSDptr_zuweisung,len_zuweisung,_EMA_ LSDptr_zuweisung)
+#define FN_to_NDS(obj,MSDptr_assignment,len_assignment,LSDptr_assignment)  \
+  FN_to_NDS_(copy,obj,_EMA_ MSDptr_assignment,len_assignment,_EMA_ LSDptr_assignment)
 #define alloc_FNDS_copy  num_stack_need
 
 /* Fixnum to Normalized Digit sequence
@@ -1519,8 +1532,8 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
  < MSDptr/len/LSDptr: normalized digit sequence, may be modified.
  below MSDptr, there is still room for one 1 digit.
  num_stack is decreased. */
-#define FN_to_NDS_1(obj,MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung) \
-  FN_to_NDS_(copy_1,obj,_EMA_ MSDptr_zuweisung,len_zuweisung,_EMA_ LSDptr_zuweisung)
+#define FN_to_NDS_1(obj,MSDptr_assignment,len_assignment,LSDptr_assignment) \
+  FN_to_NDS_(copy_1,obj,_EMA_ MSDptr_assignment,len_assignment,_EMA_ LSDptr_assignment)
 #define alloc_FNDS_copy_1  num_stack_need_1
 
 /* only needed, when FN_maxlength >= 2, i.e. intDsize-1 < oint_data_len */
@@ -1535,7 +1548,7 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
 /* only needed, when FN_maxlength >= 5, i.e. 4*intDsize-1 < oint_data_len */
 #define FN_MSD4_mask                                                    \
   (FN_value_vz_mask & ~((oint)(bitc(4*intDsize-1)-1)<<oint_data_shift))
-#define FN_to_NDS_(option, obj, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung) \
+#define FN_to_NDS_(option, obj, MSDptr_assignment,len_assignment,LSDptr_assignment) \
   do { var oint fix_from_FN_to_NDS = as_oint(obj);                      \
     var uintC len_from_FN_to_NDS;                                       \
     var uintD* ptr_from_FN_to_NDS;                                      \
@@ -1564,10 +1577,10 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
         len_from_FN_to_NDS=5; /* five digits to store */                \
       }                                                                 \
     }                                                                   \
-    len_zuweisung len_from_FN_to_NDS;                                   \
+    len_assignment len_from_FN_to_NDS;                                  \
     /* allocate space: */                                               \
     CONCAT(alloc_FNDS_,option)                                          \
-      (len_from_FN_to_NDS, MSDptr_zuweisung ptr_from_FN_to_NDS =,_EMA_ LSDptr_zuweisung); \
+      (len_from_FN_to_NDS, MSDptr_assignment ptr_from_FN_to_NDS =,_EMA_ LSDptr_assignment); \
     /* fill space: */                                                   \
     if (len_from_FN_to_NDS > 0) {                                       \
       if ((FN_maxlength>1) && (len_from_FN_to_NDS > 1)) {               \
@@ -1590,7 +1603,7 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
       *ptr_from_FN_to_NDS = FN_LSD0(as_object(fix_from_FN_to_NDS));     \
     }                                                                   \
   } while(0)
-#define FN_to_NDS_nocopy_(obj, room, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung) \
+#define FN_to_NDS_nocopy_(obj, room, MSDptr_assignment,len_assignment,LSDptr_assignment) \
   do { var oint fix_from_FN_to_NDS = as_oint(obj);                      \
     var uintC len_from_FN_to_NDS;                                       \
     /* determine the length of the NDS and fill space: */               \
@@ -1630,19 +1643,19 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
       }                                                                 \
       *ptr_from_FN_to_NDS = FN_LSD0(as_object(fix_from_FN_to_NDS));     \
     }                                                                   \
-    len_zuweisung len_from_FN_to_NDS;                                   \
-    unused (LSDptr_zuweisung (MSDptr_zuweisung room) + len_from_FN_to_NDS); \
+    len_assignment len_from_FN_to_NDS;                                  \
+    unused (LSDptr_assignment (MSDptr_assignment room) + len_from_FN_to_NDS); \
   } while(0)
 
 /* Bignum to Normalized Digit sequence, copying unnecessary
  BN_to_NDS_nocopy(obj, MSDptr=,len=,LSDptr=);
  > obj: a Bignum
  < MSDptr/len/LSDptr: Normalized Digit sequence */
-#define BN_to_NDS_nocopy(obj, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung) \
-  do { var Bignum bn_from_BN_to_NDS_nocopy = TheBignum(obj);            \
-    unused (MSDptr_zuweisung &bn_from_BN_to_NDS_nocopy->data[0]);       \
-    unused (LSDptr_zuweisung &bn_from_BN_to_NDS_nocopy->data[(uintP)(   \
-            len_zuweisung bignum_length(bn_from_BN_to_NDS_nocopy) )]);  \
+#define BN_to_NDS_nocopy(obj, MSDptr_assignment,len_assignment,LSDptr_assignment) \
+  do { var Bignum bn_from_BN_to_NDS_nocopy = TheBignum(obj);             \
+    unused (MSDptr_assignment &bn_from_BN_to_NDS_nocopy->data[0]);       \
+    unused (LSDptr_assignment &bn_from_BN_to_NDS_nocopy->data[(uintP)(   \
+            len_assignment bignum_length(bn_from_BN_to_NDS_nocopy) )]);  \
   } while(0)
 
 /* Bignum to Normalized Digit sequence
@@ -1650,12 +1663,12 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
  > obj: a Bignum
  < MSDptr/len/LSDptr: Normalized Digit sequence, may be modified.
  num_stack is decreased. */
-#define BN_to_NDS(obj, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung) \
+#define BN_to_NDS(obj, MSDptr_assignment,len_assignment,LSDptr_assignment) \
   do { var object obj_from_BN_to_NDS = (obj);                           \
     var uintD* MSDptr_from_BN_to_NDS;                                   \
     var uintC len_from_BN_to_NDS;                                       \
-    len_zuweisung len_from_BN_to_NDS = Bignum_length(obj_from_BN_to_NDS); \
-    num_stack_need(len_from_BN_to_NDS, MSDptr_zuweisung MSDptr_from_BN_to_NDS = ,_EMA_ LSDptr_zuweisung); \
+    len_assignment len_from_BN_to_NDS = Bignum_length(obj_from_BN_to_NDS); \
+    num_stack_need(len_from_BN_to_NDS, MSDptr_assignment MSDptr_from_BN_to_NDS = ,_EMA_ LSDptr_assignment); \
     copy_loop_up(&TheBignum(obj_from_BN_to_NDS)->data[0],MSDptr_from_BN_to_NDS,len_from_BN_to_NDS); \
   } while(0)
 
@@ -1665,12 +1678,12 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
  < MSDptr/len/LSDptr: Normalized Digit sequence, may be modified.
  below MSDptr, there is still room for one 1 digit.
  num_stack is decreased. */
-#define BN_to_NDS_1(obj, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung) \
+#define BN_to_NDS_1(obj, MSDptr_assignment,len_assignment,LSDptr_assignment) \
   do { var object obj_from_BN_to_NDS = (obj);                           \
     var uintD* MSDptr_from_BN_to_NDS;                                   \
     var uintC len_from_BN_to_NDS;                                       \
-    len_zuweisung len_from_BN_to_NDS = Bignum_length(obj_from_BN_to_NDS); \
-    num_stack_need_1(len_from_BN_to_NDS, MSDptr_zuweisung MSDptr_from_BN_to_NDS = ,_EMA_ LSDptr_zuweisung); \
+    len_assignment len_from_BN_to_NDS = Bignum_length(obj_from_BN_to_NDS); \
+    num_stack_need_1(len_from_BN_to_NDS, MSDptr_assignment MSDptr_from_BN_to_NDS = ,_EMA_ LSDptr_assignment); \
     copy_loop_up(&TheBignum(obj_from_BN_to_NDS)->data[0],MSDptr_from_BN_to_NDS,len_from_BN_to_NDS); \
   } while(0)
 
@@ -1678,13 +1691,13 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
  { I_to_NDS_nocopy(obj, MSDptr=,len=,LSDptr=); ... }
  > obj: an Integer
  < MSDptr/len/LSDptr: Normalized Digit sequence */
-#define I_to_NDS_nocopy(obj, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung) \
+#define I_to_NDS_nocopy(obj, MSDptr_assignment,len_assignment,LSDptr_assignment) \
   var uintD CONCAT(I_to_NDS_room_,__LINE__)[FN_maxlength]; do {         \
     var object obj_from_I_to_NDS_nocopy = (obj);                        \
     if (I_fixnump(obj_from_I_to_NDS_nocopy))                            \
-      FN_to_NDS_nocopy_(obj_from_I_to_NDS_nocopy,CONCAT(I_to_NDS_room_,__LINE__),_EMA_ MSDptr_zuweisung,len_zuweisung,_EMA_ LSDptr_zuweisung); \
+      FN_to_NDS_nocopy_(obj_from_I_to_NDS_nocopy,CONCAT(I_to_NDS_room_,__LINE__),_EMA_ MSDptr_assignment,len_assignment,_EMA_ LSDptr_assignment); \
     else                                                                \
-      BN_to_NDS_nocopy(obj_from_I_to_NDS_nocopy,_EMA_ MSDptr_zuweisung,len_zuweisung,_EMA_ LSDptr_zuweisung); \
+      BN_to_NDS_nocopy(obj_from_I_to_NDS_nocopy,_EMA_ MSDptr_assignment,len_assignment,_EMA_ LSDptr_assignment); \
   } while(0)
 
 /* Integer to Normalized Digit sequence
@@ -1692,12 +1705,12 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
  > obj: an Integer
  < MSDptr/len/LSDptr: Normalized Digit sequence, may be modified.
  num_stack is decreased. */
-#define I_to_NDS(obj, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung)  \
+#define I_to_NDS(obj, MSDptr_assignment,len_assignment,LSDptr_assignment)  \
   do { var object obj_from_I_to_NDS = (obj);                            \
     if (I_fixnump(obj_from_I_to_NDS))                                   \
-      FN_to_NDS(obj_from_I_to_NDS,_EMA_ MSDptr_zuweisung,len_zuweisung,_EMA_ LSDptr_zuweisung); \
+      FN_to_NDS(obj_from_I_to_NDS,_EMA_ MSDptr_assignment,len_assignment,_EMA_ LSDptr_assignment); \
     else                                                                \
-      BN_to_NDS(obj_from_I_to_NDS,_EMA_ MSDptr_zuweisung,len_zuweisung,_EMA_ LSDptr_zuweisung); \
+      BN_to_NDS(obj_from_I_to_NDS,_EMA_ MSDptr_assignment,len_assignment,_EMA_ LSDptr_assignment); \
   } while(0)
 
 /* Integer to Normalized Digit sequence
@@ -1706,12 +1719,12 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
  < MSDptr/len/LSDptr: Normalized Digit sequence, may be modified.
  below MSDptr, there is still room for one 1 digit.
  num_stack is decreased. */
-#define I_to_NDS_1(obj, MSDptr_zuweisung,len_zuweisung,LSDptr_zuweisung) \
+#define I_to_NDS_1(obj, MSDptr_assignment,len_assignment,LSDptr_assignment) \
   do { var object obj_from_I_to_NDS = (obj);                            \
     if (I_fixnump(obj_from_I_to_NDS))                                   \
-      FN_to_NDS_1(obj_from_I_to_NDS,_EMA_ MSDptr_zuweisung,len_zuweisung,_EMA_ LSDptr_zuweisung); \
+      FN_to_NDS_1(obj_from_I_to_NDS,_EMA_ MSDptr_assignment,len_assignment,_EMA_ LSDptr_assignment); \
     else                                                                \
-      BN_to_NDS_1(obj_from_I_to_NDS,_EMA_ MSDptr_zuweisung,len_zuweisung,_EMA_ LSDptr_zuweisung); \
+      BN_to_NDS_1(obj_from_I_to_NDS,_EMA_ MSDptr_assignment,len_assignment,_EMA_ LSDptr_assignment); \
   } while(0)
 
 /* Fetches the next pFN_maxlength digits into a uintV:
@@ -1740,26 +1753,26 @@ global maygc object DS_to_I (const uintD* MSDptr, uintC len)
 #endif
 
 /* writes a uint32 into the next pFN_maxlength digits:
- _ptr is of type uintD*, _wert of type uintV. */
+ _ptr is of type uintD*, _value of type uintV. */
 #if (pFN_maxlength==1)
-  #define set_pFN_maxlength_digits_at(_ptr,_wert)  \
-    (_ptr[0] = (uintD)_wert)
+  #define set_pFN_maxlength_digits_at(_ptr,_value)  \
+    (_ptr[0] = (uintD)_value)
 #elif (pFN_maxlength==2) && (intDsize==16)
-  #define set_pFN_maxlength_digits_at(_ptr,_wert)  \
-    set_highlow32_at(_ptr,_wert)
+  #define set_pFN_maxlength_digits_at(_ptr,_value)  \
+    set_highlow32_at(_ptr,_value)
 #elif (pFN_maxlength==2)
-  #define set_pFN_maxlength_digits_at(_ptr,_wert)  \
-    (_ptr[0] = (uintD)(_wert>>intDsize), \
-     _ptr[1] = (uintD)(_wert))
+  #define set_pFN_maxlength_digits_at(_ptr,_value)  \
+    (_ptr[0] = (uintD)(_value>>intDsize), \
+     _ptr[1] = (uintD)(_value))
 #elif (pFN_maxlength==3)
-  #define set_pFN_maxlength_digits_at(_ptr,_wert)  \
-    (_ptr[0] = (uintD)(_wert>>(2*intDsize)), \
-     _ptr[1] = (uintD)(_wert>>intDsize),     \
-     _ptr[2] = (uintD)(_wert))
+  #define set_pFN_maxlength_digits_at(_ptr,_value)  \
+    (_ptr[0] = (uintD)(_value>>(2*intDsize)), \
+     _ptr[1] = (uintD)(_value>>intDsize),     \
+     _ptr[2] = (uintD)(_value))
 #elif (pFN_maxlength==4)
-  #define set_pFN_maxlength_digits_at(_ptr,_wert)  \
-    (_ptr[0] = (uintD)(_wert>>(3*intDsize)), \
-     _ptr[1] = (uintD)(_wert>>(2*intDsize)), \
-     _ptr[2] = (uintD)(_wert>>intDsize),     \
-     _ptr[3] = (uintD)(_wert))
+  #define set_pFN_maxlength_digits_at(_ptr,_value)  \
+    (_ptr[0] = (uintD)(_value>>(3*intDsize)), \
+     _ptr[1] = (uintD)(_value>>(2*intDsize)), \
+     _ptr[2] = (uintD)(_value>>intDsize),     \
+     _ptr[3] = (uintD)(_value))
 #endif

@@ -1,22 +1,54 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <!-- *** Entities for impnotes.xml *** -->
-<!ENTITY clisp-announce '<email>clisp-announce@lists.sourceforge.net</email> (<ulink url="http://lists.sourceforge.net/lists/listinfo/clisp-announce"/>)'>
-<!ENTITY clisp-list '<email>clisp-list@lists.sourceforge.net</email> (<ulink url="http://lists.sourceforge.net/lists/listinfo/clisp-list"/>)'>
-<!ENTITY clisp-devel '<email>clisp-devel@lists.sourceforge.net</email> (<ulink url="http://lists.sourceforge.net/lists/listinfo/clisp-devel"/>)'>
 
 <!-- *** people *** -->
-<!ENTITY bruno '<author><firstname>Bruno</firstname><surname>Haible</surname><address><otheraddr><ulink url="http://www.haible.de/bruno/"/></otheraddr></address></author>'>
-<!ENTITY gilbert-baumann '<author><firstname>Gilbert</firstname><surname>Baumann</surname><address><otheraddr><ulink url="http://www.uni-karlsruhe.de/~unk6/"/></otheraddr></address><email>unk6@rz.uni-karlsruhe.de</email></author>'>
-<!ENTITY hin '<author><firstname>John</firstname><surname>Hinsdale</surname><address><otheraddr><ulink url="http://www.alma.com/staff/hin"/></otheraddr></address><email>hin@alma.com</email></author>'>
-<!ENTITY sds '<author><firstname>Sam</firstname><surname>Steingold</surname><address><otheraddr><ulink url="http://www.podval.org/~sds/"/></otheraddr></address></author>'>
-<!ENTITY stoll '<author><firstname>Michael</firstname><surname>Stoll</surname><address><otheraddr><ulink url="http://www.math.iu-bremen.de/stoll/"/></otheraddr></address></author>'>
+<!ENTITY bruno '<author><firstname>Bruno</firstname><surname>Haible</surname>
+  <contrib>The original author and long-time maintainer.</contrib>
+  <address><otheraddr><ulink url="http://www.haible.de/bruno/"/>
+  </otheraddr></address></author>'>
+<!ENTITY bruno-a '<authorinitials>bruno</authorinitials>'>
+<!ENTITY gilbert-baumann '<author><firstname>Gilbert</firstname><surname>Baumann</surname>
+  <contrib>The NEW-CLX module.</contrib>
+  <address><otheraddr><ulink url="http://www.uni-karlsruhe.de/~unk6/"/>
+   </otheraddr></address><email>unk6@rz.uni-karlsruhe.de</email></author>'>
+<!ENTITY hin '<author><firstname>John</firstname><surname>Hinsdale</surname>
+  <contrib>The ORACLE and FastCGI modules.</contrib>
+  <address><otheraddr><ulink url="http://www.alma.com/staff/hin"/></otheraddr>
+  </address><email>hin@alma.com</email></author>'>
+<!ENTITY sds '<author><firstname>Sam</firstname><surname>Steingold</surname>
+  <contrib>Co-maintainer since 1998.</contrib>
+  <address><otheraddr><ulink url="http://sds.podval.org/"/>
+  </otheraddr></address></author>'>
+<!ENTITY sds-a '<authorinitials>sds</authorinitials>'>
+<!ENTITY stoll '<author><firstname>Michael</firstname><surname>Stoll</surname>
+  <contrib>The original author.</contrib>
+  <address><otheraddr><ulink url="http://www.faculty.iu-bremen.de/mstoll/"/>
+  </otheraddr></address></author>'>
+<!ENTITY clisp-authors '<authorgroup id="authors">&bruno; &stoll; &sds;
+ <othercredit><othername>Others</othername><contrib>See
+   <emphasis><filename role="clisp-cvs">COPYRIGHT</filename></emphasis>
+   for the list of other contributors and the license.
+ </contrib></othercredit></authorgroup>'>
+<!ENTITY clisp-doc-copyright
+  '<copyright><year>1992-2010</year><holder>Bruno Haible</holder></copyright>
+   <copyright><year>1998-2010</year><holder>Sam Steingold</holder></copyright>'>
+<!ENTITY clisp-bugs-and-support
+  '<para>See <olink targetdoc="man" targetptr="bugs"/> for instructions
+    on how to report bugs (both in the software and the documentaion).</para>
+   <para>See <olink targetdoc="impnotes" targetptr="faq-help"/> for
+    information on &clisp; support.</para>'>
+<!ENTITY clisp-abstract
+  '<abstract id="clisp-abstract"><para>This document describes the
+   &gnu; &clisp; - an implementation of the &ansi-cl;.</para>
+   &clisp-bugs-and-support;</abstract>'>
 
 <!-- *** platforms *** -->
 <!ENTITY with '<emphasis role="strong">with</emphasis>'>
 <!ENTITY without '<emphasis role="strong">without</emphasis>'>
 <!ENTITY typecodes '<link linkend="typecodes"><emphasis role="strong"><option>TYPECODES</option></emphasis></link>'>
 <!ENTITY heapcodes '<link linkend="typecodes"><emphasis role="strong"><option>HEAPCODES</option></emphasis></link>'>
+<!ENTITY with-debug '<olink targetdoc="impnotes" targetptr="with-debug"><option>--with-debug</option></olink>'>
 
 <!-- *** literals *** -->
 <!ENTITY abort-k '<constant>:ABORT</constant>'>
@@ -56,6 +88,7 @@
 <!ENTITY home-k '<constant>:HOME</constant>'>
 <!ENTITY hyper-k '<constant>:HYPER</constant>'>
 <!ENTITY if-does-not-exist '<constant>:IF-DOES-NOT-EXIST</constant>'>
+<!ENTITY if-exists '<constant>:IF-EXISTS</constant>'>
 <!ENTITY if-output-exists '<constant>:IF-OUTPUT-EXISTS</constant>'>
 <!ENTITY ignore-k '<constant>:IGNORE</constant>'>
 <!ENTITY in-k '<constant>:IN</constant>'>
@@ -89,6 +122,7 @@
 <!ENTITY out-k '<constant>:OUT</constant>'>
 <!ENTITY outfile-k '<constant>:OUTPUT-FILE</constant>'>
 <!ENTITY output-k '<constant>:OUTPUT</constant>'>
+<!ENTITY override-k '<constant>:OVERRIDE</constant>'>
 <!ENTITY overwrite-k '<constant>:OVERWRITE</constant>'>
 <!ENTITY parent-k '<constant>:PARENT</constant>'>
 <!ENTITY previous-k '<constant>:PRECIOUS</constant>'>
@@ -113,6 +147,7 @@
 <!ENTITY use-k '<constant>:USE</constant>'>
 <!ENTITY value-k '<constant>:VALUE</constant>'>
 <!ENTITY verbose-k '<constant>:VERBOSE</constant>'>
+<!ENTITY version-k '<constant>:VERSION</constant>'>
 <!ENTITY wait-k '<constant>:WAIT</constant>'>
 <!ENTITY warnings-k '<constant>:WARNINGS</constant>'>
 <!ENTITY wild-inferiors-k '<constant>:WILD-INFERIORS</constant>'>
@@ -135,7 +170,6 @@
 <!ENTITY tab-c '<keycode>TAB</keycode>'>
 
 <!-- *** packages *** -->
-<!ENTITY affi-pac '<link linkend="affi"><quote role="package">AFFI</quote></link>'>
 <!ENTITY charset-pac '<link linkend="encoding"><quote role="package">CHARSET</quote></link>'>
 <!ENTITY clos-pac '<link linkend="classes"><quote role="package">CLOS</quote></link>'>
 <!ENTITY cs-cl '<olink targetdoc="impnotes" targetptr="package-case"><quote role="package">CS-COMMON-LISP</quote></olink>'>
@@ -147,6 +181,7 @@
 <!ENTITY gstream-pac '<link linkend="gstream"><quote role="package">GSTREAM</quote></link>'>
 <!ENTITY i18n-pac '<link linkend="i18n"><quote role="package">I18N</quote></link>'>
 <!ENTITY ldap-pac '<link linkend="dir-key"><quote role="package">LDAP</quote></link>'>
+<!ENTITY mt-pac '<link linkend="mt"><quote role="package">THREADS</quote></link>'>
 <!ENTITY posix-pac '<link linkend="syscalls"><quote role="package">POSIX</quote></link>'>
 <!ENTITY regexp-pac '<link linkend="regexp-mod"><quote role="package">REGEXP</quote></link>'>
 <!ENTITY screen-pac '<link linkend="screen"><quote role="package">SCREEN</quote></link>'>
@@ -159,9 +194,9 @@
 <!ENTITY abort-on-error '<olink targetdoc="impnotes" targetptr="abort-on-error"><function>EXT:ABORT-ON-ERROR</function></olink>'>
 <!ENTITY absolute-pathname '<link linkend="absolute-pathname"><function>EXT:ABSOLUTE-PATHNAME</function></link>'>
 <!ENTITY ansi '<olink targetdoc="impnotes" targetptr="ansi"><varname>CUSTOM:*ANSI*</varname></olink>'>
-<!ENTITY ansi-opt '<olink targetdoc="man" targetptr="opt-ansi"><option>-ansi</option></olink>'>
 <!ENTITY apropos-do-more '<link linkend="apropos"><varname>CUSTOM:*APROPOS-DO-MORE*</varname></link>'>
 <!ENTITY apropos-matcher '<link linkend="apropos"><varname>CUSTOM:*APROPOS-MATCHER*</varname></link>'>
+<!ENTITY arglist '<link linkend="arglist"><function>EXT:ARGLIST</function></link>'>
 <!ENTITY appease-cerrors '<olink targetdoc="impnotes" targetptr="appease-cerrors"><function>EXT:APPEASE-CERRORS</function></olink>'>
 <!ENTITY browse-url '<link linkend="browse-url"><function>EXT:BROWSE-URL</function></link>'>
 <!ENTITY browser '<link linkend="browse-url"><varname>CUSTOM:*BROWSER*</varname></link>'>
@@ -172,12 +207,16 @@
 <!ENTITY impnotes-root '<olink targetdoc="impnotes" targetptr="impnotes-root"><function>CUSTOM:IMPNOTES-ROOT</function></olink>'>
 <!ENTITY impnotes-root-default '<link linkend="impnotes-root"><varname>CUSTOM:*IMPNOTES-ROOT-DEFAULT*</varname></link>'>
 <!ENTITY open-http '<link linkend="open-http"><function>EXT:OPEN-HTTP</function></link>'>
+<!ENTITY fcase '<link linkend="fcase"><function>EXT:FCASE</function></link>'>
 <!ENTITY buffered '<link linkend="buffered"><constant>:BUFFERED</constant></link>'>
 <!ENTITY byte-t '<link linkend="byte-type"><type>BYTE</type></link>'>
 <!ENTITY case-inverted-k '<link linkend="package-case"><constant>:CASE-INVERTED</constant></link>'>
 <!ENTITY case-sensitive-k '<link linkend="package-case"><constant>:CASE-SENSITIVE</constant></link>'>
 <!ENTITY modern-k '<link linkend="package-case"><constant>:MODERN</constant></link>'>
 <!ENTITY cd '<link linkend="cd"><function>EXT:CD</function></link>'>
+<!ENTITY default-dir '<link linkend="default-dir"><function>EXT:DEFAULT-DIRECTORY</function></link>'>
+<!ENTITY delete-dir '<link linkend="delete-dir"><function>EXT:DELETE-DIRECTORY</function></link>'>
+<!ENTITY rename-dir '<link linkend="rename-dir"><function>EXT:RENAME-DIRECTORY</function></link>'>
 <!ENTITY ch-ctrl '<link linkend="char-bits"><constant>EXT:CHAR-CONTROL-BIT</constant></link>'>
 <!ENTITY ch-hyper '<link linkend="char-bits"><constant>EXT:CHAR-HYPER-BIT</constant></link>'>
 <!ENTITY ch-meta '<link linkend="char-bits"><constant>EXT:CHAR-META-BIT</constant></link>'>
@@ -185,6 +224,8 @@
 <!ENTITY char-width '<link linkend="char-width"><function>EXT:CHAR-WIDTH</function></link>'>
 <!ENTITY char-invertcase '<link linkend="char-invertcase"><function>EXT:CHAR-INVERTCASE</function></link>'>
 <!ENTITY char-key '<link linkend="with-kbd"><function>EXT:CHAR-KEY</function></link>'>
+<!ENTITY convert-string-from-bytes '<link linkend="string-byte"><function>EXT:CONVERT-STRING-FROM-BYTES</function></link>'>
+<!ENTITY convert-string-to-bytes '<link linkend="string-byte"><function>EXT:CONVERT-STRING-TO-BYTES</function></link>'>
 <!ENTITY cur-frame '<link linkend="cur-frame">current stack frame</link>'>
 <!ENTITY no-prim '<link linkend="no-prim"><function>CLOS:NO-PRIMARY-METHOD</function></link>'>
 <!ENTITY meth-call-err '<link linkend="meth-call-err"><classname>CLOS:METHOD-CALL-ERROR</classname></link>'>
@@ -198,8 +239,8 @@
 <!ENTITY gen-labels '<link linkend="gen-labels"><function>CLOS:GENERIC-LABELS</function></link>'>
 <!ENTITY symbol-mex '<link linkend="symbol-mex"><function>EXT:SYMBOL-MACRO-EXPAND</function></link>'>
 <!ENTITY compile-decl '<link linkend="compile-decl"><code>(COMPILE)</code></link>'>
-<!ENTITY compile-warn '<link linkend="compilefile"><varname>CUSTOM:*COMPILE-WARNINGS*</varname></link>'>
-<!ENTITY compiled-types '<link linkend="loadfile"><varname>CUSTOM:*COMPILED-FILE-TYPES*</varname></link>'>
+<!ENTITY compile-warn '<link linkend="compile-warn"><varname>CUSTOM:*COMPILE-WARNINGS*</varname></link>'>
+<!ENTITY compiled-types '<link linkend="compiled-types"><varname>CUSTOM:*COMPILED-FILE-TYPES*</varname></link>'>
 <!ENTITY count-ansi '<link linkend="count-ansi"><varname>CUSTOM:*SEQUENCE-COUNT-ANSI*</varname></link>'>
 <!ENTITY curr-lang '<olink targetdoc="impnotes" targetptr="language"><varname>CUSTOM:*CURRENT-LANGUAGE*</varname></olink>'>
 <!ENTITY deflang '<link linkend="deflang"><function>I18N:DEFLANGUAGE</function></link>'>
@@ -227,13 +268,16 @@
 <!ENTITY enc-built-in '<link linkend="charset-symbols">built-in</link>'> <!-- encoding -->
 <!ENTITY enc-charset '<link linkend="enc-charset"><function>EXT:ENCODING-CHARSET</function></link>'>
 <!ENTITY encoding '<link linkend="encoding"><classname>EXT:ENCODING</classname></link>'>
+<!ENTITY enc1-1 '<link linkend="enc1-1"><quote>1:1</quote> encoding</link>'>
 <!ENTITY endianness '<link linkend="endianness"><replaceable>ENDIANNESS</replaceable></link>'>
 <!ENTITY ethe '<link linkend="ethe"><function>EXT:ETHE</function></link>'>
 <!ENTITY exec '<link linkend="exec"><function>EXT:EXECUTE</function></link>'>
+<!ENTITY exit '<link linkend="quit"><function>EXT:EXIT</function></link>'>
 <!ENTITY exit-on-error '<olink targetdoc="impnotes" targetptr="exit-on-error"><function>EXT:EXIT-ON-ERROR</function></olink>'>
 <!ENTITY expand-form '<link linkend="code-walk"><function>EXT:EXPAND-FORM</function></link>'>
 <!ENTITY extfmt '<link linkend="extfmt"><constant>:EXTERNAL-FORMAT</constant></link>'>
-<!ENTITY file-pipe-socket-s '<link linkend="open">file</link>/<link linkend="pipe">pipe</link>/<link linkend="socket">socket</link> &stream-t;'>
+<!ENTITY sock '<link linkend="socket">socket</link>'>
+<!ENTITY file-pipe-socket-s '<link linkend="open">file</link>/<link linkend="pipe">pipe</link>/&sock; &stream-t;'>
 <!ENTITY finalize '<link linkend="final"><function>EXT:FINALIZE</function></link>'>
 <!ENTITY fixnum-char-ansi '<link linkend="fixnum-char-ansi"><varname>CUSTOM:*COERCE-FIXNUM-CHAR-ANSI*</varname></link>'>
 <!ENTITY flocont '<link linkend="flocont"><varname>CUSTOM:*FLOATING-POINT-CONTAGION-ANSI*</varname></link>'>
@@ -245,7 +289,7 @@
 <!ENTITY fu-st-in '<link linkend="fu-st-in"><classname>GRAY:FUNDAMENTAL-INPUT-STREAM</classname></link>'>
 <!ENTITY fu-st-out '<link linkend="fu-st-out"><classname>GRAY:FUNDAMENTAL-OUTPUT-STREAM</classname></link>'>
 <!ENTITY fill-stream '<link linkend="fill-stream"><classname>EXT:FILL-STREAM</classname></link>'>
-<!ENTITY gc '<link linkend="gc">garbage-collect</link>'>
+<!ENTITY gc '<olink targetdoc="impnotes" targetptr="gc">garbage-collect</olink>'>
 <!ENTITY getenv '<link linkend="getenv"><function>EXT:GETENV</function></link>'>
 <!ENTITY input-char '<link linkend="input-char"><classname>SYS::INPUT-CHARACTER</classname></link>'>
 <!ENTITY init-hooks '<olink targetdoc="impnotes" targetptr="init-hooks"><varname>CUSTOM:*INIT-HOOKS*</varname></olink>'>
@@ -254,21 +298,26 @@
 <!ENTITY lalist '<link linkend="lalist">lambda list</link>'>
 <!ENTITY letf '<link linkend="letf"><function>EXT:LETF</function></link>'>
 <!ENTITY letf-star '<link linkend="letf"><function>EXT:LETF*</function></link>'>
+<!ENTITY with-collect '<link linkend="with-collect"><function>EXT:WITH-COLLECT</function></link>'>
 <!ENTITY lfd '<link linkend="lfd"><function>EXT:LONG-FLOAT-DIGITS</function></link>'>
 <!ENTITY lfd-l '<code>(<link linkend="lfd"><function>EXT:LONG-FLOAT-DIGITS</function></link>)</code>'>
 <!ENTITY line-term '<link linkend="newline">line terminator</link>'>
-<!ENTITY load-comp '<olink targetdoc="impnotes" targetptr="loadfile"><varname>CUSTOM:*LOAD-COMPILING*</varname></olink>'>
-<!ENTITY load-echo '<olink targetdoc="impnotes" targetptr="loadfile"><varname>CUSTOM:*LOAD-ECHO*</varname></olink>'>
+<!ENTITY libdir '<olink targetdoc="man" targetptr="opt-libdir"><varname>CUSTOM:*LIB-DIRECTORY*</varname></olink>'>
+<!ENTITY user-libdir '<olink targetdoc="clink" targetptr="opt-install"><varname>CUSTOM:*USER-LIB-DIRECTORY*</varname></olink>'>
+<!ENTITY opt-install '<option><olink targetdoc="clink" targetptr="opt-install">install</olink></option>'>
+<!ENTITY load-comp '<olink targetdoc="impnotes" targetptr="load-comp"><varname>CUSTOM:*LOAD-COMPILING*</varname></olink>'>
+<!ENTITY load-echo '<olink targetdoc="impnotes" targetptr="load-echo"><varname>CUSTOM:*LOAD-ECHO*</varname></olink>'>
 <!ENTITY load-lpt-db '<olink targetdoc="impnotes" targetptr="load-lpt"><varname>CUSTOM:*LOAD-LOGICAL-PATHNAME-TRANSLATIONS-DATABASE*</varname></olink>'>
-<!ENTITY load-obs '<link linkend="loadfile"><varname>CUSTOM:*LOAD-OBSOLETE-ACTION*</varname></link>'>
-<!ENTITY load-paths '<link linkend="load-paths"><varname>CUSTOM:*LOAD-PATHS*</varname></link>'>
+<!ENTITY load-obs '<link linkend="load-obs"><varname>CUSTOM:*LOAD-OBSOLETE-ACTION*</varname></link>'>
+<!ENTITY load-paths '<olink targetdoc="impnotes" targetptr="load-paths"><varname>CUSTOM:*LOAD-PATHS*</varname></olink>'>
 <!ENTITY make-encoding '<link linkend="make-encoding"><function>EXT:MAKE-ENCODING</function></link>'>
 <!ENTITY make-stream '<link linkend="make-stream"><function>EXT:MAKE-STREAM</function></link>'>
 <!ENTITY mapcap '<link linkend="mapcap"><function>EXT:MAPCAP</function></link>'>
 <!ENTITY maplap '<link linkend="mapcap"><function>EXT:MAPLAP</function></link>'>
-<!ENTITY match-t '<classname>REGEXP:MATCH</classname>'>
+<!ENTITY match-t '<link linkend="regexp-api"><classname>REGEXP:MATCH</classname></link>'>
 <!ENTITY mem-image '<olink targetdoc="impnotes" targetptr="image">memory image</olink>'>
 <!ENTITY savemem '<olink targetdoc="impnotes" targetptr="image"><function>EXT:SAVEINITMEM</function></olink>'>
+<!ENTITY savemem-verbose '<olink targetdoc="impnotes" targetptr="image"><varname>CUSTOM:*SAVEINITMEM-VERBOSE*</varname></olink>'>
 <!ENTITY misc-enc '<olink targetdoc="impnotes" targetptr="misc-enc"><varname>CUSTOM:*MISC-ENCODING*</varname></olink>'>
 <!ENTITY mk-pipe-in '<link linkend="pipe"><function>EXT:MAKE-PIPE-INPUT-STREAM</function></link>'>
 <!ENTITY mk-pipe-io '<link linkend="pipe"><function>EXT:MAKE-PIPE-IO-STREAM</function></link>'>
@@ -277,19 +326,27 @@
 <!ENTITY muffle-cerrors '<link linkend="muffle-cerrors"><function>EXT:MUFFLE-CERRORS</function></link>'>
 <!ENTITY need-defmethod '<simpara>You must define a method for this function.</simpara>'>
 <!ENTITY notspec '<link linkend="notspec-decl"><literal>EXT:NOTSPECIAL</literal></link>'>
+<!ENTITY constnotin '<link linkend="constant-notinline"><literal>EXT:CONSTANT-NOTINLINE</literal></link>'>
 <!ENTITY no-underflow '<link linkend="no-underflow"><function>EXT:WITHOUT-FLOATING-POINT-UNDERFLOW</function></link>'>
+<!ENTITY opt-ansi '<option><olink targetdoc="man" targetptr="opt-ansi">-ansi</olink></option>'>
+<!ENTITY opt-b '<option><olink targetdoc="man" targetptr="opt-printlibdir">-b</olink></option>'>
 <!ENTITY opt-C '<option><olink targetdoc="man" targetptr="opt-load-comp">-C</olink></option>'>
 <!ENTITY opt-E '<option><olink targetdoc="man" targetptr="opt-enc"/></option>'>
 <!ENTITY opt-i '<option><olink targetdoc="man" targetptr="opt-init">-i</olink></option>'>
 <!ENTITY opt-K '<option><olink targetdoc="man" targetptr="opt-link-set">-K</olink></option>'>
 <!ENTITY opt-L '<option><olink targetdoc="man" targetptr="opt-lang">-L</olink></option>'>
 <!ENTITY opt-M '<option><olink targetdoc="man" targetptr="opt-memfile">-M</olink></option>'>
+<!ENTITY opt-m '<option><olink targetdoc="man" targetptr="opt-memsize">-m</olink></option>'>
 <!ENTITY opt-v '<option><olink targetdoc="man" targetptr="opt-verbose">-v</olink></option>'>
 <!ENTITY opt-q '<option><olink targetdoc="man" targetptr="opt-verbose">-q</olink></option>'>
 <!ENTITY opt-x '<option><olink targetdoc="man" targetptr="opt-exec-expr">-x</olink></option>'>
 <!ENTITY opt-norc '<option><olink targetdoc="man" targetptr="opt-norc">-norc</olink></option>'>
 <!ENTITY opt-modern '<option><olink targetdoc="man" targetptr="opt-modern">-modern</olink></option>'>
 <!ENTITY opt-on-error '<option><olink targetdoc="man" targetptr="opt-on-error">-on-error</olink></option>'>
+<!ENTITY opt-traditional '<option><olink targetdoc="man" targetptr="opt-traditional">-traditional</olink></option>'>
+<!ENTITY opt-norl '<option><olink targetdoc="man" targetptr="opt-norl">-disable-readline</olink></option>'>
+<!ENTITY script '<olink targetdoc="man" targetptr="opt-exec-file">script</olink>'>
+<!ENTITY without-dynmod '<option><olink targetdoc="impnotes" targetptr="mod-dynload">--without-dynamic-modules</olink></option>'>
 <!ENTITY pack-inverted '<link linkend="pack-inverted"><function>EXT:PACKAGE-CASE-INVERTED-P</function></link>'>
 <!ENTITY pack-sensitive '<link linkend="pack-sensitive"><function>EXT:PACKAGE-CASE-SENSITIVE-P</function></link>'>
 <!ENTITY package-lock '<link linkend="pack-lock"><function>EXT:PACKAGE-LOCK</function></link>'>
@@ -307,6 +364,7 @@
 <!ENTITY pr-indent '<link linkend="pr-indent"><varname>CUSTOM:*PRINT-INDENT-LISTS*</varname></link>'>
 <!ENTITY pr-rpars '<link linkend="pr-rpars"><varname>CUSTOM:*PRINT-RPARS*</varname></link>'>
 <!ENTITY probe-dir '<link linkend="probe-dir"><function>EXT:PROBE-DIRECTORY</function></link>'>
+<!ENTITY probe-path '<link linkend="probe-path"><function>EXT:PROBE-PATHNAME</function></link>'>
 <!ENTITY prompt-start '<link linkend="prompt-start"><varname>CUSTOM:*PROMPT-START*</varname></link>'>
 <!ENTITY prompt-step '<link linkend="prompt-step"><varname>CUSTOM:*PROMPT-STEP*</varname></link>'>
 <!ENTITY prompt-break '<link linkend="prompt-break"><varname>CUSTOM:*PROMPT-BREAK*</varname></link>'>
@@ -339,6 +397,7 @@
 <!ENTITY re-regexp-quote '<link linkend="re-regexp-quote"><function>REGEXP:REGEXP-QUOTE</function></link>'>
 <!ENTITY re-regexp-split '<link linkend="re-regexp-split"><function>REGEXP:REGEXP-SPLIT</function></link>'>
 <!ENTITY re-with-loop-split '<link linkend="re-with-loop-split"><function>REGEXP:WITH-LOOP-SPLIT</function></link>'>
+<!ENTITY reopen '<link linkend="reopen"><varname>CUSTOM:*REOPEN-OPEN-FILE*</varname></link>'>
 <!ENTITY run-cmd '<link linkend="run-prog"><function>EXT:RUN-SHELL-COMMAND</function></link>'>
 <!ENTITY run-prog '<link linkend="run-prog"><function>EXT:RUN-PROGRAM</function></link>'>
 <!ENTITY scr-win '<link linkend="screen"><varname>SCREEN:*WINDOW*</varname></link>'>
@@ -362,20 +421,31 @@
 <!ENTITY sost-peer '<link linkend="sost-peer"><function>SOCKET:SOCKET-STREAM-PEER</function></link>'>
 <!ENTITY sost-port '<link linkend="sost-hopo"><function>SOCKET:SOCKET-STREAM-PORT</function></link>'>
 <!ENTITY sost-shut '<link linkend="sost-shut"><function>SOCKET:SOCKET-STREAM-SHUTDOWN</function></link>'>
-<!ENTITY source-types '<link linkend="loadfile"><varname>CUSTOM:*SOURCE-FILE-TYPES*</varname></link>'>
+<!ENTITY source-program-error '<link linkend="compile-errors"><classname>EXT:SOURCE-PROGRAM-ERROR</classname></link>'>
+<!ENTITY source-program-error-detail '<link linkend="compile-errors"><function>EXT:SOURCE-PROGRAM-ERROR-DETAIL</function></link>'>
+<!ENTITY source-program-error-form '<link linkend="compile-errors"><function>EXT:SOURCE-PROGRAM-ERROR-FORM</function></link>'>
+<!ENTITY source-types '<link linkend="source-types"><varname>CUSTOM:*SOURCE-FILE-TYPES*</varname></link>'>
 <!ENTITY spacecharprint '<link linkend="spacecharprint"><varname>CUSTOM:*PRINT-SPACE-CHAR-ANSI*</varname></link>'>
 <!ENTITY spe-var-p '<link linkend="spe-var-p"><function>EXT:SPECIAL-VARIABLE-P</function></link>'>
+<!ENTITY st-position '<link linkend="st-position"><function>GRAY:STREAM-POSITION</function></link>'>
 <!ENTITY st-lc '<link linkend="st-lc"><function>GRAY:STREAM-LINE-COLUMN</function></link>'>
 <!ENTITY st-rb '<link linkend="st-rb"><function>GRAY:STREAM-READ-BYTE</function></link>'>
 <!ENTITY st-rbla '<link linkend="st-rbla"><function>GRAY:STREAM-READ-BYTE-LOOKAHEAD</function></link>'>
+<!ENTITY st-rbnh '<link linkend="rbnh"><function>GRAY:STREAM-READ-BYTE-NO-HANG</function></link>'>
+<!ENTITY st-rbwhp '<link linkend="rbwhp"><function>GRAY:STREAM-READ-BYTE-WILL-HANG-P</function></link>'>
 <!ENTITY st-rc '<link linkend="st-rc"><function>GRAY:STREAM-READ-CHAR</function></link>'>
 <!ENTITY st-rcnh '<link linkend="st-rcnh"><function>GRAY:STREAM-READ-CHAR-NO-HANG</function></link>'>
 <!ENTITY st-uc '<link linkend="st-uc"><function>GRAY:STREAM-UNREAD-CHAR</function></link>'>
 <!ENTITY st-wc '<link linkend="st-wc"><function>GRAY:STREAM-WRITE-CHAR</function></link>'>
+<!ENTITY st-rd-cs '<link linkend="st-rd-cs"><function>GRAY:STREAM-READ-CHAR-SEQUENCE</function></link>'>
+<!ENTITY st-rd-bs '<link linkend="st-rd-bs"><function>GRAY:STREAM-READ-BYTE-SEQUENCE</function></link>'>
+<!ENTITY st-wr-cs '<link linkend="st-wr-cs"><function>GRAY:STREAM-WRITE-CHAR-SEQUENCE</function></link>'>
+<!ENTITY st-wr-bs '<link linkend="st-wr-bs"><function>GRAY:STREAM-WRITE-BYTE-SEQUENCE</function></link>'>
 <!ENTITY string-width '<link linkend="string-width"><function>EXT:STRING-WIDTH</function></link>'>
 <!ENTITY string-invertcase '<link linkend="string-invertcase"><function>EXT:STRING-INVERTCASE</function></link>'>
 <!ENTITY nstring-invertcase '<link linkend="string-invertcase"><function>EXT:NSTRING-INVERTCASE</function></link>'>
 <!ENTITY suppress-check-redef '<link linkend="suppress-check-redef"><varname>CUSTOM:*SUPPRESS-CHECK-REDEFINITION*</varname></link>'>
+<!ENTITY suppress-similar-const-redef '<link linkend="defconstant-similar"><varname>CUSTOM:*SUPPRESS-SIMILAR-CONSTANT-REDEFINITION-WARNING*</varname></link>'>
 <!ENTITY sys-pack-list '<link linkend="pack-lock"><varname>CUSTOM:*SYSTEM-PACKAGE-LIST*</varname></link>'>
 <!ENTITY term-enc '<olink targetdoc="impnotes" targetptr="term-enc"><varname>CUSTOM:*TERMINAL-ENCODING*</varname></olink>'>
 <!ENTITY the-env '<link linkend="the-env"><function>EXT:THE-ENVIRONMENT</function></link>'>
@@ -383,12 +453,13 @@
 <!ENTITY timeout-opt '&optional-amp; <link linkend="timeout-opt">[<replaceable>seconds</replaceable> [<replaceable>microseconds</replaceable>]]</link>'>
 <!ENTITY trace-indent '<link linkend="trace-indent"><varname>CUSTOM:*TRACE-INDENT*</varname></link>'>
 <!ENTITY trace-val '<link linkend="trace-val"><varname>EXT:*TRACE-VALUES*</varname></link>'>
-<!ENTITY traditional-opt '<olink targetdoc="man" targetptr="opt-traditional"><option>-traditional</option></olink>'>
 <!ENTITY ts '<link linkend="time"><function>EXT:TIMES</function></link>'>
 <!ENTITY uncompile '<link linkend="uncompile"><function>EXT:UNCOMPILE</function></link>'>
 <!ENTITY user-commands '<link linkend="user-commands"><varname>CUSTOM:*USER-COMMANDS*</varname></link>'>
+<!ENTITY ucs-4 '<link linkend="charset-UCS-4"><constant>CHARSET:UCS-4</constant></link>'>
 <!ENTITY utf-8 '<link linkend="charset-UTF-8"><constant>CHARSET:UTF-8</constant></link>'>
 <!ENTITY utf-16 '<link linkend="charset-UTF-16"><constant>CHARSET:UTF-16</constant></link>'>
+<!ENTITY iso-8859-1 '<link linkend="charset-UTF-16"><constant>CHARSET:ISO-8859-1</constant></link>'>
 <!ENTITY warn-fpc '<link linkend="warn-fpc"><varname>CUSTOM:*WARN-ON-FLOATING-POINT-CONTAGION*</varname></link>'>
 <!ENTITY warn-fprc '<link linkend="warn-fprc"><varname>CUSTOM:*WARN-ON-FLOATING-POINT-RATIONAL-CONTAGION*</varname></link>'>
 <!ENTITY wdkey-open '<link linkend="with-dir-key-open"><function>LDAP:WITH-DIR-KEY-OPEN</function></link>'>
@@ -410,8 +481,10 @@
 <!ENTITY wr-integer '<link linkend="bin-output"><function>EXT:WRITE-INTEGER</function></link>'>
 <!ENTITY pr-empty-arr-ansi '<link linkend="pr-empty-arr-ansi"><varname>CUSTOM:*PRINT-EMPTY-ARRAYS-ANSI*</varname></link>'>
 <!ENTITY pr-unreadable-ansi '<link linkend="pr-unreadable-ansi"><varname>CUSTOM:*PRINT-UNREADABLE-ANSI*</varname></link>'>
-<!ENTITY init-function '<olink targetdoc="impnotes" targetptr="image">init function</olink>'>
+<!ENTITY init-function '<olink targetdoc="impnotes" targetptr="init-func">init function</olink>'>
 <!ENTITY RC-file '<olink targetdoc="man" targetptr="opt-norc">RC file</olink>'>
+<!ENTITY rt '<olink targetdoc="man" targetptr="runtime">runtime</olink>'>
+<!ENTITY batch-mode '<olink targetdoc="man" targetptr="batch-mode">batch mode</olink>'>
 <!ENTITY compile-file-my '<olink targetdoc="impnotes" targetptr="compilefile"><function>COMPILE-FILE</function></olink>'>
 <!ENTITY load-my '<olink targetdoc="impnotes" targetptr="loadfile"><function>LOAD</function></olink>'>
 <!ENTITY require-my '<olink targetdoc="impnotes" targetptr="require"><function>REQUIRE</function></olink>'>
@@ -423,14 +496,99 @@
 <!ENTITY structure-stablehash '<link linkend="make-hash"><classname>EXT:STRUCTURE-STABLEHASH</classname></link>'>
 <!ENTITY warn-on-hashtable-needing-rehash-after-gc '<link linkend="hashtable-gc-rehash-warn"><varname>CUSTOM:*WARN-ON-HASHTABLE-NEEDING-REHASH-AFTER-GC*</varname></link>'>
 <!ENTITY err-pr-bt '<olink targetdoc="impnotes" targetptr="err-pr-bt"><varname>CUSTOM:*REPORT-ERROR-PRINT-BACKTRACE*</varname></olink>'>
-<!ENTITY http-proxy "<link linkend='http-proxy'><varname>CUSTOM:*HTTP-PROXY*</varname></link>">
+<!ENTITY http-log-stream '<link linkend="http-log-stream"><varname>CUSTOM:*HTTP-LOG-STREAM*</varname></link>'>
+<!ENTITY http-proxy '<link linkend="http-proxy"><varname>CUSTOM:*HTTP-PROXY*</varname></link>'>
+<!ENTITY argv '<link linkend="argv"><function>EXT:ARGV</function></link>'>
+<!ENTITY canonicalize '<link linkend="canonicalize"><function>EXT:CANONICALIZE</function></link>'>
+<!ENTITY mod-expt '<link linkend="mod-expt"><function>EXT:MOD-EXPT</function></link>'>
+<!ENTITY compiled-file-p '<link linkend="compiled-file-p"><function>EXT:COMPILED-FILE-P</function></link>'>
+<!ENTITY help '<olink targetdoc="impnotes" targetptr="debugger-main-deb-step"><command>help</command></olink>'>
+<!ENTITY debugger '<link linkend="debugger">debugger</link>'>
+<!ENTITY format-bang '<link linkend="format-bang"><literal>~!</literal></link>'>
+<!ENTITY format-dot '<link linkend="format-dot"><literal>~.</literal></link>'>
+<!ENTITY nlcA '<emphasis role="strong">A</emphasis>'>
+<!ENTITY nlcB '<emphasis role="strong">B</emphasis>'>
+<!ENTITY nlcC '<emphasis role="strong">C</emphasis>'>
+<!ENTITY nlcAB '<emphasis role="strong">AB</emphasis>'>
+<!ENTITY nlcBC '<emphasis role="strong">BC</emphasis>'>
+<!ENTITY nlcBp "<emphasis role='strong'>B'</emphasis>">
+<!ENTITY nlcABp "<emphasis role='strong'>AB'</emphasis>">
+<!ENTITY nlcBpC "<emphasis role='strong'>B'C</emphasis>">
+<!-- *** multithreading *** -->
+<!ENTITY thread '<link linkend="thread"><type>MT:THREAD</type></link>'>
+<!ENTITY make-thread '<link linkend="make-thread"><function>MT:MAKE-THREAD</function></link>'>
+<!ENTITY threadp '<link linkend="threadp"><function>MT:THREADP</function></link>'>
+<!ENTITY thread-yield '<link linkend="thread-yield"><function>MT:THREAD-YIELD</function></link>'>
+<!ENTITY thread-interrupt '<link linkend="thread-interrupt"><function>MT:THREAD-INTERRUPT</function></link>'>
+<!ENTITY thread-name '<link linkend="thread-name"><function>MT:THREAD-NAME</function></link>'>
+<!ENTITY thread-active-p '<link linkend="thread-active-p"><function>MT:THREAD-ACTIVE-P</function></link>'>
+<!ENTITY thread-join '<link linkend="thread-join"><function>MT:THREAD-JOIN</function></link>'>
+<!ENTITY current-thread '<link linkend="current-thread"><function>MT:CURRENT-THREAD</function></link>'>
+<!ENTITY list-threads '<link linkend="list-threads"><function>MT:LIST-THREADS</function></link>'>
+<!ENTITY mutex '<link linkend="mutex"><type>MT:MUTEX</type></link>'>
+<!ENTITY mutexp '<link linkend="mutexp"><function>MT:MUTEXP</function></link>'>
+<!ENTITY make-mutex '<link linkend="make-mutex"><function>MT:MAKE-MUTEX</function></link>'>
+<!ENTITY mutex-name '<link linkend="mutex-name"><function>MT:MUTEX-NAME</function></link>'>
+<!ENTITY mutex-lock '<link linkend="mutex-lock"><function>MT:MUTEX-LOCK</function></link>'>
+<!ENTITY mutex-unlock '<link linkend="mutex-unlock"><function>MT:MUTEX-UNLOCK</function></link>'>
+<!ENTITY mutex-owner '<link linkend="mutex-owner"><function>MT:MUTEX-OWNER</function></link>'>
+<!ENTITY mutex-recursive-p '<link linkend="mutex-recursive-p"><function>MT:MUTEX-RECURSIVE-P</function></link>'>
+<!ENTITY with-lock '<link linkend="with-lock"><function>MT:WITH-LOCK</function></link>'>
+<!ENTITY exemption '<link linkend="exemption"><type>MT:EXEMPTION</type></link>'>
+<!ENTITY exemptionp '<link linkend="exemptionp"><function>MT:EXEMPTIONP</function></link>'>
+<!ENTITY make-exemption '<link linkend="make-exemption"><function>MT:MAKE-EXEMPTION</function></link>'>
+<!ENTITY exemption-name '<link linkend="exemption-name"><function>MT:EXEMPTION-NAME</function></link>'>
+<!ENTITY exemption-signal '<link linkend="exemption-signal"><function>MT:EXEMPTION-SIGNAL</function></link>'>
+<!ENTITY exemption-wait '<link linkend="exemption-wait"><function>MT:EXEMPTION-WAIT</function></link>'>
+<!ENTITY exemption-broadcast '<link linkend="exemption-broadcast"><function>MT:EXEMPTION-BROADCAST</function></link>'>
+<!ENTITY y-or-n-p-timeout '<link linkend="y-or-n-p-timeout"><function>MT:Y-OR-N-P-TIMEOUT</function></link>'>
+<!ENTITY yes-or-no-p-timeout '<link linkend="y-or-n-p-timeout"><function>MT:YES-OR-NO-P-TIMEOUT</function></link>'>
+<!ENTITY with-timeout '<link linkend="with-timeout"><function>MT:WITH-TIMEOUT</function></link>'>
+<!ENTITY symbol-value-thread '<link linkend="symbol-value-thread"><function>MT:SYMBOL-VALUE-THREAD</function></link>'>
+<!ENTITY default-special-bindings '<link linkend="default-special-bindings"><varname>MT:*DEFAULT-SPECIAL-BINDINGS*</varname></link>'>
+<!ENTITY with-deferred-interrupts '<link linkend="with-deferred-interrupts"><function>MT:WITH-DEFERRED-INTERRUPTS</function></link>'>
+<!ENTITY glob-var '<link linkend="mt-symvalue"><emphasis>Global Variable</emphasis></link>'>
+<!ENTITY thr-var '<link linkend="mt-symvalue"><emphasis>Per-Thread Variable</emphasis></link>'>
+
 <!-- *** pre-processors *** -->
 <!ENTITY modprep '<link linkend="modprep-file"><command>modprep</command></link>'>
+
+<!-- *** modules *** -->
+<!ENTITY i18n-mod '<filename role="module" path="i18n-mod">i18n</filename>'>
+<!ENTITY regexp-mod '<filename role="module" path="regexp-mod">regexp</filename>'>
+<!ENTITY syscalls-mod '<filename role="module" path="syscalls">syscalls</filename>'>
+<!ENTITY readline-mod '<filename role="module" path="readline-mod">readline</filename>'>
+<!ENTITY gdbm-mod '<filename role="module" path="gdbm">gdbm</filename>'>
+<!ENTITY berkeley-db-mod '<filename role="module" path="berkeley-db">berkeley-db</filename>'>
+<!ENTITY dirkey-mod '<filename role="module" path="dir-key">dirkey</filename>'>
+<!ENTITY postgresql-mod '<filename role="module" path="postgresql">postgresql</filename>'>
+<!ENTITY oracle-mod '<filename role="module" path="oracle">oracle</filename>'>
+<!ENTITY libsvm-mod '<filename role="module" path="libsvm">libsvm</filename>'>
+<!ENTITY pari-mod '<filename role="module" path="pari">pari</filename>'>
+<!ENTITY matlab-mod '<filename role="module" path="matlab">matlab</filename>'>
+<!ENTITY netica-mod '<filename role="module" path="netica">netica</filename>'>
+<!ENTITY pcre-mod '<filename role="module" path="pcre">pcre</filename>'>
+<!ENTITY wildcard-mod '<filename role="module" path="wildcard">wildcard</filename>'>
+<!ENTITY zlib-mod '<filename role="module" path="zlib">zlib</filename>'>
+<!ENTITY rawsock-mod '<filename role="module" path="rawsock">rawsock</filename>'>
+<!ENTITY dbus-mod '<filename role="module" path="dbus">dbus</filename>'>
+<!ENTITY fastcgi-mod '<filename role="module" path="fastcgi">fastcgi</filename>'>
+<!ENTITY mit-clx '<filename role="module">clx/mit-clx</filename>'>
+<!ENTITY new-clx '<filename role="module">clx/new-clx</filename>'>
+<!ENTITY gtk2-mod '<filename role="module" path="gtk">gtk2</filename>'>
+<!ENTITY glibc-mod '<filename role="module">bindings/glibc</filename>'>
+<!ENTITY win32-mod '<filename role="module">bindings/win32</filename>'>
+<!ENTITY queens-mod '<filename role="module">queens</filename>'>
 
 <!-- *** syscalls *** -->
 <!ENTITY resolve-host '<link linkend="resolve-host"><function>POSIX:RESOLVE-HOST-IPADDR</function></link>'>
 <!ENTITY rlimit '<link linkend="rlimit"><function>POSIX:RLIMIT</function></link>'>
 <!ENTITY mk-xterm-io '<link linkend="mk-xterm-io"><function>POSIX:MAKE-XTERM-IO-STREAM</function></link>'>
+<!ENTITY stream-options '<link linkend="fcntl"><function>POSIX:STREAM-OPTIONS</function></link>'>
+<!ENTITY stream-lock '<link linkend="stream-lock"><function>POSIX:STREAM-LOCK</function></link>'>
+<!ENTITY copy-file '<link linkend="copy-file"><function>POSIX:COPY-FILE</function></link>'>
+<!ENTITY file-size '<link linkend="file-size"><function>POSIX:FILE-SIZE</function></link>'>
+<!ENTITY dup-handle '<link linkend="dup-handle"><function>POSIX:DUPLICATE-HANDLE</function></link>'>
 
 <!-- *** netica *** -->
 <!ENTITY netica-link '<ulink url="http://norsys.com/netica_c_api.htm">Netica C API</ulink>'>
@@ -446,7 +604,6 @@
 
 <!-- *** postgresql *** -->
 <!ENTITY postgresql-link '<ulink url="http://www.PostgreSQL.org/">PostgreSQL</ulink>'>
-<!ENTITY postgresql-doc 'http://www.postgresql.org/docs/8.0/interactive'>
 
 <!-- *** pari *** -->
 <!ENTITY pari-link '<ulink url="http://pari.math.u-bordeaux.fr/">PARI</ulink>'>
@@ -459,6 +616,21 @@
 <!ENTITY ngettext '<link linkend="ngettext"><function>I18N:NGETTEXT</function></link>'>
 <!ENTITY textdomain '<link linkend="textdomain"><function>I18N:TEXTDOMAIN</function></link>'>
 <!ENTITY textdomaindir '<link linkend="textdomaindir"><function>I18N:TEXTDOMAINDIR</function></link>'>
+
+<!-- *** libsvm *** -->
+<!ENTITY libsvm-link '<ulink url="http://www.csie.ntu.edu.tw/~cjlin/libsvm/">LibSVM</ulink>'>
+
+<!-- *** rawsock *** -->
+<!ENTITY convert-address '<link linkend="rawsock-convert-address"><function>RAWSOCK:CONVERT-ADDRESS</function></link>'>
+
+<!-- *** dbus *** -->
+<!ENTITY d-bus-link '<ulink url="http://www.freedesktop.org/wiki/Software/dbus">D-Bus</ulink>'>
+
+<!-- *** zlib *** -->
+<!ENTITY zlib-link '<ulink url="http://zlib.net">ZLIB</ulink>'>
+
+<!-- *** pcre *** -->
+<!ENTITY pcre-link '<ulink url="http://www.pcre.org/">Perl Compatible Regular Expressions</ulink>'>
 
 <!-- *** FFI *** -->
 <!ENTITY allocate-deep '<link linkend="foreign-heap"><function>FFI:ALLOCATE-DEEP</function></link>'>
@@ -479,7 +651,7 @@
 <!ENTITY c-var-addr '<link linkend="c-var-addr"><function>FFI:C-VAR-ADDRESS</function></link>'>
 <!ENTITY c-var-object '<link linkend="c-var-object"><function>FFI:C-VAR-OBJECT</function></link>'>
 <!ENTITY cast '<link linkend="cast"><function>FFI:CAST</function></link>'>
-<!ENTITY clisp-link '<link linkend="mod-overview"><command>clisp-link</command></link>'>
+<!ENTITY clisp-link '<olink targetdoc="clink" targetptr="clisp-link"><command>clisp-link</command></olink>'>
 <!ENTITY def-c-const '<link linkend="def-c-const"><function>FFI:DEF-C-CONST</function></link>'>
 <!ENTITY def-c-enum '<link linkend="def-c-enum"><function>FFI:DEF-C-ENUM</function></link>'>
 <!ENTITY def-c-struct '<link linkend="def-c-struct"><function>FFI:DEF-C-STRUCT</function></link>'>
@@ -497,7 +669,6 @@
 <!ENTITY f-ptr '<replaceable>foreign-pointer</replaceable>'>
 <!ENTITY set-foreign-pointer '<link linkend="fptr"><function>FFI:SET-FOREIGN-POINTER</function></link>'>
 <!ENTITY foreign-address '<link linkend="faddr"><function>FFI:FOREIGN-ADDRESS</function></link>'>
-<!ENTITY foreign-address-null '<link linkend="fa-null"><function>FFI:FOREIGN-ADDRESS-NULL</function></link>'>
 <!ENTITY foreign-address-t '<link linkend="faddr"><classname>FFI:FOREIGN-ADDRESS</classname></link>'>
 <!ENTITY foreign-address-unsigned '<link linkend="faddr-u"><function>FFI:FOREIGN-ADDRESS-UNSIGNED</function></link>'>
 <!ENTITY foreign-value '<link linkend="foreign-value"><function>FFI:FOREIGN-VALUE</function></link>'>
@@ -507,18 +678,22 @@
 <!ENTITY foreign-function-t '<link linkend="dffi"><classname>FFI:FOREIGN-FUNCTION</classname></link>'>
 <!ENTITY foreign-pointer '<link linkend="fptr"><function>FFI:FOREIGN-POINTER</function></link>'>
 <!ENTITY foreign-pointer-t '<link linkend="fptr"><classname>FFI:FOREIGN-POINTER</classname></link>'>
+<!ENTITY foreign-pointer-info '<link linkend="fptr-info"><function>FFI:FOREIGN-POINTER-INFO</function></link>'>
 <!ENTITY foreign-variable '<link linkend="dffi-make-var"><function>FFI:FOREIGN-VARIABLE</function></link>'>
 <!ENTITY foreign-variable-t '<link linkend="dffi-variables"><classname>FFI:FOREIGN-VARIABLE</classname></link>'>
 <!ENTITY close-foreign-library '<link linkend="dffi-close-lib"><function>FFI:CLOSE-FOREIGN-LIBRARY</function></link>'>
+<!ENTITY open-foreign-library '<link linkend="dffi-open-lib"><function>FFI:OPEN-FOREIGN-LIBRARY</function></link>'>
+<!ENTITY default-foreign-language '<link linkend="c-flavor"><function>FFI:DEFAULT-FOREIGN-LANGUAGE</function></link>'>
+<!ENTITY default-foreign-library '<link linkend="dffi-default-lib"><function>FFI:DEFAULT-FOREIGN-LIBRARY</function></link>'>
 <!ENTITY linkset '<olink targetdoc="impnotes" targetptr="linkset">linking set</olink>'>
 <!ENTITY link-sh '<olink targetdoc="impnotes" targetptr="modset"><command>link.sh</command></olink>'>
 <!ENTITY modset '<olink targetdoc="impnotes" targetptr="modset">module set</olink>'>
-<!ENTITY mod-dynload '<link linkend="mod-dynload"><function>SYS::DYNLOAD-MODULES</function></link>'>
+<!ENTITY mod-dynload '<olink targetdoc="impnotes" targetptr="mod-dynload"><function>SYS::DYNLOAD-MODULES</function></olink>'>
 <!ENTITY mod-load '<link linkend="mod-load"><envar>TO_LOAD</envar></link>'>
 <!ENTITY mod-preload '<link linkend="mod-preload"><envar>TO_PRELOAD</envar></link>'>
 <!ENTITY modinfo '<link linkend="modinfo"><function>EXT:MODULE-INFO</function></link>'>
-<!ENTITY module '<link linkend="modules">module</link>'>
-<!ENTITY base-module '<simpara>This module is present even in the &base; &linkset; by default.</simpara>'>
+<!ENTITY module '<olink targetdoc="impnotes" targetptr="modules">module</olink>'>
+<!ENTITY base-module '<simpara>This module is present in the &base; &linkset; by default.</simpara>'>
 <!ENTITY base '<olink targetdoc="impnotes" targetptr="base-modules"><command>base</command></olink>'>
 <!ENTITY full '<olink targetdoc="impnotes" targetptr="base-modules"><command>full</command></olink>'>
 <!ENTITY object-t '<link linkend="typecodes"><type>object</type></link>'>
@@ -536,6 +711,7 @@
 <!ENTITY with-foreign-object '<link linkend="foreign-stack"><function>FFI:WITH-FOREIGN-OBJECT</function></link>'>
 <!ENTITY with-foreign-string '<link linkend="foreign-stack-string"><function>FFI:WITH-FOREIGN-STRING</function></link>'>
 <!ENTITY memory-as '<link linkend="memory-as"><function>FFI:MEMORY-AS</function></link>'>
+<!ENTITY write-float-decimal '<link linkend="write-float-decimal"><function>SYS::WRITE-FLOAT-DECIMAL</function></link>'>
 
 <!-- *** Byte code *** -->
 <!ENTITY block-const '<link linkend="comp-fun"><literal>block-const</literal></link>'>
@@ -549,10 +725,15 @@
    <entry>description</entry><entry>semantics</entry></row></thead>'>
 <!ENTITY mv-count '<link linkend="vm"><varname>mv_count</varname></link>'>
 <!ENTITY mv-space '<link linkend="vm"><varname>mv_space</varname></link>'>
+<!ENTITY mvalues '<link linkend="vm"><varname>values</varname></link>'>
+<!ENTITY ret-mvalues 'The returned values go into &mvalues;.'>
+<!ENTITY undef-mvalues 'Invalidate &mvalues;.'>
+<!ENTITY clear-stack 'The arguments are removed from the &STACK;.'>
 <!ENTITY numreq '<link linkend="comp-fun"><literal>numreq</literal></link>'>
 <!ENTITY other-const '<link linkend="comp-fun"><literal>other-const</literal></link>'>
 <!ENTITY SP '<olink targetdoc="impnotes" targetptr="vm"><literal>SP</literal></olink>'>
 <!ENTITY STACK '<olink targetdoc="impnotes" targetptr="vm"><literal>STACK</literal></olink>'>
+<!ENTITY FUNTAB '<link linkend="byte-version"><varname>FUNTAB</varname></link>'>
 <!ENTITY tagbody-const '<link linkend="comp-fun"><literal>tagbody-const</literal></link>'>
 <!ENTITY unbound '<literal role="data">#&lt;UNBOUND&gt;</literal>'>
 <!ENTITY value1 '<link linkend="vm"><varname>value1</varname></link>'>
@@ -573,6 +754,7 @@
 <!ENTITY class-r '<replaceable>class</replaceable>'>
 <!ENTITY classes-r '<replaceable>classes</replaceable>'>
 <!ENTITY cname-r '<replaceable>c-name</replaceable>'>
+<!ENTITY col-r '<replaceable>column</replaceable>'>
 <!ENTITY command-r '<replaceable>command</replaceable>'>
 <!ENTITY cond-r '<replaceable>condition</replaceable>'>
 <!ENTITY conn-r '<replaceable>connection</replaceable>'>
@@ -581,21 +763,32 @@
 <!ENTITY cplace-r '<replaceable>c-place</replaceable>'>
 <!ENTITY create-r '<replaceable>create</replaceable>'>
 <!ENTITY ctype-r '<replaceable>c-type</replaceable>'>
+<!ENTITY ctype1-r '<replaceable>c-type&sub-1;</replaceable>'>
+<!ENTITY ctypen-r '<replaceable>c-type&sub-n;</replaceable>'>
 <!ENTITY ctypei-r '<replaceable>c-type-internal</replaceable>'>
 <!ENTITY data-r '<replaceable>data</replaceable>'>
+<!ENTITY db-r '<replaceable>db</replaceable>'>
 <!ENTITY declaration-r '<replaceable>declaration</replaceable>'>
 <!ENTITY dependent-r '<replaceable>dependent</replaceable>'>
 <!ENTITY dest-r '<replaceable>destination</replaceable>'>
 <!ENTITY digits-r '<replaceable>digits</replaceable>'>
+<!ENTITY dim-r '<replaceable>dim</replaceable>'>
+<!ENTITY dim1-r '<replaceable>dim&sub-1;</replaceable>'>
+<!ENTITY dimn-r '<replaceable>dim&sub-n;</replaceable>'>
 <!ENTITY dimensions-r '<replaceable>dimensions</replaceable>'>
 <!ENTITY direction-r '<replaceable>direction</replaceable>'>
 <!ENTITY dkey-r '<replaceable>dkey</replaceable>'>
+<!ENTITY dom-r '<replaceable>domain</replaceable>'>
+<!ENTITY ecode-r '<replaceable>error-code</replaceable>'>
 <!ENTITY eltype-r '<replaceable>element-type</replaceable>'>
 <!ENTITY encoding-r '<replaceable>encoding</replaceable>'>
 <!ENTITY end-r '<replaceable>end</replaceable>'>
 <!ENTITY eof-ep '<replaceable>eof-error-p</replaceable>'>
 <!ENTITY eof-v '<replaceable>eof-value</replaceable>'>
+<!ENTITY exemp-r '<replaceable>exemption</replaceable>'>
 <!ENTITY f-r '<replaceable>f</replaceable>'>
+<!ENTITY family-r '<replaceable>family</replaceable>'>
+<!ENTITY file-r '<replaceable>file</replaceable>'>
 <!ENTITY filename-r '<replaceable>filename</replaceable>'>
 <!ENTITY form-r '<replaceable>form</replaceable>'>
 <!ENTITY fmt-r '<replaceable>format-string</replaceable>'>
@@ -603,10 +796,17 @@
 <!ENTITY funcname-r '<replaceable>function-name</replaceable>'>
 <!ENTITY gf-r '<replaceable>generic-function</replaceable>'>
 <!ENTITY gid-r '<replaceable>gid</replaceable>'>
+<!ENTITY guardian-r '<replaceable>guardian</replaceable>'>
 <!ENTITY hash-f '<replaceable>hash-function</replaceable>'>
 <!ENTITY host-r '<replaceable>host</replaceable>'>
+<!ENTITY ht-r '<replaceable>hash-table</replaceable>'>
 <!ENTITY hw '<replaceable>hardware</replaceable>'>
 <!ENTITY i-r '<replaceable>i</replaceable>'>
+<!ENTITY ident1-r '<replaceable>ident&sub-1;</replaceable>'>
+<!ENTITY identn-r '<replaceable>ident&sub-n;</replaceable>'>
+<!ENTITY index-r '<replaceable>index</replaceable>'>
+<!ENTITY index1-r '<replaceable>index&sub-1;</replaceable>'>
+<!ENTITY indexn-r '<replaceable>index&sub-n;</replaceable>'>
 <!ENTITY initargs-r '<replaceable>initargs</replaceable>'>
 <!ENTITY initform-r '<replaceable>initform</replaceable>'>
 <!ENTITY instance-r '<replaceable>instance</replaceable>'>
@@ -622,23 +822,31 @@
 <!ENTITY l-r '<replaceable>l</replaceable>'>
 <!ENTITY lib-name '<replaceable>library-name</replaceable>'>
 <!ENTITY lab-r '<replaceable>label</replaceable>'>
+<!ENTITY lalist-r '<replaceable>lambda-list</replaceable>'>
+<!ENTITY laexpr-r '<replaceable>lambda-expression</replaceable>'>
 <!ENTITY lang-r '<replaceable>language</replaceable>'>
 <!ENTITY lc-r '<replaceable>lc</replaceable>'>
 <!ENTITY len-r '<replaceable>length</replaceable>'>
+<!ENTITY line-r '<replaceable>line</replaceable>'>
 <!ENTITY list-r '<replaceable>list</replaceable>'>
+<!ENTITY log-r '<replaceable>log</replaceable>'>
 <!ENTITY location-r '<replaceable>location</replaceable>'>
 <!ENTITY m-r '<replaceable>m</replaceable>'>
 <!ENTITY match-r '<replaceable>match</replaceable>'>
 <!ENTITY maxdim-r '<replaceable>maxdimension</replaceable>'>
 <!ENTITY mc-r '<replaceable>method-combination</replaceable>'>
+<!ENTITY mems-r '<replaceable>memory-size</replaceable>'>
 <!ENTITY mesg-r '<replaceable>message</replaceable>'>
 <!ENTITY metaobject-r '<replaceable>metaobject</replaceable>'>
 <!ENTITY method-r '<replaceable>method</replaceable>'>
 <!ENTITY methods-r '<replaceable>methods</replaceable>'>
 <!ENTITY mod-r '<replaceable>module</replaceable>'>
 <!ENTITY mode-r '<replaceable>mode</replaceable>'>
+<!ENTITY model-r '<replaceable>model</replaceable>'>
+<!ENTITY mutex-r '<replaceable>mutex</replaceable>'>
 <!ENTITY n-r '<replaceable>n</replaceable>'>
 <!ENTITY name-r '<replaceable>name</replaceable>'>
+<!ENTITY net-r '<replaceable>network</replaceable>'>
 <!ENTITY next-r '<replaceable>next</replaceable>'>
 <!ENTITY nname-r '<replaceable>new-name</replaceable>'>
 <!ENTITY no-hang '<replaceable>no-hang</replaceable>'>
@@ -651,6 +859,7 @@
 <!ENTITY options-r '<replaceable>options</replaceable>'>
 <!ENTITY os '<replaceable>operating system</replaceable>'>
 <!ENTITY pack-r '<replaceable>package</replaceable>'>
+<!ENTITY param-r '<replaceable>parameter</replaceable>'>
 <!ENTITY pass-r '<replaceable>password</replaceable>'>
 <!ENTITY path-r '<replaceable>pathname</replaceable>'>
 <!ENTITY pattern-r '<replaceable>pattern</replaceable>'>
@@ -658,10 +867,13 @@
 <!ENTITY place-r '<replaceable>place</replaceable>'>
 <!ENTITY port-r '<replaceable>port</replaceable>'>
 <!ENTITY pred-r '<replaceable>predicate</replaceable>'>
+<!ENTITY problem-r '<replaceable>problem</replaceable>'>
 <!ENTITY program-r '<replaceable>program</replaceable>'>
 <!ENTITY proto-r '<replaceable>protocol</replaceable>'>
 <!ENTITY real-r '<replaceable>real</replaceable>'>
+<!ENTITY rec-p '<replaceable>recursive-p</replaceable>'>
 <!ENTITY res-r '<replaceable>result</replaceable>'>
+<!ENTITY res-type-r '<replaceable>result-type</replaceable>'>
 <!ENTITY restart-clause-r '<replaceable>restart-clause</replaceable>'>
 <!ENTITY sequence-r '<replaceable>sequence</replaceable>'>
 <!ENTITY size-r '<replaceable>size</replaceable>'>
@@ -694,9 +906,11 @@
 <!ENTITY target-r '<replaceable>target</replaceable>'>
 <!ENTITY tbc-r '<replaceable>tagbody-cons</replaceable>'>
 <!ENTITY test-f '<replaceable>test-function</replaceable>'>
+<!ENTITY thr '<replaceable>thread</replaceable>'>
 <!ENTITY type-r '<replaceable>type</replaceable>'>
 <!ENTITY uc-r '<replaceable>uc</replaceable>'>
 <!ENTITY uid-r '<replaceable>uid</replaceable>'>
+<!ENTITY user-r '<replaceable>user</replaceable>'>
 <!ENTITY v-r '<replaceable>v</replaceable>'>
 <!ENTITY val-type-r '<replaceable>value-type</replaceable>'>
 <!ENTITY value-r '<replaceable>value</replaceable>'>
@@ -706,6 +920,7 @@
 <!ENTITY ws-r '<replaceable>window-stream</replaceable>'>
 <!ENTITY x-r '<replaceable>x</replaceable>'>
 <!ENTITY x1-r '<replaceable>x&sub-1;</replaceable>'>
+<!ENTITY x2-r '<replaceable>x&sub-2;</replaceable>'>
 <!ENTITY xn-r '<replaceable>x&sub-n;</replaceable>'>
 <!ENTITY y-r '<replaceable>y</replaceable>'>
 
@@ -770,16 +985,18 @@
    <entry/></row>'>
 <!ENTITY alt '<keycap>Alternate</keycap>'>
 <!ENTITY ctrl '<keycap>Control</keycap>'>
+<!ENTITY ctrl-c '<keycombo>&ctrl;<keysym>C</keysym></keycombo>'>
 <!ENTITY shift '<keycap>Shift</keycap>'>
+<!ENTITY enter '<keycap>Enter</keycap>'>
 <!ENTITY fasl-file '<filename>#P".fas"</filename>'>
 <!ENTITY lisp-file '<filename>#P".lisp"</filename>'>
 <!ENTITY mem-file '<filename>#P".mem"</filename>'>
 <!ENTITY c-file '<filename>#P".c"</filename>'>
-<!ENTITY lib-file '<link linkend="require"><filename>#P".lib"</filename></link>'>
+<!ENTITY lib-file '<link linkend="lib-files"><filename>#P".lib"</filename></link>'>
 <!ENTITY make-file '<filename>Makefile</filename>'>
 <!ENTITY lispinit '<link linkend="image"><filename>lispinit.mem</filename></link>'>
 <!ENTITY lisp-run '<filename>lisp.run</filename>'>
-<!ENTITY clisp-h '<link linkend="clisp-h"><filename>"clisp.h"</filename></link>'>
+<!ENTITY clisp-h '<olink targetdoc="impnotes" targetptr="clisp-h"><filename>"clisp.h"</filename></olink>'>
 
 <!-- *** pathnames *** -->
 <!ENTITY file-star  '<filename>"*"</filename>'>
@@ -792,13 +1009,14 @@
 <!ENTITY file-letter-uc '<filename>A</filename>|...|<filename>Z</filename>'>
 <!ENTITY defaults-r '<replaceable>defaults</replaceable>'>
 <!ENTITY device-r '<replaceable>device</replaceable>'>
-<!ENTITY directory-r '<replaceable>directory</replaceable>'>
+<!ENTITY dir-r '<replaceable>directory</replaceable>'>
 <!ENTITY startpoint-r '<replaceable>startpoint</replaceable>'>
 <!ENTITY subdir-r '<replaceable>subdir</replaceable>'>
+<!ENTITY version-r '<replaceable>version</replaceable>'>
 <!ENTITY always-nil '<listitem><simpara>always &nil;</simpara></listitem>'>
 <!ENTITY path-comps '<title>Pathname components</title>'>
 <!ENTITY unix-win32-dir-name-type-version
- '<varlistentry><term><code>&directory-r; = (&startpoint-r;
+ '<varlistentry><term><code>&dir-r; = (&startpoint-r;
   . <replaceable>subdirs</replaceable>)</code></term>
  <listitem><informaltable frame="all">
  <tgroup cols="2" colsep="1" rowsep="1" align="center">
@@ -818,7 +1036,7 @@
  <varlistentry><term>&name-r;</term><term>&type-r;</term>
   <listitem><simpara>&nil; or &simple-string-t;, &maybe-wild;
  </simpara></listitem></varlistentry>
- <varlistentry><term><replaceable>version</replaceable></term>
+ <varlistentry><term>&version-r;</term>
   <listitem><simpara>&nil; or &wild-k; or &newest-k;
     (after merging the defaults)</simpara></listitem></varlistentry>'>
 <!ENTITY maybe-wild 'may contain wildcard characters &file-ques; and
@@ -857,9 +1075,19 @@
 <!ENTITY ubyte-vec '<literal role="type">(&vector-t; (&unsigned-byte-t; 8))</literal>'>
 <!ENTITY yes '<listitem><simpara>yes</simpara></listitem>'>
 <!ENTITY no '<listitem><simpara>no</simpara></listitem>'>
+<!ENTITY yes-en '<entry>yes</entry>'>
+<!ENTITY no-en '<entry>no</entry>'>
+<!ENTITY all-e '<emphasis role="strong">all</emphasis>'>
 <!ENTITY and-e '<emphasis role="strong">and</emphasis>'>
+<!ENTITY or-e '<emphasis role="strong">or</emphasis>'>
 <!ENTITY not-e '<emphasis role="strong">not</emphasis>'>
 <!ENTITY is-e '<emphasis role="strong">is</emphasis>'>
+<!ENTITY after-e '<emphasis role="strong">after</emphasis>'>
+<!ENTITY before-e '<emphasis role="strong">before</emphasis>'>
+<!ENTITY both-e '<emphasis role="strong">both</emphasis>'>
+<!ENTITY must-e '<emphasis role="strong">must</emphasis>'>
+<!ENTITY cannot-e '<emphasis role="strong">cannot</emphasis>'>
+<!ENTITY very-e '<emphasis role="strong">very</emphasis>'>
 <!ENTITY charset-glibc-libiconv 'This character set is only available on
                                  platforms with &glibc; or &libiconv;.'>
 <!ENTITY charset-libiconv 'This character set is only available on
@@ -867,16 +1095,19 @@
 <!ENTITY charset-ascii '<link linkend="charset-ASCII">ASCII character set</link>'>
 <!ENTITY ascii-pl-ext 'a platform specific extension of the &charset-ascii;'>
 <!ENTITY ascii-iso-ext 'an extension of the &charset-ascii;, suitable for the'>
+<!ENTITY good-for 'meant to be suitable for'>
 <!ENTITY err-sig '&error-t; is &signal;ed'>
 <!ENTITY sig-err '&signal;s an &error-t;'>
 
 <!ENTITY clisp-only '<title>Implementation dependent: only in &clisp;</title>'>
 <!ENTITY win32-only '<emphasis role="plat-dep">&win32; platform only.</emphasis>'>
+<!ENTITY win32-cygwin-only '<emphasis role="plat-dep">&win32; and &cygwin; platforms only.</emphasis>'>
 <!ENTITY unix-only '<emphasis role="plat-dep">&unix; platform only.</emphasis>'>
 <!ENTITY unix-w32-only '<emphasis role="plat-dep">&unix;, &win32; platforms only.</emphasis>'>
 <!ENTITY unicode-only '<emphasis role="plat-dep">Only in &clisp; built &with; compile-time flag &unicode;</emphasis>'>
 <!ENTITY non-unicode-only '<emphasis role="plat-dep">Only in &clisp; built &without; compile-time flag &unicode;</emphasis>'>
 <!ENTITY no-platform-only '<emphasis role="plat-dep">No platform supports this currently</emphasis>'>
+<!ENTITY dynmod-only '<emphasis role="plat-dep">Only in &clisp; built &without; configure flag &without-dynmod;.</emphasis>'>
 <!ENTITY varlist-table '<?dbhtml list-presentation="table"?><?dbfo list-presentation="list"?>'>
 <!ENTITY advantages '<title>Advantages and Disadvantages</title>&varlist-table;'>
 <!ENTITY sost-raw-too '<simpara>The &sost-r; argument can also be a

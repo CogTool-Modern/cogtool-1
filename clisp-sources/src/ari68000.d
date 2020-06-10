@@ -1,5 +1,5 @@
 # Externe Routinen zu ARILEV1.D
-# Compiler: CC oder GNU-C auf SUN3 oder AMIGA
+# Compiler: CC oder GNU-C auf AMIGA
 # Parameter-Übergabe:
 #   auf dem Stack: sp@(4), sp@(8), ... (.W-Größen belegen 4 Byte!),
 #   Rückgabewert in d0.

@@ -1,6 +1,6 @@
 ;;;; Common Lisp Object System for CLISP: Classes
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2004
+;;;; Sam Steingold 1998 - 2004, 2009
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -48,7 +48,7 @@
   ;; Hash table, mapping a cons (old-class . new-class) to
   ;; - a list of valid keyword arguments.
 
-;; FIXME: These tables must also be cleaned when a classed is redefined
+;; FIXME: These tables must also be cleaned when a class is redefined
 ;; (because subclassp changes, and for *update-instance-for-redefined-class-table*
 ;; also because the class-slots change).
 
@@ -367,7 +367,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(instance slot-names &rest initargs)
-    'signature #s(compiler::signature :req-num 2 :rest-p t)))
+    'signature #s(system::signature :req-num 2 :rest-p t)))
 (do-defmethod 'shared-initialize
   (make-instance-<standard-method> <standard-method>
     :specializers (list (find-class 'structure-object) (find-class 't))
@@ -375,7 +375,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(instance slot-names &rest initargs)
-    'signature #s(compiler::signature :req-num 2 :rest-p t)))
+    'signature #s(system::signature :req-num 2 :rest-p t)))
 
 ;; CLtL2 28.1.12., ANSI CL 7.3.
 (defgeneric reinitialize-instance
@@ -419,7 +419,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(instance &rest initargs)
-    'signature #s(compiler::signature :req-num 1 :rest-p t)))
+    'signature #s(system::signature :req-num 1 :rest-p t)))
 (do-defmethod 'reinitialize-instance
   (make-instance-<standard-method> <standard-method>
     :specializers (list (find-class 'structure-object))
@@ -427,7 +427,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(instance &rest initargs)
-    'signature #s(compiler::signature :req-num 1 :rest-p t)))
+    'signature #s(system::signature :req-num 1 :rest-p t)))
 ;; At the first call of REINITIALIZE-INSTANCE of each class
 ;; we memorize the needed information in *reinitialize-instance-table*.
 (defun initial-reinitialize-instance (instance &rest initargs)
@@ -483,7 +483,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(instance &rest initargs)
-    'signature #s(compiler::signature :req-num 1 :rest-p t)))
+    'signature #s(system::signature :req-num 1 :rest-p t)))
 (do-defmethod 'initialize-instance
   (make-instance-<standard-method> <standard-method>
     :specializers (list (find-class 'structure-object))
@@ -491,7 +491,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(instance &rest initargs)
-    'signature #s(compiler::signature :req-num 1 :rest-p t)))
+    'signature #s(system::signature :req-num 1 :rest-p t)))
 ;; At the first call of MAKE-INSTANCE or INITIALIZE-INSTANCE of each class
 ;; we memorize the needed information in *make-instance-table*.
 (defun initial-initialize-instance (instance &rest initargs)
@@ -542,7 +542,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(class &rest initargs)
-    'signature #s(compiler::signature :req-num 1 :rest-p t)))
+    'signature #s(system::signature :req-num 1 :rest-p t)))
 (do-defmethod 'allocate-instance
   (make-instance-<standard-method> <standard-method>
     :specializers (list (find-class 'structure-class))
@@ -550,7 +550,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(class &rest initargs)
-    'signature #s(compiler::signature :req-num 1 :rest-p t)))
+    'signature #s(system::signature :req-num 1 :rest-p t)))
 ; No extended method check because this GF is specified in ANSI CL.
 ;(initialize-extended-method-check #'allocate-instance)
 
@@ -606,7 +606,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(class &rest initargs)
-    'signature #s(compiler::signature :req-num 1 :rest-p t)))
+    'signature #s(system::signature :req-num 1 :rest-p t)))
 (do-defmethod 'make-instance
   (make-instance-<standard-method> <standard-method>
     :specializers (list (find-class 'structure-class))
@@ -614,7 +614,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(class &rest initargs)
-    'signature #s(compiler::signature :req-num 1 :rest-p t)))
+    'signature #s(system::signature :req-num 1 :rest-p t)))
 ; No extended method check because this GF is specified in ANSI CL.
 ;(initialize-extended-method-check #'make-instance)
 ;; At the first call of MAKE-INSTANCE or INITIALIZE-INSTANCE of each class

@@ -1,5 +1,5 @@
 ;;; Utilities for function objects
-;;; Sam Steingold 2001-2005
+;;; Sam Steingold 2001-2005, 2008
 ;;; Bruno Haible 2004
 
 (in-package "COMMON-LISP")
@@ -22,7 +22,7 @@
   (setq obj (coerce obj 'function))
   (cond #+FFI
         ((eq (type-of obj) 'FFI::FOREIGN-FUNCTION)
-         (values nil nil (sys::%record-ref obj 0)))
+         (values nil nil (sys::%record-ref obj 0))) ; ff_name
         ((sys::subr-info obj)
          (values nil nil (sys::subr-info obj)))
         ((sys::%compiled-function-p obj) ; compiled closure?
@@ -32,7 +32,7 @@
                           'sys::definition)))
            (values (when def (cons 'LAMBDA (cddar def))) t name)))
         ((sys::closurep obj) ; interpreted closure?
-         (values (cons 'LAMBDA (sys::%record-ref obj 1)) ; lambda-expression without docstring
+         (values (cons 'LAMBDA (sys::%record-ref obj 1)) ; lambda-expression without docstring (from clos_form)
                  (vector ; environment
                          (sys::%record-ref obj 4) ; venv
                          (sys::%record-ref obj 5) ; fenv
@@ -46,7 +46,7 @@
   (setq obj (coerce obj 'function))
   (cond #+FFI
         ((eq (type-of obj) 'FFI::FOREIGN-FUNCTION)
-         (sys::%record-ref obj 0))
+         (sys::%record-ref obj 0)) ; ff_name
         ((sys::subr-info obj))
         ((sys::%compiled-function-p obj) ; compiled closure?
          (sys::closure-name obj))

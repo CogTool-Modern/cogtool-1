@@ -1,8 +1,10 @@
 /* Basic functions for Long-Floats */
 
 /* error-message for too long Long-FLoat */
-nonreturning_function(local, fehler_LF_toolong, (void)) {
-  fehler(arithmetic_error,GETTEXT("long float too long"));
+nonreturning_function(local, error_LF_toolong, (void)) {
+  pushSTACK(TheSubr(subr_self)->name); /* slot :OPERATION */
+  pushSTACK(NIL);               /* slot :OPERANDS not available */
+  error(arithmetic_error,GETTEXT("long float too long"));
 }
 
 /* Decoding a Long-Float:
@@ -14,81 +16,81 @@ nonreturning_function(local, fehler_LF_toolong, (void)) {
         UDS mantMSDptr/mantlen/mantLSDptr = mantissa
           (>= 2^(intDsize*mantlen-1), < 2^(intDsize*mantlen)),
           with mantlen>=LF_minlen. */
-#define LF_decode(obj,zero_statement,sign_zuweisung,exp_zuweisung,mantMSDptr_zuweisung,mantlen_zuweisung,mantLSDptr_zuweisung)   do { \
+#define LF_decode(obj,zero_statement,sign_assignment,exp_assignment,mantMSDptr_assignment,mantlen_assignment,mantLSDptr_assignment)   do { \
   var object _obj = (obj);                                              \
   var Lfloat _x = TheLfloat(_obj);                                      \
   var uintL uexp = _x->expo;                                            \
   if (uexp==0) {                                                        \
-    unused (mantlen_zuweisung lfloat_length(_x));                       \
+    unused (mantlen_assignment lfloat_length(_x));                      \
     zero_statement; /* e=0 -> number 0.0 */                             \
   } else {                                                              \
-    exp_zuweisung (sintL)(uexp - LF_exp_mid);     /* exponent */        \
-    sign_zuweisung LF_sign(_obj);                 /* sign */            \
-    unused (mantMSDptr_zuweisung &(_x->data[0])); /* mantissa-UDS */    \
-    unused (mantLSDptr_zuweisung &(_x->data[(uintP)( mantlen_zuweisung lfloat_length(_x) )])); \
+    exp_assignment (sintL)(uexp - LF_exp_mid);     /* exponent */       \
+    sign_assignment LF_sign(_obj);                 /* sign */           \
+    unused (mantMSDptr_assignment &(_x->data[0])); /* mantissa-UDS */   \
+    unused (mantLSDptr_assignment &(_x->data[(uintP)( mantlen_assignment lfloat_length(_x) )])); \
   }                                                                     \
  } while(0)
 
 /* encoding a Long-Float:
- encode_LF0(len,erg_zuweisung) returns a Long-Float 0.0 with len digits.
+ encode_LF0(len,res_assignment) returns a Long-Float 0.0 with len digits.
  > uintC len: number of digits
- < object erg: new Long-Float 0.0 with len digits
+ < object res: new Long-Float 0.0 with len digits
  can trigger GC */
-#define encode_LF0(len,erg_zuweisung)   do {                            \
+#define encode_LF0(len,res_assignment)   do {                           \
   var uintC _len = (len);                                               \
-  var object _erg = allocate_lfloat(_len,0,0); /* exponent 0, sign + */ \
-  clear_loop_up(&TheLfloat(_erg)->data[0],_len); /* mantissa := 0 */    \
-  erg_zuweisung _erg;                                                   \
+  var object _res = allocate_lfloat(_len,0,0); /* exponent 0, sign + */ \
+  clear_loop_up(&TheLfloat(_res)->data[0],_len); /* mantissa := 0 */    \
+  res_assignment _res;                                                  \
  } while(0)
 
 /* encoding a Long-Float:
- encode_LF1s(sign,len,erg_zuweisung) returns a Long-Float +-1.0 with len digits.
+ encode_LF1s(sign,len,res_assignment) returns a Long-Float +-1.0 with len digits.
  > signean sign: sign
  > uintC len: number of digits
- < object erg: new Long-Float +1.0 or -1.0 with len digits
+ < object res: new Long-Float +1.0 or -1.0 with len digits
  can trigger GC */
-#define encode_LF1s(sign,len,erg_zuweisung)    do {                     \
+#define encode_LF1s(sign,len,res_assignment)    do {                    \
   var uintC _len = (len);                                               \
-  var object _erg = allocate_lfloat(_len,LF_exp_mid+1,(sign)); /* exponent 1 */ \
-  TheLfloat(_erg)->data[0] = bit(intDsize-1); /* mantissa := 2^(intDsize*len-1) */ \
-  clear_loop_up(&TheLfloat(_erg)->data[1],_len-1);                      \
-  erg_zuweisung _erg;                                                   \
+  var object _res = allocate_lfloat(_len,LF_exp_mid+1,(sign)); /* exponent 1 */ \
+  TheLfloat(_res)->data[0] = bit(intDsize-1); /* mantissa := 2^(intDsize*len-1) */ \
+  clear_loop_up(&TheLfloat(_res)->data[1],_len-1);                      \
+  res_assignment _res;                                                  \
  } while(0)
 
 /* encoding a Long-Float:
- encode_LF1(len,erg_zuweisung) returns a Long-Float 1.0 with len digits.
+ encode_LF1(len,res_assignment) returns a Long-Float 1.0 with len digits.
  > uintC len: number of digits
- < object erg: new Long-Float 1.0 with len digits
+ < object res: new Long-Float 1.0 with len digits
  can trigger GC */
-#define encode_LF1(len,erg_zuweisung)  encode_LF1s(0,len,erg_zuweisung)
+#define encode_LF1(len,res_assignment)  encode_LF1s(0,len,res_assignment)
 
 /* encoding a Long-Float:
- encode_LFu(sign,uexp,mantMSDptr,mantlen, erg_zuweisung) returns a Long-Float
+ encode_LFu(sign,uexp,mantMSDptr,mantlen, res_assignment) returns a Long-Float
  > signean sign: sign
  > uintL exp: exponent + LF_exp_mid
  > uintD* mantMSDptr: pointer to a NUDS with set highest bit
  > uintC mantlen: number of digits, >= LF_minlen
- < object erg: new Long-Float with the UDS mantMSDptr/mantlen/.. as mantissa
+ < object res: new Long-Float with the UDS mantMSDptr/mantlen/.. as mantissa
  the exponent is not tested for overflow/underflow.
  can trigger GC */
-#define encode_LFu(sign,uexp,mantMSDptr,mantlen,erg_zuweisung)        do { \
+#define encode_LFu(sign,uexp,mantMSDptr,mantlen,res_assignment)        do { \
   var uintC _len = (mantlen);                                           \
-  var object _erg = allocate_lfloat(_len,uexp,(sign)); /* exponent */   \
-  copy_loop_up((mantMSDptr),&TheLfloat(_erg)->data[0],_len); /* mantissa copied */ \
-  erg_zuweisung _erg;                                                   \
+  var object _res = allocate_lfloat(_len,uexp,(sign)); /* exponent */   \
+  copy_loop_up((mantMSDptr),&TheLfloat(_res)->data[0],_len); /* mantissa copied */ \
+  res_assignment _res;                                                   \
  } while(0)
 
 /* encoding a Long-Float:
- encode_LF(sign,exp,mantMSDptr,mantlen, erg_zuweisung) returns a Long-Float
+ encode_LF(sign,exp,mantMSDptr,mantlen, res_assignment) returns a Long-Float
  > signean sign: sign
  > sintL exp: exponent
  > uintD* mantMSDptr: pointer to a NUDS with set highest bit
  > uintC mantlen: number of digits, >= LF_minlen
- < object erg: new Long-Float with the UDS mantMSDptr/mantlen/.. as mantissa
+ < object res: new Long-Float with the UDS mantMSDptr/mantlen/.. as mantissa
  the exponent is not tested for overflow/underflow.
  can trigger GC */
-#define encode_LF(sign,exp,mantMSDptr,mantlen,erg_zuweisung)            \
-  encode_LFu(sign,LF_exp_mid+(uintL)(exp),mantMSDptr,mantlen,_EMA_ erg_zuweisung)
+#define encode_LF(sign,exp,mantMSDptr,mantlen,res_assignment)            \
+  encode_LFu(sign,LF_exp_mid+(uintL)(exp),mantMSDptr,mantlen,_EMA_ res_assignment)
 
 /* hash-code of a Long-Float: mixture of exponent, length, first 32 bits */
 global uint32 hashcode_lfloat (object obj) {
@@ -402,7 +404,7 @@ local maygc object LF_fround_LF (object x)
     var uintD* x_mantMSDptr = &TheLfloat(x)->data[0];
     var uintD* ptr =
       copy_loop_up(x_mantMSDptr,&TheLfloat(y)->data[0],count); /* copy count complete digits */
-    *ptr++ = x_mantMSDptr[count] & mask; /* then copy bitcount bits */
+    *ptr++ = x_mantMSDptr[count] & (mask<<1); /* then copy bitcount bits */
     clear_loop_up(ptr,len-count-1); /* fill rest with Nulls */
     return y;
   }
@@ -415,6 +417,7 @@ local maygc object LF_fround_LF (object x)
     var uintD* y_mantMSDptr = &TheLfloat(y)->data[0];
     var uintD* ptr = /* copy count complete digits */
       copy_loop_up(x_mantMSDptr,y_mantMSDptr,count);
+    mask<<=1;
     if ((ptr[0] = ((x_mantMSDptr[count] & mask) - mask)) == 0) /* then copy bitcount bits and increment */
       if (inc_loop_down(ptr,count)!=0) { /* poss. continue to increment */
         y_mantMSDptr[0] = bit(intDsize-1); (TheLfloat(y)->expo)++; /* poss. increase exponent */
@@ -566,7 +569,7 @@ local maygc object LF_shorten_LF (object x, uintC len)
       TheLfloat(y)->data[0] = bit(intDsize-1); /* mantissa := 10...0 */
       /* increase exponent: */
       if (++(TheLfloat(y)->expo) == (uint32)(LF_exp_high+1))
-        fehler_overflow();
+        error_overflow();
     }
   }
   return y;
@@ -721,7 +724,7 @@ local maygc object LF_LF_plus_LF (object x1, object x2)
         if ( inc_loop_down(ptr,i) ) { /* carry beyond the first digit */
           /* increment exponent of y : */
           if (++(TheLfloat(y)->expo) == (uint32)(LF_exp_high+1))
-            fehler_overflow();
+            error_overflow();
           /* normalize by shifting by 1 bit to the right: */
           var uintD carry_rechts =
             shift1right_loop_up(y_mantMSDptr,len,(uintD)(-1));
@@ -800,7 +803,7 @@ local maygc object LF_LF_plus_LF (object x1, object x2)
             end_arith_call();
             RESTORE_NUM_STACK /* restore num_stack */
             if (underflow_allowed()) {
-              fehler_underflow();
+              error_underflow();
             } else {
               encode_LF0(len, return); /* result 0.0 */
             }
@@ -837,7 +840,7 @@ local maygc object LF_LF_plus_LF (object x1, object x2)
             end_arith_call();
             RESTORE_NUM_STACK /* restore num_stack */
             if (underflow_allowed()) {
-              fehler_underflow();
+              error_underflow();
             } else {
               encode_LF0(len, return); /* result 0.0 */
             }
@@ -862,7 +865,7 @@ local maygc object LF_LF_plus_LF (object x1, object x2)
       y_mantMSDptr[0] = bit(intDsize-1); /* mantissa := 10...0 */
       /* increase exponent: */
       if (++(TheLfloat(y)->expo) == (uint32)(LF_exp_high+1)) {
-        end_arith_call(); RESTORE_NUM_STACK; fehler_overflow();
+        end_arith_call(); RESTORE_NUM_STACK; error_overflow();
       }
     }
    ab: /* round off */
@@ -920,7 +923,7 @@ local maygc object LF_square_LF (object x)
     uexp = 2*uexp;
     if (uexp < LF_exp_mid+LF_exp_low) {
       if (underflow_allowed()) {
-        fehler_underflow();
+        error_underflow();
       } else {
         encode_LF0(Lfloat_length(x), return); /* result 0.0 */
       }
@@ -928,7 +931,7 @@ local maygc object LF_square_LF (object x)
   } else { /* Carry */
     uexp = 2*uexp;
     if (uexp > (uintL)(LF_exp_mid+LF_exp_high+1))
-      fehler_overflow();
+      error_overflow();
   }
   uexp = uexp - LF_exp_mid;
   /* now, LF_exp_low <= uexp <= LF_exp_high+1.
@@ -952,7 +955,7 @@ local maygc object LF_square_LF (object x)
         end_arith_call();
         RESTORE_NUM_STACK /* restore num_stack */
           if (underflow_allowed()) {
-            fehler_underflow();
+            error_underflow();
           } else {
             encode_LF0(len, return); /* result 0.0 */
           }
@@ -981,7 +984,7 @@ local maygc object LF_square_LF (object x)
     }
     /* assure LF_exp_low <= exp <= LF_exp_high : */
     if (TheLfloat(y)->expo == (uint32)(LF_exp_high+1)) {
-      RESTORE_NUM_STACK; fehler_overflow();
+      RESTORE_NUM_STACK; error_overflow();
     }
   }
   RESTORE_NUM_STACK /* restore num_stack */
@@ -989,7 +992,7 @@ local maygc object LF_square_LF (object x)
 }
 
 /* returns for two equal-length Long-Float x and y : (* x y), a LF.
- LF_LF_mal_LF(x,y)
+ LF_LF_mult_LF(x,y)
  can trigger GC
  method:
  If x1=0.0 or x2=0.0 -> result 0.0
@@ -1000,7 +1003,7 @@ local maygc object LF_square_LF (object x)
           the left (the front n+1 digits are enough)
           and decrement exponent.
         Rounding to n digits yields the result-mantissa. */
-local maygc object LF_LF_mal_LF (object x1, object x2)
+local maygc object LF_LF_mult_LF (object x1, object x2)
 {
   var uintL uexp1 = TheLfloat(x1)->expo;
   if (uexp1==0)
@@ -1015,14 +1018,14 @@ local maygc object LF_LF_mal_LF (object x1, object x2)
   if (uexp1 >= uexp2) { /* no Carry */
     if (uexp1 < LF_exp_mid+LF_exp_low) {
       if (underflow_allowed()) {
-        fehler_underflow();
+        error_underflow();
       } else {
         encode_LF0(Lfloat_length(x1), return); /* result 0.0 */
       }
     }
   } else { /* Carry */
     if (uexp1 > (uintL)(LF_exp_mid+LF_exp_high+1))
-      fehler_overflow();
+      error_overflow();
   }
   uexp1 = uexp1 - LF_exp_mid;
   /* now, LF_exp_low <= uexp1 <= LF_exp_high+1. */
@@ -1040,7 +1043,7 @@ local maygc object LF_LF_mal_LF (object x1, object x2)
   { /* form product: */
     var uintD* MSDptr;
     begin_arith_call();
-    UDS_UDS_mal_UDS(len,&TheLfloat(x1)->data[(uintP)len],
+    UDS_UDS_mult_UDS(len,&TheLfloat(x1)->data[(uintP)len],
                     len,&TheLfloat(x2)->data[(uintP)len],
                     MSDptr=,_EMA_,);
     var uintD* midptr = &MSDptr[(uintP)len]; /* pointer into the middle of the 2n digits */
@@ -1052,7 +1055,7 @@ local maygc object LF_LF_mal_LF (object x1, object x2)
         end_arith_call();
         RESTORE_NUM_STACK /* restore num_stack */
         if (underflow_allowed()) {
-          fehler_underflow();
+          error_underflow();
         } else {
           encode_LF0(len, return); /* result 0.0 */
         }
@@ -1079,7 +1082,7 @@ local maygc object LF_LF_mal_LF (object x1, object x2)
     }
     /* assure LF_exp_low <= exp <= LF_exp_high : */
     if (TheLfloat(y)->expo == (uint32)(LF_exp_high+1)) {
-      RESTORE_NUM_STACK; fehler_overflow();
+      RESTORE_NUM_STACK; error_overflow();
     }
   }
   RESTORE_NUM_STACK /* restore num_stack */
@@ -1087,7 +1090,7 @@ local maygc object LF_LF_mal_LF (object x1, object x2)
 }
 
 /* returns for two equal-length Long-Float x and y : (/ x y), a LF.
- LF_LF_durch_LF(x,y)
+ LF_LF_div_LF(x,y)
  can trigger GC
  method:
  x2 = 0.0 -> Error
@@ -1114,7 +1117,7 @@ local maygc object LF_LF_mal_LF (object x1, object x2)
 #else
   #define workaround_gcc270_bug()
 #endif
-local maygc object LF_LF_durch_LF (object x1, object x2)
+local maygc object LF_LF_div_LF (object x1, object x2)
 {
   var uintL uexp2 = TheLfloat(x2)->expo;
   if (uexp2==0)
@@ -1129,14 +1132,14 @@ local maygc object LF_LF_durch_LF (object x1, object x2)
     uexp1 = uexp1 - uexp2; /* no carry */
     workaround_gcc270_bug();
     if (uexp1 > LF_exp_high-LF_exp_mid)
-      fehler_overflow();
+      error_overflow();
     uexp1 = uexp1 + LF_exp_mid;
   } else {
     uexp1 = uexp1 - uexp2; /* carry */
     workaround_gcc270_bug();
     if (uexp1 < (uintL)(LF_exp_low-1-LF_exp_mid)) {
       if (underflow_allowed()) {
-        fehler_underflow();
+        error_underflow();
       } else {
         encode_LF0(Lfloat_length(x1), return); /* result 0.0 */
       }
@@ -1160,7 +1163,7 @@ local maygc object LF_LF_durch_LF (object x1, object x2)
     var uintD* z_LSDptr;
     z_len = 2*(uintL)len + 1;
     if ((intWCsize < 32) && (z_len > (uintL)(bitc(intWCsize)-1)))
-      fehler_LF_toolong();
+      error_LF_toolong();
     {
       SAVE_NUM_STACK /* save num_stack */
       num_stack_need(z_len, z_MSDptr=,z_LSDptr=);
@@ -1188,7 +1191,7 @@ local maygc object LF_LF_durch_LF (object x1, object x2)
                                  /* carry left = q.MSDptr[0] = 1 */ 1 );
         /* increment exponent: */
         if (++(TheLfloat(y)->expo) == (uint32)(LF_exp_high+1))
-          fehler_overflow();
+          error_overflow();
         /* round: */
         if ((carry_rechts == 0) /* shifted out bit =0 -> round off */
             || ((q.LSDptr[-1]==0) /* =1 and further bits >0 or rest >0 -> round up */
@@ -1217,7 +1220,7 @@ local maygc object LF_LF_durch_LF (object x1, object x2)
             y_mantMSDptr[0] = bit(intDsize-1); /* mantissa := 10...0 */
             /* increment exponents: */
             if (++(TheLfloat(y)->expo) == (uint32)(LF_exp_high+1))
-              fehler_overflow();
+              error_overflow();
           }
         }
       }
@@ -1227,7 +1230,7 @@ local maygc object LF_LF_durch_LF (object x1, object x2)
     /* assure LF_exp_low <= exp <= LF_exp_high : */
     if (TheLfloat(y)->expo == LF_exp_low-1) {
       if (underflow_allowed()) {
-        fehler_underflow();
+        error_underflow();
       } else {
         encode_LF0(len, return); /* result 0.0 */
       }
@@ -1266,7 +1269,7 @@ local maygc object LF_sqrt_LF (object x)
   var uintD* r_LSDptr;
   var uintL r_len = 2*(uintL)len+2; /* length of the radicand */
   if ((intWCsize < 32) && (r_len > (uintL)(bitc(intWCsize)-1)))
-    fehler_LF_toolong();
+    error_LF_toolong();
   {
     SAVE_NUM_STACK /* save num_stack */
     num_stack_need(r_len, r_MSDptr=,r_LSDptr=);
@@ -1332,7 +1335,7 @@ local maygc object LF_to_I (object x)
   var uintC len = Lfloat_length(x);
   var uintC len1 = len+1; /* need 1 Digit more */
   if (uintWCoverflow(len1))
-    fehler_LF_toolong();
+    error_LF_toolong();
   {
     SAVE_NUM_STACK /* save num_stack */
     num_stack_need(len1, MSDptr=,LSDptr=);
@@ -1386,7 +1389,7 @@ local maygc object I_to_LF (object x, uintC len, bool signal_overflow)
     /* guarantees exp <= intDsize*2^intWCsize-1 <= LF_exp_high-LF_exp_mid */
   } else {
     if (!(exp <= (uintL)(LF_exp_high-LF_exp_mid))) {
-      if (signal_overflow) fehler_overflow(); else return nullobj;
+      if (signal_overflow) error_overflow(); else return nullobj;
     }
   }
   /* build Long-Float: */
@@ -1441,7 +1444,7 @@ local maygc object I_to_LF (object x, uintC len, bool signal_overflow)
         (TheLfloat(y)->expo)++; /* now, exp <= LF_exp_high-LF_exp_mid */
       } else {
         if (++(TheLfloat(y)->expo) == (uint32)(LF_exp_high+1)) {
-          if (signal_overflow) fehler_overflow(); else return nullobj;
+          if (signal_overflow) error_overflow(); else return nullobj;
         }
       }
     }

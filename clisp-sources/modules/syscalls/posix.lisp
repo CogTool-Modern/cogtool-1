@@ -1,5 +1,5 @@
 ;;; handle the posix functions
-;;; Sam Steingold 1999-2006
+;;; Sam Steingold 1999-2010
 
 (defpackage #:posix
   (:use #:common-lisp #:ext)
@@ -7,15 +7,18 @@
   (:import-from "SYS" sys::process-id)
   (:shadowing-import-from "EXPORTING" #:defstruct)
   (:export
-   #:resolve-host-ipaddr #:bogomips #:mkstemp #:mkdtemp
+   #:resolve-host-ipaddr #:bogomips #:loadavg #:mkstemp #:mkdtemp #+unix #:wait
    #:stream-lock #:with-stream-lock #:duplicate-handle #:copy-file
-   #:file-owner #:physical-memory #:stream-options #+unix #:string-time
+   #:file-owner #:physical-memory #:stream-options #:string-time
+   #:version-compare #:version< #:version<= #:version> #:version>=
    #+(or :win32 :cygwin) #:file-properties #+unix #:make-xterm-io-stream
-   #:priority #:process-id #:openlog #:setlogmask #:syslog #:closelog
-   #:getpgid #:setpgrp #:getsid #:setsid #:setpgid #:kill #:sync
-   #:erf #:erfc #:j0 #:j1 #:jn #:y0 #:y1 #:yn #:gamma #:lgamma))
+   #:priority #:openlog #:setlogmask #:syslog #:closelog #:process-id #:getppid
+   #:getsid #:setsid #:getpgrp #:setpgrp #:setreuid #:setregid #:kill #:sync
+   #:errno #:strerror #:hostid #:domainname #:file-size #:user-shells
+   #:erf #:erfc #:j0 #:j1 #:jn #:y0 #:y1 #:yn #:tgamma #:lgamma #:ffs))
 
 (pushnew :syscalls *features*)
+(provide "syscalls")
 (in-package #:posix)
 
 (setf (documentation (find-package '#:posix) 'sys::impnotes) "syscalls")
@@ -28,17 +31,23 @@
 )
 ;;; ============================================================
 #+unix (progn
-(export '(getuid getgid geteuid getegid))
-(defsetf getuid posix::%setuid)
-(defsetf getgid posix::%setgid)
-(defsetf geteuid posix::%seteuid)
-(defsetf getegid posix::%setegid)
+(export '(uid gid euid egid pgid groups))
+(defsetf uid %setuid)
+(defsetf gid %setgid)
+(defsetf euid %seteuid)
+(defsetf egid %setegid)
+(defsetf pgid %setpgid)
+(defsetf groups %setgroups)
 )
 ;;; ============================================================
 (defmacro with-stream-lock ((stream &rest options) &body body)
   "Lock the stream, execute the body, unlock the stream."
   `(unwind-protect (progn (stream-lock ,stream t ,@options) ,@body)
      (stream-lock ,stream nil ,@options)))
+;;; ============================================================
+(defsetf file-size %set-file-size)
+(defsetf hostid %sethostid)
+(defsetf domainname %setdomainname)
 ;;; ============================================================
 (defun syslog (severity facility format &rest args)
   (%syslog severity facility (apply #'format nil format args)))
@@ -49,7 +58,7 @@
   `(%syslog ,severity ,facility (format nil ,format ,@args)))
 ;;; ============================================================
 (defsetf priority (pid &optional which) (value)
-  `(set-priority ,value ,pid ,which))
+  `(%set-priority ,value ,pid ,which))
 ;;; ============================================================
 (defstruct (hostent (:constructor
                      make-hostent (name aliases addr-list addrtype)))
@@ -125,8 +134,7 @@
   (vol-name nil :type (or null string) :read-only t)
   (fs-type nil :type (or null string) :read-only t))
 ;;; ============================================================
-#+unix (export '(sysconf confstr))
-#+unix
+#+unix (export '(sysconf confstr pathconf))
 (defstruct (uname (:constructor make-uname (sysname nodename release
                                             version machine)))
   "see uname(2) for details"
@@ -195,7 +203,8 @@
                     (file-stat-file file-stat)))) ; name-short
 ;;; ============================================================
 #+(or win32 cygwin) (progn
-(export '(make-shortcut))
+(export '(make-shortcut get-user-sid clipboard))
+(defsetf clipboard %set-clipboard)
 
 (defstruct (shortcut-info
              (:constructor make-shortcut-info
@@ -265,7 +274,9 @@
                    (* page-size (sysconf :AVPHYS-PAGES))))
   #+win32 (let ((mem-stat (memory-status)))
             (values (memstat-total-physical mem-stat)
-                    (memstat-avail-physical mem-stat))))
+                    (memstat-avail-physical mem-stat)))
+  #-(or unix win32)
+  (error "~S: only ~S and ~S are supported" 'physical-memory :unix :win32))
 
 ;;;--------------------------------------------------------------------------
 ;;; service / port map
@@ -280,7 +291,9 @@
 (defvar *services*)
 (defvar *services-file*
   #+unix "/etc/services"
-  #+win32 (string-concat (getenv "WINDIR") "/system32/drivers/etc/services"))
+  #+win32 (string-concat (getenv "WINDIR") "/system32/drivers/etc/services")
+  #-(or unix win32)
+  (error "~S: only ~S and ~S are supported" '*services-file* :unix :win32))
 (defun service (&optional service-name protocol)
   (unless (boundp '*services*)
     (setq *services*
@@ -354,19 +367,18 @@
 
 ;;;--------------------------------------------------------------------------
 #+unix
-(defun make-xterm-io-stream (&key (title "CLISP I/O"))
-  (let* ((tmps (mkstemp "/tmp/clisp-x-io-XXXXXX"))
-         (pipe (namestring tmps))
+(defun make-xterm-io-stream (&key (title "CLISP I/O") (xterm "xterm"))
+  (let* ((tmpdir (mkdtemp "/tmp/clisp-x-io-XXXXXX/"))
+         (pipe (namestring (merge-pathnames "pipe" tmpdir)))
          xio
-         (clos::*warn-if-gf-already-called* nil))
-    (close tmps) (delete-file tmps)
-    (mknod tmps :FIFO :RWXU)
+         (clos::*enable-clos-warnings* nil))
+    (mknod pipe :FIFO :RWXU)
     (setq title (string title))
     ;; - tty tells us what device to use for IO
     ;; - cat holds xterm from quitting and prints the good-bye message
     ;;   (actually, the xterm window disappears before you can read it...)
-    (shell (format nil "xterm -n ~s -T ~s -e 'tty >> ~a; cat ~a' &"
-                   title title pipe pipe))
+    (shell (format nil "~a -n ~s -T ~s -e 'tty >> ~a; cat ~a' &"
+                   xterm title title pipe pipe))
     (with-open-file (s pipe :direction :input)
       (setq xio (open (read-line s) :direction :io)))
     ;; GC uses the internal non-generic builtin_stream_close() so
@@ -380,10 +392,30 @@
       (with-open-file (s pipe :direction :output)
         (write-line (SYS::TEXT "Bye.") s))
       (delete-file pipe)
-      (let ((clos::*warn-if-gf-already-called* nil))
+      (delete-directory tmpdir)
+      (let ((clos::*enable-clos-warnings* nil))
         (remove-method #'close (find-method #'close '(:after) `((eql ,xio))))))
     xio))
-
+;;;--------------------------------------------------------------------------
+#+FFI (progn
+(export '(fopen fdopen freopen fclose fflush ; fgetc fputc ungetc
+          clearerr feof ferror fileno stdin stdout stderr))
+(defconstant stdin (%stdio 0))
+(defconstant stdout (%stdio 1))
+(defconstant stderr (%stdio 2))
+)
+;;;--------------------------------------------------------------------------
+(defun ffs (n) (integer-length (logand n (- n))))
+;; http://www.opengroup.org/onlinepubs/009695399/functions/ffs.html
+;; this lisp implementation is about 10% faster than using FFI:
+;; (ffi:def-call-out ffs (:name "ffs") (:arguments (i ffi:int))
+;;   (:return-type ffi:int) (:language :stdc) (:library :default))
+;; and it also supports bignums.
+(unless (fboundp 'os:tgamma)
+  ;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1966375&group_id=1355
+  (defun os:tgamma (x)
+    (multiple-value-bind (lg sg) (os:lgamma x)
+      (* (or sg 1) (exp lg)))))
 ;;;--------------------------------------------------------------------------
 (setf (package-lock "EXT") nil)
 (use-package '("POSIX") "EXT")

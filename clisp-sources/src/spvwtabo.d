@@ -1,13 +1,16 @@
-# Moved out of memory management:
-# Table of all fixed objects
-# Bruno Haible 1990-2002
+/*
+ * Moved out of memory management:
+ * Table of all fixed objects
+ * Bruno Haible 1990-2002
+ * Sam Steingold 2002-2009
+ */
 
 #include "lispbibl.c"
 
 #undef LISPOBJ
 
-# Table of all fixed objects
-global struct object_tab_ object_tab
+/* Table of all fixed objects */
+modexp struct object_tab_ object_tab
     #if defined(INIT_OBJECT_TAB) && NIL_IS_CONSTANT
     = {
         #define LISPOBJ LISPOBJ_B

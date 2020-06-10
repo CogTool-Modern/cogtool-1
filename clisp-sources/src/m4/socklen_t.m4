@@ -16,9 +16,10 @@ AC_EGREP_HEADER(socklen_t, sys/socket.h,
 cl_cv_type_socklen_t=yes, cl_cv_type_socklen_t=no)
 ])
 if test $cl_cv_type_socklen_t = yes; then
-  AC_DEFINE(SOCKLEN_T, socklen_t, [socklen_t (if defined in <sys/socket.h>) or int otherwise)])
+  AC_DEFINE(CLISP_SOCKLEN_T, socklen_t,
+[socklen_t (if defined in <sys/socket.h>) or int otherwise])
 else
-  AC_DEFINE(SOCKLEN_T, int)
+  AC_DEFINE(CLISP_SOCKLEN_T, int)
 fi
 ]
 )

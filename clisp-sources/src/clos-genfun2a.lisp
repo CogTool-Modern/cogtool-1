@@ -2,7 +2,7 @@
 ;;;; Generic Functions
 ;;;; Part 2: Generic function dispatch and execution
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2004
+;;;; Sam Steingold 1998 - 2004, 2007
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -129,7 +129,7 @@
                               ))))))))))
 
 ;; Preliminary.
-(defun compute-applicable-methods (gf args)
+(predefun compute-applicable-methods (gf args)
   (compute-applicable-methods-<generic-function> gf args))
 
 (defun compute-applicable-methods-<generic-function> (gf args)
@@ -162,7 +162,7 @@
 ;; brain fart of the PCL authors). But the MOP wants it, so we implement it.
 
 ;; Preliminary.
-(defun compute-applicable-methods-using-classes (gf req-arg-classes)
+(predefun compute-applicable-methods-using-classes (gf req-arg-classes)
   (compute-applicable-methods-using-classes-<generic-function> gf req-arg-classes))
 
 (defun compute-applicable-methods-using-classes-<generic-function> (gf req-arg-classes)

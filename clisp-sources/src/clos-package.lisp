@@ -1,6 +1,6 @@
 ;;;; Common Lisp Object System for CLISP
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2005
+;;;; Sam Steingold 1998 - 2007, 2009
 
 ;; to use it: (USE-PACKAGE "CLOS").
 
@@ -21,8 +21,8 @@
 (import 'check-function-name)
 
 ;; Defined later, in compiler.lisp.
-(import 'compiler::%generic-function-lambda)
-(import 'compiler::%optimize-function-lambda)
+(import '%generic-function-lambda)
+(import '%optimize-function-lambda)
 
 (defpackage "CLOS"
   (:nicknames "MOP")
@@ -33,6 +33,7 @@
     sys::text                   ; for error messages (i18n.d)
     sys::error-of-type          ; defined in error.d
     sys::check-function-name    ; defined in control.d
+    sys::check-symbol           ; defined in control.d
     sys::function-name-p        ; defined in control.d
     sys::function-block-name    ; defined in eval.d
     sys::memq                   ; defined in list.d
@@ -52,8 +53,8 @@
     ;; clos:slot-boundp clos:slot-makunbound ; defined in record.d
     ;; clos:slot-exists-p ; defined in record.d
     ;; clos::class-gethash clos::class-tuple-gethash ; defined in hashtabl.d
-    compiler::%generic-function-lambda ; defined in compiler.lisp
-    compiler::%optimize-function-lambda ; defined in compiler.lisp
+    sys::%generic-function-lambda ; defined in compiler.lisp
+    sys::%optimize-function-lambda ; defined in compiler.lisp
     ;; clos:generic-flet clos:generic-labels ; treated in compiler.lisp
     ;; Export:
     ;; clos::closclass ; property in predtype.d, type.lisp, compiler.lisp
@@ -107,8 +108,7 @@
    call-method make-method))
 
 ;;; MOP exports: ** also in init.lisp ** !
-(export
-        '(metaobject
+(export '(metaobject
           ;; MOP for dependents
           add-dependent remove-dependent map-dependents update-dependent
           ;; MOP for slot definitions
@@ -173,4 +173,5 @@
           method-call-error-generic-function
           method-call-error-method method-call-error-argument-list
           standard-stablehash structure-stablehash
+          clos-warning gf-already-called-warning gf-replacing-method-warning
 )        )

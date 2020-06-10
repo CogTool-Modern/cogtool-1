@@ -1,58 +1,67 @@
 # Makefile for CLISP module set clx
 
+srcdir = @srcdir@
 CC = @CC@
 CPPFLAGS = @CPPFLAGS@
 CFLAGS = -O
-INCLUDES= ../..
-CLISP = clisp -q -norc
-MODPREP = ../../modprep.fas
-LN = ln
+CLISP = @CLISP@ -norc -q
+CLISP_LINKKIT = @CLISP_LINKKIT@
+LN = @LN@
+LN_S = @LN_S@
 SHELL = /bin/sh
 
-DISTRIBFILES = link.sh Makefile clx-preload.lisp clx.lisp image.lisp resource.lisp clx.o
+GENERATED = clx.fas image.fas resource.fas clx.o clx-preload.lisp
+DISTRIBFILES = link.sh Makefile $(GENERATED) $(srcdir)/README \
+	$(srcdir)/clx.lisp $(srcdir)/image.lisp $(srcdir)/resource.lisp
 distribdir =
 
 ### Custom defs.
 CCMP2C = ../../ccmp2c
 RM = rm -f
 WANTS = @WANTS@
-X_INCLUDES = @X_INCLUDES@
+X_CFLAGS = @X_CFLAGS@
 
-all : clx.fas image.fas resource.fas clx.o
+# default target: make the module
+clisp-module : $(GENERATED)
 
-clx.fas clx.lib: clx.lisp clx-preload.lisp
-	$(CLISP) -i clx-preload.lisp -c clx.lisp
+clx.fas clx.lib: $(srcdir)/clx.lisp $(srcdir)/clx-preload.lisp
+	$(CLISP) -i $(srcdir)/clx-preload.lisp -c $(srcdir)/clx.lisp -o ./
 
-image.fas: image.lisp clx.lib
-	$(CLISP) -i clx-preload.lisp -c image.lisp
+image.fas: $(srcdir)/image.lisp clx.lib
+	$(CLISP) -i $(srcdir)/clx-preload.lisp -c $(srcdir)/image.lisp -o ./
 
-resource.fas: resource.lisp clx.lib
-	$(CLISP) -i clx-preload.lisp -c resource.lisp
+resource.fas: $(srcdir)/resource.lisp clx.lib
+	$(CLISP) -i $(srcdir)/clx-preload.lisp -c $(srcdir)/resource.lisp -o ./
 
-clx.e: clx.f
-	$(CCMP2C) clx.f > genclx.c
+clx.d: $(srcdir)/clx.f
+	$(CCMP2C) $(srcdir)/clx.f > genclx.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WANTS) genclx.c -o genclx
-	./genclx -l -o clx.e > clx.e
+	./genclx -l -o clx.d > clx.d
 	$(RM) genclx.c
 	$(RM) genclx
 
-clx.c: clx.e $(MODPREP)
-	cp clx.e clx.d
-	$(CLISP) $(MODPREP) clx.d clx.c
+clx.c: clx.d
+	$(CLISP) -C $(CLISP_LINKKIT)/modprep clx.d clx.c
 
-clx.o: clx.c $(INCLUDES)/clisp.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(X_INCLUDES) -I$(INCLUDES) -c clx.c
+clx.o: clx.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(X_CFLAGS) -I$(CLISP_LINKKIT) -c clx.c
 
-# Make a module
-clisp-module : clx.fas image.fas resource.fas clx.o
+clx-preload.lisp : $(srcdir)/clx-preload.lisp
+	$(LN_S) $(srcdir)/clx-preload.lisp .
 
 # Make a module distribution into $(distribdir)
 clisp-module-distrib : clisp-module force
 	$(LN) $(DISTRIBFILES) $(distribdir)
-
+	mkdir -p $(distribdir)/demos
+	$(LN) $(srcdir)/demos/*.lisp $(srcdir)/demos/README $(distribdir)/demos/
+	mkdir -p $(distribdir)/demos/screens $(distribdir)/demos/xpms
+	$(LN) $(srcdir)/demos/screens/screen.* $(distribdir)/demos/screens/
+	$(LN) $(srcdir)/demos/xpms/*.xpm $(distribdir)/demos/xpms/
 
 clean : force
-	$(RM) genclx.c genclx *.lib *.fas clx.e clx.d clx.c clx.o
+	$(RM) genclx.c genclx *.lib *.fas clx.e clx.d clx.c clx.o core *.a
+
+distclean : clean
 
 force:
 

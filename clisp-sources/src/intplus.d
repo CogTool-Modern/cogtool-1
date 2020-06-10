@@ -8,7 +8,7 @@
     {                                                                      \
       var uintD* ptr_from_DS_1_plus = (ptr);                               \
       var uintC count_from_DS_1_plus = (count);                            \
-      loop {                                                               \
+      while (1) {                                                          \
         if (--count_from_DS_1_plus==0) { # Zähler erniedrigen              \
           # Beim Most Significant Digit angelangt                          \
           *(--ptr_from_DS_1_plus) += 1;                                    \
@@ -36,7 +36,7 @@
     {                                                                 \
       var uintD* ptr_from_DS_minus1_plus = (ptr);                     \
       var uintC count_from_DS_minus1_plus = (count);                  \
-      loop {                                                          \
+      while (1) {                                                     \
         if (--count_from_DS_minus1_plus==0) { # Zähler erniedrigen    \
           # Beim Most Significant Digit angelangt                     \
           *(--ptr_from_DS_minus1_plus) -= 1;                          \
@@ -58,7 +58,7 @@
 
 # (1+ x), wo x ein Integer ist. Ergebnis Integer.
 # can trigger GC
-  global maygc object I_1_plus_I (object x)
+modexp maygc object I_1_plus_I (object x)
   {
     if (I_fixnump(x)) {
       # x ist Fixnum
@@ -83,7 +83,7 @@
 
 # (1- x), wo x ein Integer ist. Ergebnis Integer.
 # can trigger GC
-  global maygc object I_minus1_plus_I (object x)
+modexp maygc object I_minus1_plus_I (object x)
   {
     if (I_fixnump(x)) {
       # x ist Fixnum
@@ -108,7 +108,7 @@
 
 # (+ x y), wo x und y Integers sind. Ergebnis Integer.
 # can trigger GC
-  global maygc object I_I_plus_I (object x, object y)
+modexp maygc object I_I_plus_I (object x, object y)
   {
     # Methode:
     # x Fixnum ->
@@ -283,7 +283,7 @@
 
 # (- x y), wo x und y Integers sind. Ergebnis Integer.
 # can trigger GC
-  global maygc object I_I_minus_I (object x, object y)
+modexp maygc object I_I_minus_I (object x, object y)
   {
     # Methode:
     # x Fixnum ->

@@ -4,7 +4,7 @@
 # liefert eine 16-Bit-Wurzel.
 # UL_sqrt_UW(x)
 # > uintL x : Radikand, >=0, <2^32
-# < uintWL ergebnis : Wurzel, >=0, <2^16
+# < uintWL result : Wurzel, >=0, <2^16
   local uintWL UL_sqrt_UW (uintL x);
   # Methode:
   # x=0 -> y=0, fertig.
@@ -28,7 +28,7 @@
     if (k1 < 16-1) {
       # k < 16
       var uintWL y = (x >> (k1+2)) | bit(k1); # stets 2^(k-1) <= y < 2^k
-      loop {
+      while (1) {
         var uintWL z;
         divu_3216_1616(x,y, z=,); # Dividiere x/y (geht, da x/y < 2^(2k)/2^(k-1) = 2^(k+1) <= 2^16)
         if (z >= y)
@@ -40,7 +40,7 @@
       # k = 16, Vorsicht!
       var uintWL x1 = high16(x);
       var uintWL y = (x >> (16+1)) | bit(16-1); # stets 2^(k-1) <= y < 2^k
-      loop {
+      while (1) {
         var uintWL z;
         if (x1 >= y) # Division x/y ergäbe Überlauf -> z > y
           break;
@@ -60,7 +60,7 @@
 # liefert eine 32-Bit-Wurzel.
 # UL2_sqrt_UL(x1,x0)
 # > uintL2 x = x1*2^32+x0 : Radikand, >=0, <2^64
-# < uintL ergebnis : Wurzel, >=0, <2^32
+# < uintL result : Wurzel, >=0, <2^32
   local uintL UL2_sqrt_UL (uintL x1, uintL x0);
   # Methode:
   # x=0 -> y=0, fertig.
@@ -84,7 +84,7 @@
     if (k < 32) {
       # k < 32
       var uintL y = ((x1 << (32-k)) | (x0 >> k) | bit(k)) >> 1; # stets 2^(k-1) <= y < 2^k
-      loop {
+      while (1) {
         var uintL z;
         divu_6432_3232(x1,x0,y, z=,); # Dividiere x/y (geht, da x/y < 2^(2k)/2^(k-1) = 2^(k+1) <= 2^32)
         if (z >= y)
@@ -95,7 +95,7 @@
     } else {
       # k = 32, Vorsicht!
       var uintL y = (x1 >> 1) | bit(32-1); # stets 2^(k-1) <= y < 2^k
-      loop {
+      while (1) {
         var uintL z;
         if (x1 >= y) # Division x/y ergäbe Überlauf -> z > y
           break;
@@ -118,12 +118,12 @@
 # a wird nicht modifiziert.
 # Vorzeichenerweiterung von b ist erlaubt.
 # num_stack wird erniedrigt.
-  #define UDS_sqrt(a_MSDptr,a_len,a_LSDptr,b_,squarep_zuweisung)  \
-    {                                                           \
+  #define UDS_sqrt(a_MSDptr,a_len,a_LSDptr,b_,squarep_assignment)\
+    {                                                            \
       # ceiling(a_len,2) Digits Platz fürs Ergebnis machen:     \
-      var uintC _a_len = (a_len);                               \
-      num_stack_need_1(ceiling(_a_len,2),(b_)->MSDptr=,);       \
-      squarep_zuweisung UDS_sqrt_(a_MSDptr,_a_len,a_LSDptr,b_); \
+      var uintC _a_len = (a_len);                                \
+      num_stack_need_1(ceiling(_a_len,2),(b_)->MSDptr=,);        \
+      squarep_assignment UDS_sqrt_(a_MSDptr,_a_len,a_LSDptr,b_); \
     }
   local bool UDS_sqrt_ (uintD* a_MSDptr, uintC a_len, uintD* a_LSDptr, DS* b_);
 # Methode:
@@ -226,7 +226,7 @@
         #endif
         # Anfangswert: x := floor((beta + a[2n-1])/2)
         var uintD x = floor(a_msd,2) | bit(intDsize-1);
-        loop { # Heron-Iterationsschleife
+        while (1) { # Heron-Iterationsschleife
           var uintD d;
           # Dividiere d := floor((a[2n-1]*beta+a[2n-2])/x) :
           if (a_msd>=x) # Überlauf -> d>=beta -> fertig
@@ -272,11 +272,11 @@
       var uintD* a_lptr = &a_MSDptr[2];
       var uintD* b_ptr = &b_MSDptr[2];
       # Wurzel-Hauptschleife
-      until (++j == n) { # j=1,...,n
+      while (++j != n) {        /* j=1,...,n */
         # b_MSDptr = Pointer auf b[n], b_ptr = Pointer hinter b[n-j].
         # a_mptr = Pointer auf a[2n-j], a_lptr = Pointer hinter a[2n-2j].
         # Bestimme b* :
-        var uintD b_stern;
+        var uintD b_star;
         {
           var uintD a_1d = a_mptr[0]; # a[2n-j], =0 oder =1
           var uintD a_2d = a_mptr[1]; # a[2n-j-1]
@@ -287,30 +287,30 @@
             var uintDD a_123dd = highlowDD(a_2d,a_3d);
             a_123dd = a_123dd>>1; if (!(a_1d==0)) { a_123dd |= bit(2*intDsize-1); }
             if (highD(a_123dd) >= b_msd)
-              b_stern = bitm(intDsize)-1; # bei Überlauf: beta-1
+              b_star = bitm(intDsize)-1; # bei Überlauf: beta-1
             else
-              divuD(a_123dd,b_msd, b_stern=,);
+              divuD(a_123dd,b_msd, b_star=,);
           #else
             a_3d = a_3d>>1; if (!((a_2d & bit(0)) ==0)) { a_3d |= bit(intDsize-1); }
             a_2d = a_2d>>1; if (!(a_1d==0)) { a_2d |= bit(intDsize-1); }
             if (a_2d >= b_msd)
-              b_stern = bitm(intDsize)-1; # bei Überlauf: beta-1
+              b_star = bitm(intDsize)-1; # bei Überlauf: beta-1
             else
-              divuD(a_2d,a_3d,b_msd, b_stern=,);
+              divuD(a_2d,a_3d,b_msd, b_star=,);
           #endif
         }
-        # b_stern = b* in der ersten Schätzung.
+        # b_star = b* in der ersten Schätzung.
         a_lptr++; # Pointer hinter a[2n-2j-1]
         # Subtraktion [a[2n-j],...,a[2n-2j-1]] -= b* * [b[n],b[n-1],...,b[n-j]] :
         {
-          var uintD carry = mulusub_loop_down(b_stern,b_ptr,a_lptr,j+1);
+          var uintD carry = mulusub_loop_down(b_star,b_ptr,a_lptr,j+1);
           if (a_mptr[0] >= carry) {
             a_mptr[0] -= carry;
           } else {
             a_mptr[0] -= carry; # a[2n-j] wird <0
             # negativer Übertrag -> b* nach unten korrigieren:
-            loop {
-              b_stern = b_stern-1; # b* := b* - 1
+            while (1) {
+              b_star = b_star-1; # b* := b* - 1
               # erhöhe [a[2n-j],...,a[2n-2j-1]] um [b[n],...,b[n-j]]:
               if (!(( addto_loop_down(b_ptr,a_lptr,j+1) ==0)))
                 if ((a_mptr[0] += 1) ==0) # Übertrag zu a[2n-j]
@@ -318,61 +318,61 @@
             }
           }
         }
-        # b_stern = b* in der zweiten Schätzung.
+        # b_star = b* in der zweiten Schätzung.
         a_mptr++; # Pointer auf a[2n-j-1]
         a_lptr++; # Pointer hinter a[2n-2j-2]
         # Ziehe b* ^ 2 von [a[2n-j],...,a[2n-2j-2]] ab:
         #if HAVE_DD
         {
-          var uintDD b_stern_2 = muluD(b_stern,b_stern);
+          var uintDD b_star_2 = muluD(b_star,b_star);
           var uintDD a_12dd = highlowDD(a_lptr[-2],a_lptr[-1]); # a[2n-2j-1]*beta+a[2n-2j-2]
-          var uintDD a_12dd_new = a_12dd - b_stern_2;
+          var uintDD a_12dd_new = a_12dd - b_star_2;
           a_lptr[-2] = highD(a_12dd_new); a_lptr[-1] = lowD(a_12dd_new);
-          if (a_12dd >= b_stern_2)
-            goto b_stern_ok;
+          if (a_12dd >= b_star_2)
+            goto b_star_ok;
         }
         #else
         {
-          var uintD b_stern_2_hi;
-          var uintD b_stern_2_lo;
-          muluD(b_stern,b_stern, b_stern_2_hi=,b_stern_2_lo=);
+          var uintD b_star_2_hi;
+          var uintD b_star_2_lo;
+          muluD(b_star,b_star, b_star_2_hi=,b_star_2_lo=);
           var uintD a_1d = a_lptr[-2]; # a[2n-2j-1]
           var uintD a_2d = a_lptr[-1]; # a[2n-2j-2]
-          var uintD a_1d_new = a_1d - b_stern_2_hi;
-          var uintD a_2d_new = a_2d - b_stern_2_lo;
-          if (a_2d < b_stern_2_lo)
+          var uintD a_1d_new = a_1d - b_star_2_hi;
+          var uintD a_2d_new = a_2d - b_star_2_lo;
+          if (a_2d < b_star_2_lo)
             a_1d_new -= 1;
           a_lptr[-2] = a_1d_new; a_lptr[-1] = a_2d_new;
-          if ((a_1d > b_stern_2_hi)
-              || ((a_1d == b_stern_2_hi) && (a_2d >= b_stern_2_lo))
+          if ((a_1d > b_star_2_hi)
+              || ((a_1d == b_star_2_hi) && (a_2d >= b_star_2_lo))
              )
-            goto b_stern_ok;
+            goto b_star_ok;
         }
         #endif
         if (true) {
           # muss noch [a[2n-j],...,a[2n-2j]] um 1 erniedrigen:
           if ( dec_loop_down(&a_lptr[-2],j+1) ==0)
-            goto b_stern_ok;
+            goto b_star_ok;
           # Subtraktion von b*^2 lieferte negativen Carry
-          b_stern = b_stern-1; # b* := b* - 1
+          b_star = b_star-1; # b* := b* - 1
           # Workaround gcc-2.7.0 bug on i386 and gcc-2.5.8 bug on hppa.
             #if defined(__GNUC__) && (__GNUC__ == 2) && (__GNUC_MINOR__ <= 7)
-              *&b_stern = *&b_stern;
+              *&b_star = *&b_star;
             #endif
           # erhöhe [a[2n-j-1],...,a[2n-2j-2]] um [b[n],...,b[n-j],0] + 2 * b* + 1
-          if ((sintD)b_stern < 0)
+          if ((sintD)b_star < 0)
             b_ptr[-1] |= bit(0); # höchstes Bit von b* in b[n-j] ablegen
-          b_ptr[0] = (uintD)(b_stern<<1)+1; # niedrige Bits von b* und eine 1 als b[n-j-1] ablegen
+          b_ptr[0] = (uintD)(b_star<<1)+1; # niedrige Bits von b* und eine 1 als b[n-j-1] ablegen
           addto_loop_down(&b_ptr[1],a_lptr,j+2);
           # (a[2n-j] wird nicht mehr gebraucht.)
           b_ptr[0] -= 1; # niedrige Bits von b* in b[n-j-1] ablegen
           b_ptr++;
         } else {
-         b_stern_ok:
+         b_star_ok:
           # b* als b[n-j-1] ablegen:
-          if ((sintD)b_stern < 0)
+          if ((sintD)b_star < 0)
             b_ptr[-1] |= bit(0); # höchstes Bit von b* in b[n-j] ablegen
-          b_ptr[0] = (uintD)(b_stern<<1); # niedrige Bits von b* als b[n-j-1] ablegen
+          b_ptr[0] = (uintD)(b_star<<1); # niedrige Bits von b* als b[n-j-1] ablegen
           b_ptr++;
         }
       }
@@ -399,7 +399,7 @@
 # I_isqrt_I(x)
 # > x: an Integer >=0
 # < STACK_0: (isqrt x)
-# < ergebnis: true falls x Quadratzahl, false sonst
+# < result: true falls x Quadratzahl, false sonst
 # erniedrigt STACK um 1
 # can trigger GC
   local maygc bool I_isqrt_I (object x)
@@ -422,7 +422,7 @@
 # Stellt fest, ob ein Integer >=0 eine Quadratzahl ist.
 # I_sqrtp(x)
 # > x: ein Integer >=0
-# < ergebnis: Integer (sqrt x) falls x Quadratzahl, nullobj sonst
+# < result: Integer (sqrt x) falls x Quadratzahl, nullobj sonst
 # can trigger GC
   local maygc object I_sqrtp (object x);
 # Methode:
@@ -451,7 +451,7 @@
 # I_rootp(x,n)
 # > x: ein Integer >=0
 # > n: ein Integer >0
-# < ergebnis: Integer (expt x (/ n)) falls x eine n-te Potenz, nullobj sonst
+# < result: Integer (expt x (/ n)) falls x eine n-te Potenz, nullobj sonst
 # can trigger GC
   local maygc object I_rootp (object x, object n1);
 # Methode:
@@ -550,11 +550,11 @@
       #        = y_lsd + (x_lsd-y_lsd^n) / (n*y_lsd^(n-1))
       doconsttimes(log2_intDsize, { # log2(intDsize) Iterationen reichen aus
         var uintD y_lsd_n1 = D_UL_expt_D(y_lsd,n-1); # y_lsd^(n-1)
-        var uintD y_lsd_n = D_D_mal2adic_D(y_lsd_n1,y_lsd); # y_lsd^n
+        var uintD y_lsd_n = D_D_mult2adic_D(y_lsd_n1,y_lsd); # y_lsd^n
         var uintD delta = x_lsd-y_lsd_n; # x_lsd - y_lsd^n
         if (delta==0)
           goto y_lsd_ok;
-        y_lsd = y_lsd + D_D_durch2adic_D(delta,D_D_mal2adic_D((uintD)n,y_lsd_n1));
+        y_lsd = y_lsd + D_D_div2adic_D(delta,D_D_mult2adic_D((uintD)n,y_lsd_n1));
       });
      y_lsd_ok:
       ASSERT(D_UL_expt_D(y_lsd,n)==x_lsd);
@@ -575,7 +575,7 @@
         begin_arith_call();
         var uintL k = 1; # y ist bisher mod beta^k bekannt
         y_LSDptr[-1] = y_lsd; # Startwert von y
-        until (k==m) {
+        while (k != m) {
           var uintL k2 = 2*k; if (k2>m) { k2=m; } # k2 = min(2*k,m) > k
           # bisheriges y mod beta^k2 mit n-1 potenzieren:
           # Methode für z := y^(n-1) :
@@ -601,7 +601,7 @@
           # (zz nicht kopieren; ab der nächsten Veränderung von zz wird
           # {zz_LSDptr,z_LSDptr,free_LSDptr} = {z1_LSDptr,z2_LSDptr,z3_LSDptr}
           # gelten.)
-          until ((e = e>>1) == 0) {
+          while ((e = e>>1) != 0) {
             {
               var uintD* new_zz_LSDptr = free_LSDptr;
               mulu_2loop_down(zz_LSDptr,k2,zz_LSDptr,k2,new_zz_LSDptr); # zz:=zz*zz
@@ -622,7 +622,7 @@
           ASSERT(!test_loop_up(&zz_LSDptr[-(uintP)k],k)); # zz == 0 mod beta^k
           mulu_2loop_down(z_LSDptr,k2-k,n_LSDptr,n_len,free_LSDptr); # n*y^(n-1)
           # Quotienten mod beta^(k2-k) bilden und an y mod beta^k ankleben:
-          UDS_UDS_durch2adic_UDS(k2-k,&zz_LSDptr[-(uintP)k],free_LSDptr,&y_LSDptr[-(uintP)k]);
+          UDS_UDS_div2adic_UDS(k2-k,&zz_LSDptr[-(uintP)k],free_LSDptr,&y_LSDptr[-(uintP)k]);
           k = k2; # jetzt gilt y^n == x sogar mod beta^k2.
         }
         end_arith_call();
@@ -640,10 +640,10 @@
       pushSTACK(y);
       pushSTACK(y);
     } # Stackaufbau: x, y, c, a.
-    until ((n = n>>1) == 0) {
+    while ((n = n>>1) != 0) {
       var object a = STACK_0 = I_square_I(STACK_0);
       if (!((n & bit(0)) == 0))
-        STACK_1 = I_I_mal_I(a,STACK_1);
+        STACK_1 = I_I_mult_I(a,STACK_1);
     }
     {
       var object temp = STACK_1; skipSTACK(2); # temp = y^n

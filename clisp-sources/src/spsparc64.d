@@ -9,11 +9,13 @@
 
         .seg "text"
 
+        .global getSP
         .global _getSP
         .global _get_g1
         .global __get_g1
 
 #    extern void* getSP (void);
+getSP:
 _getSP: retl
        _ mov %sp,%o0
 

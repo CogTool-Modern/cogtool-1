@@ -1,7 +1,7 @@
 /*
  * Auxiliary functions for CLISP on UNIX
- * Bruno Haible 1990-2004
- * Sam Steingold 1998-2005
+ * Bruno Haible 1990-2008
+ * Sam Steingold 1998-2009
  */
 
 #include "lispbibl.c"
@@ -70,27 +70,6 @@ global int select (int width, fd_set* readfds, fd_set* writefds,
     }
   }
   return result;
-}
-#endif
-
-/* ======================================================================== */
-
-#ifdef NEED_OWN_GETTIMEOFDAY
-/* an emulation of gettimeofday(3). */
-global int gettimeofday (struct timeval * tp, struct timezone * tzp) {
-  if ((tp != NULL) || (tzp != NULL)) {
-    var struct timeb timebuf;
-    ftime(&timebuf);
-    if (tp != NULL) {
-      tp->tv_sec = timebuf.time;
-      tp->tv_usec = (long)(timebuf.millitm) * (1000000/1000);
-    }
-    if (tzp != NULL) {
-      tzp->tz_minuteswest = timebuf.timezone;
-      tzp->tz_dsttime = 0;      /* ?? */
-    }
-  }
-  return 0;
 }
 #endif
 
@@ -168,8 +147,6 @@ global int nonintr_tcflush (int fd, int flag) {
 global int siginterrupt (int sig, int flag);
 #if defined(HAVE_SIGACTION)
 extern_C int sigaction (/* int sig, [const] struct sigaction * new, struct sigaction * old */);
-#elif defined(HAVE_SIGVEC) && defined(SV_INTERRUPT)
-extern_C int sigvec (/* int sig, [const] struct sigvec * new, struct sigvec * old */);
 #endif
 global int siginterrupt (int sig, int flag) {
  #if defined(HAVE_SIGACTION)
@@ -198,19 +175,6 @@ global int siginterrupt (int sig, int flag) {
   }
  #endif
   sigaction(sig,&sa,(struct sigaction *)NULL);
- #elif defined(HAVE_SIGVEC) && defined(SV_INTERRUPT)
-  var struct sigvec sv;
-  sigvec(sig,(struct sigvec *)NULL,&sv);
-  if (flag) {
-    if (sv.sv_flags & SV_INTERRUPT)
-      return 0;
-    sv.sv_flags |= SV_INTERRUPT; /* system calls will be interrupted */
-  } else {
-    if (!(sv.sv_flags & SV_INTERRUPT))
-      return 0;
-    sv.sv_flags &= ~ SV_INTERRUPT; /* system calls will be restarted */
-  }
-  sigvec(sig,&sv,(struct sigvec *)NULL);
  #endif
   return 0;                    /* the return value is always ignored. */
 }
@@ -235,8 +199,8 @@ local inline int fd_read_will_hang_p (int fd)
         goto restart_poll;
       OS_error();
     } else {
-      # revents has POLLIN or some other bits set if read() would return
-      # without blocking.
+      /* revents has POLLIN or some other bits set if read() would return
+       without blocking. */
       if (pollfd_bag[0].revents == 0)
         #ifdef HAVE_RELIABLE_POLL
         return 1;
@@ -244,13 +208,13 @@ local inline int fd_read_will_hang_p (int fd)
         return -1;
         #endif
     }
-    # Now we know that read() will return immediately.
+    /* Now we know that read() will return immediately. */
     return 0;
   #elif defined(HAVE_SELECT) && !defined(UNIX_BEOS)
-    # Use select() with readfds = singleton set {fd}
-    # and timeout = zero interval.
-    var fd_set handle_set; # set of handles := {fd}
-    var struct timeval zero_time; # time interval := 0
+    /* Use select() with readfds = singleton set {fd}
+     and timeout = zero interval. */
+    var fd_set handle_set;         /* set of handles := {fd} */
+    var struct timeval zero_time;  /* time interval := 0 */
     FD_ZERO(&handle_set); FD_SET(fd,&handle_set);
    restart_select:
     zero_time.tv_sec = 0; zero_time.tv_usec = 0;
@@ -258,10 +222,10 @@ local inline int fd_read_will_hang_p (int fd)
     if (result<0) {
       if (errno==EINTR)
         goto restart_select;
-      if (!(errno==EBADF)) { OS_error(); } # UNIX_LINUX returns EBADF for files!
+      if (errno!=EBADF) { OS_error(); } /*UNIX_LINUX returns EBADF for files!*/
     } else {
-      # result = number of handles in handle_set for which read() would
-      # return without blocking.
+      /* result = number of handles in handle_set for which read() would
+       return without blocking. */
       if (result==0)
         #ifdef HAVE_RELIABLE_SELECT
         return 1;
@@ -269,7 +233,7 @@ local inline int fd_read_will_hang_p (int fd)
         return -1;
         #endif
     }
-    # Now we know that read() will return immediately.
+    /* Now we know that read() will return immediately. */
     return 0;
   #else
     return -1;
@@ -280,14 +244,15 @@ local inline int fd_read_will_hang_p (int fd)
    Return value like read().
    When the return value is 0, it sets errno to indicate whether EOF has been
    seen (ENOENT) or whether it is not yet known (EAGAIN). */
-global ssize_t fd_read (int fd, void* bufarea, size_t nbyte, perseverance_t persev)
-{
+modexp ssize_t fd_read
+(int fd, void* bufarea, size_t nbyte, perseverance_t persev) {
   var char* buf = (char*) bufarea;
   if (nbyte == 0) {
     errno = EAGAIN;
     return 0;
   }
- #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED)
+  /* in MT builds the heap protection is managed by pin_varobject() */
+ #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED) && !defined(MULTITHREAD)
   /* Must adjust the memory permissions before calling read().
    - On SunOS4 a missing write permission causes the read() call to hang
      in an endless loop.
@@ -310,11 +275,11 @@ global ssize_t fd_read (int fd, void* bufarea, size_t nbyte, perseverance_t pers
         NOTREACHED;
       #else
         if (persev == persev_bonus) {
-          # Non-blocking I/O is not worth it unless absolutely necessary.
+          /* Non-blocking I/O is not worth it unless absolutely necessary. */
           errno = EAGAIN;
           return 0;
         }
-        # As a last resort, use non-blocking I/O.
+        /* As a last resort, use non-blocking I/O. */
         var ssize_t done = 0;
         NO_BLOCK_DECL(fd);
         START_NO_BLOCK(fd);
@@ -354,6 +319,11 @@ global ssize_t fd_read (int fd, void* bufarea, size_t nbyte, perseverance_t pers
       errno = ENOENT;
       break;
     } else if (retval < 0) {
+     #ifdef ECONNRESET
+      if (errno == ECONNRESET)
+        /* avoid SIGPIPE on further accesses to fd */
+        close(fd); /* errno is still ECONNRESET */
+     #endif
      #ifdef EINTR
       if (errno != EINTR)
      #endif
@@ -383,8 +353,8 @@ local inline int fd_write_will_hang_p (int fd)
         goto restart_poll;
       OS_error();
     } else {
-      # revents has POLLOUT or some other bits set if write() would return
-      # without blocking.
+      /* revents has POLLOUT or some other bits set if write() would return
+       without blocking. */
       if (pollfd_bag[0].revents == 0)
         #ifdef HAVE_RELIABLE_POLL
         return 1;
@@ -392,13 +362,13 @@ local inline int fd_write_will_hang_p (int fd)
         return -1;
         #endif
     }
-    # Now we know that write() will return immediately.
+    /* Now we know that write() will return immediately. */
     return 0;
   #elif defined(HAVE_SELECT) && !defined(UNIX_BEOS)
-    # Use select() with writefds = singleton set {fd}
-    # and timeout = zero interval.
-    var fd_set handle_set; # set of handles := {fd}
-    var struct timeval zero_time; # time interval := 0
+    /* Use select() with writefds = singleton set {fd}
+     and timeout = zero interval. */
+    var fd_set handle_set;         /* set of handles := {fd} */
+    var struct timeval zero_time;  /* time interval := 0 */
     FD_ZERO(&handle_set); FD_SET(fd,&handle_set);
    restart_select:
     zero_time.tv_sec = 0; zero_time.tv_usec = 0;
@@ -406,10 +376,10 @@ local inline int fd_write_will_hang_p (int fd)
     if (result<0) {
       if (errno==EINTR)
         goto restart_select;
-      if (!(errno==EBADF)) { OS_error(); } # UNIX_LINUX returns EBADF for files!
+      if (errno!=EBADF) { OS_error(); } /*UNIX_LINUX returns EBADF for files!*/
     } else {
-      # result = number of handles in handle_set for which write() would
-      # return without blocking.
+      /* result = number of handles in handle_set for which write() would
+       return without blocking. */
       if (result==0)
         #ifdef HAVE_RELIABLE_SELECT
         return 1;
@@ -417,7 +387,7 @@ local inline int fd_write_will_hang_p (int fd)
         return -1;
         #endif
     }
-    # Now we know that write() will return immediately.
+    /* Now we know that write() will return immediately. */
     return 0;
   #else
     return -1;
@@ -428,14 +398,15 @@ local inline int fd_write_will_hang_p (int fd)
    Return value like write().
    When the return value is 0, it sets errno to indicate whether EOWF has been
    seen (ENOENT) or whether it is not yet known (EAGAIN). */
-global ssize_t fd_write (int fd, const void* bufarea, size_t nbyte, perseverance_t persev)
-{
+modexp ssize_t fd_write
+(int fd, const void* bufarea, size_t nbyte, perseverance_t persev) {
   var const char* buf = (const char*) bufarea;
   if (nbyte == 0) {
     errno = EAGAIN;
     return 0;
   }
- #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED)
+  /* in MT builds the heap protection is managed by pin_varobject() */
+ #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED) && !defined(MULTITHREAD)
   /* Must adjust the memory permissions before calling write(). */
   handle_fault_range(PROT_READ,(aint)buf,(aint)buf+nbyte);
  #endif
@@ -450,11 +421,11 @@ global ssize_t fd_write (int fd, const void* bufarea, size_t nbyte, perseverance
         NOTREACHED;
       #else
         if (persev == persev_bonus) {
-          # Non-blocking I/O is not worth it unless absolutely necessary.
+          /* Non-blocking I/O is not worth it unless absolutely necessary. */
           errno = EAGAIN;
           return 0;
         }
-        # As a last resort, use non-blocking I/O.
+        /* As a last resort, use non-blocking I/O. */
         var ssize_t done = 0;
         NO_BLOCK_DECL(fd);
         START_NO_BLOCK(fd);
@@ -515,10 +486,10 @@ global ssize_t fd_write (int fd, const void* bufarea, size_t nbyte, perseverance
    Returns 1 for yes, 0 for no, -1 for unknown. */
 local inline int sock_read_will_hang_p (int fd)
 {
-  # Use select() with readfds = singleton set {fd}
-  # and timeout = zero interval.
-  var fd_set handle_set; # set of handles := {fd}
-  var struct timeval zero_time; # time interval := 0
+  /* Use select() with readfds = singleton set {fd}
+   and timeout = zero interval. */
+  var fd_set handle_set;         /* set of handles := {fd} */
+  var struct timeval zero_time;  /* time interval := 0 */
   FD_ZERO(&handle_set); FD_SET(fd,&handle_set);
  restart_select:
   zero_time.tv_sec = 0; zero_time.tv_usec = 0;
@@ -528,12 +499,12 @@ local inline int sock_read_will_hang_p (int fd)
       goto restart_select;
     OS_error();
   } else {
-    # result = number of handles in handle_set for which read() would
-    # return without blocking.
+    /* result = number of handles in handle_set for which read() would
+     return without blocking. */
     if (result==0)
       return 1;
   }
-  # Now we know that recv() will return immediately.
+  /* Now we know that recv() will return immediately. */
   return 0;
 }
 
@@ -547,7 +518,8 @@ global ssize_t sock_read (int fd, void* bufarea, size_t nbyte, perseverance_t pe
     errno = EAGAIN;
     return 0;
   }
- #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED)
+  /* in MT builds the heap protection is managed by pin_varobject() */
+ #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED) && !defined(MULTITHREAD)
   /* Must adjust the memory permissions before calling recv(). */
   handle_fault_range(PROT_READ_WRITE,(aint)buf,(aint)buf+nbyte);
  #endif
@@ -593,10 +565,10 @@ global ssize_t sock_read (int fd, void* bufarea, size_t nbyte, perseverance_t pe
 local inline int sock_write_will_hang_p (int fd)
 {
   #if 0 /* On BeOS, select() supports only readfds, not writefds. */
-    # Use select() with writefds = singleton set {fd}
-    # and timeout = zero interval.
-    var fd_set handle_set; # set of handles := {fd}
-    var struct timeval zero_time; # time interval := 0
+    /* Use select() with writefds = singleton set {fd}
+     and timeout = zero interval. */
+    var fd_set handle_set;         /* set of handles := {fd} */
+    var struct timeval zero_time;  /* time interval := 0 */
     FD_ZERO(&handle_set); FD_SET(fd,&handle_set);
    restart_select:
     zero_time.tv_sec = 0; zero_time.tv_usec = 0;
@@ -606,12 +578,12 @@ local inline int sock_write_will_hang_p (int fd)
         goto restart_select;
       OS_error();
     } else {
-      # result = number of handles in handle_set for which write() would
-      # return without blocking.
+      /* result = number of handles in handle_set for which write() would
+       return without blocking. */
       if (result==0)
         return 0;
     }
-    # Now we know that send() will return immediately.
+    /* Now we know that send() will return immediately. */
   #else
     return -1;
   #endif
@@ -628,7 +600,8 @@ global ssize_t sock_write (int fd, const void* bufarea, size_t nbyte, perseveran
     errno = EAGAIN;
     return 0;
   }
- #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED)
+  /* in MT builds the heap protection is managed by pin_varobject() */
+ #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED) && !defined(MULTITHREAD)
   /* Must adjust the memory permissions before calling send(). */
   handle_fault_range(PROT_READ,(aint)buf,(aint)buf+nbyte);
  #endif
@@ -640,11 +613,11 @@ global ssize_t sock_write (int fd, const void* bufarea, size_t nbyte, perseveran
     }
     if (will_hang < 0) {
       if (persev == persev_bonus) {
-        # Non-blocking I/O is not worth it unless absolutely necessary.
+        /* Non-blocking I/O is not worth it unless absolutely necessary. */
         errno = EAGAIN;
         return 0;
       }
-      # As a last resort, use non-blocking I/O.
+      /* As a last resort, use non-blocking I/O. */
       var ssize_t done = 0;
       NO_BLOCK_DECL(fd);
       START_NO_BLOCK(fd);
@@ -706,10 +679,10 @@ global int wait2 (PID_T child) {
   /* WAIT(2V) and #include <sys/wait.h> :
      WIFSTOPPED(status)  ==  ((status & 0xFF) == 0177)
      WEXITSTATUS(status)  == ((status & 0xFF00) >> 8) */
-  loop {
-    var int ergebnis = waitpid(child,&status,0);
-    if (ergebnis != child) {
-      if (ergebnis<0) {
+  while (1) {
+    var int result = waitpid(child,&status,0);
+    if (result != child) {
+      if (result<0) {
         if (errno==EINTR)
           continue;
        #ifdef ECHILD
@@ -800,7 +773,7 @@ global void abort() {
 #include <windows.h>
 #define FACTOR LL(0x19db1ded53ea710)
 #define NSPERSEC LL(10000000)
-global long time_t_from_filetime (const FILETIME * ptr) {
+modexp long time_t_from_filetime (const FILETIME * ptr) {
   /* A file time is the number of 100ns since jan 1 1601
      stuffed into two long words.
      A time_t is the number of seconds since jan 1 1970.  */
@@ -816,8 +789,7 @@ global long time_t_from_filetime (const FILETIME * ptr) {
   x += (long long) (rem/NSPERSEC);
   return x;
 }
-global void time_t_to_filetime (time_t time_in, FILETIME *out)
-{
+modexp void time_t_to_filetime (time_t time_in, FILETIME *out) {
   long long x = time_in * NSPERSEC + FACTOR;
   out->dwHighDateTime = x >> 32;
   out->dwLowDateTime = x;
@@ -853,14 +825,12 @@ global void close_all_fd (void) {
 /* file identification for check_file_re_open() */
 /* if file NAMESTRING exists, fill file_id and call function on it,
    otherwise return NULL */
-global void* with_file_id (char * namestring, void *data,
-                           void* (*func) (struct file_id *, void *data)) {
+global errno_t namestring_file_id (char * namestring, struct file_id *fi) {
   var struct stat st;
-  if (stat(namestring,&st)) return NULL;
-  var struct file_id fi;
-  fi.device = st.st_dev;
-  fi.inode = st.st_ino;
-  return (*func)(&fi,data);
+  if (stat(namestring,&st)) return errno;
+  fi->device = st.st_dev;
+  fi->inode = st.st_ino;
+  return 0;
 }
 
 /* fill FI for an existing file handle */
@@ -875,3 +845,72 @@ global errno_t handle_file_id (int fd, struct file_id *fi) {
 /* if the file IDs are identical, return 1, otherwise return 0 */
 global int file_id_eq (struct file_id *fi1, struct file_id *fi2)
 { return (fi1->device == fi2->device) && (fi1->inode == fi2->inode); }
+
+/* ======================================================================== */
+/*  http://www.usenix.org/events/sec02/full_papers/chen/chen.pdf */
+#define SYSCALL(f,a) if (f a < 0) {             \
+  perror(STRING(f));                            \
+  abort();                                      \
+ }
+global void drop_privileges (void) {
+  { /* first group, then user */
+    var gid_t gid = getgid(), r, e, s;
+    if (gid != getegid()) {
+     #if defined(HAVE_GETRESGID) && defined(HAVE_SETRESGID)
+      SYSCALL(setresgid,(gid,gid,gid));
+      SYSCALL(getresgid,(&r,&e,&s));
+      if (gid != r || gid != e || gid != s) {
+        fprintf(stderr,"Failed to drop group privileges(%ld): %ld %ld %ld\n",
+                (long)gid,(long)r,(long)e,(long)s);
+        abort();
+      }
+     #elif defined(HAVE_SETREGID)
+      SYSCALL(setregid,(gid,gid));
+      r = getgid(); e = getegid();
+      if (gid != r || gid != e) {
+        fprintf(stderr,"Failed to drop group privileges(%ld): %ld %ld\n",
+                (long)gid,(long)r,(long)e);
+        abort();
+      }
+     #else
+      SYSCALL(setegid,(gid)); SYSCALL(setgid,(gid));
+      r = getgid(); e = getegid();
+      if (gid != r || gid != e) {
+        fprintf(stderr,"Failed to drop group privileges(%ld): %ld %ld\n",
+                (long)gid,(long)r,(long)e);
+        abort();
+      }
+     #endif
+    }
+  }
+  {
+    var uid_t uid = getuid(), r, e, s;
+    if (uid != geteuid()) {
+     #if defined(HAVE_GETRESUID) && defined(HAVE_SETRESUID)
+      SYSCALL(setresuid,(uid,uid,uid));
+      SYSCALL(getresuid,(&r,&e,&s));
+      if (uid != r || uid != e || uid != s) {
+        fprintf(stderr,"Failed to drop user privileges(%ld): %ld %ld %ld\n",
+                (long)uid,(long)r,(long)e,(long)s);
+        abort();
+      }
+     #elif defined(HAVE_SETREUID)
+      SYSCALL(setreuid,(uid,uid));
+      r = getuid(); e = geteuid();
+      if (uid != r || uid != e) {
+        fprintf(stderr,"Failed to drop user privileges(%ld): %ld %ld\n",
+                (long)uid,(long)r,(long)e);
+        abort();
+      }
+     #else
+      SYSCALL(seteuid,(uid)); SYSCALL(setuid,(uid));
+      r = getuid(); e = geteuid();
+      if (uid != r || uid != e) {
+        fprintf(stderr,"Failed to drop user privileges(%ld): %ld %ld\n",
+                (long)uid,(long)r,(long)e);
+        abort();
+      }
+     #endif
+    }
+  }
+}

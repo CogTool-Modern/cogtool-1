@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; check universal time functions
 ;; <http://www.lisp.org/HyperSpec/Body/sec_25-1-4.html>
 ;; <http://www.lisp.org/HyperSpec/Body/sec_25-1-4-1.html>

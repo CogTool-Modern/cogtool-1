@@ -1,40 +1,7 @@
 ;; Tracer
 ;; Bruno Haible 13.2.1990, 15.3.1991, 4.4.1991
 ;; German comments translated into English: Stefan Kain 2001-12-26
-;; Sam Steingold 2001-2002
-
-;; (TRACE) returns a list of traced functions
-;; (TRACE fun ...) additionally traces the functions fun, ... .
-;; Format for fun:
-;;  Either a Symbol
-;;   symbol
-;;  or a List made of a Symbol and a few Keyword-Arguments (pair-wise!)
-;;   (symbol
-;;    [:suppress-if form]   ; no Trace-Output, as long as form is true
-;;    [:max-depth form]     ; no trace output, as long as (> *trace-level* form)
-;;    [:step-if form]       ; Trace moves into the Stepper, if form is true
-;;    [:pre form]           ; executes form before function call
-;;    [:post form]          ; executes form after  function call
-;;    [:pre-break-if form]  ; Trace moves into break-loop before function call,
-;;                          ; if form is true
-;;    [:post-break-if form] ; Trace moves into break-loop after  function call,
-;;                          ; if form is true
-;;    [:pre-print form]     ; prints the values of form before function call
-;;    [:post-print form]    ; prints the values of form after  function call
-;;    [:print form]         ; prints the values of form before
-;;                          ; and after the function call
-;;   )
-;;   In all these forms *TRACE-FUNCTION* (the function itself),
-;;   *TRACE-ARGS* (the function arguments),
-;;   *TRACE-FORM* (the function-/macro-call as form),
-;;   and after function call also *TRACE-VALUES* (the list of values
-;;   of the function call) can be accessed,
-;;   and the function can be left with RETURN with given values.
-;; (UNTRACE) returns list of traced functions, discards the all.
-;; (UNTRACE symbol ...) discards symbol, ... from the list of traced
-;;   functions.
-;; TRACE and UNTRACE are also applicable to functions (SETF symbol) and macros,
-;;   not however applicable to locally defined functions and macros.
+;; Sam Steingold 2001-2009
 
 (in-package "COMMON-LISP")
 (export '(trace untrace))
@@ -66,13 +33,13 @@
 
 (labels ((subclosure-pos (closure name)
            (do ((length (sys::%record-length closure))
-                ;; compiler::symbol-suffix is defined in compiler.lisp
-                (nm (compiler::symbol-suffix (closure-name closure) name))
-                (pos 2 (1+ pos)) obj)
+                ;; sys::symbol-suffix is defined in compiler.lisp
+                (nm (sys::symbol-suffix (closure-name closure) name))
+                (pos 0 (1+ pos)) obj)
                ((= pos length)
-                (error (TEXT "~s: no local name ~s in ~s")
+                (error (TEXT "~S: no local name ~S in ~S")
                        'local name closure))
-             (setq obj (sys::%record-ref closure pos))
+             (setq obj (sys::closure-const closure pos))
              (when (and (closurep obj)
                         (or (eq (closure-name obj) nm)
                             (eq (closure-name obj)
@@ -97,18 +64,18 @@
 
   (defun %local-get (spec) ; ABI
     (multiple-value-bind (clo pos) (local-helper spec)
-      (sys::%record-ref clo pos)))
+      (sys::closure-const clo pos)))
   (defun %local-set (new-def spec) ; ABI
     (unless (closurep new-def)
       (error-of-type 'type-error
         :datum new-def :expected-type 'closure
         (TEXT "~S: ~S is not a closure") `(setf (local ,@spec)) new-def))
     (multiple-value-bind (clo pos) (local-helper spec)
-      (sys::%record-store clo pos
-         (if (sys::%compiled-function-p new-def)
-             new-def
-             (fdefinition (compile (closure-name (sys::%record-ref clo pos))
-                                   new-def)))))))
+      (setf (sys::closure-const clo pos)
+            (if (sys::%compiled-function-p new-def)
+                new-def
+                (fdefinition (compile (closure-name (sys::%record-ref clo pos))
+                                      new-def)))))))
 
 (defmacro local (&rest spec)
   "Return the closure defined locally with LABELS or FLET.
@@ -132,6 +99,7 @@ This will not work with closures that use lexical variables!"
 (defstruct (tracer (:type vector))
   name symb cur-def local-p
   suppress-if max-depth step-if pre post pre-break-if post-break-if
+  bindings
   pre-print post-print print)
 
 ;; install the new function definition
@@ -141,6 +109,36 @@ This will not work with closures that use lexical variables!"
       (setf (symbol-function (tracer-symb trr)) new-fdef)))
 
 (defmacro trace (&rest funs)
+  "Trace function execution.
+\(TRACE) returns the list of all traced functions.
+\(TRACE fun ...) additionally traces the functions fun, ... .
+Format for fun:
+ Either a function name
+ or a list made of a function-cell and a few keyword arguments (pairwise!)
+  (function-name
+   [:suppress-if form]   ; no Trace-Output, as long as form is true
+   [:max-depth form]     ; no trace output, as long as (> *trace-level* form)
+   [:step-if form]       ; Trace moves into the Stepper, if form is true
+   [:bindings ((variable form)...)] ; binds variables around the following forms
+   [:pre form]           ; executes form before function call
+   [:post form]          ; executes form after  function call
+   [:pre-break-if form]  ; Trace moves into break-loop before function call,
+                         ; if form is true
+   [:post-break-if form] ; Trace moves into break-loop after  function call,
+                         ; if form is true
+   [:pre-print form]     ; prints the values of form before function call
+   [:post-print form]    ; prints the values of form after  function call
+   [:print form]         ; prints the values of form before
+                         ; and after the function call
+  )
+In all these forms *TRACE-FUNCTION* (the function itself),
+  *TRACE-ARGS* (the function arguments),
+  *TRACE-FORM* (the function-/macro-call as form),
+  and after function call also *TRACE-VALUES* (the list of values
+  of the function call) can be accessed,
+  and the function can be left with RETURN with given values.
+TRACE and UNTRACE are also applicable to functions (SETF symbol) and macros,
+ however not applicable to locally defined functions and macros."
   (if (null funs)
     '*TRACED-FUNCTIONS*
     `(APPEND
@@ -174,7 +172,7 @@ This will not work with closures that use lexical variables!"
                    (get (tracer-symb trr) 'sys::untraced-name))))
           (t (setq funname (check-function-name funname caller))
              (go restart))))
-  (check-redefinition funname caller "function")
+  (check-redefinition funname caller (TEXT "function"))
   trr)
 
 (defun trace1 (trr) ; ABI
@@ -195,7 +193,8 @@ This will not work with closures that use lexical variables!"
           (let ((newname (concat-pnames "TRACED-" (tracer-symb trr)))
                 (body
                  `((declare (inline car cdr cons apply values-list))
-                   (let ((*trace-level* (1+ *trace-level*)))
+                   (let ((*trace-level* (1+ *trace-level*))
+                         ,@(tracer-bindings trr))
                      (block nil
                        (unless (or ,(tracer-suppress-if trr)
                                    ,(if (tracer-max-depth trr) `(> *trace-level* ,(tracer-max-depth trr)) 'nil))
@@ -225,12 +224,12 @@ This will not work with closures that use lexical variables!"
                              `((trace-print (multiple-value-list
                                              ,(tracer-print trr)))))
                          ,@(when (tracer-post-print trr)
-                                `((trace-print (multiple-value-list
+                             `((trace-print (multiple-value-list
                                              ,(tracer-post-print trr)))))
                          (unless (or ,(tracer-suppress-if trr)
                                      ,(if (tracer-max-depth trr) `(> *trace-level* ,(tracer-max-depth trr)) 'nil))
-                               (trace-post-output))
-                             (values-list *trace-values*)))))))
+                           (trace-post-output))
+                         (values-list *trace-values*)))))))
             (setf (get newname 'sys::untraced-name) (tracer-symb trr))
             (macrolet ((f (def) `(fdefinition (compile newname ,def))))
               (cond (macro-flag
@@ -241,7 +240,8 @@ This will not work with closures that use lexical variables!"
                                     (macro-expander
                                      (get-traced-definition
                                       ',(tracer-symb trr)))))
-                            ,@body))))
+                            ,@body))
+                      (macro-lambda-list (tracer-cur-def trr))))
                     ((tracer-local-p trr)
                      (f `(lambda ,sig
                            (let* ((*trace-args* (list ,@sig))
@@ -280,22 +280,20 @@ This will not work with closures that use lexical variables!"
                     (cons 'quote (cons arg nil)))
                 args)))
 ;; Output before call, uses *trace-level* and *trace-form*
-(defun trace-pre-output ()
+(defun trace-output () ; common for pre & post
   (fresh-line *trace-output*)
   (when *trace-indent*
     (write-spaces *trace-level* *trace-output*))
   (write *trace-level* :stream *trace-output* :base 10 :radix t)
-  (write-string " Trace: " *trace-output*)
+  (write-string " Trace: " *trace-output*))
+(defun trace-pre-output ()
+  (trace-output)
   (prin1 *trace-form* *trace-output*)
   (elastic-newline *trace-output*))
 ;; Output after call, uses *trace-level*, *trace-form* and *trace-values*
 (defun trace-post-output ()
   (declare (inline car cdr consp atom))
-  (fresh-line *trace-output*)
-  (when *trace-indent*
-    (write-spaces *trace-level* *trace-output*))
-  (write *trace-level* :stream *trace-output* :base 10 :radix t)
-  (write-string " Trace: " *trace-output*)
+  (trace-output)
   (write (car *trace-form*) :stream *trace-output*)
   (write-string " ==> " *trace-output*)
   (trace-print *trace-values* nil))
@@ -310,6 +308,8 @@ This will not work with closures that use lexical variables!"
   (elastic-newline *trace-output*))
 
 (defmacro untrace (&rest funs)
+  "(UNTRACE) returns the list of traced functions, stops tracing all of them.
+\(UNTRACE symbol ...) removes symbol, ... from the list of traced functions."
   `(MAPCAN #'UNTRACE1
      ,(if (null funs) `(COPY-LIST *TRACED-FUNCTIONS*) `',funs)))
 

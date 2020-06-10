@@ -42,7 +42,7 @@
 <!ENTITY extract-specializer-names '<link linkend="extract-specializer-names"><function>CLOS:EXTRACT-SPECIALIZER-NAMES</function></link>'>
 <!ENTITY finalize-inheritance '<link linkend="finalize-inheritance"><function>CLOS:FINALIZE-INHERITANCE</function></link>'>
 <!ENTITY find-method-combination '<link linkend="find-method-combination"><function>CLOS:FIND-METHOD-COMBINATION</function></link>'>
-<!ENTITY forward-referenced-class '<link linkend="mop-inherit-struct"><classname>CLOS:FORWARD-REFERENCED-CLASS</classname></link>'>
+<!ENTITY forward-referenced-class '<link linkend="forward-referenced-class-clisp"><classname>CLOS:FORWARD-REFERENCED-CLASS</classname></link>'>
 <!ENTITY funcallable-standard-class '<link linkend="mop-sa-funcallable"><classname>CLOS:FUNCALLABLE-STANDARD-CLASS</classname></link>'>
 <!ENTITY funcallable-standard-instance-access '<link linkend="funcallable-standard-instance-access"><function>CLOS:FUNCALLABLE-STANDARD-INSTANCE-ACCESS</function></link>'>
 <!ENTITY funcallable-standard-object-t '<link linkend="mop-sa-funcallable"><classname>CLOS:FUNCALLABLE-STANDARD-OBJECT</classname></link>'>
@@ -111,10 +111,11 @@
 <!ENTITY result-immutable '<simpara>The list returned by this function
  will not be mutated by the implementation.  The results are undefined
  if a portable program mutates the list returned by this function.</simpara>'>
-<!ENTITY result-immutable-all '<simpara>For any of these generic
- functions which returns a list, such lists will not be mutated by the
- implementation.  The results are undefined if a portable program allows
- such a list to be mutated.</simpara>'>
+<!ENTITY user-and-implementation-callable-result-immutable '<simpara>These
+  generic functions can be called by the user or the implementation.</simpara>
+  <simpara>For any of these generic functions which returns a list, such lists
+  will not be mutated by the implementation.  The results are undefined if a
+  portable program allows such a list to be mutated.</simpara>'>
 <!ENTITY init-method-restrictions '<itemizedlist>
  <listitem><simpara>Portable programs must not define primary methods.
  </simpara></listitem>
@@ -131,8 +132,9 @@
 <!ENTITY no-extra-specs '<simpara>No behavior is specified for these
    methods beyond that which is specified for their respective generic
    functions.</simpara>'>
-<!ENTITY values-unspecified '<simpara>The value returned by this generic
- function is unspecified.</simpara>'>
+<!ENTITY values-unspecified '<varlistentry><term>Values</term><listitem>
+ <simpara>The values returned by this generic function are unspecified.
+ </simpara></listitem></varlistentry>'>
 <!ENTITY also-must-override 'This method cannot be overridden unless the
  following methods are overridden as well:'>
 <!ENTITY may-override '<simpara>Overriding these methods is permitted,
@@ -175,3 +177,26 @@
 <!ENTITY m-mo '<link linkend="mop-method-mo">method metaobject</link>'>
 <!ENTITY mcmo '<link linkend="mop-meth-comp-mo">method combination metaobject</link>'>
 <!ENTITY sdmo '<link linkend="mop-slot-def-mo">slot definition metaobject</link>'>
+<!ENTITY an-object '<listitem><simpara>an object.</simpara></listitem>'>
+<!ENTITY a-cmo '<listitem><simpara>a &c-mo;.</simpara></listitem>'>
+<!ENTITY class-obj-slot-arg '<varlistentry><term>&class-r;</term>
+  <listitem><simpara>a &c-mo; - the class of the
+    &object-r; argument.</simpara></listitem></varlistentry>
+  <varlistentry><term>&object-r;</term>&an-object;</varlistentry>
+  <varlistentry><term>&slot-r;</term>
+    <listitem><simpara>an &esdmo;.</simpara></listitem></varlistentry>'>
+<!ENTITY mo-gfmo '<varlistentry><term>&metaobject-r;</term>
+  <listitem><simpara>a &c-mo; or a &gfmo;.</simpara></listitem></varlistentry>'>
+<!ENTITY mo-prim '<primary>metaobject</primary>'>
+<!ENTITY me-prim '<primary>method</primary>'>
+<!ENTITY cam-cdf '<simpara>When a generic function is invoked, the
+   discriminating function must determine the ordered list of methods
+   applicable to the arguments.  Depending on the generic function and
+   the arguments, this is done in one of three ways: using a memoized
+   value; calling &compute-applicable-methods-UC;; or calling
+   &compute-applicable-methods-mop;.
+   (Refer to the description of &compute-discriminating-function; for
+   the details of this process.)</simpara>'>
+<!ENTITY reinit-keep-value '<para>Unless there is a specific note to the
+  contrary, then during reinitialization, if an initialization argument
+  is not supplied, the previously stored value is left unchanged.</para>'>

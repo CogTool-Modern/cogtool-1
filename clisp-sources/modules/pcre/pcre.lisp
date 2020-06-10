@@ -1,6 +1,6 @@
 ;; Module for PCRE / CLISP
 ;; <http://www.pcre.org/>
-;; Sam Steingold 2003-2004
+;; Sam Steingold 2003-2008
 
 (defpackage "PCRE"
   (:documentation
@@ -13,6 +13,7 @@
 
 (in-package "PCRE")
 (pushnew :pcre *features*)
+(provide "pcre")
 (push "PCRE" custom:*system-package-list*)
 (setf (documentation (find-package "PCRE") 'sys::impnotes) "pcre")
 

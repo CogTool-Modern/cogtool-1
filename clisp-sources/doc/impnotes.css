@@ -1,6 +1,6 @@
-/*      -*- C -*-
+/*
  * CLISP implementation notes stylesheets
- * Copyright (C) 2001-2005 by Sam Steingold <sds@gnu.org>
+ * Copyright (C) 2001-2008 by Sam Steingold <sds@gnu.org>
  * Covered by the GNU GPL <http://www.gnu.org/copyleft/gpl.html>
  */
 
@@ -30,6 +30,9 @@ li, td, dd p { margin: 0pt; }
 /* mark packages with color */
 .package { background-color: lightgreen; color: navy; }
 
+/* mark format strings with color */
+.format { background-color: lightgray; color: navy; }
+
 /* no border for images */
 img { border-width: 0; }
 
@@ -38,6 +41,9 @@ img { border-width: 0; }
 
 /* cmdsynopsis: indent first line */
 .cmdsynopsis { text-indent: -40px; margin-left: 40px; }
+
+/* userinput: highlight */
+.userinput { background-color: lightgreen; color: darkred; font-weight: bold; }
 
 /* larger headings:
  (loop :for i :from 1 :to 6 :do
@@ -50,14 +56,25 @@ h4 { font-size: 133%; }
 h5 { font-size: 121%; }
 h6 { font-size: 110%; }
 
-/* necessary when <programlisting> is in a centered table cell */
-.programlisting { text-align: left; }
+/* necessary when <programlisting> or <screen> is in a centered table cell */
+.programlisting, .screen { text-align: left; }
 
 /* platform dependencies */
 .plat-dep { background-color: lightcyan; color: darkred; }
+.platform { font-weight: bold; }
 
 /* highlight the FAQ questions */
 .question { background-color: lightyellow; }
 
 /* term in table */
-td, dt span.term { font-weight: bold; }
+td span.term, dt span.term { font-weight: bold; }
+
+/* revhistory */
+.revnumber { background-color: lightblue; color: darkred; font-weight: bold; }
+.revdate { background-color: lightgreen; color: darkred; font-weight: bold; }
+
+/* modules */
+.module { background-color: lightyellow; color: darkblue; font-weight: bold; }
+
+/* full width horizontal rulers */
+hr { width: 100%; }

@@ -1,7 +1,7 @@
 /*
  * Arithmetics for CLISP
  * Bruno Haible 1990-2005
- * Sam Steingold 1998-2004
+ * Sam Steingold 1998-2010
  * German comments translated into English: Stefan Kain 2002-12-23
  */
 
@@ -15,11 +15,11 @@
 
 
 /* UP: decides over number equality
- number_gleich(x,y)
+ number_equal(x,y)
  > x,y: two numbers
  < result: true, if (= x y)  */
-global bool number_gleich (object x, object y);
-#define N_N_gleich  number_gleich  /* N_N_gleich is defined later */
+global bool number_equal (object x, object y);
+#define N_N_equal  number_equal  /* N_N_equal is defined later */
 
 
 /* arithmetics in general: */
@@ -62,12 +62,12 @@ global bool number_gleich (object x, object y);
  *                 input routines for numbers */
 
 /* UP: multiplies an integer with 10 and adds a second digit.
- mal_10_plus_x(y,x)
+ mult_10_plus_x(y,x)
  > y: integer Y (>=0)
  > x: digit value X (>=0,<10)
  < result: integer Y*10+X (>=0)
  can trigger GC */
-global maygc object mal_10_plus_x (object y, uintB x) {
+global maygc object mult_10_plus_x (object y, uintB x) {
   SAVE_NUM_STACK
   var uintD* MSDptr;
   var uintC len;
@@ -139,7 +139,7 @@ global maygc object read_rational (uintWL base, signean sign, object string,
       DIGITS_to_I(&TheSnstring(string)->data[index1],index3-index1,(uintD)base);
     if (!(sign==0))
       x = I_minus_I(x); /* incl. sign */
-    return I_posI_durch_RA(x,popSTACK()); /* numerator/denominator */
+    return I_posI_div_RA(x,popSTACK()); /* numerator/denominator */
   }
 }
 
@@ -199,7 +199,7 @@ global maygc object read_float (uintWL base, signean sign, object string,
   exponent = popSTACK();
   /* mantissa (integer) and exponent (rational >0) inelegant to multiply: */
   if (RA_integerp(exponent)) {
-    mantisse = I_I_mal_I(mantisse,exponent);
+    mantisse = I_I_mult_I(mantisse,exponent);
   } else {
     /* if mantissa/=0, replace in exponent=1/10^i the numerator by mantissa
        (returns unshortened fraction, caution!) */
@@ -258,8 +258,8 @@ global maygc void print_integer (object z, uintWL base, const gcv_object_t* stre
     var uintL need = digits_need(len,base);
     var DYNAMIC_STRING(digits,need);
     pushSTACK(digits);
-    var DIGITS erg; erg.LSBptr = &TheSnstring(digits)->data[need];
-    UDS_to_DIGITS(MSDptr,len,(uintD)base,&erg); /* conversion into digits */
+    var digits_t erg; erg.LSBptr = &TheSnstring(digits)->data[need];
+    UDS_to_digits(MSDptr,len,(uintD)base,&erg); /* conversion into digits */
     /* print digits: */
     write_char_array(stream_,&STACK_0,erg.MSBptr-&TheSnstring(digits)->data[0],
                      erg.len);
@@ -315,12 +315,12 @@ global maygc void print_float (object z, const gcv_object_t* stream_) {
 
 /* error-message because of illegal digits-argument obj.
  > obj: object */
-nonreturning_function(local, fehler_digits, (object obj)) {
+nonreturning_function(local, error_digits, (object obj)) {
   pushSTACK(obj);                /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_posfixnum1)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument should be a positive fixnum, not ~S"));
+  error(type_error,GETTEXT("~S: argument should be a positive fixnum, not ~S"));
 }
 
 /* check_number(obj)
@@ -363,9 +363,8 @@ global maygc object check_real_replacement (object obj) {
     pushSTACK(TheSubr(subr_self)->name);
     check_value(type_error,GETTEXT("~S: ~S is not a real number"));
     obj = value1;
-    if_realp(obj, break; , continue; );
+    if_realp(obj, return obj; , ; );
   }
-  return obj;
 }
 
 /* check_float(obj)
@@ -417,9 +416,8 @@ local maygc object check_rational_replacement (object obj) {
     pushSTACK(TheSubr(subr_self)->name);
     check_value(type_error,GETTEXT("~S: ~S is not a rational number"));
     obj = value1;
-    if_rationalp(obj, break; , continue; );
+    if_rationalp(obj, return obj; , ; );
   }
-  return obj;
 }
 
 /* UP: Returns the decimal string representation of an integer >= 0.
@@ -434,8 +432,8 @@ global maygc object decimal_string (object x) {
   I_to_NDS(x, MSDptr=,len=,); /* x (>=0) as UDS */
   var uintL need = digits_need(len,10);
   var DYNAMIC_ARRAY(ziffern,chart,need); /* space for the digits */
-  var DIGITS erg; erg.LSBptr = &ziffern[need];
-  UDS_to_DIGITS(MSDptr,len,10,&erg); /* conversion into digits */
+  var digits_t erg; erg.LSBptr = &ziffern[need];
+  UDS_to_digits(MSDptr,len,10,&erg); /* conversion into digits */
   /* write digits into normal-simple-string: */
   check_stringsize(erg.len);
   var object string = allocate_string(erg.len);
@@ -526,7 +524,7 @@ local maygc void test_integer_args (uintC argcount, gcv_object_t* args_pointer) 
   } while (argcount--); /* sic: not --argcount! */
 }
 
-LISPFUN(gleich,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(numequal,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (= number {number}), CLTL p. 196 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_number_args(argcount,args_pointer); /* all arguments numbers? */
@@ -537,18 +535,18 @@ LISPFUN(gleich,seclass_foldable,1,0,rest,nokey,0,NIL)
     var const gcv_object_t* arg_i_ptr = args_pointer;
     dotimespC(argcount,argcount, {
       var object arg_i = NEXT(arg_i_ptr);
-      if (!N_N_gleich(arg_i,Next(arg_i_ptr))) goto no;
+      if (!N_N_equal(arg_i,Next(arg_i_ptr))) goto no;
     });
   }
  yes:
-  value1 = T; goto ok;
+  { value1 = T; } goto ok;
  no:
-  value1 = NIL; goto ok;
+  { value1 = NIL; } goto ok;
  ok:
   mv_count=1; set_args_end_pointer(args_pointer);
 }
 
-LISPFUN(ungleich,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(numunequal,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (/= number {number}), CLTL p. 196 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_number_args(argcount,args_pointer); /* all arguments numbers? */
@@ -562,20 +560,20 @@ LISPFUN(ungleich,seclass_foldable,1,0,rest,nokey,0,NIL)
     var const gcv_object_t* arg_j_ptr = rest_args_pointer;
     dotimespC(argcount,argcount, {
       var const gcv_object_t* arg_i_ptr = args_pointer;
-      do { if (N_N_gleich(NEXT(arg_i_ptr),Next(arg_j_ptr))) goto no; }
+      do { if (N_N_equal(NEXT(arg_i_ptr),Next(arg_j_ptr))) goto no; }
       while (arg_i_ptr != arg_j_ptr);
       arg_j_ptr skipSTACKop -1;
     });
   }
  yes:
-  value1 = T; goto ok;
+  { value1 = T; } goto ok;
  no:
-  value1 = NIL; goto ok;
+  { value1 = NIL; } goto ok;
  ok:
   mv_count=1; set_args_end_pointer(args_pointer);
 }
 
-LISPFUN(kleiner,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(smaller,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (< real {real}), CLTL p. 196 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_real_args(argcount,args_pointer); /* all arguments real numbers? */
@@ -590,14 +588,14 @@ LISPFUN(kleiner,seclass_foldable,1,0,rest,nokey,0,NIL)
     });
   }
  yes:
-  value1 = T; goto ok;
+  { value1 = T; } goto ok;
  no:
-  value1 = NIL; goto ok;
+  { value1 = NIL; } goto ok;
  ok:
   mv_count=1; set_args_end_pointer(args_pointer);
 }
 
-LISPFUN(groesser,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(greater,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (> real {real}), CLTL p. 196 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_real_args(argcount,args_pointer); /* all arguments real numbers? */
@@ -612,14 +610,14 @@ LISPFUN(groesser,seclass_foldable,1,0,rest,nokey,0,NIL)
     });
   }
  yes:
-  value1 = T; goto ok;
+  { value1 = T; } goto ok;
  no:
-  value1 = NIL; goto ok;
+  { value1 = NIL; } goto ok;
  ok:
   mv_count=1; set_args_end_pointer(args_pointer);
 }
 
-LISPFUN(klgleich,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(ltequal,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (<= real {real}), CLTL p. 196 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_real_args(argcount,args_pointer); /* all arguments real numbers? */
@@ -634,14 +632,14 @@ LISPFUN(klgleich,seclass_foldable,1,0,rest,nokey,0,NIL)
     });
   }
  yes:
-  value1 = T; goto ok;
+  { value1 = T; } goto ok;
  no:
-  value1 = NIL; goto ok;
+  { value1 = NIL; } goto ok;
  ok:
   mv_count=1; set_args_end_pointer(args_pointer);
 }
 
-LISPFUN(grgleich,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(gtequal,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (>= real {real}), CLTL p. 196 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_real_args(argcount,args_pointer); /* all arguments real numbers? */
@@ -656,9 +654,9 @@ LISPFUN(grgleich,seclass_foldable,1,0,rest,nokey,0,NIL)
     });
   }
  yes:
-  value1 = T; goto ok;
+  { value1 = T; } goto ok;
  no:
-  value1 = NIL; goto ok;
+  { value1 = NIL; } goto ok;
  ok:
   mv_count=1; set_args_end_pointer(args_pointer);
 }
@@ -733,7 +731,7 @@ LISPFUN(minus,seclass_foldable,1,0,rest,nokey,0,NIL)
   mv_count=1; set_args_end_pointer(args_pointer);
 }
 
-LISPFUN(mal,seclass_foldable,0,0,rest,nokey,0,NIL)
+LISPFUN(star,seclass_foldable,0,0,rest,nokey,0,NIL)
 { /* (* {number}), CLTL p. 199
      method:
      (*) = 1
@@ -750,12 +748,12 @@ LISPFUN(mal,seclass_foldable,0,0,rest,nokey,0,NIL)
   var object x = NEXT(arg_i_ptr); /* product so far */
   dotimesC(argcount,argcount, {
     var object arg = NEXT(arg_i_ptr);
-    x = (eq(x,arg) ? N_square_N(x) : N_N_mal_N(x,arg));
+    x = (eq(x,arg) ? N_square_N(x) : N_N_mult_N(x,arg));
   });
   VALUES1(x); set_args_end_pointer(rest_args_pointer);
 }
 
-LISPFUN(durch,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(slash,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (/ number {number}), CLTL p. 200
      method:
      (/ x) extra.
@@ -764,26 +762,26 @@ LISPFUN(durch,seclass_foldable,1,0,rest,nokey,0,NIL)
   test_number_args(argcount,args_pointer); /* all arguments numbers? */
   if (argcount==0) {
     /* unary division */
-    value1 = N_durch_N(Next(args_pointer));
+    value1 = N_div_N(Next(args_pointer));
   } else {
     /* method:
        n+1 arguments Arg[0..n].
        x:=Arg[0], for i:=1 to n do ( x := x/Arg[i] ), return(x). */
     var gcv_object_t* arg_i_ptr = args_pointer;
     var object x = NEXT(arg_i_ptr); /* difference so far */
-    dotimespC(argcount,argcount, { x = N_N_durch_N(x,NEXT(arg_i_ptr)); } );
+    dotimespC(argcount,argcount, { x = N_N_div_N(x,NEXT(arg_i_ptr)); } );
     value1 = x;
   }
   mv_count=1; set_args_end_pointer(args_pointer);
 }
 
-LISPFUNNF(einsplus,1)
+LISPFUNNF(plus_one,1)
 { /* (1+ number), CLTL p. 200 */
   var object x = check_number(popSTACK());
   VALUES1(N_1_plus_N(x));
 }
 
-LISPFUNNF(einsminus,1)
+LISPFUNNF(minus_one,1)
 { /* (1- number), CLTL p. 200 */
   var object x = check_number(popSTACK());
   VALUES1(N_minus1_plus_N(x));
@@ -860,7 +858,7 @@ LISPFUN(xgcd,seclass_foldable,0,0,rest,nokey,0,NIL)
       I_I_xgcd_I_I_I(arg_0,arg_1);
       Before(arg_i_ptr) = STACK_2;
     }
-    loop {
+    while (1) {
       NEXT(arg_i_ptr) = STACK_1;
       g = STACK_0; skipSTACK(3);
       if (arg_i_ptr == args_end_pointer)
@@ -869,7 +867,7 @@ LISPFUN(xgcd,seclass_foldable,0,0,rest,nokey,0,NIL)
       var gcv_object_t* arg_j_ptr = arg_i_ptr;
       do {
         var object arg_j = Before(arg_j_ptr);
-        BEFORE(arg_j_ptr) = I_I_mal_I(STACK_2,arg_j);
+        BEFORE(arg_j_ptr) = I_I_mult_I(STACK_2,arg_j);
       } while (arg_j_ptr != rest_args_pointer);
     }
     value1 = g; /* g as 1. value */
@@ -877,7 +875,7 @@ LISPFUN(xgcd,seclass_foldable,0,0,rest,nokey,0,NIL)
       var object* mvp = &value2;
       var gcv_object_t* arg_i_ptr = rest_args_pointer;
       if (argcount >= mv_limit-2)
-        fehler_mv_zuviel(S(xgcd));
+        error_mv_toomany(S(xgcd));
       mv_count = argcount+2;
       dotimespC(argcount,argcount+1, { *mvp++ = NEXT(arg_i_ptr); } );
     }
@@ -1100,7 +1098,7 @@ global maygc object coerce_float (object obj, object type) {
  > obj: an object, usually a real number
  < result: its value as a C 'double'
  can trigger GC */
-global maygc double to_double (object x) {
+modexp maygc double to_double (object x) {
   double ret;
   x = check_real(x);
   DF_to_c_double(R_to_DF(x), (dfloatjanus*)&ret);
@@ -1112,7 +1110,7 @@ global maygc double to_double (object x) {
  > obj: an object, usually an integer
  < result: its value as a C 'int'
  can trigger GC */
-global maygc int to_int (object x) {
+modexp maygc int to_int (object x) {
   x = check_integer(x);
   return I_to_L(x);
 }
@@ -1278,6 +1276,69 @@ LISPFUNNF(scale_float,2)
   VALUES1(F_I_scale_float_F(STACK_1,STACK_0)); skipSTACK(2);
 }
 
+LISPFUNNF(float_scale_exponent,1)
+{ /* for a Float x:
+ sign, mantissa and n, with n being an integer
+ and mantissa being a floating-point-number, 0.1 <= mantissa < 1,
+ arg = mantissa * 10^n (also 10^(n-1) <= arg < 10^n ).
+ (for arg=zero: zero and n=0.)
+ This is similar to DECODE-FLOAT, but decimal instead of binary and
+ with a different return value order to accommodate format.lisp.
+ original code from format.lisp:
+ (defun format-scale-exponent-aux (arg zero one ten tenth lg2)
+  (multiple-value-bind (significand expon) (decode-float arg)
+    (declare (ignore significand))
+    (if (zerop arg)
+      (values zero 0)
+      (let* ((expon10a (truncate (* expon lg2))) ; round is not used, in order to avoid overflow
+             (signif10a (/ arg (expt ten expon10a))))
+        (do ((ten-power ten (* ten-power ten))
+             (signif10b signif10a (/ signif10a ten-power))
+             (expon10b expon10a (1+ expon10b)))
+            ((< signif10b one)
+             (do ((ten-power ten (* ten-power ten))
+                  (signif10c signif10b (* signif10b ten-power))
+                  (expon10c expon10b (1- expon10c)))
+                 ((>= signif10c tenth)
+                  (values signif10c expon10c)))))))))
+ (defun format-scale-exponent (arg)
+  (format-scale-exponent-aux arg 0 1 10 1/10 (log 2 (float 10 arg))) */
+  STACK_0 = check_float(STACK_0);
+  if (R_zerop(STACK_0)) {
+    VALUES3(Fixnum_0/*exp*/,I_F_float_F(Fixnum_0,STACK_0)/*mant*/,Fixnum_0);
+    skipSTACK(1); return;
+  }
+  var int s;                    /* sign */
+  if (R_minusp(STACK_0)) {
+    s = -1;
+    STACK_0 = F_minus_F(STACK_0);
+  } else s = 1;
+  /* STACK_0 > 0 */
+  /* increase computational precision to avoid overflow
+     short -> double since single has the same exponent size as short */
+  pushSTACK(F_extend2_F(STACK_0));
+  F_floor_I_F(R_R_log_R(STACK_0,fixnum(10)));
+  STACK_1 = I_1_plus_I(STACK_1);
+  /* STACK: x, x', q, r */
+  STACK_0 = R_I_expt_R(fixnum(10),STACK_1); /* 10^q */
+  STACK_0 = R_R_div_R(STACK_2,STACK_0);     /* x/10^q */
+  STACK_0 = F_F_float_F(STACK_0,STACK_3);   /* restore the precision */
+  /* if the mantissa is one, increase q and divide r */
+  if (N_N_equal(Fixnum_1,STACK_0)) {
+    STACK_0 = N_N_div_N(STACK_0,fixnum(10)); /* r <- r / 10 */
+    STACK_1 = I_1_plus_I(STACK_1);           /* q <- q+1 */
+  }
+  /* if 10^q=X, increase q and set r=1/10 */
+  STACK_2 = R_I_expt_R(fixnum(10),STACK_1);
+  STACK_2 = RA_F_float_F(STACK_2,STACK_3,false); /* ignore overflows! */
+  if (!eq(nullobj,STACK_2) && N_N_equal(STACK_2,STACK_3)) {
+    object tmp = make_ratio(Fixnum_1,fixnum(10));
+    STACK_0 = RA_F_float_F(tmp,STACK_3,true); /* r <- 1/10 */
+    STACK_1 = I_1_plus_I(STACK_1);            /* q <- q+1 */
+  }
+  VALUES3(STACK_1/*exp*/,STACK_0/*mant*/,sfixnum(s)/*sign*/); skipSTACK(4);
+}
+
 LISPFUNNF(float_radix,1)
 { /* (FLOAT-RADIX float), CLTL p. 218 */
   var object f = check_float(popSTACK());
@@ -1303,17 +1364,17 @@ LISPFUN(float_digits,seclass_foldable,1,1,norest,nokey,0,NIL)
     VALUES1(F_float_digits_I(STACK_1));
   } else { /* 2 arguments: (FLOAT-DIGITS number digits) */
     if (!posfixnump(STACK_0)) /* not a fixnum!?? */
-      fehler_digits(STACK_0);
+      error_digits(STACK_0);
     var uintV d = posfixnum_to_V(STACK_0); /* = I_to_UL(STACK_0); ?? */
     if (d==0) /* should be >0 */
-      fehler_digits(STACK_0);
+      error_digits(STACK_0);
     STACK_1 = check_real(STACK_1);
     /* convert STACK_1 into a float with at least d bits: */
     if (d > DF_mant_len+1) { /* -> long-float */
       d = ceiling(d,intDsize);
      #if (intWCsize<intVsize)
       if (d >= vbit(intWCsize))
-        fehler_LF_toolong();
+        error_LF_toolong();
      #endif
       VALUES1(R_to_LF(STACK_1,d));
     } else if (d > FF_mant_len+1) /* a double-float is sufficient */
@@ -1561,7 +1622,7 @@ LISPFUNNF(ldb_test,2)
 }
 
 LISPFUNNF(mask_field,2)
-{ /* (MASK_FIELD bytespec integer), CLTL p. 226 */
+{ /* (MASK-FIELD bytespec integer), CLTL p. 226 */
   var object x = check_integer(STACK_0);
   var object b = STACK_1; /* Type check will take place later */
   skipSTACK(2);
@@ -1595,19 +1656,19 @@ local object check_random_state (object obj) {
       pushSTACK(S(random_state)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(obj); pushSTACK(S(random_state));
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(type_error,GETTEXT("~S: argument should be a ~S, not ~S"));
+      error(type_error,GETTEXT("~S: argument should be a ~S, not ~S"));
     }
   } else { /* not specified -> default from *RANDOM-STATE* */
-    obj = Symbol_value(S(random_state_stern)); /* value of *RANDOM-STATE* */
+    obj = Symbol_value(S(random_state_star)); /* value of *RANDOM-STATE* */
     if (random_state_p(obj)) {
       return obj;
     } else {
       pushSTACK(obj); /* TYPE-ERROR slot DATUM */
       pushSTACK(S(random_state)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(obj); pushSTACK(S(random_state));
-      pushSTACK(S(random_state_stern));
+      pushSTACK(S(random_state_star));
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(type_error,GETTEXT("~S: the value of ~S should be a ~S, not ~S"));
+      error(type_error,GETTEXT("~S: the value of ~S should be a ~S, not ~S"));
     }
   }
 }
@@ -1629,7 +1690,7 @@ LISPFUN(random,seclass_default,1,1,norest,nokey,0,NIL)
   pushSTACK(x); /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_random_arg)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(x); pushSTACK(S(random));
-  fehler(type_error,
+  error(type_error,
          GETTEXT("~S: argument should be positive and an integer or float, not ~S"));
 }
 
@@ -1666,12 +1727,15 @@ local maygc object make_random_state (object r)
     get_real_time(&real_time);
     seed_lo = highlow32(real_time.tv_sec,real_time.tv_usec); /* 16+16 random bits */
     #endif
-    #ifdef TIME_UNIX_TIMES
-    seed_lo = get_real_time(); /* time, CLK_TCK Hz */
-    #endif
     begin_system_call();
-    seed_hi = (rand() /* random 31 bits (on UNIX_BSD) resp. 16 bits (on UNIX_SYSV) */
-               << 8) ^ (uintL)(getpid()); /* ca. 8 bits from the Process ID */
+    var unsigned int pid = (unsigned int)(getpid());
+    seed_hi = (
+     #if defined(HAVE_RAND_R)
+      rand_r(&pid)
+     #else
+      rand() /* random 31 bits (on UNIX_BSD) resp. 16 bits (on UNIX_SYSV) */
+     #endif
+      << 8) ^ pid; /* ca. 8 bits from the Process ID */
     end_system_call();
    #elif defined(WIN32_NATIVE)
     var internal_time_t real_time; /* time */
@@ -1681,7 +1745,7 @@ local maygc object make_random_state (object r)
     seed_hi = CoGetCurrentProcess();
     end_system_call();
    #else
-    #error "make_random_state() is not defined on this platform!"
+    #error make_random_state() is not defined on this platform!
    #endif
   } else { /* check random-state: */
     r = check_random_state( (nullp(r) ? unbound : r) );
@@ -1708,7 +1772,7 @@ LISPFUN(make_random_state,seclass_default,0,1,norest,nokey,0,NIL)
   VALUES1(make_random_state(popSTACK()));
 }
 
-LISPFUNNF(fakultaet,1)
+LISPFUNNF(factorial,1)
 { /* (! integer) */
   var object x = check_posfixnum(popSTACK()); /* x is a fixnum >=0. */
   VALUES1(FN_fak_I(x));
@@ -1786,14 +1850,14 @@ LISPFUNN(set_long_float_digits,1)
 { /* ((SETF LONG-FLOAT-DIGITS) digits) */
   var object arg = STACK_0;
   if (!posfixnump(arg)) /* not necessarily Fixnum!?? */
-    fehler_digits(arg);
+    error_digits(arg);
   var uintV d = posfixnum_to_V(arg); /* = I_to_UL(arg); ?? */
   if (d==0) /* should be >0 */
-    fehler_digits(arg);
+    error_digits(arg);
   d = ceiling(d,intDsize);
  #if (intWCsize<intVsize)
   if (d >= vbit(intWCsize))
-    fehler_LF_toolong();
+    error_LF_toolong();
  #endif
   if (d < LF_minlen)
     d = LF_minlen; /* coerce d>=LF_minlen */
@@ -1806,10 +1870,10 @@ LISPFUNN(set_long_float_digits,1)
 local maygc object log_digits (object x, object digits, gcv_object_t* objptr) {
   /* check digits-argument: */
   if (!posfixnump(digits)) /* not necessarily Fixnum!?? */
-    fehler_digits(digits);
+    error_digits(digits);
   var uintV d = posfixnum_to_V(digits); /* = I_to_UL(digits); ?? */
   if (d==0) /* should be >0 */
-    fehler_digits(digits);
+    error_digits(digits);
   /* fetch known value: */
   var object ln_x = *objptr;
   /* convert ln_x into a float with at least d bits: */
@@ -1817,7 +1881,7 @@ local maygc object log_digits (object x, object digits, gcv_object_t* objptr) {
     d = ceiling(d,intDsize);
    #if (intWCsize<intVsize)
     if (d >= vbit(intWCsize))
-      fehler_LF_toolong();
+      error_LF_toolong();
    #endif
     var uintC oldlen = Lfloat_length(ln_x); /* existing length */
     if (d < oldlen)
@@ -2022,7 +2086,7 @@ global maygc void init_arith (void)
   define_variable(S(read_default_float_format),S(single_float)); /* *READ-DEFAULT-FLOAT-FORMAT* := 'SINGLE-FLOAT */
   {
     var object obj = make_random_state(T); /* new random Random-State */
-    define_variable(S(random_state_stern),obj); /* =: *RANDOM-STATE* */
+    define_variable(S(random_state_star),obj); /* =: *RANDOM-STATE* */
   }
   /* SYS::*INHIBIT-FLOATING-POINT-UNDERFLOW* := NIL */
   define_variable(S(inhibit_floating_point_underflow),NIL);

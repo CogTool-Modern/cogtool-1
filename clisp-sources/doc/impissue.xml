@@ -75,7 +75,7 @@
  <varlistentry id="iss062"><term>&iss062;</term>&yes;</varlistentry>
  <varlistentry id="iss063"><term>&iss063;</term>&yes;</varlistentry>
  <varlistentry id="iss064"><term>&iss064;</term>&yes;</varlistentry>
- <varlistentry id="iss065"><term>&iss065;</term>&no;</varlistentry>
+ <varlistentry id="iss065"><term>&iss065;</term>&yes;</varlistentry>
  <varlistentry id="iss066"><term>&iss066;</term>&yes;</varlistentry>
  <varlistentry id="iss067"><term>&iss067;</term>&yes;</varlistentry>
  <varlistentry id="iss068"><term>&iss068;</term>&yes;</varlistentry>
@@ -341,7 +341,7 @@
  <varlistentry id="iss300"><term>&iss300;</term>&yes;</varlistentry>
  <varlistentry id="iss301"><term>&iss301;</term>&yes;</varlistentry>
  <varlistentry id="iss302"><term>&iss302;</term>&yes;</varlistentry>
- <varlistentry id="iss303"><term>&iss303;</term>&no;</varlistentry>
+ <varlistentry id="iss303"><term>&iss303;</term>&yes;</varlistentry>
  <varlistentry id="iss304"><term>&iss304;</term>&yes;</varlistentry>
  <varlistentry id="iss305"><term>&iss305;</term>&yes;</varlistentry>
  <varlistentry id="iss306"><term>&iss306;</term>&yes;</varlistentry>

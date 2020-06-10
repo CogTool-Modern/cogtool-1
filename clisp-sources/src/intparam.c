@@ -19,11 +19,6 @@
 #undef ushort
 #undef uchar
 
-#if !(defined(__STDC__) || defined(__cplusplus))
-/* Only for use in function parameter lists and as function return type. */
-#define void
-#endif
-
 /* Boolean type.  */
 /* Not a typedef because AIX <sys/types.h> already defines boolean_t.  */
 #define boolean_t int
@@ -39,7 +34,7 @@ typedef unsigned char  uchar;
 typedef unsigned short  ushort;
 typedef unsigned /* int */  uint;
 typedef unsigned long  ulong;
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
 typedef long long  longlong;
 typedef unsigned long long  ulonglong;
 #endif
@@ -77,24 +72,14 @@ int next_random_bit(void)
   return (random_table[random_position/8] >> (random_position % 8)) & 1;
 }
 
-#if defined(__STDC__) || defined(__cplusplus)
 void printf_underscored (const char* string)
-#else
-void printf_underscored(string)
-  char* string;
-#endif
 { char c;
   while ((c = *string++) != '\0') { printf("%c",(c==' ' ? '_' : c)); }
 }
 
 /* string_length(string) is the same as strlen(string).
    Better avoid depending on <string.h>. */
-#if defined(__STDC__) || defined(__cplusplus)
-int string_length (char* string)
-#else
-int string_length(string)
-  char* string;
-#endif
+int string_length (const char* string)
 { int count = 0;
   while (*string++ != '\0') { count++; }
   return count;
@@ -104,56 +89,72 @@ static int char_bitsize, short_bitsize, int_bitsize, long_bitsize;
 static int uchar_bitsize, ushort_bitsize, uint_bitsize, ulong_bitsize;
 static boolean_t char_uchar_same, short_ushort_same, int_uint_same, long_ulong_same;
 static int pointer_bitsize;
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
 static int longlong_bitsize, ulonglong_bitsize;
 static boolean_t longlong_ulonglong_same;
 #endif
 
 void main1(void) {
-#define get_integer_bitsize(type,where)  \
-  { type x = 1;                                 \
-    int bits = 0;                               \
-    while(1) {                                  \
-      if (x==0) break;                          \
-        x = x+x;                                \
-        bits++;                                 \
-        if (bits==1000) { bits = -1; break; }   \
-      }                                         \
-    where = bits;                               \
+#define get_unsigned_integer_bitsize(type,where)  \
+  { type x = 1;                               \
+    int bits = 0;                             \
+    while(1) {                                \
+      if (x==0) break;                        \
+      x = x+x;                                \
+      bits++;                                 \
+      if (bits==1000) { bits = -1; break; }   \
+    }                                         \
+    where = bits;                             \
+  }
+#define get_signed_integer_bitsize(type,unsigned_type,where)  \
+  { /* Signed integer overflow is "undefined behaviour" in C99, and gcc-4.3    \
+       (without -fwrapv option) actually does weird things when signed integer \
+       overflow occurs. Therefore perform the addition on the unsigned type.   \
+       Drawback: This will not detect cases where the signed type has more bits\
+       than the unsigned type but the same size according to sizeof. Blech. */ \
+    type x = 1;                               \
+    int bits = 0;                             \
+    while(1) {                                \
+      if (x==0) break;                        \
+      x = (unsigned_type)x + (unsigned_type)x;\
+      bits++;                                 \
+      if (bits==1000) { bits = -1; break; }   \
+    }                                         \
+    where = bits;                             \
   }
 #define print_integer_bitsize(type,typestr,where)  \
   { if (where >= 0) {                                                   \
-      printf("/* Integers of t%spe %s have %ld bits. */\n","y",typestr,(long)where); \
+      printf("/* Integers of type %s have %ld bits. */\n",typestr,(long)where); \
       if (typestr[0] != 'u')                                            \
         { printf("#define "); printf_underscored(typestr); printf("_bitsize %ld\n",(long)where); } \
       printf("\n");                                                     \
     } else                                                              \
-      printf("#error \"Integers of t%spe %s have no binary representation!!\"\n","y",typestr); \
+      printf("#error \"Integers of type %s have no binary representation!!\"\n",typestr); \
     if (where != char_bitsize * sizeof(type))                           \
-      printf("#error \"Formula BITSIZE(T) = SIZEOF(T) * BITSPERBYTE does not hold for t%spe %s!!\"\n","y",typestr); \
+      printf("#error \"Formula BITSIZE(T) = SIZEOF(T) * BITSPERBYTE does not hold for type %s!!\"\n",typestr); \
   }
-  get_integer_bitsize(schar,char_bitsize);
-  get_integer_bitsize(short,short_bitsize);
-  get_integer_bitsize(int,int_bitsize);
-  get_integer_bitsize(long,long_bitsize);
+  get_signed_integer_bitsize(schar,uchar,char_bitsize);
+  get_signed_integer_bitsize(short,ushort,short_bitsize);
+  get_signed_integer_bitsize(int,uint,int_bitsize);
+  get_signed_integer_bitsize(long,ulong,long_bitsize);
   print_integer_bitsize(schar,"char",char_bitsize);
   print_integer_bitsize(short,"short",short_bitsize);
   print_integer_bitsize(int,"int",int_bitsize);
   print_integer_bitsize(long,"long",long_bitsize);
-#ifdef HAVE_LONGLONG
-  get_integer_bitsize(longlong,longlong_bitsize);
+#ifdef HAVE_LONG_LONG_INT
+  get_signed_integer_bitsize(longlong,ulonglong,longlong_bitsize);
   print_integer_bitsize(longlong,"long long",longlong_bitsize);
 #endif
-  get_integer_bitsize(uchar,uchar_bitsize);
-  get_integer_bitsize(ushort,ushort_bitsize);
-  get_integer_bitsize(uint,uint_bitsize);
-  get_integer_bitsize(ulong,ulong_bitsize);
+  get_unsigned_integer_bitsize(uchar,uchar_bitsize);
+  get_unsigned_integer_bitsize(ushort,ushort_bitsize);
+  get_unsigned_integer_bitsize(uint,uint_bitsize);
+  get_unsigned_integer_bitsize(ulong,ulong_bitsize);
   print_integer_bitsize(uchar,"unsigned char",uchar_bitsize);
   print_integer_bitsize(ushort,"unsigned short",ushort_bitsize);
   print_integer_bitsize(uint,"unsigned int",uint_bitsize);
   print_integer_bitsize(ulong,"unsigned long",ulong_bitsize);
-#ifdef HAVE_LONGLONG
-  get_integer_bitsize(ulonglong,ulonglong_bitsize);
+#ifdef HAVE_LONG_LONG_INT
+  get_unsigned_integer_bitsize(ulonglong,ulonglong_bitsize);
   print_integer_bitsize(ulonglong,"unsigned long long",ulonglong_bitsize);
 #endif
 }
@@ -167,7 +168,7 @@ void main2(void) {
   compare_integer_bitsizes("short","unsigned short",short_bitsize,ushort_bitsize);
   compare_integer_bitsizes("int","unsigned int",int_bitsize,uint_bitsize);
   compare_integer_bitsizes("long","unsigned long",long_bitsize,ulong_bitsize);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   compare_integer_bitsizes("long long","unsigned long long",longlong_bitsize,ulonglong_bitsize);
 #endif
 }
@@ -220,7 +221,7 @@ void main3(void) {
   compare_integer_representation(short,ushort,"short","unsigned short",short_bitsize,ushort_bitsize,short_ushort_same);
   compare_integer_representation(int,uint,"int","unsigned int",int_bitsize,uint_bitsize,int_uint_same);
   compare_integer_representation(long,ulong,"long","unsigned long",long_bitsize,ulong_bitsize,long_ulong_same);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   compare_integer_representation(longlong,ulonglong,"long long","unsigned long long",longlong_bitsize,ulonglong_bitsize,longlong_ulonglong_same);
 #endif
   printf("\n");
@@ -257,9 +258,9 @@ void main4(void) {
       }                                                                 \
     }                                                                   \
     if (!left_works)                                                    \
-      printf("#error \"Left shift of integers of t%spe %s does not work!!\"\n","y",typestr); \
+      printf("#error \"Left shift of integers of type %s does not work!!\"\n",typestr); \
     if (!right_works)                                                   \
-      printf("#error \"Right shift of integers of t%spe %s does not work!!\"\n","y",typestr); \
+      printf("#error \"Right shift of integers of type %s does not work!!\"\n",typestr); \
   }
 #define test_integer_sshift(type,typestr,type_bitsize)                  \
   if (type_bitsize >= 0) {                                              \
@@ -291,22 +292,22 @@ void main4(void) {
       }                                                                 \
     }                                                                   \
     if (!left_works)                                                    \
-      printf("#error \"Left shift of integers of t%spe %s does not work!!\"\n","y",typestr); \
+      printf("#error \"Left shift of integers of type %s does not work!!\"\n",typestr); \
     if (!right_works)                                                   \
-      printf("#error \"Right shift of integers of t%spe %s does not work!!\"\n","y",typestr); \
+      printf("#error \"Right shift of integers of type %s does not work!!\"\n",typestr); \
   }
   test_integer_ushift(uchar,"unsigned char",uchar_bitsize);
   test_integer_ushift(ushort,"unsigned short",ushort_bitsize);
   test_integer_ushift(uint,"unsigned int",uint_bitsize);
   test_integer_ushift(ulong,"unsigned long",ulong_bitsize);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   test_integer_ushift(ulonglong,"unsigned long long",ulonglong_bitsize);
 #endif
   test_integer_sshift(schar,"char",char_bitsize);
   test_integer_sshift(short,"short",short_bitsize);
   test_integer_sshift(int,"int",int_bitsize);
   test_integer_sshift(long,"long",long_bitsize);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   test_integer_sshift(longlong,"long long",longlong_bitsize);
 #endif
 }
@@ -364,7 +365,7 @@ void main5(void) {
   test_integer_casts(ushort,short,"unsigned short","short",ushort_bitsize,short_bitsize,0);
   test_integer_casts(uint,int,"unsigned int","int",uint_bitsize,int_bitsize,0);
   test_integer_casts(ulong,long,"unsigned long","long",ulong_bitsize,long_bitsize,0);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   test_integer_casts(longlong,ulonglong,"long long","unsigned long long",longlong_bitsize,ulonglong_bitsize,0);
   test_integer_casts(ulonglong,longlong,"unsigned long long","long long",ulonglong_bitsize,longlong_bitsize,0);
 #endif
@@ -375,7 +376,7 @@ void main5(void) {
   test_integer_casts(ushort,uint,"unsigned short","unsigned int",ushort_bitsize,uint_bitsize,1);
   test_integer_casts(ushort,ulong,"unsigned short","unsigned long",ushort_bitsize,ulong_bitsize,1);
   test_integer_casts(uint,ulong,"unsigned int","unsigned long",uint_bitsize,ulong_bitsize,1);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   test_integer_casts(uchar,ulonglong,"unsigned char","unsigned long long",uchar_bitsize,ulonglong_bitsize,1);
   test_integer_casts(ushort,ulonglong,"unsigned short","unsigned long long",ushort_bitsize,ulonglong_bitsize,1);
   test_integer_casts(uint,ulonglong,"unsigned int","unsigned long long",uint_bitsize,ulonglong_bitsize,1);
@@ -387,7 +388,7 @@ void main5(void) {
   test_integer_casts(short,int,"short","int",short_bitsize,int_bitsize,2);
   test_integer_casts(short,long,"short","long",short_bitsize,long_bitsize,2);
   test_integer_casts(int,long,"int","long",int_bitsize,long_bitsize,2);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   test_integer_casts(schar,longlong,"char","long long",char_bitsize,longlong_bitsize,2);
   test_integer_casts(short,longlong,"short","long long",short_bitsize,longlong_bitsize,2);
   test_integer_casts(int,longlong,"int","long long",int_bitsize,longlong_bitsize,2);
@@ -400,7 +401,7 @@ void main5(void) {
   test_integer_casts(ushort,int,"unsigned short","int",ushort_bitsize,int_bitsize,1);
   test_integer_casts(ushort,long,"unsigned short","long",ushort_bitsize,long_bitsize,1);
   test_integer_casts(uint,long,"unsigned int","long",uint_bitsize,long_bitsize,1);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   test_integer_casts(uchar,longlong,"unsigned char","long long",uchar_bitsize,longlong_bitsize,1);
   test_integer_casts(ushort,longlong,"unsigned short","long long",ushort_bitsize,longlong_bitsize,1);
   test_integer_casts(uint,longlong,"unsigned int","long long",uint_bitsize,longlong_bitsize,1);
@@ -412,7 +413,7 @@ void main5(void) {
   test_integer_casts(short,uint,"short","unsigned int",short_bitsize,uint_bitsize,2);
   test_integer_casts(short,ulong,"short","unsigned long",short_bitsize,ulong_bitsize,2);
   test_integer_casts(int,ulong,"int","unsigned long",int_bitsize,ulong_bitsize,2);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   test_integer_casts(schar,ulonglong,"char","unsigned long long",char_bitsize,ulonglong_bitsize,2);
   test_integer_casts(short,ulonglong,"short","unsigned long long",short_bitsize,ulonglong_bitsize,2);
   test_integer_casts(int,ulonglong,"int","unsigned long long",int_bitsize,ulonglong_bitsize,2);
@@ -429,7 +430,7 @@ void main6(void) {
   check_sizeof_pointer(long*,"long *");
   check_sizeof_pointer(function*,"function *");
   pointer_bitsize = char_bitsize * sizeof(char*);
-  printf("/* Pointers of t%spe %s have %ld bits. */\n","y","char *",(long)pointer_bitsize);
+  printf("/* Pointers of type %s have %ld bits. */\n","char *",(long)pointer_bitsize);
   printf("#define pointer_bitsize %ld\n",(long)pointer_bitsize);
   printf("\n");
 }
@@ -488,14 +489,14 @@ void main8(void) {
       printf(" %ld\n",alignment);                                       \
     }                                                                   \
     if ((alignment & (alignment-1)) != 0)                               \
-      printf("#error \"The alignment %ld of t%spe %s is not a power of two!!\"\n",alignment,"y",typestr); \
+      printf("#error \"The alignment %ld of type %s is not a power of two!!\"\n",alignment,typestr); \
     printf("\n");                                                       \
   }
   get_alignment(char,"char"); get_alignment(uchar,"unsigned char");
   get_alignment(short,"short"); get_alignment(ushort,"unsigned short");
   get_alignment(int,"int"); get_alignment(uint,"unsigned int");
   get_alignment(long,"long"); get_alignment(ulong,"unsigned long");
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   get_alignment(longlong,"long long"); get_alignment(ulonglong,"unsigned long long");
 #endif
   get_alignment(float,"float");
@@ -525,7 +526,7 @@ void main9(void) {
       }                                                                 \
       if (big_endian && little_endian) {                                \
         if (sizeof(type) != 1)                                          \
-          printf("#error \"Endianness of t%spe %s in memory doesn't matter.\"\n","y",typestr); \
+          printf("#error \"Endianness of type %s in memory doesn't matter.\"\n",typestr); \
       }                                                                 \
       if (big_endian && !little_endian) {                               \
         printf("/* Type %s is stored BIG-ENDIAN in memory (i.e. like mc68000 or sparc). */\n",typestr); \
@@ -540,13 +541,13 @@ void main9(void) {
       if (!big_endian && !little_endian)                                \
         printf("#error \"Type %s is stored in memory in an obscure manner!!\"\n",typestr); \
     } else                                                              \
-      printf("#error \"Endianness makes no sense for t%spe %s !!\"\n","y",typestr); \
+      printf("#error \"Endianness makes no sense for type %s !!\"\n",typestr); \
   }
   get_endian(uchar,"unsigned char",uchar_bitsize);
   get_endian(ushort,"unsigned short",ushort_bitsize);
   get_endian(uint,"unsigned int",uint_bitsize);
   get_endian(ulong,"unsigned long",ulong_bitsize);
-#ifdef HAVE_LONGLONG
+#ifdef HAVE_LONG_LONG_INT
   get_endian(ulonglong,"unsigned long long",ulonglong_bitsize);
 #endif
   printf("\n");
@@ -580,8 +581,9 @@ void main10(void)
     printf("#error \"Unknown stack model -- incorrect C semantics!!\"\n");
 }
 
-int main()
-{ main1();
+int main (int argc, char *argv[]) {
+  if (freopen(argc==1 ? "conftest.h" : argv[1], "w", stdout) == NULL) return 1;
+  main1();
   main2();
   main3();
   main4();
@@ -591,6 +593,5 @@ int main()
   main8();
   main9();
   main10();
-  if (ferror(stdout) || fclose(stdout)) return 1;
-  return 0;
+  return ferror(stdout) || fclose(stdout);
 }

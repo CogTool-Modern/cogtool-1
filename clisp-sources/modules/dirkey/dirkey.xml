@@ -3,15 +3,19 @@
 <section id="dir-key"><title>Directory Access</title>
 
 <para>This module provides some directory access from lisp,
- in package &ldap-pac;.  3 types of directory keys
- may exist, depending on the compilation environment.</para>
+ in package &ldap-pac;.</para>
+<simpara>When this module is present, &features-my;
+ contains the symbol <constant>:DIRKEY</constant>.</simpara>
+
+<para>3 types of directory keys may exist,
+ depending on the compilation environment.</para>
 
 <variablelist id="dir-key-type"><title>valid directory key types</title>
  <varlistentry><term>:win32</term>
   <listitem><simpara>&win32; registry access
   </simpara></listitem></varlistentry>
  <varlistentry><term>:gnome</term>
-  <listitem><simpara><ulink url="http://developer.gnome.org/doc/API/libgnome/gnome-gnome-config.html">gnome-config</ulink> access
+  <listitem><simpara><ulink url="http://library.gnome.org/devel/libgnome/stable/libgnome-gnome-config.html">gnome-config</ulink> access
   </simpara></listitem></varlistentry>
  <varlistentry><term>:ldap</term>
   <listitem><simpara>LDAP interface via
@@ -114,7 +118,7 @@ future).</para>
     <function>LDAP:DIR-KEY-VALUES</function>,
     <function>LDAP:DIR-KEY-CHILDREN</function> and
     <function>LDAP:DIR-KEY-DUMP-TREE</function> in
-    <filename role="clisp-cvs">modules/dirkey/dirkey.lisp</filename>.
+    <filename role="clisp-cvs">modules/dirkey/dirkey1.lisp</filename>.
     </simpara></listitem></varlistentry>
 </variablelist>
 

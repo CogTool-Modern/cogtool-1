@@ -1,4 +1,4 @@
-;;; Copyright (C) 2003-2005 by Sam Steingold
+;;; Copyright (C) 2003-2008, 2010 by Sam Steingold
 ;;; This is Free Software, covered by the GNU GPL (v2)
 ;;; See <http://www.gnu.org/copyleft/gpl.html>
 
@@ -30,6 +30,7 @@
 (use-package '("BDB") "EXT")
 (ext:re-export "BDB" "EXT")
 (pushnew :berkeley-db *features*)
+(provide "bdb")
 (in-package "BDB")
 
 (setf (documentation (find-package "BDB") 'sys::impnotes) "berkeley-db")
@@ -207,7 +208,7 @@
   ;; The version of the log file type.
   (version 0 :type (unsigned-byte 32) :read-only t)
   ;; The mode of any created log files.
-  (mode 0 :type int :read-only t)
+  (mode 0 :type (unsigned-byte 32) :read-only t)
   ;; The in-memory log record cache size.
   (lg_bsize 0 :type (unsigned-byte 32) :read-only t)
   ;; The current log file size.
@@ -251,7 +252,7 @@
   (region_nowait 0 :type (unsigned-byte 32) :read-only t))
 
 (defstruct (db-txn-active (:constructor mktxnactive
-                                        (txnid parentid lsn xa_status xid)))
+                                        (txnid parentid lsn status gid)))
   ;; The transaction ID of the transaction.
   (txnid 0 :type (unsigned-byte 32) :read-only t)
   ;; The transaction ID of the parent transaction (or 0, if no parent).
@@ -260,10 +261,10 @@
   (lsn nil :type lsn :read-only t)
   ;; If the transaction is an XA transaction, the status of the
   ;; transaction, otherwise 0.
-  (xa_status 0 :type (unsigned-byte 32) :read-only t)
+  (status 0 :type (or keyword (unsigned-byte 32)) :read-only t)
   ;; If the transaction is an XA transaction, the transaction's XA ID.
-  (xid nil :type (vector (unsigned-byte 8)
-                         #,(dbe-get-options nil :DB-XIDDATASIZE))
+  (gid nil :type (vector (unsigned-byte 8)
+                         #,(dbe-get-options nil :DB-GID-SIZE))
        :read-only t))
 
 (defstruct (db-txn-stat (:constructor mktxnstat
@@ -331,8 +332,7 @@
   (declare (ignore abort))
   (dbe-close dbe))
 (defmethod close ((db db) &key abort)
-  (declare (ignore abort))
-  (db-close db))
+  (db-close db :nosync abort))
 (defmethod close ((cu dbc) &key abort)
   (declare (ignore abort))
   (dbc-close cu))
@@ -347,7 +347,7 @@
 )
 
 (define-condition bdb-error (simple-error)
-  (($errno :initarg :errno :reader bdb-error-number)))
+  (($ecode :reader bdb-error-code :initarg :code)))
 
 ;;; restore locks
 (pushnew "BDB" custom:*system-package-list* :test #'string=)

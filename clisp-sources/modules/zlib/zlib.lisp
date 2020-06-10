@@ -2,7 +2,7 @@
 ;;; <http://www.gzip.org/zlib>, <http://www.zlib.org>
 ;;;
 ;;; Copyright (C) 2004 by Joerg Hoehle
-;;; Copyright (C) 2004-2005 by Sam Steingold
+;;; Copyright (C) 2004-2008 by Sam Steingold
 ;;; This is Free Software, covered by the GNU GPL (v2)
 ;;; See http://www.gnu.org/copyleft/gpl.html
 
@@ -81,4 +81,3 @@
 (pushnew :zlib *features*)
 (provide "zlib")
 (pushnew "ZLIB" custom:*system-package-list* :test #'string=)
-(setf (package-lock "ZLIB") t)

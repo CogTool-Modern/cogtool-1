@@ -1,3 +1,634 @@
+2.49 (2010-07-07)
+=================
+
+User visible changes
+--------------------
+
+* New command line option -disable-readline lets working around bugs and
+  incompatibilities between readline CLISP was built against and the
+  library actually installed.
+  See <http://clisp.cons.org/impnotes/clisp.html#opt-norl> for details.
+
+* FFI:OPEN-FOREIGN-LIBRARY now accepts the :REQUIRE argument.
+  See <http://clisp.cons.org/impnotes/dffi.html#dffi-open-lib> for details.
+
+* New user variable CUSTOM:*USER-LIB-DIRECTORY* is respected by REQUIRE
+  and used by "clisp-link install".
+  Dynamic modules are now the default build option.
+  See <http://clisp.cons.org/impnotes/require.html> and
+  <http://clisp.cons.org/impnotes/clisp-link.html> for details.
+
+* Function RENAME-FILE now accepts :IF-EXISTS argument which determines
+  the action when the destination exists, unless, of course, *ANSI* is T.
+  See <http://clisp.cons.org/impnotes/file-func.html#rename-file> for details.
+
+* The replacement value entered by the user in STORE-VALUE and USE-VALUE
+  restarts is now EVALuated.
+
+* The old user variable CUSTOM:*PRINT-CLOSURE* now controls interpreted
+  closure output too (RFE#3001956). This is a tricky feature, read up!
+  See <http://clisp.cons.org/impnotes/multi-rep.html#pr-closure>.
+
+* Module readline now supports readline 6.1.
+  (Older versions are, of course, still supported).
+  See <http://clisp.cons.org/impnotes/readline-mod.html> for details.
+
+* Module pcre now supports pcre 8.01.
+  (Older versions are, of course, still supported).
+  See <http://clisp.cons.org/impnotes/pcre.html> for details.
+
+* Module libsvm does not come with the upstream sources anymore, install
+  locally and pass --with-libsvm-prefix to the top-level configure instead.
+  All upstream versions up to 2.91 are supported.
+  See <http://clisp.cons.org/impnotes/libsvm.html> for details.
+
+* Module berkeley-db now supports Berkeley-DB 4.8.
+  (Older versions are, of course, still supported).
+  See <http://clisp.cons.org/impnotes/berkeley-db.html> for details.
+
+* Module postgresql now supports PostgreSQL 8.4.
+  (Older versions are, of course, still supported).
+  See <http://clisp.cons.org/impnotes/postgresql.html> for details.
+
+* Module pari has been updated to support both 64 & 32 bit platforms
+  with and without GMP.
+  See <http://clisp.cons.org/impnotes/pari.html> for details.
+
+* New functions OS:VERSION-COMPARE et al call strverscmp.
+  See <http://clisp.cons.org/impnotes/syscalls.html#strverscmp> for details.
+
+* Bug fixes:
+  + Do not eliminate function calls which are advertised to have
+    exceptional situation in unsafe code (bug#2868166).
+  + Fix an internal error in DECLAIM on bad OPTIMIZE quality (bug#2868147).
+  + CLEAR-INPUT now clears the EOF condition on file streams (bug#2902716).
+  + When quitting on a signal, never enter the debugger (bug#2795278).
+  + Respect :FULL T in DIRECTORY :WILD-INFERIORS (bug#3009966).
+  + Handle TWO-WAY-STREAM and ECHO-STREAM correctly by
+    (SETF STREAM-EXTERNAL-FORMAT) (bug#3020933).
+  + Fix unbuffered output pipe stream initialization (bug#3024887).
+
+* ANSI compliance:
+  + Implement the ANSI issue COMPILER-DIAGNOSTICS:USE-HANDLER: use the
+    CL Condition System for compiler diagnostics.
+  + STREAM-ELEMENT-TYPE on empty CONCATENATED-STREAMs now returns NIL
+    because nothing can be read from such streams (bug#3014921).
+
+
+2.48 (2009-07-28)
+=================
+
+User visible changes
+--------------------
+
+* Multiple threads of execution are now experimentally supported
+  (not ready for prime time yet).
+  Thanks to  Vladimir Tzankov <vtzankov@gmail.com>.
+  See <http://clisp.cons.org/impnotes/mt.html> for details.
+
+* Module libsvm has been upgraded to the upstream version 2.89.
+  See <http://clisp.cons.org/impnotes/libsvm.html> for details.
+
+* Module Berkeley-DB now supports Berkeley DB 4.7.
+  (older versions 4.* are, of course, still supported).
+  See <http://clisp.cons.org/impnotes/berkeley-db.html> for details.
+
+* Module readline now supports readline 6.0.
+  (older versions 5.* are, of course, still supported).
+  See <http://clisp.cons.org/impnotes/readline-mod.html> for details.
+
+* Passing :EXECUTABLE 0 to EXT:SAVEINITMEM results in an executable
+  image which delegates processing of all the usual CLISP command line
+  options to the :INIT-FUNCTION.
+  See <http://clisp.cons.org/impnotes/image.html> for details.
+
+* Driver clisp accepts "-b" to print the installation directory.
+  See <http://clisp.cons.org/impnotes/clisp.html#opt-printlibdir> for details.
+
+* Add file clisp.m4 so that the packages which use CLISP can check
+  whether it is properly installed and has the required version.
+
+* POSIX:COPY-FILE now accepts :METHOD :HARDLINK-OR-COPY.
+  See <http://clisp.cons.org/impnotes/syscalls.html#copy-file> for details.
+
+* New function POSIX:WAIT calls waitpid or wait4.
+  See <http://clisp.cons.org/impnotes/syscalls.html#wait> for details.
+
+* New function EXT:TRIM-IF removes leading and trailing matches.
+  See <http://clisp.cons.org/impnotes/seq-func-ext.html#trim-if> for details.
+
+* New user command "LocalSymbols" (abbreviated ":ls").
+  See <http://clisp.cons.org/impnotes/repl.html#debugger-main-deb-step>
+  for details.
+
+* Commands "add" and "create" replace "add-module-set", "add-module-sets" and
+  "create-module-set" in clisp-link.
+  See <http://clisp.cons.org/impnotes/modules.html#clisp-link> for details.
+
+* Bug fixes:
+  + Better support of :START and :END arguments in NEW-CLX (bug#2159172).
+  + Fix LOAD-LOGICAL-PATHNAME-TRANSLATIONS when *LOAD-PATHS* contains
+    wild pathnames (introduced in 2.47) (bug#2198109).
+  + Module NEW-CLX now has the XLIB:QUEUE-EVENT function,
+    implemented by Philippe Brochard <hocwp@free.fr>.
+  + Extend the domain of LOG to larger BIGNUMs and RATIOs (bug#1007358).
+  + Avoid a segfault on (EXPT <HUGE> <HUGE>) (bug#2807311).
+  + Fix interaction of finalizers and weak objects (bug#1472478).
+
+* ANSI compliance:
+  + Implement the ANSI (IGNORE #'FUNCTION) declaration.
+
+
+2.47 (2008-10-23)
+=================
+
+User visible changes
+--------------------
+
+* New module DBUS interfaces to the D-Bus message bus system.
+  See <http://clisp.cons.org/impnotes/dbus.html> for details.
+
+* New function EXT:PROBE-PATHNAME can figure out whether the existing
+  pathname refers to a file or a directory.
+  See <http://clisp.cons.org/impnotes/files.html#probe-path> for details.
+
+* New function EXT:CANONICALIZE lets you easily canonicalize a value
+  before processing it.
+  See <http://clisp.cons.org/impnotes/macros3.html#canonicalize> for details.
+
+* New user variable CUSTOM:*REOPEN-OPEN-FILE* controls CLISP behavior
+  when opening an already open file.
+  See <http://clisp.cons.org/impnotes/open.html#reopen> for details.
+
+* New SETFable function OS:FILE-SIZE extends FILE-LENGTH to pathname
+  designators and lets you change file size.
+  See <http://clisp.cons.org/impnotes/syscalls.html#file-size> for details.
+  New function OS:USER-SHELLS returns the list of legal user shells.
+  See <http://clisp.cons.org/impnotes/syscalls.html#user-shells> for details.
+  New SETFable functions OS:HOSTID and OS:DOMAINNAME.
+  See <http://clisp.cons.org/impnotes/syscalls.html#hostid> for details.
+
+* Module readline has been upgraded to readline 5.2
+  (older versions 5.0 and 5.1 are, of course, still supported).
+  See <http://clisp.cons.org/impnotes/readline-mod.html> for details.
+
+* LOAD now uses DIRECTORY only for wild *LOAD-PATHS* components, thus
+  speeding up the most common cases and preventing the denial-of-service
+  attack whereas CLISP would not start if a file with a name
+  incompatible with *PATHNAME-ENCODING* is present in USER-HOMEDIR-PATHNAME.
+
+* ROOM now prints some GC statistics and returns the same values as GC.
+  See <http://clisp.cons.org/impnotes/environment-enq.html#room> for details.
+
+* New user variable CUSTOM:*HTTP-LOG-STREAM* controls EXT:OPEN-HTTP logging.
+  See <http://clisp.cons.org/impnotes/macros3.html#http-log-stream> for details.
+
+* Bug fixes:
+  + Comparison of floats and rationals never underflows (bug#2014262).
+  + When failing to convert a huge LONG-FLOAT to a RATIONAL, signal an
+    ARITHMETIC-ERROR instead of blowing the stack (bug#2015118).
+  + Restored TYPECODES g++ compilation (bug#1385641), which allowed fixing
+    a few GC-safety bugs.
+  + Fixed a segfault when signaling some UNBOUND-VARIABLE errors in some
+    interpreted code on MacOS X (introduced in 2.46) (bug#2020784).
+    Thanks to Vladimir Tzankov <vtzankov@gmail.com>.
+  + Fixed input after switching a :DOS stream to binary (bug#2022362).
+  + Support circular objects in EQUAL and EQUALP hash-tables (bug#2029069).
+  + Avoid C namespace pollution (bug#2146126).
+  + Fix timeout precision in NEW-CLX (bug#2188102).
+
+* ANSI compliance:
+  + The sets of declaration and type names are disjoint.
+  + FLET, LABELS and MACROLET respect declarations.
+
+
+2.46 (2008-07-02)
+=================
+
+User visible changes
+--------------------
+
+* CLISP built natively on 64-bit platforms (i.e., with 64-bit pointers)
+  now has :WORD-SIZE=64 in *FEATURES*.
+  See <http://clisp.cons.org/impnotes/features.html> for details.
+
+* Module syscalls now offers OS:ERRNO and OS:STRERROR (for the sake of
+  FFI modules).
+  See <http://clisp.cons.org/impnotes/syscalls.html#errno> for details.
+
+* Modules MIT-CLX and NEW-CLX export a new macro XLIB:WITH-OPEN-DISPLAY.
+
+* Module netica has been upgraded to the Netica C API version 3.25 (from 2.15).
+  See <http://clisp.cons.org/impnotes/netica.html> for details.
+
+* Module libsvm has been upgraded to the upstream version 2.86.
+  See <http://clisp.cons.org/impnotes/libsvm.html> for details.
+
+* Bug fixes:
+  + Work around the absence of tgamma on solaris (bug#1966375).
+  + Avoid a rare segfault on SIGHUP (bug#1956715).
+  + Improve module portability to systems with non-GNU make (bug#1970141).
+  + Fix GRAY:STREAM-READ-SEQUENCE and GRAY:STREAM-WRITE-SEQUENCE (bug#1975798).
+  + Fix the remaining bugs in special bindings in evaluated code on
+    TYPECODES (64-bit) platforms.
+  + Fix SOCKET:SOCKET-CONNECT with timeout to a dead port (bug#2007052).
+
+
+2.45 (2008-05-15)
+=================
+
+Important notes
+---------------
+
+* All .fas files generated by previous CLISP versions are invalid and
+  must be recompiled.  This is because the Just-In-Time Compiled code is
+  kept with the closures.
+  Set CUSTOM:*LOAD-OBSOLETE-ACTION* to :COMPILE to automate this.
+  See <http://clisp.cons.org/impnotes/system-dict.html#loadfile> for details.
+
+User visible changes
+--------------------
+
+* The top-level configure option --build has been replaced by --cbc
+  (Configure/Build/Check) to avoid conflict with the standard autoconf option.
+
+* Experimental Just-In-Time Compilation of byte-compiled closures is now
+  done using GNU lightning (this is a configure-time option).
+  Thanks to Yann Dauphin <yann-nicolas.dauphin@polymtl.ca>.
+
+* New command-line option -lp adds directories to *LOAD-PATHS*.
+  See <http://clisp.cons.org/impnotes/clisp.html#opt-load-paths> for details.
+
+* New function FFI:OPEN-FOREIGN-LIBRARY allows pre-opening of shared libraries.
+  See <http://clisp.cons.org/impnotes/dffi.html#dffi-open-lib> for details.
+
+* New macro EXT:COMPILE-TIME-VALUE allows computing values at file compilation.
+  See <http://clisp.podval.org/impnotes/macros3.html#compile-time-value>
+  for details.
+
+* New function FFI:FOREIGN-POINTER-INFO allows some introspection.
+  See <http://clisp.cons.org/impnotes/dffi.html#fptr-info> for details.
+
+* Versioned library symbols are now accessible via the :VERSION argument of
+  DEF-CALL-OUT and DEF-C-VAR.
+  Thanks to Kaz Kylheku <kkylheku@gmail.com>.
+  See <http://clisp.cons.org/impnotes/dffi.html#def-call-out> for details.
+
+* New functions GRAY:STREAM-READ-SEQUENCE and GRAY:STREAM-WRITE-SEQUENCE have
+  been added for portability reasons.
+  Suggested by Anton Vodonosov <avodonosov@yandex.ru>.
+  See <http://clisp.cons.org/impnotes/gray.html#st-rd-seq> for details.
+
+* New user variable CUSTOM:*SUPPRESS-SIMILAR-CONSTANT-REDEFINITION-WARNING*
+  controls whether the redefinition warning is issues when the new
+  constant value is visually similar to the old one.
+  See <http://clisp.cons.org/impnotes/defconstant.html#defconstant-similar>
+  for details.
+
+* REPL commands can now accept arguments.
+  See <http://clisp.cons.org/impnotes/repl.html> for details.
+
+* Updated the postgresql module to PostgreSQL 8.3.
+  See <http://clisp.cons.org/impnotes/postgresql.html> for details.
+
+* Module syscalls now interfaces to <stdio.h> (for the sake of FFI modules).
+  See <http://clisp.cons.org/impnotes/syscalls.html#stdio> for details.
+  There are others additions there also, but they are too numerous to
+  be enumerated here.
+
+* Bug fixes:
+  + Fix handling of quoted objects by READ-PRESERVING-WHITESPACE (bug#1890854).
+  + Fix rectangle count in NEW-CLX XLIB:SET-GCONTEXT-CLIP-MASK (bug#1918017).
+  + Fix argument handling in NEW-CLX XLIB:QUERY-COLORS (bug#1931101).
+  + Fix compilation on systems not supporting returning void (bug#1924506).
+  + Fix TANH floating point overflow for large floats (bug#1683394).
+  + Avoid extra aggressive bignum overflow reporting in READ (bug#1928735).
+  + Improved floating point number formatting. (bug#1790496, bug#1928759)
+  + COMPILE no longer discards MACRO doc strings (bug#1936255).
+  + Improved accuracy of LOG on complex numbers (bug#1934968).
+  + Fix COERCE for compound float result-types (bug#1942246).
+  + Fix $http_proxy parsing (bug#1959436).
+  + Fix LISTEN on buffered streams when the last character was
+    CRLF (bug#1961475).
+  + Cross-compilation process has been restored to its former glory,
+    thanks to the valiant and persistent testing by
+    Vladimir Volovich <vvv2@users.sourceforge.net>.
+    (bug#1928920, bug#1929496, bug#1929516, bug#1931097)
+
+
+2.44.1 (2008-02-23)
+===================
+
+User visible changes
+--------------------
+
+* Bug fixes:
+  + Add a workaround against a gcc 4.2.x bug (bug#1836142).
+  + Fix error in compilation of floatparam.c during configuration with gcc 4.3
+    snapshots (bug#1836142).
+
+
+2.44 (2008-02-02)
+=================
+
+User visible changes
+--------------------
+
+* CLISP does not come with GNU libffcall anymore.
+  This is now a separate package and should be installed separately.
+  Pass --with-libffcall-prefix to the top-level configure if it is not
+  installed in a standard place.
+  Option --with-dynamic-ffi is now replaced with --with-ffcall.
+
+* CLOS now issues warnings of type CLOS:CLOS-WARNING.
+  See <http://clisp.cons.org/impnotes/mop-clisp.html#mop-clisp-warn>
+  for details.
+
+* The AFFI (simple ffi, originally for Amiga) code has been removed.
+
+* Speed up list and sequence functions when :TEST is EQ, EQL, EQUAL or EQUALP.
+
+* Rename EXT:DELETE-DIR, EXT:MAKE-DIR, and EXT:RENAME-DIR to
+  EXT:DELETE-DIRECTORY, EXT:MAKE-DIRECTORY, and EXT:RENAME-DIRECTORY,
+  respectively, for consistency with EXT:PROBE-DIRECTORY,
+  EXT:DEFAULT-DIRECTORY and CL:PATHNAME-DIRECTORY.
+  The old names are still available, but deprecated.
+
+* The :VERBOSE argument to SAVEINITMEM defaults to a new user variable
+  *SAVEINITMEM-VERBOSE*, initial value T.
+  See <http://clisp.cons.org/impnotes/image.html> for details.
+
+* Bug fixes:
+  + Fix FRESH-LINE at the end of a line containing only TABs (bug#1834193).
+  + PPRINT-LOGICAL-BLOCK no longer ignores
+    *PRINT-PPRINT-DISPATCH-TABLE* (bug#1835520).
+  + BYTE is now a full-fledged type (bug#1854698).
+  + Fix linux:dirent definition in the bindings/glibc module (bug#1779490).
+  + Symbolic links into non-existent directories can now be
+    deleted (bug#1860489).
+  + DIRECTORY :FULL on directories now returns the same information as
+    on files (bug#1860677).
+  + CLISP no longer hangs at the end of a script coming via a pipe
+    ("clisp < script.lisp" or "cat script | clisp") (bug#1865567).
+  + When *CURRENT-LANGUAGE* is incompatible with *TERMINAL-ENCODING*,
+    CLISP no longer goes into an infinite recursion trying to print
+    various help messages (bug#1865636).
+  + Fix the "Quit" debugger command (bug#1448744).
+  + Repeated terminating signals kill CLISP instantly with the correct
+    exit code (bug#1871205).
+  + Stack inspection is now safer (bug#1506316).
+  + Errors in the RC-file and init files are now handled properly (bug#1714737).
+  + Avoid the growth of the restart set with each image save (bug#1877497).
+  + Handle foreign functions coming from the old image which cannot be
+    validated (bug#1407486).
+  + Fix signal code in bindings/glibc/linux.lisp (bug#1781476).
+
+
+2.43 (2007-11-18)
+=================
+
+User visible changes
+--------------------
+
+* Infrastructure:
+  + Top-level configure now accepts a new option --vimdir which specifies
+    the installation directory for the VIM files (lisp.vim).
+    The default value is ${datadir}/vim/vimfiles/after/syntax/.
+    Thus, lisp.vim is now installed by "make install", and should
+    be included in the 3rd party distributions.
+  + Top-level configure now always runs makemake, and makemake no longer is
+    a "user-level" command; do not run it unless you know what you are doing.
+    This brings the CLISP build process in compliance with the GNU standards.
+  + We now use gnulib-tool to sync with gnulib (not really user visible,
+    but a major infrastructure change).
+
+* Portability:
+  + Support for ancient systems with broken CPP have been dropped.
+    This includes AIX 4.2, Coherent386, Ultrix, MSVC4, MSVC5.
+  + NeXT application (GUI) code has been removed. Plain TTY is still supported.
+
+* Module Berkeley-DB now supports Berkeley DB 4.5 & 4.6.
+
+* Bug fixes:
+  + FORCE-OUTPUT breakage on MacOS X when stdout is not a terminal
+    (bug#1827572).
+  + Fixed *PRINT-PPRINT-DISPATCH* binding in WITH-STANDARD-IO-SYNTAX
+    (bug#1831367).
+
+
+2.42 (2007-10-16)
+=================
+
+User visible changes
+--------------------
+
+* New module gtk2 interfaces to GTK+ v2 and makes it possible to build
+  GUI with Glade.
+  Thanks to James Bailey <dgym.bailey@gmail.com> for the original code.
+  See <http://clisp.cons.org/impnotes/gtk.html> for details.
+
+* New module gdbm interfaces to GNU DataBase Manager.
+  Thanks to Masayuki Onjo <masayuki.onjo@gmail.com>.
+  See <http://clisp.cons.org/impnotes/gdbm.html> for details.
+
+* A kind of Meta-Object Protocol for structures is now available.
+  See <http://clisp.cons.org/impnotes/defstruct-mop.html> for details.
+
+* Module libsvm has been upgraded to the upstream version 2.84.
+  See <http://clisp.cons.org/impnotes/libsvm.html> for details.
+
+* NEW-CLX module now supports Stumpwm <http://www.nongnu.org/stumpwm/>.
+  Thanks to Shawn Betts <sabetts@vcn.bc.ca>.
+  New NEW-CLX demos: bball bwindow greynetic hanoi petal plaid recurrence from
+  <http://www.cs.cmu.edu/afs/cs/project/ai-repository/ai/lang/lisp/gui/clx/clx_demo.cl>.
+  New NEW-CLX demo: clclock based on <http://common-lisp.net/~crhodes/clx>.
+  New function XLIB:OPEN-DEFAULT-DISPLAY from portable CLX.
+
+* Function EXT:ARGLIST now works on macros too.
+  See <http://clisp.cons.org/impnotes/flow-dict.html#arglist> for details.
+
+* Macro TRACE has a new option :BINDINGS, which is useful to share data
+  between PRE-* and POST-* forms.
+  See <http://clisp.cons.org/environment-dict.html#trace> for details.
+
+* Macro FFI:DEF-C-TYPE can now be called with one argument to define an
+  integer type.
+  See <http://clisp.cons.org/impnotes/dffi.html#def-c-type> for details.
+
+* New function EXT:RENAME-DIR can be used to rename directories.
+  See <http://clisp.cons.org/impnotes/file-dict.html#rename-dir> for details.
+
+* Functions FILE-LENGTH and FILE-POSITION now work on unbuffered streams too.
+  See  <http://clisp.cons.org/impnotes/stream-dict.html#file-pos> for details.
+
+* Bug fixes:
+  + Fixed EXT:LETF to work with more than one place (bug#1731462).
+  + Fixed rounding of long floats [even+1/2] (bug#1589311).
+  + Fixed stdio when running without a TTY, e.g., under SSH (bug#1592343).
+  + ANSI compliance: PPRINT dispatch is now respected for nested
+    objects, not just the top-level (bug#1483768, bug#1598053).
+  + Fixed print-read-consistency of strings containing #\Return characters
+    (manifested by COMPILE-FILE) (bug#1578179).
+  + Fixed "clisp-link run" (bug#1469663).
+  + Fixed ATANH branch cut continuity (bug#1436987).
+  + Reset the function lambda expression when loading a compiled
+    file (bug#1603260).
+  + DOCUMENTATION set by SETF is now preserved by COMPILE (bug#1604579).
+  + LISTEN now calls STREAM-LISTEN as per the Gray proposal (bug#1607666).
+  + IMPORT into the KEYWORD package does not make a symbol a constant
+    variable (bug#1612859).
+  + DEFPACKAGE code was executed during non top-level compilation (bug#1612313).
+  + Fixed format error message formatting (bug#1482465).
+  + Fixed *PPRINT-FIRST-NEWLINE* handling (bug#1412454).
+  + Improved hash code generation for very large bignums and for long lists
+    (bug#948868, bug#1208124).
+  + Some bugs related to UNICODE-16 & UNICODE-32 (bug#1564818,
+    bug#1631760, bug#1632718).
+  + All exported defined symbols are now properly locked (bug#1713130).
+  + Berkeley-DB module no longer fills up error log file (bug#1779416).
+  + New-clx now supports 64-bit KeySym (bug#1797132).
+
+
+2.41 (2006-10-13)
+=================
+
+User visible changes
+--------------------
+
+* New module libsvm interfaces to <http://www.csie.ntu.edu.tw/~cjlin/libsvm>
+  and makes Support Vector Machines available in CLISP.
+  See <http://clisp.cons.org/impnotes/libsvm.html> for details.
+
+* FASTCGI:GETENV is now compatible with EXT:GETENV and can return the
+  entire environment as an alist.
+
+* The same internal interface now handles FFI forms DEF-CALL-OUT and
+  DEF-C-VAR regardless of the presence of the :LIBRARY argument.
+  (:LIBRARY NIL) is now identical to omitting the :LIBRARY argument.
+  The default for the :LIBRARY argument is set by
+  FFI:DEFAULT-FOREIGN-LIBRARY per compilation unit.
+  See <http://clisp.cons.org/impnotes/dffi.html#dffi-default-lib> for details.
+
+* Bug fixes:
+  + DOCUMENTATION on built-in functions was broken on some
+    platforms (bug#1569234).
+  + Fixed FFI callbacks, broken since the 2.36 release.
+  + Fixed the way the top-level driver handles the "--" option terminator.
+  + Fixed COMPILE of APPLY in LABELS for local function (bug#1575946).
+
+
+2.40 (2006-09-23)
+=================
+
+Important notes
+---------------
+
+* All .fas files generated by previous CLISP versions are invalid and
+  must be recompiled.  This is because DOCUMENTATION and LAMBDA-LIST are
+  now kept with the closures.
+  Set CUSTOM:*LOAD-OBSOLETE-ACTION* to :COMPILE to automate this.
+  See <http://clisp.cons.org/impnotes/system-dict.html#loadfile> for details.
+
+User visible changes
+--------------------
+
+* Infrastructure
+  + Top-level configure now accepts a new option --elispdir which specifies
+    the installation directory for the Emacs Lisp files (clhs.el et al).
+    The default value is ${datadir}/emacs/site-lisp/.
+    Thus, clhs.el at al are now installed by "make install", and should
+    be included in the 3rd party distributions.
+  + Top-level configure now accepts variables on command line, e.g.,
+    ./configure CC=g++ CFLAGS=-g
+
+* Function PCRE:PCRE-EXEC accepts :DFA and calls pcre_dfa_exec() when
+  built against PCRE v6.  See <http://clisp.cons.org/impnotes/pcre.html>.
+
+* New functions RAWSOCK:IF-NAME-INDEX, RAWSOCK:IFADDRS.
+  See <http://clisp.cons.org/impnotes/rawsock.html>.
+
+* When the OPTIMIZE SPACE level is low enough, keep function
+  documentation and lambda list.
+  See <http://clisp.cons.org/impnotes/declarations.html#space-decl>.
+
+* Bug fixes:
+  + Make it possible to set *IMPNOTES-ROOT-DEFAULT* and *CLHS-ROOT-DEFAULT*
+    to local paths, as opposed to URLs (bug#1494059).
+  + Fix the evaluation order of initialization and :INITIALLY forms in
+    then extended LOOP (bug#1516684).
+  + Do not allow non-symbols as names of anonymous classes (bug#1528201).
+  + REINITIALIZE-INSTANCE now calls FINALIZE-INHERITANCE (bug#1526448).
+  + Fix the RAWSOCK module on big-endian platforms (bug#1529244).
+  + PRINT-OBJECT now works on built-in objects (bug#1482533).
+  + ADJUST-ARRAY signals an error if :FILL-POINTER is supplied and non-NIL
+    but the non-adjustable array has no fill pointer, as per ANSI (bug#1538333).
+  + MAKE-PATHNAME no longer ignores explicit :DIRECTORY NIL (thanks to
+    Stephen Compall <s11001001@users.sourceforge.net>) (bug#1550803).
+  + Executable images now work on ia64 (thanks to Dr. Werner Fink
+    <werner@suse.de>).
+  + MAKE-PATHNAME on win32 now handles correctly directories that start
+    with a non-string (e.g., :WILD) (bug#1555096).
+  + SOCKET-STREAM-PEER and SOCKET-STREAM-LOCAL had do-not-resolve-p
+    inverted since 2.37.
+  + Set functions with :TEST 'EQUALP were broken on large lists (bug#1567186).
+
+
+2.39 (2006-07-16)
+=================
+
+User visible changes
+--------------------
+
+* SAVEINITMEM now accepts :SCRIPT argument that disables interpreting
+  the first positional argument as the script name; and :DOCUMENTATION
+  argument that is printed by the new -help-image command line option.
+  See <http://clisp.cons.org/impnotes/image.html> and
+  <http://clisp.cons.org/impnotes/clisp.html#opt-help-image> for details.
+
+* FFI:UINT64 and FFI:SINT64 are now compatible with C's long long type.
+
+* Stack overflow detection and recovery finally work fine on Unix.
+  Libsigsegv is required for this, on all platforms (including MS-Windows).
+  CLISP should neither exit nor crash under infinite recursion.
+  If your distribution has CLISP compiled without libsigsegv, report
+  the missing feature to its maintainer.
+  Note that libsigsegv 2.4 is required, there are bugs in libsigsegv 2.3!
+
+* It is now possible to specify the default method-combination of a generic
+  function, to be used when the DEFGENERIC form does not specify the
+  :METHOD-COMBINATION explicitly, through a default initarg specification
+  for the :METHOD-COMBINATION keyword on the generic function class.
+
+* Readline completion works with non 1:1 terminal encodings, e.g. UTF-8.
+
+* WITH-KEYBOARD works with the terminal even when SLIME hijacks *TERMINAL-IO*.
+
+* I/O operations on Win32 are now much faster.
+
+* New functions: POSIX:FFS, POSIX:PATHCONF.
+
+* Infrastructure:
+  + Top-level configure now accepts a new option --with-gmalloc to use the
+    GNU malloc implementation instead of the one supplied by libc.
+    You may need it on older HP-UX and newer OpenBSD systems.
+    See file unix/PLATFORMS for more information.
+  + The value of the environment variable CFLAGS is respected by configure.
+
+* Bug fixes:
+  + SOCKET:SOCKET-SERVER :INTERFACE now behaves as documented.
+  + EXT:READ-BYTE-NO-HANG and SOCKET:SOCKET-STATUS used to hang on
+    buffered binary sockets.
+  + Allow DESTRUCTURING-BIND (a . b) with circular and dotted lists.
+  + ADJUST-ARRAY of zero length adjustable string now works.
+  + TIME now reports correct results when the heap grows over 4GB.
+  + RAWSOCK functions now handle :START/:END arguments correctly.
+  + BDB:DBC-GET now accepts :READ-COMMITTED and :READ-UNCOMMITTED.
+  + POSIX:GROUP-INFO and POSIX:USER-INFO now handle errors correctly.
+
+* Portability:
+  + Support DragonFly BSD.
+
+
 2.38 (2006-01-24)
 =================
 
@@ -6,7 +637,7 @@ User visible changes
 
 * SAVEINITMEM can create standalone executables.
   Thanks to Frank Buß <fb@frank-buss.de> for the idea.
-  SAVEINITMEM also accepts :NORC argument do disable RC-file loading.
+  SAVEINITMEM also accepts :NORC argument to disable RC-file loading.
   See <http://clisp.cons.org/impnotes/image.html> for details.
 
 * POSIX:SYSLOG no longer recognizes "%m" and other formatting instructions.
@@ -16,7 +647,7 @@ User visible changes
 
 * Fixed a crash on woe32 in opening files with names longer than MAX_PATH.
 
-* Module berkeley-db now supports Berkeley DB 4.4.
+* Module Berkeley-DB now supports Berkeley DB 4.4.
 
 
 2.37 (2006-01-02)
@@ -34,8 +665,8 @@ User visible changes
   Thanks to Tomas Zellerin <zellerin@gmail.com>.
   See <http://clisp.cons.org/impnotes/socket.html#sose> for details.
 
-* EXT:HTTP-PROXY now uses the environment variable "http_proxy", not
-  "HTTP_PROXY", like curl does, to avoid confusing it with CGI arguments.
+* EXT:HTTP-PROXY now uses the environment variable "http_proxy", like
+  curl does, not "HTTP_PROXY", to avoid confusing it with CGI arguments.
 
 * OPEN :DIRECTION :OUTPUT now creates write-only handles and treats
   named pipes correctly.
@@ -96,7 +727,7 @@ User visible changes
   Function POSIX:USER-DATA is renamed to POSIX:USER-INFO.
   See <http://clisp.cons.org/impnotes/syscalls.html> for details.
 
-* New NEW-CLX demo: foch.lisp draws fractal snowflakes.
+* New NEW-CLX demo: koch.lisp draws fractal snowflakes.
   Implemented XLIB:SET-MODIFIER-MAPPING, XLIB:KEYSYM->KEYCODES,
   XLIB:ACCESS-HOSTS, XLIB:ADD-ACCESS-HOST, XLIB:REMOVE-ACCESS-HOST,
   XLIB:CHANGE-KEYBOARD-CONTROL, XLIB:CHANGE-KEYBOARD-MAPPING,
@@ -166,7 +797,6 @@ User visible changes
 
 * Danish translations of the user interface messages have been added.
   Thanks to Dennis Decker Jensen <dennisdjensen@tiscali.dk>.
-
 
 
 2.34 (2005-07-20)
@@ -538,6 +1168,9 @@ User visible changes
   Do not copy it anywhere - create a shortcut to it instead!
   Use install.bat to automate shortcut creation.
 
+* (SOFTWARE-TYPE) now returns memory model information,
+  valuable in bug reports.
+
 Modules
 -------
 
@@ -563,7 +1196,7 @@ Modules
 * Module syscalls is significantly expanded.
   See <http://clisp.cons.org/impnotes.html#syscalls> for details.
 
-* Module berkeley-db is vastly expanded.
+* Module Berkeley-DB is vastly expanded.
   See <http://clisp.cons.org/impnotes.html#berkeley-db> for details.
   Added support for Berkeley DB 4.3.
 
@@ -586,7 +1219,6 @@ Portability
 
 * On most 64-bit platforms, fixnums are now 49 bits wide (including the sign
   bit), instead of 33 bits wide.
-
 
 
 2.33.2 (2004-06-02)
@@ -693,7 +1325,7 @@ User visible changes
 * Support files larger than 2 GB or 4 GB on platforms with LFS
   (Large File Support).
 
-* New module berkeley-db interfaces to
+* New module Berkeley-DB interfaces to
   <http://www.sleepycat.com/docs/api_c/frame.html>
   and allows working with Berkeley DB databases.
   See <http://clisp.cons.org/impnotes.html#berkeley-db> for details.
@@ -942,7 +1574,7 @@ User visible changes
   Kaz Kylheku <kaz@ashi.footprints.net>.
 
 * New function EXT:MAKE-XTERM-IO-STREAM creates an input-output stream
-  that uses a separate X terminal.  UNIX platforms only.
+  that uses a separate X terminal.  Unix platforms only.
   See <http://clisp.cons.org/impnotes.html#separate-io> for details.
 
 * Fixed a bug in PEEK-CHAR with non-NIL peek-type on ECHO-STREAMS.
@@ -1385,8 +2017,8 @@ Portability
 * Removed support for DOS. Not to worry, OS/2 and Win32 are still supported.
 
 
-2000-03-06
-==========
+2.24 (2000-03-06)
+=================
 
 User visible changes
 --------------------
@@ -1429,8 +2061,8 @@ Other modifications
 * Speed up ADJUST-ARRAY.
 
 
-1999-07-22
-==========
+2.23 (1999-07-22)
+=================
 
 User visible changes
 --------------------
@@ -1635,8 +2267,8 @@ Other modifications
 * Speed up compiled calls to LDB, LDB-TEST, MASK-FIELD, DPB, DEPOSIT-FIELD.
 
 
-1999-01-08
-==========
+2.22 (1999-01-08)
+=================
 
 Important note
 --------------
@@ -1779,8 +2411,8 @@ Other modifications
 -------------------
 
 
-9 September 1998
-================
+2.21 (9 September 1998)
+=======================
 
 Important note
 --------------
@@ -1999,8 +2631,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-6 December 1997
-===============
+2.20.1 (6 December 1997)
+========================
 
 User visible changes
 --------------------
@@ -2014,8 +2646,8 @@ Other modifications
 * The implementation notes now also exist in HTML format.
 
 
-25 September 1997
-=================
+2.20 (25 September 1997)
+========================
 
 User visible changes
 --------------------
@@ -2097,8 +2729,8 @@ Other modifications
   Thanks to Karl M. Hegbloom <karlheg@inetarena.com>.
 
 
-7 August 1997
-=============
+2.19 (7 August 1997)
+====================
 
 User visible changes
 --------------------
@@ -2155,8 +2787,8 @@ Other modifications
 * Overall speedup by 13% on i386.
 
 
-3 May 1997
-==========
+2.18 (3 May 1997)
+=================
 
 User visible changes
 --------------------
@@ -2325,8 +2957,8 @@ Other modifications
 * Reduced the startup time by 20-30%.
 
 
-21 July 1996
-============
+2.17 (21 July 1996)
+===================
 
 Important note
 --------------
@@ -2459,8 +3091,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-23 June 1995
-============
+2.16 (23 June 1995)
+===================
 
 Important note
 --------------
@@ -2559,8 +3191,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-25 April 1995
-=============
+2.15 (25 April 1995)
+====================
 
 User visible changes
 --------------------
@@ -2653,8 +3285,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-4 April 1995
-============
+2.14 (4 April 1995)
+===================
 
 User visible changes
 --------------------
@@ -2783,8 +3415,8 @@ Generational GC works on
   * DEC Alpha AXP, OSF/1 3.0
 
 
-1 January 1995
-==============
+2.13.1 (1 January 1995)
+=======================
 
 Important note
 --------------
@@ -2839,8 +3471,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-26 October 1994
-===============
+2.13 (26 October 1994)
+======================
 
 Important note
 --------------
@@ -2925,8 +3557,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-1 September 1994
-================
+2.12.1 (1 September 1994)
+=========================
 
 User visible changes
 --------------------
@@ -2950,8 +3582,8 @@ Portability
 * GNU malloc for HP-UX now works.
 
 
-23 August 1994
-==============
+2.12 (23 August 1994)
+=====================
 
 User visible changes
 --------------------
@@ -3027,8 +3659,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-4 July 1994
-===========
+2.11 (4 July 1994)
+==================
 
 User visible changes
 --------------------
@@ -3066,8 +3698,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-22 June 1994
-============
+2.10 (22 June 1994)
+===================
 
 User visible changes
 --------------------
@@ -3233,8 +3865,8 @@ CLISP now compiles and runs on
   * Atari ST/TT, MiNT
 
 
-7 January 1994
-==============
+2.9 (7 January 1994)
+====================
 
 Important note
 --------------
@@ -3363,8 +3995,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-8 November 1993
-===============
+2.8 (8 November 1993)
+=====================
 
 User visible changes
 --------------------
@@ -3429,8 +4061,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-27 September 1993
-=================
+2.7 (27 September 1993)
+=======================
 
 User visible changes
 --------------------
@@ -3489,8 +4121,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-1 September 1993
-================
+2.6.1 (1 September 1993)
+========================
 
 Important note
 --------------
@@ -3530,8 +4162,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-22 August 1993
-==============
+2.6 (22 August 1993)
+====================
 
 Important note
 --------------
@@ -3621,8 +4253,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-17 July 1993
-============
+2.5.1 (17 July 1993)
+====================
 
 User visible changes
 --------------------
@@ -3663,8 +4295,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-29 June 1993
-============
+2.5 (29 June 1993)
+==================
 
 User visible changes
 --------------------
@@ -3708,8 +4340,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-24 May 1993
-===========
+2.4 (24 May 1993)
+=================
 
 User visible changes
 --------------------
@@ -3776,8 +4408,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-5 April 1993
-============
+2.3.1 (5 April 1993)
+====================
 
 Portability
 -----------
@@ -3788,8 +4420,8 @@ Portability
 * Improved efficiency of the WIDE tagging scheme.
 
 
-30 March 1993
-=============
+2.3 (30 March 1993)
+===================
 
 User visible changes
 --------------------
@@ -3823,8 +4455,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-19 March 1993
-=============
+2.2.2 (19 March 1993)
+=====================
 
 User visible changes
 --------------------
@@ -3860,8 +4492,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-4 March 1993
-============
+2.2.1 (4 March 1993)
+====================
 
 User visible changes
 --------------------
@@ -3890,8 +4522,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-21 February 1993
-================
+2.2 (21 February 1993)
+======================
 
 User visible changes
 --------------------
@@ -3924,8 +4556,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-3 February 1993
-===============
+2.1.3 (3 February 1993)
+=======================
 
 Portability
 -----------
@@ -3943,8 +4575,8 @@ Other modifications
 * Remove init streams. Use string input streams instead.
 
 
-1 February 1993
-===============
+2.1.2 (1 February 1993)
+=======================
 
 User visible changes
 --------------------
@@ -3987,8 +4619,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-11 January 1993
-===============
+2.1.1 (11 January 1993)
+=======================
 
 User visible changes
 --------------------
@@ -4053,8 +4685,8 @@ Other modifications
 * Miscellaneous documentation updates.
 
 
-1 January 1993
-==============
+2.1 (1 January 1993)
+====================
 
 Release of the first portable version of CLISP.
 It now compiles and runs under
@@ -4070,7 +4702,9 @@ It now compiles and runs under
 Now that the tests passed, I hope I'll never again have to remove a serious
 bug.
 
-Local Variables:
-mode: text
-coding: utf-8
-end:
+;; Local Variables:
+;; mode: text
+;; mode: bug-reference
+;; bug-reference-url-format: clisp-bug-reference-url-format
+;; coding: utf-8
+;; end:

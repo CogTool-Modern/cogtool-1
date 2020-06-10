@@ -1,6 +1,9 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; some tests for Matlab
-;; clisp -K full -E 1:1 -q -norc -i ../tests/tests -x '(run-test "matlab/test")'
+;; clisp -E 1:1 -q -norc -i ../tests/tests -x '(run-test "matlab/test")'
+
+(list (require "matlab")) (#-MATLAB T #+MATLAB NIL)
+(listp (show (multiple-value-list (ext:module-info "matlab" t)) :pretty t)) T
 
 (matlab:invert-matrix #2a((1 2) (0 2)))
 #2A((1d0 -1d0) (0d0 5d-1))

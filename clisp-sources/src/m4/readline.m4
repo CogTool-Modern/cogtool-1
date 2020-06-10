@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 2002-2005 Sam Steingold, Bruno Haible
+dnl Copyright (C) 2002-2008, 2010 Sam Steingold, Bruno Haible
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -42,10 +42,11 @@ if test $ac_cv_search_tgetent != no ; then
       CL_PROTO_CONST([
 #include <stdio.h>
 #include <readline/readline.h>
-      ],[char* ${RL_FCF} (char *, int);], [char* ${RL_FCF}();],
+      ],[char* ${RL_FCF} (char *, int);],
       cl_cv_proto_readline_const) ],
       [extern char* ${RL_FCF}($cl_cv_proto_readline_const char*, int);])
-    AC_CHECK_DECLS([rl_already_prompted, rl_readline_name, rl_gnu_readline_p],,,
+    AC_CHECK_DECLS([rl_already_prompted, rl_readline_name, dnl
+rl_gnu_readline_p, rl_deprep_term_function],,,
 [#include <stdio.h>
 #include <readline/readline.h>])
     AC_MSG_CHECKING(for a modern readline)

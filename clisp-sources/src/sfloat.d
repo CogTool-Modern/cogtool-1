@@ -17,16 +17,16 @@
   #else
     #define SF_uexp(x)  ((as_oint(x) >> SF_exp_shift) & (bit(SF_exp_len)-1))
   #endif
-  #define SF_decode(obj, zero_statement, sign_zuweisung,exp_zuweisung,mant_zuweisung)  \
+  #define SF_decode(obj, zero_statement, sign_assignment,exp_assignment,mant_assignment)  \
     {                                                                   \
       var object _x = (obj);                                            \
       var uintBWL uexp = SF_uexp(_x);                                   \
       if (uexp==0) {                                                    \
         zero_statement # e=0 -> Zahl 0.0                                \
       } else {                                                          \
-        exp_zuweisung (sintWL)((uintWL)uexp - SF_exp_mid); # Exponent   \
-        unused (sign_zuweisung SF_sign(_x));               # Vorzeichen \
-        mant_zuweisung (SF_mant_len == 16                  # Mantisse   \
+        exp_assignment (sintWL)((uintWL)uexp - SF_exp_mid); # Exponent  \
+        unused (sign_assignment SF_sign(_x));               # Vorzeichen \
+        mant_assignment (SF_mant_len == 16                  # Mantisse  \
                         ? highlow32( bit(SF_mant_len-16), (as_oint(_x) >> SF_mant_shift) & (bit(SF_mant_len)-1) ) \
                         : (bit(SF_mant_len) | ((uint32)(as_oint(_x) >> SF_mant_shift) & (bit(SF_mant_len)-1)) ) \
                        );                                               \
@@ -34,26 +34,26 @@
     }
 
 # Einpacken eines Short-Float:
-# encode_SF(sign,exp,mant, ergebnis=);
+# encode_SF(sign,exp,mant, result=);
 # liefert ein Short-Float.
 # > signean sign: Vorzeichen, 0 für +, -1 für negativ.
 # > sintWL exp: Exponent
 # > uintL mant: Mantisse, sollte >= 2^SF_mant_len und < 2^(SF_mant_len+1) sein.
-# < object ergebnis: ein Short-Float
+# < object result: ein Short-Float
 # Der Exponent wird auf Überlauf/Unterlauf getestet.
-  #define encode_SF(sign,exp,mant, erg_zuweisung)  \
+  #define encode_SF(sign,exp,mant, res_assignment)    \
     {                                                 \
       if ((exp) < (sintWL)(SF_exp_low-SF_exp_mid)) {  \
         if (underflow_allowed()) {                    \
-          fehler_underflow();                         \
+          error_underflow();                          \
         } else {                                      \
-          erg_zuweisung SF_0;                         \
+          res_assignment SF_0;                        \
         }                                             \
       } else                                          \
       if ((exp) > (sintWL)(SF_exp_high-SF_exp_mid)) { \
-        fehler_overflow();                            \
+        error_overflow();                             \
       } else                                          \
-      erg_zuweisung as_object                         \
+      res_assignment as_object                        \
         (   ((oint)SF_type << oint_type_shift)        \
           | ((soint)(sign) & wbit(sign_bit_o))        \
           | ((oint)((uint8)((exp)+SF_exp_mid) & (bit(SF_exp_len)-1)) << SF_exp_shift) \
@@ -148,7 +148,7 @@
     } else {
       if (uexp > SF_exp_mid+SF_mant_len) { # e > 16 ?
         return x;
-      } elif (uexp > SF_exp_mid+1) { # e>1 ?
+      } else if (uexp > SF_exp_mid+1) { # e>1 ?
         var oint bitmask = # Bitmaske: Bit 16-e gesetzt, alle anderen gelöscht
           wbit(SF_mant_len+SF_mant_shift + SF_exp_mid-uexp);
         var oint mask = # Bitmaske: Bits 15-e..0 gesetzt, alle anderen gelöscht
@@ -168,7 +168,7 @@
                   + wbit(SF_mant_shift) # letzte Stelle erhöhen, dabei evtl. Exponenten incrementieren
                  );
         }
-      } elif (uexp == SF_exp_mid+1) { # e=1 ?
+      } else if (uexp == SF_exp_mid+1) { # e=1 ?
         # Wie bei 1 < e <= 16, nur dass Bit 17-e stets gesetzt ist.
         if ((as_oint(x) & wbit(SF_mant_len+SF_mant_shift-1)) ==0) # Bit 16-e =0 -> abrunden
           # abrunden
@@ -379,8 +379,8 @@
   }
 
 # Liefert zu zwei Short-Float x und y : (* x y), ein SF.
-# SF_SF_mal_SF(x,y)
-  local object SF_SF_mal_SF (object x, object y);
+# SF_SF_mult_SF(x,y)
+  local object SF_SF_mult_SF (object x, object y);
 # Methode:
 # Falls x1=0.0 oder x2=0.0 -> Ergebnis 0.0
 # Sonst: Ergebnis-Vorzeichen = VZ von x1 xor VZ von x2.
@@ -397,7 +397,7 @@
 #            Bits 14..0 alle Null, round-to-even; sonst aufrunden. Nach
 #            Aufrunden: Falls =2^17, um 1 Bit nach rechts schieben. Sonst
 #            Exponenten um 1 erniedrigen.
-  local object SF_SF_mal_SF (object x1, object x2)
+  local object SF_SF_mult_SF (object x1, object x2)
   {
     # x1,x2 entpacken:
     var signean sign1;
@@ -466,8 +466,8 @@
   }
 
 # Liefert zu zwei Short-Float x und y : (/ x y), ein SF.
-# SF_SF_durch_SF(x,y)
-  local object SF_SF_durch_SF (object x, object y);
+# SF_SF_div_SF(x,y)
+  local object SF_SF_div_SF (object x, object y);
 # Methode:
 # x2 = 0.0 -> Error
 # x1 = 0.0 -> Ergebnis 0.0
@@ -486,7 +486,7 @@
 #     erhöhe den Exponenten um 1.
 #   Falls der Quotient <2^18 ist, runde das letzte Bit weg. Bei rounding
 #     overflow schiebe um ein weiteres Bit nach rechts, incr. Exponenten.
-  local object SF_SF_durch_SF (object x1, object x2)
+  local object SF_SF_div_SF (object x1, object x2)
   {
     # x1,x2 entpacken:
     var signean sign1;
@@ -685,10 +685,10 @@ local maygc object I_to_SF (object x, bool signal_overflow)
         mant = mant>>1; exp = exp+1;
       }
     }
-    #define fehler_overflow() \
-      if (signal_overflow) (fehler_overflow)(); else return nullobj;
+    #define error_overflow() \
+      if (signal_overflow) (error_overflow)(); else return nullobj;
     encode_SF(sign,(sintL)exp,mant, return);
-    #undef fehler_overflow
+    #undef error_overflow
   }
 }
 
@@ -714,8 +714,8 @@ local maygc object I_to_SF (object x, bool signal_overflow)
     if (RA_integerp(x))
       return I_to_SF(x,signal_overflow);
     # x Ratio
-    #define fehler_overflow() \
-      if (signal_overflow) (fehler_overflow)(); else return nullobj;
+    #define error_overflow() \
+      if (signal_overflow) (error_overflow)(); else return nullobj;
     pushSTACK(TheRatio(x)->rt_den); # b
     var signean sign = RT_sign(x); # Vorzeichen
     x = TheRatio(x)->rt_num; # +/- a
@@ -726,11 +726,11 @@ local maygc object I_to_SF (object x, bool signal_overflow)
     var sintL lendiff = I_integer_length(x) # (integer-length a)
                         - I_integer_length(STACK_1); # (integer-length b)
     if (lendiff > SF_exp_high-SF_exp_mid) { # Exponent >= n-m > Obergrenze ?
-      fehler_overflow(); # -> Overflow
+      skipSTACK(2); error_overflow();       /* -> Overflow */
     }
     if (lendiff < SF_exp_low-SF_exp_mid-2) { # Exponent <= n-m+2 < Untergrenze ?
       if (underflow_allowed()) {
-        fehler_underflow(); # -> Underflow
+        error_underflow(); # -> Underflow
       } else {
         skipSTACK(2); return SF_0;
       }
@@ -788,6 +788,6 @@ local maygc object I_to_SF (object x, bool signal_overflow)
     skipSTACK(2);
     # Fertig.
     encode_SF(sign,lendiff,mant, return);
-    #undef fehler_overflow
+    #undef error_overflow
   }
 

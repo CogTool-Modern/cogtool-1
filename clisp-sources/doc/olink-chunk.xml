@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE targetset
-          SYSTEM "http://docbook.sourceforge.net/release/xsl/current/common/targetdatabase.dtd" [
-  <!ENTITY man-targets SYSTEM "tdb-man.xml">
-  <!ENTITY imp-targets SYSTEM "tdb-chunk.xml">
+<!DOCTYPE targetset SYSTEM "http://docbook.sourceforge.net/release/xsl/current/common/targetdatabase.dtd" [
+  <!ENTITY man-targets SYSTEM "man.tdb">
+  <!ENTITY clink-targets SYSTEM "clink.tdb">
+  <!ENTITY imp-targets SYSTEM "chunk.tdb">
 ]>
 <targetset>
  <targetsetinfo>
@@ -13,4 +13,5 @@
 
  <document targetdoc="impnotes">&imp-targets;</document>
  <document targetdoc="man" baseuri="clisp.html">&man-targets;</document>
+ <document targetdoc="clink" baseuri="clisp-link.html">&clink-targets;</document>
 </targetset>

@@ -263,7 +263,7 @@
       }
      carry_0:
       count--;
-    } until (count==0);
+    } while (count != 0);
     return 0;
     do {
       {
@@ -275,7 +275,7 @@
       }
      carry_1:
       count--;
-    } until (count==0);
+    } while (count != 0);
     return 1;
   }
 
@@ -297,7 +297,7 @@
       }
      carry_0:
       count--;
-    } until (count==0);
+    } while (count != 0);
     return 0;
     do {
       {
@@ -309,7 +309,7 @@
       }
      carry_1:
       count--;
-    } until (count==0);
+    } while (count != 0);
     return 1;
   }
 
@@ -346,7 +346,7 @@
       }
      carry_0:
       count--;
-    } until (count==0);
+    } while (count != 0);
     return 0;
     do {
       {
@@ -358,7 +358,7 @@
       }
      carry_1:
       count--;
-    } until (count==0);
+    } while (count != 0);
     return (uintD)-1;
   }
 
@@ -385,7 +385,7 @@
           }
          carry_0:
           count--;
-        } until (count==0);
+        } while (count != 0);
       return 0;
     } else {
       if (!(count==0))
@@ -399,7 +399,7 @@
           }
          carry_1:
           count--;
-        } until (count==0);
+        } while (count != 0);
       return (uintD)-1;
     }
   }
@@ -423,7 +423,7 @@
       }
      carry_0:
       count--;
-    } until (count==0);
+    } while (count != 0);
     return 0;
     do {
       {
@@ -435,7 +435,7 @@
       }
      carry_1:
       count--;
-    } until (count==0);
+    } while (count != 0);
     return (uintD)-1;
   }
 
@@ -459,7 +459,7 @@
   inline local uintD neg_loop_down (uintD* ptr, uintC count)
   {
     # erstes Digit /=0 suchen:
-    until (count==0) {
+    while (count != 0) {
       if (!(*--ptr == 0)) goto L1;
       count--;
     }

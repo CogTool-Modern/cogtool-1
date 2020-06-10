@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 #-(or GCL CMU SBCL OpenMCL LISPWORKS)
 (use-package "CLOS")
@@ -71,8 +71,7 @@ foo
 (foo a)
 11
 
-(fmakunbound 'foo)
-foo
+(symbol-cleanup 'foo) T
 
 (x-val (reinitialize-instance a :x 20))
 20
@@ -299,6 +298,8 @@ ERROR
 (unintern '<C1>)
 T
 
+;; either #+clisp (declaim (ext:notspecial a b c)) here or at end of file
+
 (progn
 (defclass <C1> ()
   ((x :initform 0 :accessor x-val :initarg :x)
@@ -484,21 +485,19 @@ T
 T
 
 ;; make-load-form
-(defun mlf-tester (symbol &optional (lisp-file "make-load-form-demo.lisp")
-                   &aux (compiled-file (compile-file-pathname lisp-file)))
+(defun mlf-tester (symbol &optional
+                   (lisp-file "clos-tst-make-load-form-demo.lisp"))
   (unwind-protect
-       (progn
+       (let (compiled-file)
          (with-open-file (stream lisp-file :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
            (format stream "(in-package ~s)~%(defparameter ~S '#.~S)~%"
                    (package-name (symbol-package symbol))
                    symbol symbol))
-         (compile-file lisp-file)
+         (setq compiled-file (compile-file lisp-file))
          (setf (symbol-value symbol) nil)
          (load compiled-file)
          (symbol-value symbol))
-    (delete-file compiled-file)
-    (delete-file lisp-file)
-    #+clisp (delete-file (make-pathname :type "lib" :defaults lisp-file))))
+    (post-compile-file-cleanup lisp-file)))
 MLF-TESTER
 
 (defun mlf-kill (type)
@@ -532,7 +531,7 @@ FOO
 (progn
   (defmethod make-load-form ((x foo) &optional env)
     (make-load-form-saving-slots x :environment env))
-  (defparameter *tmp-file* "mlf-tmp.lisp")
+  (defparameter *tmp-file* "clos-tst-mlf-tmp.lisp")
   (with-open-file (s *tmp-file* :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
     (format s "(defparameter *foo* '#S(FOO :A BAR-CONST))~%"))
   (load (compile-file *tmp-file*))
@@ -544,9 +543,7 @@ FOO
   (makunbound '*foo*)
   (defconstant bar-const 1)
   (unwind-protect (progn (load (compile-file *tmp-file*)) *foo*)
-    (delete-file *tmp-file*)
-    (delete-file (compile-file-pathname *tmp-file*))
-    #+clisp (delete-file (make-pathname :type "lib" :defaults *tmp-file*))
+    (post-compile-file-cleanup *tmp-file*)
     (mlf-kill 'foo)))
 #S(FOO :A BAR-CONST)
 
@@ -634,7 +631,7 @@ FOO
 ;; From: Kaz Kylheku <kaz@ashi.footprints.net>
 ;; Date: Sat, 3 Jan 2004 14:47:25 -0800 (PST)
 ;; <http://article.gmane.org/gmane.lisp.clisp.general:7853>
-(let ((file "foo.lisp") c)
+(let ((file "clos-tst.lisp") c)
   (unwind-protect
        (progn
          (makunbound '*foo*)
@@ -643,9 +640,7 @@ FOO
                       (defparameter *foo* #.(make-foo))~%"))
          (load (setq c (compile-file file)))
          *foo*)
-    (delete-file file)
-    (delete-file c)
-    #+clisp (delete-file (make-pathname :type "lib" :defaults file))))
+    (post-compile-file-cleanup file)))
 #+(or CLISP GCL LISPWORKS) #S(FOO :SLOT NIL)
 #+(or ALLEGRO CMU SBCL) ERROR
 #-(or CLISP GCL ALLEGRO CMU SBCL LISPWORKS) UNKNOWN
@@ -4151,7 +4146,34 @@ ERROR
 (defmethod foo132b ((x forwardclass02)))
 ERROR
 
-;;; <http://article.gmane.org/gmane.lisp.clisp.general:9582>
+;; Check that undefined classes yield an error in TYPEP and SUBTYPEP, but
+;; that incomplete classes do not.
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1591671&group_id=1355
+(progn
+  (defclass incomplete147 (undefined147) ())
+  t)
+T
+(find-class 'undefined147)
+ERROR
+(typep 42 'undefined147)
+ERROR
+(subtypep 'undefined147 'number)
+ERROR
+(subtypep 'undefined147 'standard-object)
+ERROR
+(null (find-class 'incomplete147))
+NIL
+(typep 42 'incomplete147)
+NIL
+(multiple-value-list (subtypep 'incomplete147 'number))
+(NIL T)
+(multiple-value-list (subtypep 'incomplete147 'standard-object))
+(NIL T) ; not (NIL NIL) because ANSI-CL says that SUBTYPEP on class names
+        ; must never return "unknown"
+
+;; Check that methods that become active through a class redefinition
+;; are actually invoked.
+;; <http://article.gmane.org/gmane.lisp.clisp.general:9582>
 (let ((ret '()))
   (defclass mixin-foo-144 () ())
   (defclass class-foo-144 (mixin-foo-144) ())
@@ -4186,6 +4208,28 @@ ERROR
     (nreverse ret)))
 (CLASS-FOO-145 CLASS-BAR-145-AFTER)
 
+;; Check that when redefining a class with different slot initargs, the
+;; new initargs are taken into account by make-instance.
+(progn
+  (defclass foo146 () (slot1))
+  (make-instance 'foo146)
+  (defclass foo146 () ((slot1 :initarg :foo)))
+  (make-instance 'foo146 :foo 'any)
+  t)
+T
+
+;; Check that when redefining a class with different slot initargs, the
+;; new initargs are taken into account by make-instance of subclasses.
+(progn
+  (defclass foo147 () (slot1))
+  (defclass foosub147 (foo147) (slot2))
+  (make-instance 'foosub147)
+  (defclass foo147 () ((slot1 :initarg :foo)))
+  (make-instance 'foosub147 :foo 'any)
+  t)
+T
+
+;; Check a particular use of Gray streams.
 (progn (load (make-pathname :name "listeners" :type nil
                             :defaults *run-test-truename*))
        (with-open-stream (s1 (make-string-input-stream "("))
@@ -4195,3 +4239,10 @@ ERROR
              (with-open-stream (c (make-concatenated-stream s1 l))
                (read c))))))
 (NIL)
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1528201&group_id=1355
+(make-instance (make-instance 'standard-class :name 3))
+ERROR
+
+#+CLISP (declaim (ext:notspecial a b c))
+#+CLISP NIL

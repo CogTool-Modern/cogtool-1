@@ -5,7 +5,7 @@
 # > base: Stellenwertsystem-Basis, >=2, <=36
 # > MSBptr/len/..: Ziffernfolge, bestehend aus Punkten (werden überlesen)
 #     und Ziffern/Buchstaben mit Wert < base.
-# < ergebnis: der dargestellte Integer >=0
+# < result: der dargestellte Integer >=0
 # can trigger GC
   local maygc object DIGITS_to_I (const chart* MSBptr, uintL len, uintD base)
   {
@@ -13,6 +13,8 @@
     var uintD* erg_MSDptr;
     var uintC erg_len;
     var uintD* erg_LSDptr;
+    while (len && as_cint(*MSBptr) == '0')
+      { len--; MSBptr++; } /* drop leading 0s */
     # Platz fürs Ergebnis:
     # 1+ceiling(len*log(base)/(intDsize*log(2))) oder etwas mehr Digits
     var uintL need = 1+floor(len,intDsize*256); # > len/(intDsize*256) >=0
@@ -56,7 +58,10 @@
     }
     # Nun gilt need >= len*log(base)/(intDsize*log(2)).
     need += 1;
-    if ((intWCsize < 32) && (need > (uintL)(bitc(intWCsize)-1)))
+    /* there is another check below, so be VERY lenient here.
+       the test here is to avoid doing the unnecessary work if we KNOW
+       that the number is too big. see bug [ 1928735 ] */
+    if ((intWCsize < 32) && (need > (uintL)(bitc(intWCsize+1))))
       BN_ueberlauf();
     num_stack_need(need,_EMA_,erg_LSDptr=);
     erg_MSDptr = erg_LSDptr; erg_len = 0;
@@ -80,6 +85,8 @@
           if (!(carry==0)) {
             # muss NUDS vergrößern:
             *--erg_MSDptr = carry; erg_len++;
+	    if (uintWCoverflow(erg_len)) /* overflow of the length? */
+	      BN_ueberlauf();
           }
         }
       });

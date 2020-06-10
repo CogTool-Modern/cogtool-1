@@ -420,7 +420,7 @@
               (let ((slot-initargs
                       (apply #'compute-direct-slot-definition-initargs class slot-spec)))
                 (unless (and (listp slot-initargs) (evenp (length slot-initargs)))
-                  (error (TEXT "Wrong ~S result for class ~S: not a plist: ~S")
+                  (error (TEXT "Wrong ~S result for class ~S: not a property list: ~S")
                          'compute-direct-slot-definition-initargs (class-name class) slot-initargs))
                 (unless (eq (getf slot-initargs ':NAME) (getf slot-spec ':NAME))
                   (error (TEXT "Wrong ~S result for class ~S, slot ~S: value of ~S is wrong: ~S")

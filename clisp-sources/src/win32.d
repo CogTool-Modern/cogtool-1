@@ -1,7 +1,7 @@
 /*
  * Include file for WIN32_NATIVE version of CLISP
- * Bruno Haible 1997-2005
- * Sam Steingold 1999-2006
+ * Bruno Haible 1997-2008
+ * Sam Steingold 1999-2009
  */
 
 /* control characters constants */
@@ -10,18 +10,6 @@
 /* define NL  10             -- new line, see LISPBIBL.D */
 #define RUBOUT 127              /* Rubout = Delete */
 #define CRLFstring  "\r\n"      /* C-String - CR/LF */
-
-/* Many Win32 API functions are declared differently when UNICODE is defined,
- in a way which does not work on Win95.
- We do not want this, so undefine it now. */
-#ifdef UNICODE
-  #define UNICODE_SAVED
-  #undef UNICODE
-#endif
-
-/* for _clisp.c */
-#define STDC_HEADERS 1
-#define HAVE_PERROR_DECL
 
 /* Declaration of operating system functions */
 #define WIN32_LEAN_AND_MEAN  /* avoid including junk */
@@ -157,6 +145,9 @@ extern_C char *setlocale (int category, const char *locale);
 #ifndef _MAX_PATH
   #define _MAX_PATH 1024
 #endif
+#ifndef MAXPATHLEN
+  #define MAXPATHLEN _MAX_PATH
+#endif
 /* used by pathname.d */
 
 /* Retrieve information about a file
@@ -172,12 +163,10 @@ struct file_id {        /* Unique ID for an open file on this machine */
   DWORD nFileIndexHigh;
   DWORD nFileIndexLow;
 };
-/* if file NAMESTRING exists, fill file_id and call function on it,
-   otherwise return NULL */
-extern void* with_file_id (char *namestring, void *data,
-                           void* (*func) (struct file_id *fid, void *data));
-/* fill FI for an existing file handle */
 typedef DWORD errno_t;
+/* fill FI for an exiting namestring */
+extern errno_t namestring_file_id (char *namestring, struct file_id *fi);
+/* fill FI for an existing file handle */
 extern errno_t handle_file_id (HANDLE fh, struct file_id *fi);
 /* if the file IDs are identical, return 1, otherwise return 0 */
 extern int file_id_eq (struct file_id *fi1, struct file_id *fi2);
@@ -247,7 +236,7 @@ extern ssize_t fd_write (HANDLE fd, const void* buf, size_t nbyte, perseverance_
 /* Changing the position within a file. */
 /* _off_t is sint32, but the Win32 APIs support 64-bit file offsets. */
 #define off_t  sint64
-#undef SIZEOF_OFF_T  /* on mingw, it was defined in unixconf.h */
+#undef SIZEOF_OFF_T  /* on mingw, it was defined in config.h */
 #define SIZEOF_OFF_T  8
 #ifdef __MINGW32__
   #include <io.h>
@@ -283,7 +272,7 @@ extern off_t lseek (HANDLE fd, off_t offset, DWORD mode);
    extern int WSAGetLastError (void);
    extern void WSASetLastError (int Error);
    extern int WSACancelBlockingCall (void); */
-#define SOCKLEN_T  int
+#define CLISP_SOCKLEN_T  int
 /* extern SOCKET socket (int af, int type, int protocol);
    extern int bind (SOCKET s, const struct sockaddr * addr, int addrlen);
    extern int listen (SOCKET s, int backlog);
@@ -358,7 +347,7 @@ extern int interruptible_socket_wait (SOCKET socket_handle, socket_wait_event wa
 
 /* Hacking the terminal */
 #ifdef __MINGW32__
-  # include <io.h>
+  /* #include <io.h> */
   #define isatty clisp_isatty /* avoid collision with prototype in <mingw/io.h> */
 #endif
 extern int isatty (HANDLE handle); /* see win32aux.d */
@@ -449,19 +438,23 @@ extern void DumpProcessMemoryMap (void); /* see win32aux.d */
    //extern LPVOID MapViewOfFileEx (HANDLE FileMappingObject, DWORD DesiredAccess, DWORD FileOffsetHigh, DWORD FileOffsetLow, DWORD NumberOfBytesToMap, LPVOID BaseAddress);
    //extern BOOL UnmapViewOfFile (LPCVOID BaseAddress); */
 #define HAVE_WIN32_VM
-/* Damit kann man munmap() und mprotect() selber schreiben. mmap() wird
-   emuliert, weil MapViewOfFileEx() zu viele Nachteile hat. Siehe spvw.d. */
+/* So you can write munmap() and mprotect() write by your own. mmap() is
+   emulated, because MapViewOfFileEx() has too many disadvantages.
+   See spvw.d. */
 /* #define HAVE_MMAP */
 #define HAVE_MUNMAP
 #define HAVE_WORKING_MPROTECT
-#define PROT_NONE  PAGE_NOACCESS
-#define PROT_READ  PAGE_READONLY
-#define PROT_READ_WRITE PAGE_READWRITE
+#if defined(HAVE_MPROTECT) /* mprotect from libgcc uses Unix constants */
+  #define PROT_NONE  0
+  #define PROT_READ  1
+  #define PROT_READ_WRITE 3
+#else
+  #define PROT_NONE  PAGE_NOACCESS
+  #define PROT_READ  PAGE_READONLY
+  #define PROT_READ_WRITE PAGE_READWRITE
+#endif
 /* PROT_WRITE, PROT_EXEC not used
  used by spvw.d */
 
-/* Now it's time to enable our UNICODE macro again. */
-#ifdef UNICODE_SAVED
-  #define UNICODE
-#endif
-
+/* from gnulib for getpagesize */
+#include <unistd.h>

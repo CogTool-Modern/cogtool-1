@@ -19,7 +19,7 @@
    along with this program; if not, write to the Free Software Foundation,
    Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
-   $Id: orafns.c,v 1.17 2005/08/26 13:47:23 hin Exp $
+   $Id: orafns.c,v 1.19 2006/06/19 13:50:06 hin Exp $
 
 */
 
@@ -1131,8 +1131,18 @@ static char * decode_data_type(int dtype)
   case 113: return "BLOB";                 /* SQLT_BLOB - Binary LOB */
   case 114: return "BFILE";                /* SQLT_BFILEE - Binary file LOB */
   case 115: return "CFILE";                /* SQLT_CFILEE - Character file LOB */
+
+  /* datetimes and intervals */
+  case 184: return "ANSI DATE";                /* SQLT_DATE */
+  case 185: return "TIME";                     /* SQLT_TIME */
+  case 186: return "TIME WITH TIME ZONE";      /* SQLT_TIME_TZ */
+  case 187: return "TIMESTAMP";                /* SQLT_TIMESTAMP */
+  case 188: return "TIMESTAMP WITH TIME ZONE"; /* SQLT_TIMESTAMP_TZ */
+  case 189: return "INTERVAL YEAR TO MONTH";   /* SQLT_INTERVAL_YM */
+  case 190: return "INTERVAL DAY TO SECOND";   /* SQLT_INTERVAL_DS */
+  case 232: return "TIMESTAMP WITH LOCAL TZ";  /* SQLT_TIMESTAMP_LTZ */
   }
-  sprintf("<Unknown type %d>", buf);
+  sprintf(buf, "<Unknown type %d>", dtype);
   return buf;
 }
 
@@ -1184,6 +1194,18 @@ static int fetch_data_len(int dtype, int dlen, int long_len)
     
   case 12:  /* DATE (SQLT_DAT) */
     return 50;
+
+  /* datetimes and intervals */
+  case 184: /* SQLT_DATE */
+  case 185: /* SQLT_TIME */
+  case 186: /* SQLT_TIME_TZ */
+  case 187: /* SQLT_TIMESTAMP */
+  case 188: /* SQLT_TIMESTAMP_TZ */
+  case 189: /* SQLT_INTERVAL_YM */
+  case 190: /* SQLT_INTERVAL_DS */
+  case 232: /* SQLT_TIMESTAMP_LTZ */
+    return 200;
+
   }
   return 0;
 }
@@ -1223,6 +1245,10 @@ static int disconnect(struct db_conn * db)
 
   free_columns(db);
   
+  /* Tell the server we are disconnecting */
+  if ( db->svc )
+    OCILogoff(db->svc, db->err);
+
   /* This should cause Oracle to free up all other handles created under it */
   if ( db->env )
     OCIHandleFree(db->env, OCI_HTYPE_ENV);

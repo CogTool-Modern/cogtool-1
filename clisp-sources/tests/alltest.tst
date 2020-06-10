@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;;*****************************************************************************
 ;;*                    short test      XCL                                    *
 ;;*****************************************************************************
@@ -604,12 +604,14 @@ NIL
              (funcall cons 1 2))))
 (KONS (1 . 2) 3)
 
-(or #+win32 (string= "g++" (software-type) :end2 3)
-    (let* ((n (min lambda-parameters-limit 1024))
-           (vars (loop repeat n collect (gensym))))
-      (eval
-       `(= ,n (flet ((%f ,vars (+ ,@vars)))
-                (%f ,@(loop for e in vars collect 1)))))))
+(let* ((n (min (1- lambda-parameters-limit)
+               (if (string= "g++" (software-type) :end2 3)
+                   256
+                   1024)))
+       (vars (loop repeat n collect (gensym))))
+  (eval
+   `(= ,n (flet ((%f ,vars (+ ,@vars)))
+            (%f ,@(loop for e in vars collect 1))))))
 T
 
 ;TAGBODY, GO, MULTIPLE-VALUE-LIST, MULTIPLE-VALUE-CALL, MULTIPLE-VALUE-PROG1,
@@ -2548,6 +2550,12 @@ NIL
 
 ;internal-time-units-per-second, SLEEP, LISP-IMPLEMENTATION-TYPE,
 ;LISP-IMPLEMENTATION-VERSION, MACHINE-INSTANCE, MACHINE-TYPE, MACHINE-VERSION,
+
+(stringp (show (lisp-implementation-type))) T
+(stringp (show (lisp-implementation-version))) T
+(stringp (show (machine-instance))) T
+(stringp (show (machine-type))) T
+(stringp (show (machine-version))) T
 
 ;SOFTWARE-TYPE, SOFTWARE-VERSION, SHORT-SITE-NAME, LONG-SITE-NAME, *features*,
 ;IDENTITY

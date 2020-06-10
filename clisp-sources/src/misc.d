@@ -1,12 +1,12 @@
 /*
  * Miscellaneous CLISP functions
- * Bruno Haible 1990-2005
- * Sam Steingold 1999-2005
+ * Bruno Haible 1990-2008
+ * Sam Steingold 1999-2009
  */
 
 #include "lispbibl.c"
 
-# Eigenwissen:
+/* Reflective knowledge: */
 
 LISPFUN(lisp_implementation_type,seclass_no_se,0,0,norest,nokey,0,NIL)
 { /* (LISP-IMPLEMENTATION-TYPE), CLTL S. 447 */
@@ -16,7 +16,7 @@ LISPFUN(lisp_implementation_type,seclass_no_se,0,0,norest,nokey,0,NIL)
 LISPFUN(lisp_implementation_version,seclass_no_se,0,0,norest,nokey,0,NIL)
 { /* (LISP-IMPLEMENTATION-VERSION), CLTL S. 447 */
   value1 = O(lisp_implementation_version_string);
-  if (nullp(value1)) { # noch unbekannt?
+  if (nullp(value1)) { /* not yet known? */
     var int count = 1;
     pushSTACK(O(lisp_implementation_package_version));
     funcall(L(machine_instance),0);
@@ -95,154 +95,108 @@ LISPFUN(lisp_implementation_version,seclass_no_se,0,0,norest,nokey,0,NIL)
 }
 
 LISPFUN(version,seclass_default,0,1,norest,nokey,0,NIL)
-# (SYSTEM::VERSION) liefert die Version des Runtime-Systems,
-# (SYSTEM::VERSION version) überprüft (am Anfang eines FAS-Files),
-# ob die Versionen des Runtime-Systems übereinstimmen.
-  {
-    var object arg = popSTACK();
-    if (!boundp(arg)) {
-      VALUES1(O(version));
-    } else {
-      if (equal(arg,O(version)) /* || equal(arg,O(oldversion)) */) {
-        VALUES0;
-      } else {
-        fehler(error,
-               GETTEXT("This file was produced by another lisp version, must be recompiled.")
-              );
-      }
-    }
+{ /* (SYSTEM::VERSION) returns the runtime-system version,
+ (SYSTEM::VERSION version) checks (at the beginning of a FAS-file),
+ if the version of the runtime-system matches. */
+  var object arg = popSTACK();
+  if (!boundp(arg))
+    VALUES1(O(version));
+  else {
+    if (equal(arg,O(version)) /* || equal(arg,O(oldversion)) */)
+      VALUES0;
+    else
+      error(error_condition,GETTEXT("This file was produced by another lisp version, must be recompiled."));
   }
+}
 
 #ifdef MACHINE_KNOWN
 
 LISPFUNN(machinetype,0)
-# (MACHINE-TYPE), CLTL S. 447
-  {
-    var object erg = O(machine_type_string);
-    if (nullp(erg)) { # noch unbekannt?
-      # ja -> holen
-      #ifdef UNIX
-        #ifdef HAVE_SYS_UTSNAME_H
-          var struct utsname utsname;
-          begin_system_call();
-          if ( uname(&utsname) <0) { OS_error(); }
-          end_system_call();
-          pushSTACK(asciz_to_string(utsname.machine,O(misc_encoding)));
-          funcall(L(nstring_upcase),1); # in Großbuchstaben umwandeln
-          erg = value1;
-        #else
-          # Betriebssystem-Kommando 'uname -m' bzw. 'arch' ausführen und
-          # dessen Output in einen String umleiten:
-          # (string-upcase
-          #   (with-open-stream (stream (make-pipe-input-stream "/bin/arch"))
-          #     (read-line stream nil nil)
-          # ) )
-          #if defined(UNIX_SUNOS4)
-            pushSTACK(ascii_to_string("/bin/arch"));
-          #elif defined(UNIX_NEXTSTEP)
-            pushSTACK(ascii_to_string("/usr/bin/arch"));
-          #else
-            pushSTACK(ascii_to_string("uname -m"));
-          #endif
-          funcall(L(make_pipe_input_stream),1); # (MAKE-PIPE-INPUT-STREAM "/bin/arch")
-          pushSTACK(value1); # Stream retten
-          pushSTACK(value1); pushSTACK(NIL); pushSTACK(NIL);
-          funcall(L(read_line),3); # (READ-LINE stream NIL NIL)
-          pushSTACK(value1); # Ergebnis (kann auch NIL sein) retten
-          builtin_stream_close(&STACK_1,0); /* close stream */
-          if (!nullp(STACK_0))
-            erg = string_upcase(STACK_0); # in Großbuchstaben umwandeln
-          else
-            erg = NIL;
-          skipSTACK(2);
-        #endif
-      #endif
-      #ifdef WIN32_NATIVE
-        {
-          var SYSTEM_INFO info;
-          begin_system_call();
-          GetSystemInfo(&info);
-          end_system_call();
-          if (info.wProcessorArchitecture==PROCESSOR_ARCHITECTURE_INTEL) {
-            erg = ascii_to_string("PC/386");
-          }
-        }
-      #endif
-      # Das Ergebnis merken wir uns für's nächste Mal:
-      O(machine_type_string) = erg;
+{ /* (MACHINE-TYPE), CLTL S. 447 */
+  var object ret = O(machine_type_string);
+  if (nullp(ret)) { /* not yet known? -> compute */
+  #if defined(UNIX)
+   #ifdef HAVE_UNAME            /* all known platforms have uname(2) */
+    var struct utsname utsname;
+    begin_system_call();
+    if (uname(&utsname) < 0) { end_system_call(); OS_error(); }
+    end_system_call();
+    pushSTACK(asciz_to_string(utsname.machine,O(misc_encoding)));
+    funcall(L(nstring_upcase),1); /* convert to uppercase */
+    ret = value1;
+   #else
+    #error MACHINE-TYPE: uname is missing
+   #endif
+  #elif defined(WIN32_NATIVE)
+    {
+      var SYSTEM_INFO info;
+      begin_system_call();
+      GetSystemInfo(&info);
+      end_system_call();
+      if (info.wProcessorArchitecture==PROCESSOR_ARCHITECTURE_INTEL) {
+        ret = ascii_to_string("PC/386");
+      }
     }
-    VALUES1(erg);
+  #else
+    #error MACHINE-TYPE is not defined
+  #endif
+    /* Store away the result for the next call: */
+    O(machine_type_string) = ret;
   }
+  VALUES1(ret);
+}
 
 LISPFUNN(machine_version,0)
-# (MACHINE-VERSION), CLTL S. 447
-  {
-    var object erg = O(machine_version_string);
-    if (nullp(erg)) { # noch unbekannt?
-      # ja -> holen
-      #ifdef UNIX
-        #ifdef HAVE_SYS_UTSNAME_H
-          var struct utsname utsname;
-          begin_system_call();
-          if ( uname(&utsname) <0) { OS_error(); }
-          end_system_call();
-          pushSTACK(asciz_to_string(utsname.machine,O(misc_encoding)));
-          funcall(L(nstring_upcase),1); # in Großbuchstaben umwandeln
-        #else
-          # Betriebssystem-Kommando 'uname -m' bzw. 'arch -k' ausführen und
-          # dessen Output in einen String umleiten:
-          # (string-upcase
-          #   (with-open-stream (stream (make-pipe-input-stream "/bin/arch -k"))
-          #     (read-line stream nil nil)
-          # ) )
-          #if defined(UNIX_SUNOS4)
-            pushSTACK(ascii_to_string("/bin/arch -k"));
-          #else
-            pushSTACK(ascii_to_string("uname -m"));
-          #endif
-          funcall(L(make_pipe_input_stream),1); # (MAKE-PIPE-INPUT-STREAM "/bin/arch -k")
-          pushSTACK(value1); # Stream retten
-          pushSTACK(value1); pushSTACK(NIL); pushSTACK(NIL);
-          funcall(L(read_line),3); # (READ-LINE stream NIL NIL)
-          pushSTACK(value1); # Ergebnis (kann auch NIL sein) retten
-          builtin_stream_close(&STACK_1,0); /* close stream */
-          funcall(L(string_upcase),1); skipSTACK(1); # in Großbuchstaben umwandeln
-        #endif
-        erg = value1;
-      #endif
-      #ifdef WIN32_NATIVE
-        {
-          var SYSTEM_INFO info;
-          var OSVERSIONINFO v;
-          begin_system_call();
-          GetSystemInfo(&info);
-          v.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-          if (!GetVersionEx(&v)) { OS_error(); }
-          end_system_call();
-          if (info.wProcessorArchitecture==PROCESSOR_ARCHITECTURE_INTEL) {
-            erg = ascii_to_string("PC/386");
-            # Check for Windows NT, since the info.wProcessorLevel is
-            # garbage on Windows 95.
-            if (v.dwPlatformId == VER_PLATFORM_WIN32_NT)
-              TheS8string(erg)->data[3] = '0'+info.wProcessorLevel;
-            else {
-              if (info.dwProcessorType == PROCESSOR_INTEL_386)
-                TheS8string(erg)->data[3] = '3';
-              elif (info.dwProcessorType == PROCESSOR_INTEL_486)
-                TheS8string(erg)->data[3] = '4';
-              elif (info.dwProcessorType == PROCESSOR_INTEL_PENTIUM)
-                TheS8string(erg)->data[3] = '5';
-            }
-          }
+{ /* (MACHINE-VERSION), CLTL S. 447 */
+  var object ret = O(machine_version_string);
+  if (nullp(ret)) { /* not yet known? -> compute */
+  #if defined(UNIX)
+   #ifdef HAVE_UNAME            /* all known platforms have uname(2) */
+    var struct utsname utsname;
+    begin_system_call();
+    if (uname(&utsname) < 0) { end_system_call(); OS_error(); }
+    end_system_call();
+    pushSTACK(asciz_to_string(utsname.machine,O(misc_encoding)));
+    funcall(L(nstring_upcase),1); /* convert to uppercase */
+    ret = value1;
+   #else
+    #error MACHINE-VERSION: uname is missing
+   #endif
+  #elif defined(WIN32_NATIVE)
+    {
+      var SYSTEM_INFO info;
+      var OSVERSIONINFO v;
+      begin_system_call();
+      GetSystemInfo(&info);
+      v.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+      if (!GetVersionEx(&v)) { end_system_call(); OS_error(); }
+      end_system_call();
+      if (info.wProcessorArchitecture==PROCESSOR_ARCHITECTURE_INTEL) {
+        ret = ascii_to_string("PC/386");
+        /* Check for Windows NT, since the info.wProcessorLevel is
+           garbage on Windows 95. */
+        if (v.dwPlatformId == VER_PLATFORM_WIN32_NT)
+          TheS8string(ret)->data[3] = '0'+info.wProcessorLevel;
+        else {
+          if (info.dwProcessorType == PROCESSOR_INTEL_386)
+            TheS8string(ret)->data[3] = '3';
+          else if (info.dwProcessorType == PROCESSOR_INTEL_486)
+            TheS8string(ret)->data[3] = '4';
+          else if (info.dwProcessorType == PROCESSOR_INTEL_PENTIUM)
+            TheS8string(ret)->data[3] = '5';
         }
-      #endif
-      # Das Ergebnis merken wir uns für's nächste Mal:
-      O(machine_version_string) = erg;
+      }
     }
-    VALUES1(erg);
+  #else
+    #error MACHINE-VERSION is not defined
+  #endif
+    /* Store away the result for the next call: */
+    O(machine_version_string) = ret;
   }
+  VALUES1(ret);
+}
 
-#endif # MACHINE_KNOWN
+#endif /* MACHINE_KNOWN */
 
 #if defined(HAVE_ENVIRONMENT)
 /* declared in <stdlib.h> or <unistd.h> */
@@ -455,7 +409,7 @@ LISPFUNN(set_env,2)
     pushSTACK(value);
     pushSTACK(name);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S (~S ~S): out of memory"));
+    error(error_condition,GETTEXT("~S (~S ~S): out of memory"));
   }
   VALUES1(value);
 }
@@ -482,7 +436,7 @@ LISPFUNN(registry,2)
           VALUES1(NIL);
           goto none;
         }
-        SetLastError(err); OS_error();
+        SetLastError(err); end_system_call(); OS_error();
       }
       err = RegQueryValueEx(key,namez,NULL,&type, NULL,&size);
       if (!(err == ERROR_SUCCESS)) {
@@ -491,15 +445,17 @@ LISPFUNN(registry,2)
           VALUES1(NIL);
           goto none;
         }
-        SetLastError(err); OS_error();
+        SetLastError(err); end_system_call(); OS_error();
       }
       switch (type) {
         case REG_SZ: {
           var char* buf = (char*)alloca(size);
           err = RegQueryValueEx(key,namez,NULL,&type, (BYTE*)buf,&size);
-          if (!(err == ERROR_SUCCESS)) { SetLastError(err); OS_error(); }
+          if (!(err == ERROR_SUCCESS))
+            { SetLastError(err); end_system_call(); OS_error(); }
           err = RegCloseKey(key);
-          if (!(err == ERROR_SUCCESS)) { SetLastError(err); OS_error(); }
+          if (!(err == ERROR_SUCCESS))
+            { SetLastError(err); end_system_call(); OS_error(); }
           end_system_call();
           VALUES1(asciz_to_string(buf,O(misc_encoding)));
         }
@@ -510,11 +466,11 @@ LISPFUNN(registry,2)
           path_name = string_concat(3);
           pushSTACK(path_name);
           pushSTACK(TheSubr(subr_self)->name);
-          fehler(error,GETTEXT("~S: type of attribute ~S is unsupported"));
+          error(error_condition,GETTEXT("~S: type of attribute ~S is unsupported"));
         }
       }
-    });
      none:;
+    });
   });
   skipSTACK(2);
 }
@@ -602,7 +558,7 @@ LISPFUNN(process_id,0) {
   end_system_call();
   VALUES1(uint32_to_I(pid));
 #else
-  #error "What is process-ID on your system?"
+  #error What is process-ID on your system?
 #endif
 }
 
@@ -712,7 +668,7 @@ local maygc object map_to_alist (const c_lisp_map_t *map) {
 
 /* Lisp symbol ---> C number
  may trigger GC -- on error only */
-global maygc long map_lisp_to_c (object obj, const c_lisp_map_t *map) {
+modexp maygc long map_lisp_to_c (object obj, const c_lisp_map_t *map) {
   unsigned int index;
  restart_map_lisp_to_c:
   if (map->use_default_function_p && integerp(obj)) return I_to_L(obj);
@@ -751,7 +707,7 @@ global maygc long map_lisp_to_c (object obj, const c_lisp_map_t *map) {
 
 /* C number ---> Lisp symbol
  may trigger GC -- on error only */
-global maygc object map_c_to_lisp (long val, const c_lisp_map_t *map) {
+modexp maygc object map_c_to_lisp (long val, const c_lisp_map_t *map) {
   unsigned int index;
  restart_map_c_to_lisp:
   for (index=0; index < map->size; index++)
@@ -777,7 +733,7 @@ global maygc object map_c_to_lisp (long val, const c_lisp_map_t *map) {
 
 /* C number ---> list of Lisp symbols, each denoting a bit
  may trigger GC */
-global maygc object map_c_to_list (long val, const c_lisp_map_t *map) {
+modexp maygc object map_c_to_list (long val, const c_lisp_map_t *map) {
   unsigned int count = 0;
   unsigned int index = 0;
   for (; index < map->size; index++) {
@@ -795,7 +751,7 @@ global maygc object map_c_to_list (long val, const c_lisp_map_t *map) {
 
 /* list of Lisp symbols, each denoting a bit ---> C number
  may trigger GC -- on error only */
-global maygc long map_list_to_c (object obj, const c_lisp_map_t *map) {
+modexp maygc long map_list_to_c (object obj, const c_lisp_map_t *map) {
   if (listp(obj)) {
     long ret = 0;
     pushSTACK(obj);
@@ -806,3 +762,20 @@ global maygc long map_list_to_c (object obj, const c_lisp_map_t *map) {
   } else
     return map_lisp_to_c(obj,map);
 }
+
+/* for modules: push a C array of strings into STACK as a Lisp list of strings
+ void push_string_array (char **arr)
+ > arr: C array of C strings, terminated by a NULL
+ < STACK_0: list of corresponding Lisp strings, encoded with *MISC-ENCODING*
+ can trigger GC, adds 1 element to STACK */
+modexp maygc void push_string_array (char **arr) {
+  int count = 0;
+  for (; *arr; count++, arr++)
+    pushSTACK(asciz_to_string(*arr,O(misc_encoding)));
+  { object tmp = listof(count); pushSTACK(tmp); }
+}
+
+/* for modules: convert a C string to a Lisp string, NULL->NIL
+ can trigger GC */
+modexp maygc object safe_to_string (const char *asciz)
+{ return asciz ? asciz_to_string(asciz,O(misc_encoding)) : NIL; }

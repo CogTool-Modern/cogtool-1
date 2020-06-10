@@ -61,9 +61,13 @@ local void init_modules_0 (void)
     module->next = module+1; module++;
   }
   *(last_module = &module->next) = NULL;
+ #if DYNAMIC_TABLES
+  main_module.stab = (subr_t*)((char*)&subr_tab_data+varobjects_misaligned);
+  main_module.otab = (gcv_object_t*)&object_tab;
+ #endif
 }
 
-global void add_module (module_t * module)
+modexp void add_module (module_t * module)
 {
   *last_module = module; last_module = &module->next;
   module_count++;
@@ -77,7 +81,7 @@ global void add_module (module_t * module)
 #else
 
 #define for_modules(which,statement)                                    \
-  module = (which); until (module->name==NULL) { statement; module++; }
+  module = (which); while (module->name != NULL) { statement; module++; }
 #define all_modules  &modules[0]
 #define all_other_modules  &modules[1]
 

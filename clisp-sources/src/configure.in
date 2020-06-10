@@ -1,243 +1,128 @@
 dnl  -*- Autoconf -*- configuration for CLISP
-dnl  Bruno Haible 1992-2005
-dnl  Sam Steingold 2002-2005
+dnl  Bruno Haible 1992-2008
+dnl  Sam Steingold 2002-2010
 dnl
 dnl  configure.in ---<autoconf>--->> configure
-dnl
+dnl               ---<autoheader>->> config.h.in
 dnl  configure    ---<sh>--->> config.status
-dnl                      --->> unixconf.h
+dnl          config.h.in --->> config.h
 dnl          intparam.c  --->> intparam.h
 dnl          floatparam.c--->> floatparam.h
 dnl          makemake.in --->> makemake
 dnl
 dnl  makemake     ---<sh>--->> Makefile
 dnl
-dnl  Makefile     ---<make>--->> lisp.run, lispinit.mem
+dnl  Makefile   ---<make>--->> lisp.run, lispinit.mem
 dnl
 dnl
-AC_PREREQ(2.57)
-AC_INIT(GNU CLISP, m4_normalize(esyscmd([if test -f version.sh; then . ./version.sh; else . ../version.sh; fi; echo "${VERSION_NUMBER} (${RELEASE_DATE})"])), http://clisp.cons.org/, clisp)
-AC_CONFIG_SRCDIR(lispbibl.d)
-AC_COPYRIGHT([GNU CLISP Copyright 1989-2005 by Bruno Haible and others
+AC_PREREQ(2.61)
+AC_INIT(GNU CLISP, m4_normalize(m4_esyscmd([if test -f version.sh; then . ./version.sh; else . ../version.sh; fi; echo "${VERSION_NUMBER} (${RELEASE_DATE})"])), http://clisp.cons.org/, clisp)
+AC_CONFIG_SRCDIR([lispbibl.d])
+AC_CONFIG_AUX_DIR([build-aux])
+AC_CONFIG_MACRO_DIR([m4])
+AM_INIT_AUTOMAKE([no-define])
+AC_COPYRIGHT([GNU CLISP Copyright 1989-2010 by Bruno Haible and others
 GNU CLISP is distributed under the GNU GPL, see file COPYRIGHT])dnl
-AC_REVISION([$Id: configure.in,v 1.108 2006/01/03 06:53:09 sds Exp $])dnl
-AC_CONFIG_HEADERS(unixconf.h)
+AC_REVISION([$Id: configure.in,v 1.183 2010/07/07 14:00:32 sds Exp $])dnl
+AC_CONFIG_HEADERS(config.h)
 dnl
-AC_MSG_NOTICE([* checks for UNIX variants that set DEFS])
-dnl DEFS _ALL_SOURCE
-AC_AIX
-dnl DEFS _GNU_SOURCE
-AC_GNU_SOURCE
-dnl DEFS __EXTENSIONS__
-gl_USE_SYSTEM_EXTENSIONS
-dnl
-AC_MSG_NOTICE([* checks for programs])
-dnl
-dnl sets variable CC
-AC_PROG_CC
-dnl sets variable CPP
-AC_PROG_CPP
-dnl sets variable RANLIB
-CL_PROG_RANLIB
-dnl sets variables INSTALL, INSTALL_DATA, INSTALL_PROGRAM
-CL_PROG_INSTALL
-dnl sets variable CP
-CL_PROG_CP
-dnl sets variable LN_S
-CL_PROG_LN_S
-dnl sets variable HLN
-CL_PROG_HLN
-dnl sets variable GROFF
-AC_CHECK_PROG(GROFF,groff,groff)
-dnl sets variable DVIPDF
-AC_CHECK_PROG(DVIPDF,dvipdf,dvipdf)
-dnl
-AC_CHECK_PROGS(COMPRESS,gzip zip compress)
-CL_TEST_NT dnl sets variable TEST_NT
-CL_PROG_MAKE dnl sets variables MAKE GNU_MAKE
-dnl
-AC_MSG_NOTICE([* checks for system features])
-dnl DEFS _FILE_OFFSET_BITS, _LARGE_FILES
-AC_SYS_LARGEFILE
-dnl sets variables CC_GCC, GCC_X_NONE
-CL_CC_GCC
-dnl sets variable CC_CPLUSPLUS
-CL_CC_CPLUSPLUS
-dnl sets variable CC_NEED_CCPAUX
-CL_CC_NEED_CCPAUX
-dnl sets variable CC_NEED_DEEMA
-CL_CC_NEED_DEEMA
-dnl sets variable AS_UNDERSCORE, DEFS ASM_UNDERSCORE
-CL_AS_UNDERSCORE
-dnl LIBS -lsun
-CL_IRIX_SUN
-dnl LIBS -lseq, -lsocket
-CL_DYNIX_SEQ
-dnl LIBS -lsocket
-CL_SOCKET
-dnl final CC check
-CL_CC_WORKS
-dnl
-AC_MSG_NOTICE([* check for host type])
-dnl
-CL_CANONICAL_HOST(build-aux)
+RSE_BOLD
+BOLD_MSG([check for host type])
+AC_CANONICAL_HOST
 dnl sets variables host, host_cpu, host_vendor, host_os
 CL_CANONICAL_HOST_CPU
+CL_DECOLONIZE
+BOLD_MSG([checks for programs])
 dnl
-AC_MSG_NOTICE([* check for add-ons])
+AC_PROG_CC  dnl sets variable CC
+AC_PROG_CPP dnl sets variable CPP
+gl_EARLY
+AC_PROG_INSTALL dnl sets variables INSTALL, INSTALL_DATA, INSTALL_PROGRAM
+CL_PROG_LN_S    dnl sets variable LN_S
+CL_PROG_HLN     dnl sets variable HLN
+AC_LIBTOOL_WIN32_DLL
+AC_PROG_LIBTOOL
+AC_SUBST(LIBTOOL_DEPS)dnl
+AC_PROG_MKDIR_P
+AC_CHECK_PROG(GROFF,groff,groff)
+AC_CHECK_PROG(PS2PDF,ps2pdf,ps2pdf)
+AC_CHECK_PROGS(COMPRESS,gzip zip compress)
+CL_TEST_NT dnl sets variable TEST_NT
 dnl
-dnl DEFS HAVE_ICONV, ICONV_CONST, set variable LIBICONV
-AM_ICONV
+BOLD_MSG([checks for system features])
+AC_SYS_LARGEFILE    dnl DEFS _FILE_OFFSET_BITS, _LARGE_FILES
+CL_CC_GCC           dnl sets variables CC_GCC, GCC_X_NONE
+CL_CC_SUNPRO        dnl sets variable CC_SUNPRO
+CL_CC_CPLUSPLUS     dnl sets variable CC_CPLUSPLUS
+CL_CC_NEED_DEEMA    dnl sets variable CC_NEED_DEEMA
+CL_AS_UNDERSCORE    dnl sets variable AS_UNDERSCORE, DEFS ASM_UNDERSCORE
+CL_SOCKET           dnl LIBS -lsocket
+CL_CC_WORKS         dnl final CC check
+dnl
+BOLD_MSG([check for add-ons])
+gl_INIT
+AM_ICONV dnl DEFS HAVE_ICONV, ICONV_CONST, set variable LIBICONV
 dnl USE_NLS CPPFLAGS LIBINTL
-dnl Set of all available languages [this is also a /bin/sh/ command!]
-ALL_LINGUAS="en da de fr es nl ru"
 AM_GNU_GETTEXT([external], [need-ngettext])
-dnl
-dnl set variable LIBSIGSEGV
-CL_SIGSEGV
-dnl
-AC_MSG_NOTICE([* checks for fundamental compiler characteristics])
-dnl
-dnl DEFS inline
-AC_C_INLINE
-dnl DEFS void
-CL_VOID
-dnl DEFS HAVE_BUILTIN_STRLEN
-CL_BUILTIN_STRLEN
-dnl DEFS HAVE_LONGLONG
-gl_AC_TYPE_LONG_LONG
-if test $ac_cv_type_long_long = yes; then
-  AC_DEFINE(HAVE_LONGLONG,,[Define if the compiler supports the 'long long' type])
+CL_FFCALL           dnl set variables LIBAVCALL LIBCALLBACK
+CL_LIGHTNING
+if test x$with_jitc = xlightning -a $ac_cv_header_lightning_h = no; then
+  AC_MSG_ERROR([cannot find gnu lightning])
 fi
 dnl
-AC_MSG_NOTICE([* checks for header files])
+BOLD_MSG([checks for fundamental compiler characteristics])
+AC_C_INLINE         dnl DEFS inline
+CL_BUILTIN_STRLEN   dnl DEFS HAVE_BUILTIN_STRLEN
+AC_TYPE_LONG_LONG_INT dnl HAVE_LONG_LONG_INT
 dnl
-dnl DEFS STDC_HEADERS if exist stdlib.h, stdarg.h, ...
-CL_STDC_HEADERS
-dnl DEFS HAVE_SYS_INTTYPES_H -- needed for stdint.h.in
-AC_CHECK_HEADERS(sys/inttypes.h unistd.h sys/file.h)
-dnl DEFS HAVE_OFFSETOF if offsetof in stddef.h
-CL_OFFSETOF
-dnl DEFS HAVE_STDBOOL_H, sets variables STDBOOL_H, HAVE__BOOL
-gt_STDBOOL_H
-dnl DEFS HAVE_STDINT_H, sets variables STDINT_H, HAVE_LONG_64BIT, HAVE_LONG_LONG_64BIT
-gl_STDINT_H
-dnl DEFS ACCESS_NEEDS_SYS_FILE_H if sys/file.h is needed for the access() flags
-CL_ACCESSFLAGS
-dnl DEFS OPEN_NEEDS_SYS_FILE_H if sys/file.h is needed for the open() flags
-CL_OPENFLAGS
-dnl directory reading functions
-CL_DIR_HEADER
-dnl DEFS HAVE_SYS_UTSNAME_H
-CL_UTSNAME
-dnl DEFS HAVE_NETDB_H if exist netdb.h
-CL_NETDB
-dnl DEFS HAVE_LDAP_H
-CL_LDAP
-dnl DEFS HAVE_SYS_IPC_H, HAVE_SYS_SHM_H
-CL_SHM_H
-dnl DEFS HAVE_TERMIOS_H, HAVE_TERMIO_H, ..., HAVE_SGTTY_H
-CL_TERM
-dnl sets variables X_INCLUDES, X_LIBS, DEFS HAVE_X11
-CL_FIND_X
+BOLD_MSG([checks for header files])
+AC_CHECK_HEADERS(sys/inttypes.h unistd.h sys/file.h time.h sys/time.h dnl
+sys/utsname.h)
+CL_SHM_H       dnl DEFS HAVE_SYS_IPC_H, HAVE_SYS_SHM_H
+CL_TERM        dnl DEFS HAVE_TERMIOS_H, HAVE_TERMIO_H, ..., HAVE_SGTTY_H
+AC_PATH_XTRA   dnl sets variables X_CFLAGS, X_LIBS
 dnl
-AC_MSG_NOTICE([* checks for typedefs])
-dnl
-dnl DEFS CADDR_T
-CL_CADDR_T
-dnl DEFS SOCKLEN_T
-CL_SOCKLEN_T
-dnl DEFS SIZEOF_OFF_T
+BOLD_MSG([checks for typedefs])
+CL_CADDR_T    dnl DEFS CADDR_T
+CL_SOCKLEN_T  dnl DEFS CLISP_SOCKLEN_T
 AC_CHECK_SIZEOF([off_t])
-dnl DEFS SIZEOF_STRUCT_TIMEVAL
 AC_CHECK_SIZEOF(struct timeval,,[#include <stdio.h>
 #include <sys/time.h>])
 dnl
-AC_MSG_NOTICE([* checks for structure members])
+BOLD_MSG([checks for structure members])
 dnl
 AC_CHECK_MEMBERS([struct dirent.d_namlen],,,[#include <dirent.h>])
-dnl DEFS TM_IN_SYS_TIME
-AC_STRUCT_TM
 dnl
-AC_MSG_NOTICE([* checks for functions and declarations])
+BOLD_MSG([checks for functions and declarations])
 dnl
-dnl set variable GMALLOC
-CL_GMALLOC
-dnl set variable ALLOCA, DEFS NO_ALLOCA
-AC_FUNC_ALLOCA
-dnl DEFS HAVE__JMP, LONGJMP_RETURNS
-CL_SETJMP
-dnl DEFS RETSIGTYPE, SIGTYPE_DOTS
-CL_TYPE_SIGNAL
-dnl DEFS SIGNALBLOCK_POSIX, SIGNALBLOCK_SYSV, SIGNALBLOCK_BSD
-CL_SIGNALBLOCK
-dnl DEFS SIGNAL_NEED_REINSTALL
-CL_SIGNAL_REINSTALL
-dnl DEFS SIGNAL_NEED_UNBLOCK
-CL_SIGNAL_UNBLOCK
-dnl DEFS SIGNAL_NEED_UNBLOCK_OTHERS
-CL_SIGNAL_BLOCK_OTHERS
-dnl DEFS HAVE_SIGACTION
-CL_SIGACTION
-dnl DEFS SIGACTION_NEED_REINSTALL
-CL_SIGACTION_REINSTALL
-dnl DEFS SIGACTION_NEED_UNBLOCK
-CL_SIGACTION_UNBLOCK
-dnl DEFS HAVE_SIGINTERRUPT, HAVE_SIGVEC
-CL_SIGINTERRUPT
-dnl DEFS HAVE_FPU_CONTROL_T, HAVE_SETFPUCW
-CL_FPU_CONTROL
-dnl DEFS HAVE_RAISE
-CL_RAISE
-dnl DEFS RETABORTTYPE, ABORT_VOLATILE
-CL_ABORT
-dnl DEFS HAVE_PERROR_DECL
-CL_PERROR
+AC_FUNC_ALLOCA dnl set variable ALLOCA, DEFS NO_ALLOCA
+CL_SETJMP      dnl DEFS HAVE__JMP, LONGJMP_RETURNS
+CL_SIGNAL_REINSTALL dnl DEFS SIGNAL_NEED_REINSTALL
+CL_SIGNAL_UNBLOCK   dnl DEFS SIGNAL_NEED_UNBLOCK
+CL_SIGNAL_BLOCK_OTHERS dnl DEFS SIGNAL_NEED_UNBLOCK_OTHERS
+CL_SIGACTION           dnl DEFS HAVE_SIGACTION
+CL_SIGACTION_REINSTALL dnl DEFS SIGACTION_NEED_REINSTALL
+CL_SIGACTION_UNBLOCK   dnl DEFS SIGACTION_NEED_UNBLOCK
+CL_SIGINTERRUPT        dnl DEFS HAVE_SIGINTERRUPT
 AC_CHECK_FUNCS(strerror sysconf getdtablesize memset setsid setpgid fchmod dnl
-fsync flock gethostent shutdown usleep ualarm setitimer nice ftime realpath)
-dnl DEFS HAVE_PUTENV, HAVE_SETENV
-CL_PUTENV
-dnl DEFS HAVE_LC_MESSAGES
-gt_LC_MESSAGES
-dnl DEFS HAVE_GETRLIMIT, HAVE_SETRLIMIT, RLIMIT_RESOURCE_T, SETRLIMIT_CONST
-CL_RLIMIT
-dnl DEFS HAVE_VFORK_H, vfork
-AC_FUNC_VFORK
-dnl DEFS PID_T
-CL_WAITPID
-dnl DEFS HAVE_SYS_RESOURCE_H, HAVE_GETRUSAGE, RUSAGE_WHO_T, HAVE_SYS_TIMES_H
-CL_RUSAGE
-dnl DEFS HAVE_GETCWD, GETCWD_SIZE_T
-CL_GETCWD
-dnl DEFS STAT_MACROS_BROKEN
-AC_HEADER_STAT
-AC_HEADER_TIME
-CL_STAT dnl DEFS HAVE_LSTAT etc
-dnl DEFS HAVE_READLINK
-CL_READLINK
-dnl DEFS ELOOP_VALUE
-CL_ELOOP
-dnl DEFS RETCLOSEDIRTYPE, VOID_CLOSEDIR
-CL_CLOSEDIR
-dnl DEFS HAVE_IOCTL, IOCTL_REQUEST_T, IOCTL_ARGUMENT_T, IOCTL_DOTS
-dnl HAVE_FIONREAD, NEED_SYS_FILIO_H, NEED_SYS_IOCTL_H, HAVE_RELIABLE_FIONREAD
-CL_IOCTL
-dnl DEFS HAVE_POLL, HAVE_RELIABLE_POLL
-CL_POLL
-dnl DEFS HAVE_SELECT, SELECT_WIDTH_T, SELECT_SET_T, SELECT_CONST, HAVE_RELIABLE_SELECT
-CL_SELECT
-dnl DEFS HAVE_GETTIMEOFDAY, GETTIMEOFDAY_DOTS, GETTIMEOFDAY_TZP_T
-CL_GETTIMEOFDAY
-dnl DEFS HAVE_TIMES_CLOCK (only if no ftime())
-CL_TIMES_CLOCK
-dnl DEFS HAVE_GETHOSTNAME
-CL_GETHOSTNAME
-dnl DEFS HAVE_GETHOSTBYNAME
-CL_GETHOSTBYNAME
-dnl DEFS HAVE_CONNECT CONNECT_NAME_T, CONNECT_CONST, CONNECT_ADDRLEN_T
-CL_CONNECT
-dnl DEFS HAVE_SYS_UN_H, HAVE_SOCKADDR_UN_LEN
-CL_UNIXCONN
+fsync flock gethostent shutdown usleep ualarm setitimer nice ftime realpath dnl
+getresuid setresuid getresgid setresgid setreuid setregid dnl
+gethostname readlink getcwd uname readdir_r rand_r)
+CL_PUTENV dnl DEFS HAVE_PUTENV, HAVE_SETENV
+gt_LC_MESSAGES dnl DEFS HAVE_LC_MESSAGES
+CL_RLIMIT dnl DEFS HAVE_GETRLIMIT, HAVE_SETRLIMIT, RLIMIT_RESOURCE_T, SETRLIMIT_CONST
+AC_FUNC_VFORK dnl DEFS HAVE_VFORK_H, vfork
+CL_WAITPID dnl DEFS PID_T
+CL_RUSAGE dnl DEFS HAVE_SYS_RESOURCE_H, HAVE_GETRUSAGE, RUSAGE_WHO_T, HAVE_SYS_TIMES_H
+CL_STAT        dnl DEFS HAVE_LSTAT etc
+CL_ELOOP       dnl DEFS ELOOP_VALUE
+CL_CLOSEDIR    dnl DEFS VOID_CLOSEDIR
+CL_IOCTL dnl DEFS HAVE_IOCTL, IOCTL_REQUEST_T, IOCTL_ARGUMENT_T, IOCTL_DOTS HAVE_FIONREAD, NEED_SYS_FILIO_H, NEED_SYS_IOCTL_H, HAVE_RELIABLE_FIONREAD
+CL_POLL dnl DEFS HAVE_POLL, HAVE_RELIABLE_POLL
+CL_SELECT dnl DEFS HAVE_SELECT, SELECT_WIDTH_T, SELECT_SET_T, SELECT_CONST, HAVE_RELIABLE_SELECT
+CL_GETHOSTBYNAME dnl DEFS HAVE_GETHOSTBYNAME
+CL_CONNECT dnl DEFS HAVE_CONNECT CONNECT_NAME_T, CONNECT_CONST, CONNECT_ADDRLEN_T
+CL_UNIXCONN dnl DEFS HAVE_SYS_UN_H, HAVE_SOCKADDR_UN_LEN
 dnl DEFS HAVE_IPV4, HAVE_IPV6, IPV6_NEED_LINUX_IN6_H, HAVE_INET_PTON,
 dnl HAVE_INET_NTOP, HAVE_NETINET_IN_H, HAVE_ARPA_INET_H, RET_INET_ADDR_TYPE,
 dnl INET_ADDR_SUFFIX, INET_ADDR_CONST, HAVE_NETINET_TCP_H, SETSOCKOPT_CONST,
@@ -246,44 +131,29 @@ CL_TCPCONN
 dnl DEFS CODE_ADDRESS_RANGE, MALLOC_ADDRESS_RANGE, SHLIB_ADDRESS_RANGE,
 dnl STACK_ADDRESS_RANGE
 CL_ADDRESS_RANGE
-dnl DEFS HAVE_GETPAGESIZE, RETGETPAGESIZETYPE
-CL_GETPAGESIZE
-dnl DEFS HAVE_VADVISE
-CL_VADVISE
-dnl DEFS HAVE_MACH_VM
-CL_MACH_VM
+CL_VADVISE dnl DEFS HAVE_VADVISE
+CL_MACH_VM dnl DEFS HAVE_MACH_VM
 dnl DEFS HAVE_MMAP, HAVE_MMAP_ANON, HAVE_MMAP_ANONYMOUS, HAVE_MMAP_DEVZERO,
 dnl HAVE_MMAP_DEVZERO_SUN4_29
 CL_MMAP
-dnl DEFS HAVE_MUNMAP
-CL_MUNMAP
-dnl DEFS HAVE_MSYNC
-CL_MSYNC
-dnl DEFS HAVE_MPROTECT, HAVE_WORKING_MPROTECT
-CL_MPROTECT
-dnl DEFS HAVE_SHM if shm works
-CL_SHM
-dnl DEFS SHM_RMID_VALID
-CL_SHM_RMID
-dnl DEFS HAVE_DLOPEN
-CL_DYNLOAD
+CL_MUNMAP   dnl DEFS HAVE_MUNMAP
+CL_MSYNC    dnl DEFS HAVE_MSYNC
+CL_MPROTECT dnl DEFS HAVE_MPROTECT, HAVE_WORKING_MPROTECT
+CL_SHM      dnl DEFS HAVE_SHM if shm works
+CL_SHM_RMID dnl DEFS SHM_RMID_VALID
+CL_DYNLOAD  dnl DEFS HAVE_DLOPEN
+gl_FCNTL_O_FLAGS dnl DEFS HAVE_WORKING_O_NOFOLLOW & HAVE_WORKING_O_NOATIME
 dnl
-AC_MSG_NOTICE([* checks for libraries])
+BOLD_MSG([checks for libraries])
+CL_TERMCAP dnl set variable LIBTERMCAP
+CL_READLINE dnl DEFS HAVE_READLINE
 dnl
-dnl set variable LIBTERMCAP
-CL_TERMCAP
-dnl DEFS HAVE_READLINE
-CL_READLINE
+BOLD_MSG([checks for OS services])
+CL_FILECHARSET dnl DEFS VALID_FILENAME_CHAR
 dnl
-AC_MSG_NOTICE([* checks for OS services])
+BOLD_MSG([checks for compiler characteristics (arithmetic data types)])
 dnl
-dnl DEFS VALID_FILENAME_CHAR
-CL_FILECHARSET
-dnl
-AC_MSG_NOTICE([* checks for compiler characteristics (arithmetic data types)])
-dnl
-dnl DEFS __CHAR_UNSIGNED__ if char is unsigned
-AC_C_CHAR_UNSIGNED
+AC_C_CHAR_UNSIGNED dnl DEFS __CHAR_UNSIGNED__ if char is unsigned
 dnl DEFS FLOAT_DIV0_EXCEPTION, FLOAT_OVERFLOW_EXCEPTION,
 dnl      FLOAT_UNDERFLOW_EXCEPTION, FLOAT_INEXACT_EXCEPTION
 CL_FLOAT_DIV0
@@ -303,13 +173,13 @@ dnl builds floatparam.h
 CL_MACHINE([floating-point types and behaviour],
 ${srcdir}/floatparam.c,[CL_FLOATPARAM_CROSS],floatparam.h,cl_cv_file_floatparam_h)
 dnl
-AC_MSG_NOTICE([* output file generation])
+BOLD_MSG([output file generation])
 dnl
 dnl gettext po files
 dnl
 AC_SUBST(PACKAGE)dnl
 PACKAGE="clisp"
-AC_CONFIG_FILES([po/Makefile.in])
+AC_CONFIG_FILES([po/Makefile.in gllib/Makefile])
 dnl
 dnl
 AC_CONFIG_FILES([makemake],[

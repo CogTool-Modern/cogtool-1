@@ -1,6 +1,6 @@
 ;;;; Common Lisp Object System for CLISP: Methods
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2004
+;;;; Sam Steingold 1998 - 2004, 2008, 2010
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -31,7 +31,7 @@
               (push (first item) req-vars)
               (push (first item) ignorable-req-vars) ; CLtL2 p. 840 top
               (push (second item) spec-list))
-            (funcall errfunc item
+            (funcall errfunc specialized-lambda-list item
               (TEXT "Invalid specialized parameter in method lambda list ~S: ~S")
               specialized-lambda-list item)))))
     (let ((lambda-list (nreconc req-vars remaining-lambda-list)))
@@ -40,11 +40,9 @@
 
 ;; helper
 (defmacro program-error-reporter (caller)
-  `#'(lambda (detail errorstring &rest arguments)
-       (declare (ignore detail))
-       (error-of-type 'program-error
-         (TEXT "~S: ~A") ,caller
-         (apply #'format nil errorstring arguments))))
+  `#'(lambda (form detail errorstring &rest arguments)
+       (apply #'sys::lambda-list-error form detail
+              "~S: ~A" ,caller (apply #'format nil errorstring arguments))))
 
 ;; MOP p. 52
 (defun extract-lambda-list (specialized-lambda-list)
@@ -91,12 +89,10 @@
           (body (cdr description)))
       (multiple-value-bind (lambda-list spec-list ignorable-req-vars)
           (decompose-specialized-lambda-list specialized-lambda-list
-            #'(lambda (detail errorstring &rest arguments)
-                (error-of-type 'ext:source-program-error
-                  :form whole-form
-                  :detail detail
-                  (TEXT "~S ~S: ~A")
-                  caller funname
+            #'(lambda (form detail errorstring &rest arguments)
+                (declare (ignore form)) ; FORM is lambda-list, use WHOLE-FORM
+                (sys::lambda-list-error whole-form detail
+                  "~S ~S: ~A" caller funname
                   (apply #'format nil errorstring arguments))))
         (let ((req-specializer-forms
                 (mapcar #'(lambda (specializer-name)
@@ -115,25 +111,15 @@
                                        (TEXT "~S ~S: Invalid specializer ~S in lambda list ~S")
                                        caller funname specializer-name specialized-lambda-list))))
                         spec-list)))
-          (sys::check-redefinition
-            (list* funname qualifiers spec-list) caller
-            ;; do not warn about redefinition when no method was defined
-            (and (fboundp 'find-method) (fboundp funname)
-                 (typep-class (fdefinition funname) <generic-function>)
-                 (not (safe-gf-undeterminedp (fdefinition funname)))
-                 (eql (sig-req-num (safe-gf-signature (fdefinition funname))) (length spec-list))
-                 (find-method (fdefinition funname) qualifiers spec-list nil)
-                 "method"))
+          (check-method-redefinition funname qualifiers spec-list caller)
           (multiple-value-bind (reqvars optvars optinits optsvars rest
                                 keyp keywords keyvars keyinits keysvars
                                 allowp auxvars auxinits)
               (analyze-lambdalist lambda-list
-                #'(lambda (detail errorstring &rest arguments)
-                    (error-of-type 'ext:source-program-error
-                      :form whole-form
-                      :detail detail
-                      (TEXT "~S ~S: ~A")
-                      caller funname
+                #'(lambda (lalist detail errorstring &rest arguments)
+                    (declare (ignore lalist)) ; use WHOLE-FORM instead
+                    (sys::lambda-list-error whole-form detail
+                      "~S ~S: ~A" caller funname
                       (apply #'format nil errorstring arguments))))
             (declare (ignore optinits optsvars keyvars keyinits keysvars
                              auxvars auxinits))
@@ -148,12 +134,15 @@
                     `(,@(subseq lambda-list 0 index) &ALLOW-OTHER-KEYS
                       ,@(subseq lambda-list index)))))
               (let* ((backpointer (gensym))
-                     (compile nil)
+                     (compile-decl nil)
                      (documentation nil)
                      (lambdabody
-                       (multiple-value-bind (body-rest declarations docstring)
+                       (multiple-value-bind (body-rest declarations docstring compile-name)
                            (sys::parse-body body t)
-                         (setq compile (member '(COMPILE) declarations :test #'equal))
+                         (setq compile-decl
+                               (case compile-name
+                                 (0 '()) (1 '((DECLARE (COMPILE))))
+                                 (t `((DECLARE (COMPILE ,compile-name))))))
                          (setq documentation docstring)
                          (when ignorable-req-vars
                            (push `(IGNORABLE ,@ignorable-req-vars) declarations))
@@ -187,7 +176,7 @@
                                           :keywords keywords :allow-p allowp)))
                 (values
                   `(LAMBDA (,backpointer)
-                     ,@(if compile '((DECLARE (COMPILE))))
+                     ,@compile-decl
                      (%OPTIMIZE-FUNCTION-LAMBDA (T) ,@lambdabody))
                   `(:QUALIFIERS ',qualifiers
                     :LAMBDA-LIST ',lambda-list

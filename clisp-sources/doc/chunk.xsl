@@ -3,5 +3,6 @@
 <xsl:import href="http://docbook.sourceforge.net/release/xsl/current/xhtml/chunk.xsl"/>
 <xsl:import href="common.xsl"/>
 <xsl:param name="generate.legalnotice.link" select="1"/>
+<xsl:param name="generate.revhistory.link" select="1"/>
 <xsl:param name="chunk.first.sections" select="1"/>
 </xsl:stylesheet>

@@ -14,7 +14,7 @@ A common coding style is a compromise for all participants, and it is also
 an exercise in tolerance. When I contribute code to Linux, I adhere to the
 Linux coding style (/usr/src/linux/Documentation/CodingStyle - very
 recommended reading). When I contribute to GCC, I follow the GNU coding style
-("info standards"), although I get nauseas when I look at the result.
+("info standards"), although I get nauseous when I look at the result.
 When I write for XFree86, I follow their style; it's a somewhat neutral one.
 
 As a general rule, don't reformat entire files other people have written;
@@ -43,10 +43,19 @@ harder to read and understand. And also, because some editors on Windows have
 a default tab width of 4, whereas on Unix, the common consensus is a tab width
 of 8. If you are using Emacs and want to contribute to CLISP, the best way to
 ensure that you don't send us tabs by mistake is to add the following lines
-to your $HOME/.emacs file:
+to your <$HOME/.emacs> file:
 
     ;; Tabs are anachronistic.
     (setq-default indent-tabs-mode nil)
+
+                          Trailing whitespace
+                          -------------------
+
+Trailing whitespace pollutes diffs and should be avoided.
+Emacs will highlight it if you do
+  (setq-default show-trailing-whitespace t)
+and remove it if you do
+  (add-hook 'write-file-functions 'delete-trailing-whitespace)
 
                Lisp indentation and parentheses placement
                ------------------------------------------
@@ -54,6 +63,7 @@ to your $HOME/.emacs file:
 We try to keep things in 79 columns, because that's the default width of
 Emacs windows.  We urge you to use the Emacs 21 lisp-mode to indent
 your lisp code, see file <clisp/emacs/clisp-indent.el>.
+VIM users should put <clisp/emacs/lisp.vim> into <$HOME/.vim/after/syntax/>.
 
 Parentheses should be set in the mainstream style (used in CLtL1, CLtL2
 and the ANSI CL spec), with the closing parens at the end of the last
@@ -98,16 +108,10 @@ column of a line.
 These 'var' symbols that you encounter in every function introduce variable
 declarations. We use one variable per declaration; the C syntax rules make
 declarations of multiple variables on the same line hard to read and hard
-to edit. 'var' is a preprocessor symbol which expands to nothing. Writing
-'var' not only makes it human reader to understand the code; it also allows
-you to mix declarations and statements freely, without the need for
-additional braces.
-
-We have a few macros defined in lispbibl.d: 'elif' means 'else if',
-'until' means 'while not' (both are now deprecated).
-'loop' introduces a loop which can be exited only via 'break'; it's
-equivalent to 'for(;;)'.  It is deprecated as well.  Use 'for (;;)',
-not 'while (1)', instead.
+to edit. 'var' is a preprocessor symbol which expands to nothing.
+Writing 'var' not only makes it easier for a human reader to understand
+the code; it also allows you to mix declarations and statements freely,
+without the need for additional braces (see utils/varbrace.c).
 
                              C indentation
                              -------------
@@ -127,17 +131,24 @@ is what the GNU standards recommend:
             if (mconsp(Car(alist)) && simple_string_p(Car(Car(alist)))
                 && string_equal(line,Car(Car(alist)))) {
 
-Use <clisp/emacs/d-mode.el> to make Emacs indent and fontify your *.d files.
+Use <clisp/emacs/d-mode.el> to make Emacs indent and fontify the *.d files.
+VIM users should put <clisp/emacs/d.vim> into <$HOME/.vim/syntax/>.
 
                                 Comments
                                 --------
 
 Comments in front of a function definition describe the function's
-specification, i.e. all a caller of the function needs to know. Describe
-the function's behavior in a sentence with implicit subject "this
-function", not as a command. For algorithmic functions with non obvious
-complexity, the (worst-case) complexity (= running time) is part of the
-function's specification.
+specification, i.e. all a caller of the function needs to know.
+Describe the function's behavior in a sentence with implicit subject
+"this function", not as a command.
+For algorithmic functions with non obvious complexity, the (worst-case)
+complexity (= running time) is part of the function's specification.
+Please follow the common format (UP stands for "Unterprogram"):
+/* UP: brief description
+ > 1st input parameter
+ > 2nd input parameter
+ < return value */
+Do not forget to list global variables accessed and modified, including STACK.
 
 Comments about the inner working of a function belong inside the function.
 
@@ -161,13 +172,26 @@ When CLISP was written, it was not anticipated to have wide distribution.
 We are sorry about the German comments. If you are a native German
 speaker, you are welcome to faithfully translate them to English.
 If not, please leave them alone and wait for someone to translate them
-to English.  Many files have been already translated by Stefan Kain;
-you may ask him (on <clisp-list>) to translate the file you need.
+to English.  Many files have been already translated by Stefan Kain
+and Reini Urban; you may ask them (on <clisp-list>) to translate
+the file you need.
 
 German variable and function names are probably even more disturbing
 than the comments, and much harder to handle.  Use babelfish.
 Remember: "fehler" == "error"; "zustand" == "state"
 (this is where the 'z' suffix often comes from).
+
+Please avoid "clever" tricks with Unicode in comments.
+E.g., using #\SUBSET_OF_OR_EQUAL_TO (Unicode #x2286) instead of the
+plain words "subclass of" or #\FULLWIDTH_SOLIDUS (Unicode #xff0f) &
+#\FULLWIDTH_ASTERISK (Unicode #xff0a) to emulate nested C comments
+breaks compilation in some language environments:
+$ LANG=ja_JP.eucJP make clisp.h
+...
+../src/lispbibl.d:1028: error: stray '\217' in program
+...
+Remember, ASCII rules!
+
 
                              Variable names
                              --------------
@@ -217,7 +241,7 @@ This helps 1. keeping the size of compiled .fas files small, 2. reducing
 the probability that O(version) needs to be bumped when you change the
 effect of the macro.
 
-Macros expansions can refer to documented symbols and functions from public
+Macro expansions can refer to documented symbols and functions from public
 packages (COMMON-LISP, CLOS, EXT, FFI), as well as undocumented, unexported
 functions. Both kinds of functions, together with their calling conventions,
 form the ABI (= Application Binary Interface) of .fas files. When the ABI
@@ -260,13 +284,22 @@ changes and add the ChangeLog entry.
 You are encouraged to add a test case to a file in <clisp/tests/>
 whenever you add a feature or fix a bug, the more tests, the better.
 One requirement must be satisfied after every CVS commit:
-    $ cvs up -C; ./configure --build build-dir
+    $ cvs up -C; ./configure --cbc build-dir
 must pass all tests, the old and the new alike.
 
-Documentation changes do not need a ChangeLog entry.  Do not abbreviate
-function, variable and file names (e.g., using regular expressions).
+Documentation and comment changes do not need a ChangeLog entry.
+Do not abbreviate function, variable and file names
+(e.g., using regular expressions).
 
 All functionality should be documented.
 When adding a new symbol, document it in the Implementation Notes and
 add an appropriate mapping from the symbol to its XML ID in the impnotes
 to the file doc/Symbol-Table.text (in the order of the impnotes' flow).
+
+
+                          Source File Encoding
+                          --------------------
+
+All files are to be encoded with utf-8 and Unix line endings (LF, ASCII 10).
+Please do make sure that you do not break non-ASCII characters
+and do not replace line endings with the dos CR/LF.

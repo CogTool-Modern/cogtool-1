@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2003 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -13,11 +13,7 @@ AC_PREREQ(2.57)
 AC_DEFUN([CL_BUILTIN_STRLEN],
 [AC_CACHE_CHECK(for inline __builtin_strlen, cl_cv_builtin_strlen, [
 cat > conftest.$ac_ext <<EOF
-#if defined(__STDC__) || defined(__cplusplus)
 int foo (char* x)
-#else
-int foo (x) char* x;
-#endif
 { return __builtin_strlen(x); }
 EOF
 if AC_TRY_COMMAND(${CC-cc} -S $CFLAGS $CPPFLAGS conftest.$ac_ext) >/dev/null 2>&1 ; then

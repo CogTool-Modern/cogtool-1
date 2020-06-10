@@ -1,21 +1,22 @@
-# Liste aller zusätzlichen dem C-Programm bekannten Packages
-# Bruno Haible 1990-2004
+/*
+ * List of all packages available in C
+ * Bruno Haible 1990-2004
+ * Sam Steingold 1999-2003
 
-# Der Macro LISPPACK deklariert eine LISP-Package.
-# LISPPACK(abbrev,packname)
-# > abbrev: Kürzel, mit dem in constsym.d auf diese Package verwiesen wird
-# > packname: C-Name der Package
+ Macro LISPPACK declares a LISP package.
+ LISPPACK(abbrev,packname)
+ > abbrev: C package identified, used in constsym.d
+ > packname: full Lisp name */
 
-# Expander für die Aufzählung:
-  #define LISPPACK_A(abbrev,packname)  \
+/* Expander for enumerating: */
+#define LISPPACK_A(abbrev,packname)             \
     enum_##abbrev##_index,
 
-# Expander für die Konstruktion der Liste O(all_packages):
-  #define LISPPACK_B(abbrev,packname)  \
+/* Expander for constructing of the list O(all_packages): */
+#define LISPPACK_B(abbrev,packname)                             \
     make_package(ascii_to_string(packname),NIL,false,false);
 
-# Welcher Expander benutzt wird, muss vom Hauptfile aus eingestellt werden.
-
+/* The including file should select which expander is actually used. */
 
 LISPPACK(clos,"CLOS")
 LISPPACK(ext,"EXT")

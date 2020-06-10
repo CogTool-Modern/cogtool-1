@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; Test some MOP-like CLOS features
 
 ; Make the MOP symbols accessible from package CLOS.
@@ -1036,6 +1036,22 @@ T
  ((0 :name testgf08-renamed) (3 add-method (method (integer))))
  ((1 :name testgf08-renamed) (4 add-method (method (integer))) (6 add-method (method (real))) (8 remove-method (method (integer)))))
 
+;; check that reinitialize-instance calls finalize-inheritance [ 1526448 ]
+(progn
+  (defclass reinit-instance-class (standard-class) ())
+  (defmethod validate-superclass ((class reinit-instance-class)
+                                  (superclass standard-class))
+    t)
+  (defparameter *finalize-inheritance-count* 0)
+  (defmethod finalize-inheritance :before ((class reinit-instance-class))
+    (incf *finalize-inheritance-count*))
+  (defclass reinit-instance-object () ((a-slot))
+    (:metaclass reinit-instance-class))
+  (unless (class-finalized-p (find-class 'reinit-instance-object))
+    (finalize-inheritance (find-class 'reinit-instance-object)))
+  (reinitialize-instance (find-class 'reinit-instance-object))
+  *finalize-inheritance-count*)
+2
 
 ;;; Check the direct-methods protocol
 ;;;   add-direct-method remove-direct-method
@@ -2431,18 +2447,14 @@ T
 #+CLISP ((STRUCT04ROV-SLOT1) NIL)
 
 ;; check that there are no redefinition warnings
-(let* ((f "defstruct-test.lisp")
-       (c (compile-file-pathname f))
+(let* ((f "mop-tst-defstruct-test.lisp")
        #+CLISP (custom:*suppress-check-redefinition* nil)
-       #+CLISP (l (make-pathname :type "lib" :defaults c))
        (*break-on-signals* t))
   (with-open-file (s f :direction :output :if-exists :supersede)
     (write '(defstruct struct05 slot) :stream s) (terpri s)
     (write '(defstruct (struct05v (:type vector)) slotv) :stream s) (terpri s))
   (unwind-protect (progn (compile-file f) nil)
-    (delete-file f)
-    (delete-file c)
-    #+clisp (delete-file l)))
+    (post-compile-file-cleanup f)))
 NIL
 
 ;; Check slot-definition-writers.
@@ -3213,6 +3225,7 @@ t
 #+(or CLISP CMU SBCL)
 ("f on A" "f on A" ("g on A" 10) ("g on D" 20) ("h on C" 30) ("h on D" 40))
 
+
 ;;; user-defined :allocation :hash
 ;; http://sourceforge.net/tracker/index.php?func=detail&aid=1359066&group_id=1355&atid=101355
 (progn
@@ -3235,8 +3248,9 @@ t
 
 ;; http://sourceforge.net/tracker/index.php?func=detail&aid=1369668&group_id=1355&atid=101355
 ;; but the allocation must be defined!
-(progn (defclass class-bad-slot () ((bad-slot :allocation :bad-allocation)))
-       (make-instance 'class-bad-slot))
+(progn
+  (defclass class-bad-slot () ((bad-slot :allocation :bad-allocation)))
+  (make-instance 'class-bad-slot))
 ERROR
 
 ;; mop.xml#mop-sa-funcallable
@@ -3259,8 +3273,49 @@ ERROR
         (funcall constructor)))
 (T #(POSITION NIL NIL))
 
+;; Ability to specify a default method-combination on the generic-function
+;; class. See #[ 1415783 ].
+(progn
+  (defclass testgf38class (standard-generic-function)
+    ()
+    (:metaclass clos:funcallable-standard-class)
+    (:default-initargs
+      :method-combination
+      (clos:find-method-combination (clos:class-prototype (find-class 'testgf38class))
+                                    '+ '())))
+  (defgeneric testgf38 (x)
+    (:generic-function-class testgf38class))
+  (defmethod testgf38 + (x) 0)
+  t)
+T
+
+;; http://clisp.cons.org/impnotes/mop-clisp.html#mop-clisp-warn
+(let ((book-counter 0) (sale-stats (make-hash-table :test 'equal))
+       (already-called 0) (replacing-method 0))
+  (defmethod initialize-instance :after ((o clos:gf-already-called-warning) &rest opts) (incf already-called))
+  (defmethod initialize-instance :after ((o clos:gf-replacing-method-warning) &rest opts) (incf replacing-method))
+  (defclass ware () ((title :initarg :title :accessor title)))
+  (defclass book (ware) ())
+  (defclass compact-disk (ware) ())
+  (defclass dvd (ware) ())
+  (defgeneric add-to-inventory (object))
+  (defmethod add-to-inventory ((object ware)) nil)
+  (add-to-inventory (make-instance 'book :title "CLtL1"))
+  (defmethod add-to-inventory ((object book)) (incf book-counter))
+  (add-to-inventory (make-instance 'book :title "CLtL2"))
+  (defmethod add-to-inventory ((object book))
+    (setf (gethash (title object) sale-stats) (cons 0 0)))
+  (add-to-inventory (make-instance 'book :title "AMOP"))
+  (list book-counter (hash-table-count sale-stats)
+        already-called replacing-method))
+(1 1 2 1)
+
 ;; cleanup
 (setf (find-class 'class-bad-slot) nil
+      (find-class 'ware) nil
+      (find-class 'book) nil
+      (find-class 'compact-disk) nil
+      (find-class 'dvd) nil
       (find-class 'constructor) nil
       (find-class 'person) nil
       (find-class 'counted1-class) nil
@@ -3312,6 +3367,8 @@ ERROR
       (find-class 'dependent07) nil
       (find-class 'prioritized-generic-function) nil
       (find-class 'dependent08) nil
+      (find-class 'reinit-instance-class) nil
+      (find-class 'reinit-instance-object) nil
       (find-class 'volatile-class) nil
       (find-class 'testclass10) nil
       (find-class 'testclass10a) nil

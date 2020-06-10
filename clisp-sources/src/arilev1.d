@@ -12,7 +12,7 @@
 # uintDD,sintDD   integer types for a double-digit
 
 #if !((32%intDsize)==0)
-  #error "intDsize should be a divisor of 32!"
+  #error intDsize should be a divisor of 32!
 #endif
 
 
@@ -82,7 +82,7 @@
   #if (intDsize==16)
     #define muluD  mulu16
   #endif
-  #if (intDsize==32) && defined(HAVE_LONGLONG)
+  #if (intDsize==32) && defined(HAVE_LONG_LONG_INT)
     #define muluD(arg1,arg2)  ((uintDD)(uintD)(arg1)*(uintDD)(uintD)(arg2))
   #endif
 #else
@@ -114,12 +114,12 @@
   #if (intDsize==16)
     #define divuD  divu_3216_1616
   #endif
-  #if (intDsize==32) && defined(HAVE_LONGLONG)
-    #define divuD(x,y,q_zuweisung,r_zuweisung) \
+  #if (intDsize==32) && defined(HAVE_LONG_LONG_INT)
+    #define divuD(x,y,q_assignment,r_assignment) \
       { var uint64 __x = (x);                                 \
         var uint32 __y = (y);                                 \
         var uint32 __q = floor(__x,(uint64)__y);              \
-        q_zuweisung __q; r_zuweisung (uint32)__x - __q * __y; \
+        q_assignment __q; r_assignment (uint32)__x - __q * __y; \
       }
   #endif
 #else

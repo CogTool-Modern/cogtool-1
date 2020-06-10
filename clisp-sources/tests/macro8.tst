@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; test the macro functions; chapter 8
 ;; -----------------------------------
 
@@ -220,6 +220,17 @@ test11
 (test11)
 2
 
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1420585&group_id=1355
+(progn
+  (defmacro test12 ()
+    `(let () (eval-when (compile) (print "compiling"))))
+  (define-compiler-macro test12 ()
+    (princ "Optimizing-")
+    '((lambda (x) (princ X)) 123))
+  (with-output-to-string (*standard-output*)
+    (funcall (lambda () (declare (compile)) (test12)))))
+"Optimizing-123"
+
 ;; check that declaration processing does not modify code
 (let* ((f '(locally (declare (optimize safety abazonk (debug 20))) (+ 3 4)))
        (c (copy-tree f)))
@@ -246,10 +257,11 @@ TEST-COMPILER
 ;; the bug was fixed by bruno in compiler.lisp 1.80
 (progn
   (defun stem (&key (obj (error "missing OBJ")))
-    (with-open-file (stream obj :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
+    (with-open-file (stream obj :direction :output #+(or CMU SBCL)
+                            :if-exists #+(or CMU SBCL) :supersede)
       (truename stream)))
   (compile 'stem)
-  (delete-file (stem :obj "foo-bar-zot"))
+  (delete-file (stem :obj "lambda-tst-foo-bar-zot"))
   t)
 t
 
@@ -299,11 +311,15 @@ m
 (destructuring-bind (&key (x x)) nil x)
 3
 
-(destructuring-bind (x . y) '(1 . 10) (list x y))
-(1 10)
-
 (destructuring-bind (&whole (a  . b) c . d) '(1 . 2) (list a b c d))
 (1 2 1 2)
+
+#+(or CLISP CMU SBCL)
+(destructuring-bind (() a b) (list () 2 3) (+ a b))
+#+(or CLISP CMU SBCL) 5
+
+(destructuring-bind (x . y) '(1 . 10) (list x y))
+(1 10)
 
 (macrolet ((%m (&whole (m a b) c d) `'(,m ,a ,b ,c ,d))) (%m 1 2))
 (%M 1 2 1 2)
@@ -475,6 +491,36 @@ FEXPAND-1
   (dolist (x (symbol-plist 'foo138)) (atom x)))
 NIL
 
+#+clisp
+(progn (define-symbol-macro foo139 1)
+       (appease-cerrors (defvar foo139 t))
+       foo139)
+T
+
+#+clisp
+(progn (define-symbol-macro foo140 1)
+       (appease-cerrors (defconstant foo140 t))
+       foo140)
+T
+
+#+clisp
+(let ((s (make-symbol "FOO141")))
+  (eval `(define-symbol-macro ,s t))
+  (appease-cerrors (import s "KEYWORD"))
+  (eq s (symbol-value s)))
+T
+
+#+clisp
+(progn (defvar foo142 1)
+       (appease-cerrors (define-symbol-macro foo142 t))
+       foo142)
+T
+
+(let ((s (define-symbol-macro foo143 t)))
+  (import s "KEYWORD")
+  (eval s))
+T
+
 ;; <https://sourceforge.net/tracker/index.php?func=detail&aid=678194&group_id=1355&atid=101355>
 (defparameter *my-typeof-counter* 0)
 *my-typeof-counter*
@@ -586,7 +632,7 @@ dm2b
   (list (notinline-test-func-2 12) *notinline-test-var*))
 (12 22)
 
-(let ((file "tmp.lisp"))
+(let ((file "macro8-tst-tmp.lisp"))
   (with-open-file (o file :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
     (write-line "(defun caller (a b) (foo a b))" o)
     (write-line "(defun foo (a b c) (list a b c))" o))
@@ -597,11 +643,13 @@ dm2b
     (delete-file file)))
 (1 2 3)
 
-(let ((file1 "tmp1.lisp") (file2 "tmp2.lisp"))
-  (with-open-file (o file1 :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
+(let ((file1 "macro8-tst-tmp1.lisp") (file2 "macro8-tst-tmp2.lisp"))
+  (with-open-file (o file1 :direction :output
+                     #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
     (write-line "(defun foo (a b c) (cons b c a))" o)
     (format o "(load ~S)~%" file2))
-  (with-open-file (o file2 :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
+  (with-open-file (o file2 :direction :output
+                     #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
     (write-line "(defun bar (a b) (sin (1+ a) (1- b a)))" o))
   (unwind-protect
       (progn
@@ -635,55 +683,51 @@ dm2b
 (T 513972305 513972305)
 
 ;; <http://article.gmane.org/gmane.lisp.clisp.devel/10566>
-(let ((file "tmp.lisp"))
-  (with-open-file (out file :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
+(let ((file "macro8-tst-tmp.lisp"))
+  (with-open-file (out file :direction :output
+                       #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
     (write '(eval-when (load compile eval)
              (+ (funcall (compile nil (lambda () (load-time-value (+ 2 3)))))
               120))
            :stream out))
   (unwind-protect (compile-file file)
-    (delete-file file)
-    (delete-file (compile-file-pathname file))
-    #+clisp (delete-file (make-pathname :type "lib" :defaults file)))
+    (post-compile-file-cleanup file))
   nil)
 nil
 
 ;; compile-file is allowed to collapse different occurrences of the same
 ;; LOAD-TIME-VALUE form, and in fact, CLISP does so.
-(let ((file "tmp.lisp"))
-  (with-open-file (out file :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
-    (write-string "(defun ltv1 () (eq #1=(load-time-value (cons nil nil)) #1#))" out))
+(let ((file "macro8-tst-tmp.lisp"))
+  (with-open-file (out file :direction :output
+                       #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
+    (write-string
+     "(defun ltv1 () (eq #1=(load-time-value (cons nil nil)) #1#))" out))
   (unwind-protect
       (progn (compile-file file) (load (compile-file-pathname file)))
-    (delete-file file)
-    (delete-file (compile-file-pathname file))
-    #+clisp (delete-file (make-pathname :type "lib" :defaults file)))
+    (post-compile-file-cleanup file))
   (ltv1))
 #+CLISP T #+(or CMU SBCL OpenMCL LISPWORKS) NIL
 #-(or CLISP CMU SBCL OpenMCL LISPWORKS) UNKNOWN
 
 ;; compile-file is not allowed to collapse different LOAD-TIME-VALUE forms
 ;; even if the inner form is the same.
-(let ((file "tmp.lisp"))
-  (with-open-file (out file :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
+(let ((file "macro8-tst-tmp.lisp"))
+  (with-open-file (out file :direction :output
+                       #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
     (write-string "(defun ltv2 () (eq (load-time-value #1=(cons nil nil)) (load-time-value #1#)))" out))
   (unwind-protect
       (progn (compile-file file) (load (compile-file-pathname file)))
-    (delete-file file)
-    (delete-file (compile-file-pathname file))
-    #+clisp (delete-file (make-pathname :type "lib" :defaults file)))
+    (post-compile-file-cleanup file))
   (ltv2))
 NIL
 
 ;; compile-file is not allowed to collapse different LOAD-TIME-VALUE forms.
-(let ((file "tmp.lisp"))
+(let ((file "macro8-tst-tmp.lisp"))
   (with-open-file (out file :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede)
     (write-string "(defun ltv3 () (eq (load-time-value (cons nil nil)) (load-time-value (cons nil nil))))" out))
   (unwind-protect
       (progn (compile-file file) (load (compile-file-pathname file)))
-    (delete-file file)
-    (delete-file (compile-file-pathname file))
-    #+clisp (delete-file (make-pathname :type "lib" :defaults file)))
+    (post-compile-file-cleanup file))
   (ltv3))
 NIL
 
@@ -691,6 +735,25 @@ NIL
  (COMPILE NIL (LAMBDA (A) (UNWIND-PROTECT (BLOCK B2 (RETURN-FROM B2 A)))))
  77759)
 77759
+
+;; COMPILER-DIAGNOSTICS:USE-HANDLER:
+;; COMPILE-FILE must notice the warnings signaled by EVAL-WHEN
+(let ((file "macro8-tst-warn.lisp"))
+  (with-open-file (out file :direction :output)
+    (write '(eval-when (:compile-toplevel)
+             (define-condition test-warning-compile-file-1 (style-warning) nil)
+             (warn (make-condition 'test-warning-compile-file-1)))
+           :stream out)
+    (terpri out)
+    (write '(eval-when (:compile-toplevel)
+             (define-condition test-warning-compile-file-2 (warning) nil)
+             (warn (make-condition 'test-warning-compile-file-2)))
+           :stream out)
+    (terpri out))
+  (unwind-protect
+       (cdr (multiple-value-list (compile-file file)))
+    (post-compile-file-cleanup file)))
+(2 1)                         ; 2 warnings, 1 of them serious
 
 ;; <https://sourceforge.net/tracker/index.php?func=detail&aid=860052&group_id=1355&atid=101355>
 (test-compiler
@@ -859,6 +922,11 @@ NIL
  2212755 3154856)
 (T 0 0)
 
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1575946&group_id=1355&atid=101355
+(test-compiler
+ (lambda () (labels ((foo () (apply #'bar nil)) (bar ())))))
+(T NIL NIL)
+
 ;; <https://sourceforge.net/tracker/index.php?func=detail&aid=890138&group_id=1355&atid=101355>
 (progn (load (merge-pathnames "bug001.lisp" *run-test-truename*)) t)
 T
@@ -878,11 +946,10 @@ T
 ((0 1 2 3 4) (5 6 7 8 9) (e d c b a))
 
 ;; <http://article.gmane.org/gmane.lisp.clisp.devel/10566>
-(let ((fname "donc.lisp") (results '()) compiled)
+(let ((fname "macro8-tst-donc.lisp") (results '()) compiled)
   (with-open-file (out fname :direction :output
-                             #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
-                             :if-exists :overwrite
-                             :if-does-not-exist :create)
+                       #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
+                       :if-exists :overwrite :if-does-not-exist :create)
     (write '(defparameter *donc* nil) :stream out)
     (terpri out)
     (write '(eval-when (:load-toplevel :compile-toplevel :execute)
@@ -896,18 +963,15 @@ T
   (push *donc* results)
   (load compiled)
   (push *donc* results)
-  (delete-file fname)
-  (delete-file compiled)
-  #+clisp (delete-file (make-pathname :type "lib" :defaults fname))
+  (post-compile-file-cleanup fname)
   (nreverse results))
 (5 5 5)
 
 ;; <http://article.gmane.org/gmane.lisp.clisp.devel/13127>
-(let ((fname "donc.lisp") (results '()) compiled)
+(let ((fname "macro8-tst-donc.lisp") (results '()) compiled)
   (with-open-file (out fname :direction :output
-                             #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
-                             :if-exists :overwrite
-                             :if-does-not-exist :create)
+                       #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
+                       :if-exists :overwrite :if-does-not-exist :create)
     (write '(defmacro m1 (x)
              (compile x (lambda nil (load-time-value (+ 2 3)))) 4)
            :stream out)
@@ -923,22 +987,18 @@ T
   (load compiled)
   (push (bar) results)
   (push (foo) results)
-  (delete-file fname)
-  (delete-file compiled)
-  #+clisp (delete-file (make-pathname :type "lib" :defaults fname))
+  (post-compile-file-cleanup fname)
   (nreverse results))
 (5 4 5 4 5 4)
 
-(let* ((f "test-compile-file-output-argument.lisp")
+(let* ((f "macro8-tst-test-compile-file-output-argument.lisp")
        (c (open (make-pathname :type "fas" :defaults f)
                 :direction :probe :if-does-not-exist :create)))
   (with-open-file (s f :direction :output :if-exists :supersede
                      :if-does-not-exist :create)
     (format s "(defun foo (x) (1+ x))~%"))
   (unwind-protect (progn (compile-file f :output-file c) t)
-    (delete-file f)
-    (delete-file c)
-    #+clisp (delete-file (make-pathname :type "lib" :defaults c))))
+    (post-compile-file-cleanup f)))
 T
 
 ;; <http://article.gmane.org/gmane.lisp.clisp.devel:13153>
@@ -967,22 +1027,292 @@ NIL
 (ONE TWO THREE MANY MANY MANY MANY)
 
 #+clisp
-(let* ((f "test-compiled-file-p.lisp") (c (compile-file-pathname f)))
+(let* ((f "macro8-tst-test-compiled-file-p.lisp") (c (compile-file-pathname f)))
   (open f :direction :probe :if-does-not-exist :create)
   (delete-file c)
   (list (multiple-value-list (ext:compiled-file-p c))
         (multiple-value-list (ext:compiled-file-p f))
         (unwind-protect (multiple-value-list
                          (ext:compiled-file-p (setq c (compile-file f))))
-          (delete-file f)
-          (delete-file c)
-          #+clisp (delete-file (make-pathname :type "lib" :defaults c)))))
+          (post-compile-file-cleanup f))))
 #+clisp
 ((NIL) (NIL) (T))
 
-; Clean up.
+#+clisp
+(let ((f "macro8-tst-test-compile-time-value.lisp"))
+  (defparameter test-compile-time-value-c 0)
+  (with-open-file (*standard-output* f :direction :output)
+    (write '(defun test-compile-time-value-f ()
+             (incf test-compile-time-value-c) 'test-compile-time-value))
+    (terpri)
+    (write '(defparameter test-compile-time-value-v
+             (compile-time-value (test-compile-time-value-f))))
+    (terpri))
+  (unwind-protect
+       (list (progn (load f)
+                    (list test-compile-time-value-c test-compile-time-value-v))
+             (progn (compile-file f)
+                    (list test-compile-time-value-c test-compile-time-value-v))
+             (progn (load (compile-file-pathname f))
+                    (list test-compile-time-value-c test-compile-time-value-v)))
+    (post-compile-file-cleanup f)))
+#+clisp ((0 NIL) (1 NIL) (1 TEST-COMPILE-TIME-VALUE))
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1578179&group_id=1355&atid=101355
+(let* ((f "macro8-tst-test-crlf-print-read.lisp")
+       (v #(#\a #\return #\newline #\null #\b))
+       (s (coerce v 'string)))
+  (unwind-protect
+       (progn
+         (with-open-file (out f :direction :output)
+           (let ((*print-readably* t))
+             #+clisp (sys::set-output-stream-fasl out)
+             (format out "(defparameter *v* ~S)~%" v)
+             (format out "(defparameter *s* ~S)~%" s)))
+         (load (compile-file f))
+         (list (string= s *s*)
+               (equalp v *v*)
+               (= (length s) (length v))))
+    (post-compile-file-cleanup f)
+    (makunbound '*v*) (unintern '*v*)
+    (makunbound '*s*) (unintern '*s*)))
+(T T T)
+
+(let ((f "macro8-tst-test-crlf-print-read.lisp")
+      (code '(defmacro add-crlf (string)
+              (with-output-to-string (o)
+                (write-string string o)
+                (princ #\Return o)
+                (princ #\LineFeed o)))))
+  (unwind-protect
+       (progn
+         (with-open-file (out f :direction :output)
+           (write code :stream out :pretty t)
+           (format out "(defparameter *z* (length (add-crlf \"a\")))~%"))
+         (list (progn (load f) *z*)
+               (progn (load (compile-file f)) *z*)))
+    (post-compile-file-cleanup f)
+    (makunbound '*z*)
+    (unintern '*z*)))
+(3 3)
+
+(let* ((f "macro8-tst-test-crlf-print-read.lisp")
+       #+clisp (*package* (find-package "CS-COMMON-LISP-USER"))
+       (c (read-from-string "*c*")))
+  (unwind-protect
+       (progn
+         (with-open-file (out f :direction :output)
+           (format out "(defconstant *c* #\\Null)~%"))
+         (load (compile-file f))
+         (char-code (symbol-value c)))
+    (post-compile-file-cleanup f)
+    (proclaim (list 'special c)) ; cannot makunbound a constant!
+    (makunbound c) (unintern c)))
+0
+
+(let ((f "macro8-tst-test-pr-kw.lisp"))
+  (with-open-file (o f :direction :output)
+    (format o "(defpackage m (:modern t))~%(in-package m)~%~
+\(defparameter p #.(make-pathname :type \"mem\"))~%"))
+  (unwind-protect
+       (progn (load (compile-file f))
+	      (symbol-value (read-from-string "m::p")))
+    (post-compile-file-cleanup f)
+    (delete-package "M")))
+#.(make-pathname :type "mem")
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1618724&group_id=1355
+(funcall (compile nil '(lambda () (declare (optimize foo)))))
+NIL
+
+#+clisp
+(let (ret)
+  (defmacro test-macro-arglist (a) a)
+  (push (arglist 'test-macro-arglist) ret)
+  (compile 'test-macro-arglist)
+  (push (arglist 'test-macro-arglist) ret)
+  ret)
+#+clisp ((A) (A))
+
+#+clisp
+(let (ret)
+  (defmacro test-macro-arglist (a) a)
+  (push (arglist 'test-macro-arglist) ret)
+  (trace test-macro-arglist)
+  (push (arglist 'test-macro-arglist) ret)
+  ret)
+#+clisp ((A) (A))
+
+#+clisp
+(locally (declare (optimize (space 2)))
+  (defmacro test-macro-arglist (a) a)
+  (compile 'test-macro-arglist)
+  (arglist 'test-macro-arglist))
+#+clisp (A)
+
+#+clisp
+(locally (declare (optimize (space 3)))
+  (defmacro test-macro-arglist (a) a)
+  (compile 'test-macro-arglist)
+  (stringp
+   (princ (with-output-to-string (s) (describe 'test-macro-arglist s)))))
+#+clisp T
+
+#+clisp
+(locally (declare (optimize (space 2)))
+  (defun test-fun-arglist (a) (declare (compile)) a)
+  (arglist 'test-fun-arglist))
+#+clisp (A)
+
+#+clisp
+(locally (declare (optimize (space 3)))
+  (defun test-fun-arglist (a) (declare (compile)) a)
+  (princ-to-string (arglist 'test-fun-arglist)))
+#+clisp "(ARG0)"
+
+#+clisp (listp (arglist 'sys::backquote)) #+clisp t
+
+;; check constant folding
+#-clisp (setf (fdefinition 'check-const-fold) #'eval) #+clisp
+(defun check-const-fold (form)
+  (sys::closure-const (compile nil `(lambda () ,form)) 0))
+check-const-fold
+#+clisp (check-const-fold '(! 10)) #+clisp 3628800
+(check-const-fold '(char-code #\a)) 97
+(check-const-fold '(code-char 97)) #\a
+(check-const-fold '(char-upcase #\a)) #\A
+#+clisp (check-const-fold '(char-invertcase #\a)) #+clisp #\A
+#+clisp (check-const-fold '(mod-expt 29 13 17)) #+clisp 14
+#+clisp (sys::closure-consts (compile nil (lambda () (atom 12)))) #+clisp ()
+#+clisp (sys::closure-consts (compile nil (lambda () (consp 12)))) #+clisp ()
+#+clisp (sys::closure-consts (compile nil (lambda () (xor 1 nil 2)))) #+clisp ()
+#+clisp (check-const-fold '(hash-table-test #s(hash-table eq))) #+clisp FASTHASH-EQ
+
+(funcall (COMPILE NIL (LAMBDA (B C) (BLOCK B3 (IF (IF B (NOT NIL) C) (RETURN-FROM B3 124))))) 1 2) 124
+
 (progn
-  (fmakunbound 'circularity-in-code)
-  (unintern 'circularity-in-code)
-  (unintern 'x))
+  (defmacro test-macro-dotted-args (&rest f) `',f)
+  (list (test-macro-dotted-args 123)
+        (test-macro-dotted-args . 123)
+        (test-macro-dotted-args 1 2 . 3)))
+((123) 123 (1 2 . 3))
+
+;; check unused function warnings
+(multiple-value-list (compile 'x (lambda (y) (when nil (format t "arg=~S" y)))))
+(X NIL NIL)
+(multiple-value-list (compile 'x (lambda (y) (flet ((f (z) (1+ z))) (f y)))))
+(X NIL NIL)
+(multiple-value-list (compile 'x (lambda (y) (flet ((f (z) (1+ z))) y))))
+(X 1 NIL)
+(multiple-value-list (compile 'x (lambda () (flet ((f (z) (1+ z))) #'f))))
+(X NIL NIL)
+(multiple-value-list (compile 'x (lambda (y) (flet ((f (z) (1+ z))) y))))
+(X 1 NIL)
+(multiple-value-list (compile 'x (lambda (y) (flet ((f (z) (1+ z))) (declare (ignorable #'f)) y))))
+(X NIL NIL)
+(multiple-value-list (compile 'x (lambda (y) (flet ((f (z) (1+ z))) (declare (ignore #'f)) y))))
+(X NIL NIL)
+(multiple-value-list (compile 'x (lambda () (flet ((f (z) (1+ z))) (declare (ignore #'f)) #'f))))
+(X 1 NIL)
+(multiple-value-list (compile 'x (lambda (y) (flet ((f (z) (1+ z))) (declare (ignore #'f)) #'f))))
+(X 2 NIL)
+(multiple-value-list (compile 'x (lambda (y) (declare (ignore y)) (flet ((f (z) (1+ z))) #'f))))
+(X NIL NIL)
+(multiple-value-list (compile 'x (lambda (y) (declare (ignore y)) (flet ((f (z) (1+ z))) (f y)))))
+(X 1 NIL)
+
+;; funcall elimination
+;; AREF: no advertised "exceptional situations", so eliminated in unsafe code
+(handler-case
+    ;; safe code, AREF not eliminated
+    (funcall (locally (declare (optimize (safety 3)))
+               (compile nil (lambda (a) (aref a 0) 1)))
+             2)
+  (type-error (c) (princ-error c) :good)
+  (error (c) (princ-error c) :bad))
+:GOOD
+
+;; unsafe code, AREF eliminated
+(funcall (locally (declare (optimize (safety 2)))
+           (compile nil (lambda (a) (aref a 0) 1)))
+         2)
+1
+
+;; PARSE-INTEGER (advertised to signal errors in unsafe code) never eliminated
+(handler-case
+    (funcall (locally (declare (optimize (safety 0)))
+               (compile nil (lambda (s) (parse-integer s) 1)))
+             "a")
+  (error (c) (princ-error c) :good))
+:GOOD
+
+(progn ; Clean up.
+  (symbol-cleanup '*c*)
+  (symbol-cleanup '*donc*)
+  (symbol-cleanup '*my-typeof-counter*)
+  (symbol-cleanup '*notinline-test-var*)
+  (symbol-cleanup '*s*)
+  (symbol-cleanup '*v*)
+  (symbol-cleanup '*z*)
+  (symbol-cleanup 'add-crlf)
+  (symbol-cleanup 'alpha)
+  (symbol-cleanup 'arithmetic-if)
+  (symbol-cleanup 'bar)
+  (symbol-cleanup 'beta)
+  (symbol-cleanup 'caller)
+  (symbol-cleanup 'check-const-fold)
+  (symbol-cleanup 'circularity-in-code)
+  (symbol-cleanup 'delta)
+  (symbol-cleanup 'dm1a)
+  (symbol-cleanup 'dm1b)
+  (symbol-cleanup 'dm2a)
+  (symbol-cleanup 'dm2b)
+  (symbol-cleanup 'fexpand)
+  (symbol-cleanup 'fexpand-1)
+  (symbol-cleanup 'foo)
+  (symbol-cleanup 'foo137)
+  (symbol-cleanup 'foo138)
+  (proclaim '(special foo140)) ; cannot makunbound a constant!
+  (symbol-cleanup 'foo140)
+  (symbol-cleanup 'foo141)
+  (symbol-cleanup 'foo142)
+  (symbol-cleanup 'foo143)
+  (symbol-cleanup 'g)
+  (symbol-cleanup 'halibut)
+  (symbol-cleanup 'incfq)
+  (symbol-cleanup 'ltv1)
+  (symbol-cleanup 'ltv2)
+  (symbol-cleanup 'ltv3)
+  (symbol-cleanup 'test-warning-compile-file-1)
+  (symbol-cleanup 'test-warning-compile-file-2)
+  (symbol-cleanup 'm)
+  (symbol-cleanup 'm1)
+  (symbol-cleanup 'mexpand)
+  (symbol-cleanup 'mexpand-1)
+  (symbol-cleanup 'my-mac)
+  (symbol-cleanup 'my-typeof)
+  (symbol-cleanup 'notinline-test-func-1)
+  (symbol-cleanup 'notinline-test-func-2)
+  (symbol-cleanup 'p)
+  (symbol-cleanup 'stem)
+  (symbol-cleanup 't1)
+  (symbol-cleanup 'test-compile-time-value-c)
+  (symbol-cleanup 'test-compile-time-value-f)
+  (symbol-cleanup 'test-compile-time-value-v)
+  (symbol-cleanup 'test-compiler)
+  (symbol-cleanup 'test-constant-folding)
+  (symbol-cleanup 'test-fun-arglist)
+  (symbol-cleanup 'test-key)
+  (symbol-cleanup 'test-macro-arglist)
+  (symbol-cleanup 'test-macro-dotted-args)
+  (symbol-cleanup 'test10)
+  (symbol-cleanup 'test11)
+  (symbol-cleanup 'test12)
+  (symbol-cleanup 'test6)
+  (symbol-cleanup 'test9)
+  (symbol-cleanup 'testf)
+  (symbol-cleanup 'testp)
+  (symbol-cleanup 'testw)
+  (symbol-cleanup 'with-var)
+  (symbol-cleanup 'x))
 T

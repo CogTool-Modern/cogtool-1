@@ -106,7 +106,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(class instance slot)
-    'signature #s(compiler::signature :req-num 3)))
+    'signature #s(system::signature :req-num 3)))
 
 ;; MOP p. 93
 (defgeneric (setf slot-value-using-class) (new-value class object slot))
@@ -135,7 +135,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(new-value class instance slot)
-    'signature #s(compiler::signature :req-num 4)))
+    'signature #s(system::signature :req-num 4)))
 
 ;; MOP p. 94
 (defgeneric slot-boundp-using-class (class object slot))
@@ -163,7 +163,7 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(class instance slot)
-    'signature #s(compiler::signature :req-num 3)))
+    'signature #s(system::signature :req-num 3)))
 
 ;; MOP p. 96
 (defgeneric slot-makunbound-using-class (class object slot))
@@ -191,4 +191,4 @@
     'wants-next-method-p nil
     :qualifiers '()
     :lambda-list '(class instance slot)
-    'signature #s(compiler::signature :req-num 3)))
+    'signature #s(system::signature :req-num 3)))

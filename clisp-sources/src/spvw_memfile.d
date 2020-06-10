@@ -3,12 +3,13 @@
 /* --------------------------- Specification ---------------------------- */
 
 /* UP: Saves a memory image on disk.
- savemem(stream);
+ savemem(stream,executable);
  > object stream: open file output stream
- > bool exec_p: should the result include runtime?
+ > uintL executable: 0: no runtime; 1: runtime; 2: also delegate command line
+ < file length
  As a side effect, the stream is closed.
  can trigger GC */
-global maygc void savemem (object stream, bool exec_p);
+global maygc off_t savemem (object stream, uintL executable);
 
 /* UP: Restores a memory image from disk.
  loadmem(filename);
@@ -83,8 +84,11 @@ local const uint32 memflags =
  #ifdef SOCKET_STREAMS
   bit(19) |
  #endif
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   bit(20) |
+ #endif
+ #ifdef MULTITHREAD
+  bit(21) |
  #endif
   0;
 
@@ -108,9 +112,13 @@ typedef struct {
   uintC _intDsize;
   uintC _module_count;
   uintL _module_names_size;
-  uintC _fsubr_anz;
-  uintC _pseudofun_anz;
-  uintC _symbol_anz;
+  uintC _fsubr_count;
+  uintC _pseudofun_count;
+ #if defined(MULTITHREAD)
+  /* number of per thread symvalues */
+  uintC _per_thread_symvalues_count;
+ #endif
+  uintC _symbol_count;
   uintL _page_alignment;
   aint _subr_tab_addr;
   aint _symbol_tab_addr;
@@ -128,7 +136,7 @@ typedef struct {
 } memdump_header_t;
 /* then the module names,
  then fsubr_tab, pseudofun_tab, symbol_tab,
- and for each module subr_addr, subr_anz, object_anz, subr_tab, object_tab, */
+ and for each module subr_addr, subr_count, object_count, subr_tab, object_tab, */
 #ifdef SPVW_MIXED_BLOCKS_OPPOSITE
 /* then the objects of variable length
  (between mem.varobjects.heap_start and mem.varobjects.heap_end),
@@ -215,19 +223,42 @@ typedef struct {
 #define WRITE(buf,len)                                                  \
   do {                                                                  \
     begin_system_call();                                                \
-    { var ssize_t ergebnis = full_write(handle,(void*)buf,len);         \
-      if (ergebnis != (ssize_t)(len)) {                                 \
+    { var ssize_t result = full_write(handle,(void*)buf,len);           \
+      if (result != (ssize_t)(len)) {                                   \
         end_system_call();                                              \
         builtin_stream_close(&STACK_0,0);                               \
-        if (ergebnis<0) /* error occurred? */                           \
+        if (result<0) /* error occurred? */                             \
           { OS_file_error(TheStream(STACK_0)->strm_file_truename); }    \
         /* FILE-ERROR slot PATHNAME */                                  \
         pushSTACK(TheStream(STACK_0)->strm_file_truename);              \
-        fehler(file_error,GETTEXT("disk full"));                        \
+        error(file_error,GETTEXT("disk full"));                         \
       }                                                                 \
     }                                                                   \
     end_system_call();                                                  \
   } while(0)
+
+/* find the marker of given size in the open file handle */
+local size_t find_marker (Handle handle, const char* marker, size_t marker_len)
+{
+  char buf[BUFSIZ];
+  size_t marker_pos = 0;
+  size_t pos = 0;
+  while (1) {
+    size_t result = full_read(handle,(void*)buf,BUFSIZ);
+    size_t i;
+    if (result <= 0)
+      return (size_t)-1;
+    for (i = 0; i < result; i++) {
+      pos++;
+      if (buf[i] == marker[marker_pos]) {
+        if (++marker_pos == marker_len) /* found! */
+          return pos - marker_len;
+      } else
+        marker_pos = 0;
+    }
+  }
+  return (size_t)-1;
+}
 
 /* write the executable into the handle */
 local Handle open_filename (const char* filename);
@@ -236,7 +267,7 @@ local void find_memdump (Handle fd);
    == the start of memory image in the executable */
 static size_t mem_start = (size_t)-1;
 static bool mem_searched = false; /* have we looked for memdump already */
-static void savemem_with_runtime (Handle handle) {
+static void savemem_with_runtime (Handle handle, bool delegating) {
   var char *executable_name = get_executable_name();
   var char buf[BUFSIZ];
   begin_system_call();
@@ -253,7 +284,7 @@ static void savemem_with_runtime (Handle handle) {
   if (!mem_searched) {
     find_memdump(runtime);      /* search for memdump_header_t */
     lseek(runtime,0,SEEK_SET);  /* reset position */
-  } /* now:  mem_searched == true */
+  } /* now: mem_searched == true */
   if (mem_start != (size_t)-1) { /* ==> have an image - cut it off */
     var uintL remains = mem_start;
     while (remains > 0) {
@@ -266,7 +297,7 @@ static void savemem_with_runtime (Handle handle) {
         /* FILE-ERROR slot PATHNAME */
         pushSTACK(asciz_to_string(executable_name,O(pathname_encoding)));
         pushSTACK(fixnum(remains));
-        fehler(file_error,GETTEXT("runtime too small (~S bytes missing)"));
+        error(file_error,GETTEXT("runtime too small (~S bytes missing)"));
       }
       var uintL len = (remains > res ? res : remains);
       remains -= len;
@@ -289,6 +320,22 @@ static void savemem_with_runtime (Handle handle) {
       begin_system_call();
     }
   }
+  if (delegating != delegating_p()) {
+    /* reset delegating_cookie in handle to delegating
+       (i.e., only handle --clisp-* command line arguments)
+       assume that the current executable has the same cookie as handle */
+    lseek(handle,0,SEEK_SET); /* search from file start */
+    var size_t delegating_cookie_pos = find_marker(handle,delegating_cookie,
+                                                   delegating_cookie_length);
+    if (delegating_cookie_pos == (size_t)-1) {
+      /* FILE-ERROR slot PATHNAME */
+      pushSTACK(asciz_to_string(executable_name,O(pathname_encoding)));
+      error(file_error,GETTEXT("Delegating cookie not found"));
+    }
+    lseek(handle,delegating_cookie_pos+delegating_cookie_length-1,SEEK_SET);
+    WRITE((delegating ? "Y" : "N"),1); /* reset the cookie */
+    lseek(handle,0,SEEK_END);   /* restore file position */
+  }
 #if defined(UNIX) && defined(HAVE_FCHMOD)
   { /* make the saved image executable */
     var mode_t mode = 0;
@@ -306,6 +353,7 @@ static void savemem_with_runtime (Handle handle) {
  return the total size of all module names */
 local uintL fill_memdump_header (memdump_header_t *header) {
   var uintL module_names_size;
+  memset(header,0,sizeof(*header));
   header->_magic = memdump_magic;
   header->_memflags = memflags;
   header->_oint_type_mask = oint_type_mask;
@@ -330,9 +378,12 @@ local uintL fill_memdump_header (memdump_header_t *header) {
     module_names_size = round_up(module_names_size,varobject_alignment);
   }
   header->_module_names_size = module_names_size;
-  header->_fsubr_anz     = fsubr_anz;
-  header->_pseudofun_anz = pseudofun_anz;
-  header->_symbol_anz    = symbol_anz;
+  header->_fsubr_count     = fsubr_count;
+  header->_pseudofun_count = pseudofun_count;
+ #if defined(MULTITHREAD)
+  header->_per_thread_symvalues_count = num_symvalues;
+ #endif
+  header->_symbol_count    = symbol_count;
   header->_page_alignment = page_alignment;
   header->_subr_tab_addr   = (aint)(&subr_tab);
   header->_symbol_tab_addr = (aint)(&symbol_tab);
@@ -356,11 +407,11 @@ local uintL fill_memdump_header (memdump_header_t *header) {
 }
 
 /* UP, stores the memory image on disk
- savemem(stream);
+ savemem(stream,executable);
  > object stream: open File-Output-Stream, will be closed
- > bool exec_p: should the result include runtime?
+ > uintL executable: 0: no runtime; 1: runtime; 2: also delegate command line
  can trigger GC */
-global maygc void savemem (object stream, bool exec_p)
+global maygc off_t savemem (object stream, uintL executable)
 { /* We need the stream only because of the handle provided by it.
      In case of an error we have to close it (the caller makes no
      WITH-OPEN-FILE, but only OPEN). Hence, the whole stream is passed
@@ -380,14 +431,23 @@ global maygc void savemem (object stream, bool exec_p)
     });
   }
   /* execute one GC first: */
-  gar_col();
-  if (exec_p) savemem_with_runtime(handle);
+  PERFORM_GC(gar_col(1),true); /* lock the heap before the GC */
+  if (executable>0) savemem_with_runtime(handle, executable>1);
   /* write basic information: */
   var memdump_header_t header;
   var uintL module_names_size = fill_memdump_header(&header);
   header._dumptime = universal_time;
   memcpy(&header._dumphost[0],&hostname[0],DUMPHOST_LEN+1);
   WRITE(&header,sizeof(header));
+  #ifdef MULTITHREAD
+   /* save per thread special variables symvalues.
+      currently just a single thread. instead of:
+    for_all_threads({
+      WRITE(thread->_ptr_symvalues,num_symvalues*sizeof(gcv_object_t));
+    });
+    we will use: */
+    WRITE(allthreads.head->_ptr_symvalues,num_symvalues*sizeof(gcv_object_t));
+  #endif
   { /* write module name: */
     var DYNAMIC_ARRAY(module_names_buffer,char,module_names_size);
     var char* ptr2 = &module_names_buffer[0];
@@ -407,7 +467,7 @@ global maygc void savemem (object stream, bool exec_p)
   WRITE(&fsubr_tab,sizeof(fsubr_tab));
   WRITE(&pseudofun_tab,sizeof(pseudofun_tab));
   WRITE(&symbol_tab,sizeof(symbol_tab));
-  { /* write for each module subr_addr, subr_anz, object_anz,
+  { /* write for each module subr_addr, subr_count, object_count,
        subr_tab, object_tab: */
     var module_t* module;
     for_modules(all_modules, {
@@ -492,10 +552,10 @@ global maygc void savemem (object stream, bool exec_p)
    #if defined(HAVE_MMAP) /* else, page_alignment is = 1, anyway */
   { /* put alignment into practice: */
     begin_system_call();
-    var off_t ergebnis = lseek(handle,0,SEEK_CUR); /* fetch file-position */
+    var off_t result = lseek(handle,0,SEEK_CUR); /* fetch file-position */
     end_system_call();
-    if (ergebnis<0) { builtin_stream_close(&STACK_0,0); OS_file_error(TheStream(STACK_0)->strm_file_truename); } /* error? */
-    WRITE_page_alignment(ergebnis);
+    if (result<0) { builtin_stream_close(&STACK_0,0); OS_file_error(TheStream(STACK_0)->strm_file_truename); } /* error? */
+    WRITE_page_alignment(result);
   }
    #endif
   #endif
@@ -641,12 +701,17 @@ global maygc void savemem (object stream, bool exec_p)
   }
   #endif
  #endif
-  if (exec_p) WRITE(&mem_start,sizeof(size_t)); /* see find_memdump() */
+  if (executable>0) WRITE(&mem_start,sizeof(size_t)); /* see find_memdump() */
   else { size_t tmp = (size_t)-1; WRITE(&tmp,sizeof(size_t)); }
   /* close stream (stream-buffer is unchanged, but thus also the
      handle at the operating system is closed): */
+  var off_t res;
+  begin_blocking_system_call();
+  res = handle_length(&STACK_0,handle);
+  end_blocking_system_call();
   builtin_stream_close(&STACK_0,0);
   skipSTACK(1);
+  return res;
 }
 #undef WRITE
 
@@ -677,13 +742,11 @@ local var offset_pages_t *offset_pages;
 #endif
 #if !defined(SINGLEMAP_MEMORY)
 local var oint offset_symbols_o;
-#if !defined(MULTIMAP_MEMORY_SYMBOL_TAB)
 local var oint old_symbol_tab_o;
-#endif
 #endif
 typedef struct { oint low_o; oint high_o; oint offset_o; } offset_subrs_t;
 local var offset_subrs_t* offset_subrs;
-local var uintC offset_subrs_anz;
+local var uintC offset_subrs_count;
 local var struct fsubr_tab_ old_fsubr_tab;
 local var struct pseudofun_tab_ old_pseudofun_tab;
 local void loadmem_update (gcv_object_t* objptr)
@@ -708,19 +771,11 @@ local void loadmem_update (gcv_object_t* objptr)
     #ifdef TYPECODES
     case_symbol: /* symbol */
      #ifndef SPVW_PURE_BLOCKS
-      #if !defined(MULTIMAP_MEMORY_SYMBOL_TAB)
       if (as_oint(*objptr) - old_symbol_tab_o
           < ((oint)sizeof(symbol_tab)<<(oint_addr_shift-addr_shift))) {
         /* symbol from symbol_tab */
         *objptr = as_object(as_oint(*objptr) + offset_symbols_o); break;
       }
-      #else
-      if (as_oint(*objptr) - (oint)(&symbol_tab)
-          < (sizeof(symbol_tab)<<(oint_addr_shift-addr_shift))) {
-        /* symbol from symbol_tab experiences no displacement */
-        break;
-      }
-      #endif
       /* other symbols are objects of variable length. */
      #endif
     #endif
@@ -737,7 +792,7 @@ local void loadmem_update (gcv_object_t* objptr)
         var oint addr = as_oint(*objptr);
         var offset_subrs_t* ptr = offset_subrs;
         var uintC count;
-        dotimespC(count,offset_subrs_anz, {
+        dotimespC(count,offset_subrs_count, {
           if ((ptr->low_o <= addr) && (addr < ptr->high_o)) {
             *objptr = as_object(as_oint(*objptr) + ptr->offset_o);
             goto found_subr;
@@ -757,12 +812,12 @@ local void loadmem_update (gcv_object_t* objptr)
     #endif
       /* object of variable length */
      #ifdef SPVW_MIXED_BLOCKS
-      *objptr = as_object(as_oint(*objptr) + offset_varobjects_o); break;
+      { *objptr = as_object(as_oint(*objptr) + offset_varobjects_o); break; }
      #endif
     case_pair:
       /* Two-Pointer-Object */
      #ifdef SPVW_MIXED_BLOCKS
-      *objptr = as_object(as_oint(*objptr) + offset_conses_o); break;
+      { *objptr = as_object(as_oint(*objptr) + offset_conses_o); break; }
      #endif
      #ifdef SPVW_PAGES
       {
@@ -798,16 +853,16 @@ local void loadmem_update (gcv_object_t* objptr)
         var oint addr = as_oint(*objptr);
         var offset_subrs_t* ptr = offset_subrs;
         var uintC count;
-        dotimespC(count,offset_subrs_anz, {
+        dotimespC(count,offset_subrs_count, {
           if ((ptr->low_o <= addr) && (addr < ptr->high_o)) {
             *objptr = as_object(as_oint(*objptr) + ptr->offset_o);
             goto found_subr;
           }
           ptr++;
         });
+        /* SUBR not found -> #<UNBOUND> */
+        *objptr = unbound;
       }
-      /* SUBR not found -> #<UNBOUND> */
-      *objptr = unbound;
    #endif
     found_subr:
       break;
@@ -825,8 +880,8 @@ local void loadmem_update (gcv_object_t* objptr)
         /* conversion old_pseudofun_tab -> pseudofun_tab : */
         var object addr = *objptr;
         {
-          var uintC i = pseudofun_anz;
-          var const object* ptr = &old_pseudofun_tab.pointer[pseudofun_anz];
+          var uintC i = pseudofun_count;
+          var const object* ptr = &old_pseudofun_tab.pointer[pseudofun_count];
           while (i!=0) {
             i--;
             if (eq(*--ptr,addr)) {
@@ -857,8 +912,8 @@ local void loadmem_update (gcv_object_t* objptr)
 local void loadmem_update_fsubr (Fsubr fsubrptr)
 {
   var void* addr = fsubrptr->function;
-  var uintC i = fsubr_anz;
-  var fsubr_t* p = &((fsubr_t*)(&old_fsubr_tab))[fsubr_anz];
+  var uintC i = fsubr_count;
+  var fsubr_t* p = &((fsubr_t*)(&old_fsubr_tab))[fsubr_count];
   while (i!=0) {
     i--;
     if ((void*) *--p == addr) {
@@ -895,7 +950,7 @@ local Handle open_filename (const char* filename)
                GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
  #else
-  #error "missing open_filename()"
+  #error missing open_filename()
  #endif
 }
 local void loadmem (const char* filename)
@@ -905,7 +960,7 @@ local void loadmem (const char* filename)
 #elif defined(WIN32_NATIVE)
  #define INVALID_HANDLE_P(handle)  (handle == INVALID_HANDLE)
 #else
- #error "missing INVALID_HANDLE_P()"
+ #error missing INVALID_HANDLE_P()
 #endif
   var Handle handle;
   begin_system_call();
@@ -933,7 +988,7 @@ local void loadmem (const char* filename)
   if (handle != INVALID_HANDLE) {
     begin_system_call(); CLOSE_HANDLE(handle); end_system_call();
   }
-  quit_sofort(1);
+  quit_instantly(1);
 }
 local void loadmem_from_handle (Handle handle, const char* filename)
 {
@@ -961,15 +1016,16 @@ local void loadmem_from_handle (Handle handle, const char* filename)
     #define READ(buf,len)                                               \
       do {                                                              \
         begin_system_call();                                            \
-        { var ssize_t ergebnis = full_read(handle,(void*)buf,len);      \
+        { var ssize_t result = full_read(handle,(void*)buf,len);        \
           end_system_call();                                            \
-          if (ergebnis<0) ABORT_SYS;                                       \
-          if (ergebnis != (ssize_t)(len)) ABORT_INI;                       \
+          if (result<0) ABORT_SYS;                                      \
+          if (result != (ssize_t)(len)) ABORT_INI;                      \
           inc_file_offset(len);                                         \
         }                                                               \
       } while(0)
    begin_read:
-    set_file_offset(0);
+    if (mem_searched) {set_file_offset(mem_start);}
+    else {set_file_offset(0);}
     /* read basic information: */
     READ(&header,sizeof(header));
     if (header._magic != memdump_magic) {
@@ -996,7 +1052,8 @@ local void loadmem_from_handle (Handle handle, const char* filename)
         begin_system_call();
         if ( lseek(handle,-(off_t)sizeof(header),SEEK_CUR) <0)
           ABORT_SYS;               /* in file, back to the start */
-        if (pipe(handles) != 0) ABORT_SYS;
+        if (pipe(handles) != 0)
+          ABORT_SYS;
         if ((child = vfork()) ==0) {
           if ( dup2(handles[1],stdout_handle) >=0)
             if ( CLOSE(handles[1]) ==0)
@@ -1015,8 +1072,10 @@ local void loadmem_from_handle (Handle handle, const char* filename)
         if (child==-1) {
           CLOSE(handles[1]); CLOSE(handles[0]); ABORT_SYS;
         }
-        if (CLOSE(handles[1]) !=0) ABORT_SYS;
-        if (CLOSE(handle) != 0) ABORT_SYS;
+        if (CLOSE(handles[1]) !=0)
+          ABORT_SYS;
+        if (CLOSE(handle) != 0)
+          ABORT_SYS;
         end_system_call();
        #if ((defined(SPVW_PURE_BLOCKS) && defined(SINGLEMAP_MEMORY)) || (defined(SPVW_MIXED_BLOCKS_STAGGERED) && defined(TRIVIALMAP_MEMORY))) && defined(HAVE_MMAP)
         use_mmap = false; /* mmap can not be done with a pipe! */
@@ -1043,14 +1102,47 @@ local void loadmem_from_handle (Handle handle, const char* filename)
     if (header._hashtable_length != hashtable_length) ABORT_INI;
     if (header._pathname_length != pathname_length) ABORT_INI;
     if (header._intDsize != intDsize) ABORT_INI;
-    if (header._fsubr_anz != fsubr_anz) ABORT_INI;
-    if (header._pseudofun_anz != pseudofun_anz) ABORT_INI;
-    if (header._symbol_anz != symbol_anz) ABORT_INI;
+    if (header._fsubr_count != fsubr_count) ABORT_INI;
+    if (header._pseudofun_count != pseudofun_count) ABORT_INI;
+    if (header._symbol_count != symbol_count) ABORT_INI;
     if (header._page_alignment != page_alignment) ABORT_INI;
    #ifndef SPVW_MIXED_BLOCKS_OPPOSITE
     if (header._heapcount != heapcount) ABORT_INI;
    #endif
+
+   #if defined(MULTITHREAD)
+    /* allocate per thread symvalues for the thread */
+    {
+      var uintL max_symvalues=
+        (uintL)((header._per_thread_symvalues_count/SYMVALUES_PER_PAGE)+1) *
+        SYMVALUES_PER_PAGE;
+      /* no need to lock allthreads_lock before reallocation since we are the
+         only thread running now */
+      if (!realloc_threads_symvalues(max_symvalues))
+        goto abort_mem;
+      num_symvalues=header._per_thread_symvalues_count;
+      if (maxnum_symvalues < max_symvalues)
+        maxnum_symvalues = max_symvalues;
+    }
+    /* read the thread symvalues for the only thread */
+    READ(allthreads.head->_ptr_symvalues,num_symvalues*sizeof(gcv_object_t));
+   #endif
+
    #ifdef SPVW_MIXED_BLOCKS_OPPOSITE
+    /* Determine if there is enough memory.
+       It's sufficient if and only if
+           required room <= available room
+       <==>
+           header._mem_conses_end - header._mem_conses_start
+           + header._mem_varobjects_end - header._mem_varobjects_start
+           <= mem.conses.heap_end - mem.varobjects.heap_start
+       Note that the left-hand side is the sum of two nonnegative values
+       and does not overflow (since the memory image fit into the address
+       range before it was saved). */
+    if ((header._mem_conses_end - header._mem_conses_start)
+        + (header._mem_varobjects_end - header._mem_varobjects_start)
+        > mem.conses.heap_end - mem.varobjects.heap_start)
+      ABORT_MEM;
     { /* calculate offsets (offset = new address - old address): */
       var sintM offset_varobjects = /* offset for objects of variable length */
         mem.varobjects.heap_start - header._mem_varobjects_start;
@@ -1059,19 +1151,35 @@ local void loadmem_from_handle (Handle handle, const char* filename)
       /* calculate new memory partitioning: */
       mem.varobjects.heap_end = header._mem_varobjects_end + offset_varobjects;
       mem.conses.heap_start = header._mem_conses_start + offset_conses;
-      /* determine, if there is enough memory:
-         it suffices exactly, if
-         required room <= available room  <==>
-         header._mem_conses_end-header._mem_conses_start
-         + header._mem_varobjects_end-header._mem_varobjects_start
-         <= mem.conses.heap_end - mem.varobjects.heap_start  <==>
-         header._mem_varobjects_end
-         + mem.varobjects.heap_start-header._mem_varobjects_start
-         <= header._mem_conses_start
-         + mem.conses.heap_end-header._mem_conses_end  <==>
-         mem.varobjects.heap_end <= mem.conses.heap_start */
-      if ((saint)(mem.varobjects.heap_end) > (saint)(mem.conses.heap_start))
-        ABORT_MEM;
+      /* Note that these don't overflow nor get negative, because of the
+         inequality that was already checked above:
+
+             header._mem_varobjects_start <= header._mem_varobjects_end
+         <==>
+             mem.varobjects.heap_start <= mem.varobjects.heap_end
+
+             header._mem_varobjects_end - header._mem_varobjects_start
+             <= mem.conses.heap_end - mem.varobjects.heap_start
+         <==>
+             mem.varobjects.heap_end <= mem.conses.heap_end
+
+             header._mem_conses_end - header._mem_conses_start
+             <= mem.conses.heap_end - mem.varobjects.heap_start
+         <==>
+             mem.varobjects.heap_start <= mem.conses.heap_start
+
+             header._mem_conses_start <= header._mem_conses_end
+         <==>
+             mem.conses.heap_start <= mem.conses.heap_end
+
+         Note that the varobjects and conses won't overlap, since,
+         considerung the full strength of the inequality:
+             header._mem_conses_end - header._mem_conses_start
+             + header._mem_varobjects_end - header._mem_varobjects_start
+             <= mem.conses.heap_end - mem.varobjects.heap_start
+         <==>
+             mem.varobjects.heap_end <= mem.conses.heap_start
+       */
       /* prepare update: */
       offset_varobjects_o = (oint)offset_varobjects << (oint_addr_shift-addr_shift);
       offset_conses_o = (oint)offset_conses << (oint_addr_shift-addr_shift);
@@ -1082,22 +1190,19 @@ local void loadmem_from_handle (Handle handle, const char* filename)
     if ((aint)(&symbol_tab) != header._symbol_tab_addr) ABORT_INI;
    #else
     offset_symbols_o = ((oint)(aint)(&symbol_tab) - (oint)header._symbol_tab_addr) << (oint_addr_shift-addr_shift);
-    #ifdef MULTIMAP_MEMORY_SYMBOL_TAB
-    if (offset_symbols_o != 0) ABORT_INI;
-    #else
-     #ifdef TYPECODES
+    #ifdef TYPECODES
     old_symbol_tab_o = as_oint(type_pointer_object(symbol_type,header._symbol_tab_addr));
-     #else
+    #else
     old_symbol_tab_o = (oint)header._symbol_tab_addr;
-     #endif  /* TYPECODES */
-    #endif  /* MULTIMAP_MEMORY_SYMBOL_TAB */
+    #endif  /* TYPECODES */
    #endif  /* SPVW_PURE_BLOCKS */
     /* initialize offset-of-SUBRs-table: */
-    offset_subrs_anz = 1+header._module_count;
+    offset_subrs_count = 1+header._module_count;
     begin_system_call();
-    offset_subrs = MALLOC(offset_subrs_anz,offset_subrs_t);
+    offset_subrs = MALLOC(offset_subrs_count,offset_subrs_t);
     end_system_call();
-    if (offset_subrs==NULL) ABORT_MEM;
+    if (offset_subrs==NULL)
+      ABORT_MEM;
     /* read module names and compare with the existing modules: */
     var DYNAMIC_ARRAY(old_modules,module_t*,1+header._module_count);
     {
@@ -1128,35 +1233,35 @@ local void loadmem_from_handle (Handle handle, const char* filename)
     READ(&old_fsubr_tab,sizeof(fsubr_tab));
     READ(&old_pseudofun_tab,sizeof(pseudofun_tab));
     READ(&symbol_tab,sizeof(symbol_tab));
-    { /* for each module read subr_addr, subr_anz, object_anz, subr_tab,
+    { /* for each module read subr_addr, subr_count, object_count, subr_tab,
          object_tab : */
       var module_t* * old_module = &old_modules[0];
       var offset_subrs_t* offset_subrs_ptr = &offset_subrs[0];
       var uintC count = 1+header._module_count;
       do {
         var subr_t* old_subr_addr;
-        var uintC old_subr_anz;
-        var uintC old_object_anz;
+        var uintC old_subr_count;
+        var uintC old_object_count;
         READ(&old_subr_addr,sizeof(subr_t*));
-        READ(&old_subr_anz,sizeof(uintC));
-        READ(&old_object_anz,sizeof(uintC));
-        if (old_subr_anz != *(*old_module)->stab_size) ABORT_INI;
-        if (old_object_anz != *(*old_module)->otab_size) ABORT_INI;
+        READ(&old_subr_count,sizeof(uintC));
+        READ(&old_object_count,sizeof(uintC));
+        if (old_subr_count != *(*old_module)->stab_size) ABORT_INI;
+        if (old_object_count != *(*old_module)->otab_size) ABORT_INI;
         offset_subrs_ptr->low_o = as_oint(subr_tab_ptr_as_object(old_subr_addr));
-        offset_subrs_ptr->high_o = as_oint(subr_tab_ptr_as_object(old_subr_addr+old_subr_anz));
+        offset_subrs_ptr->high_o = as_oint(subr_tab_ptr_as_object(old_subr_addr+old_subr_count));
         offset_subrs_ptr->offset_o = as_oint(subr_tab_ptr_as_object((*old_module)->stab)) - offset_subrs_ptr->low_o;
-        if (old_subr_anz > 0) {
-          var DYNAMIC_ARRAY(old_subr_tab,subr_t,old_subr_anz);
-          READ(old_subr_tab,old_subr_anz*sizeof(subr_t));
+        if (old_subr_count > 0) {
+          var DYNAMIC_ARRAY(old_subr_tab,subr_t,old_subr_count);
+          READ(old_subr_tab,old_subr_count*sizeof(subr_t));
           var subr_t* ptr1 = old_subr_tab;
           var subr_t* ptr2 = (*old_module)->stab;
-          var uintC counter = old_subr_anz;
+          var uintC counter = old_subr_count;
           do {
-            if (!(   (ptr1->req_anz == ptr2->req_anz)
-                  && (ptr1->opt_anz == ptr2->opt_anz)
+            if (!(   (ptr1->req_count == ptr2->req_count)
+                  && (ptr1->opt_count == ptr2->opt_count)
                   && (ptr1->rest_flag == ptr2->rest_flag)
                   && (ptr1->key_flag == ptr2->key_flag)
-                  && (ptr1->key_anz == ptr2->key_anz)))
+                  && (ptr1->key_count == ptr2->key_count)))
               ABORT_INI;
             ptr2->name = ptr1->name; ptr2->keywords = ptr1->keywords;
             ptr2->argtype = ptr1->argtype;
@@ -1164,8 +1269,8 @@ local void loadmem_from_handle (Handle handle, const char* filename)
           } while (--counter);
           FREE_DYNAMIC_ARRAY(old_subr_tab);
         }
-        if (old_object_anz > 0) {
-          READ((*old_module)->otab,old_object_anz*sizeof(gcv_object_t));
+        if (old_object_count > 0) {
+          READ((*old_module)->otab,old_object_count*sizeof(gcv_object_t));
         }
         old_module++; offset_subrs_ptr++;
       } while (--count);
@@ -1252,6 +1357,9 @@ local void loadmem_from_handle (Handle handle, const char* filename)
               physpages[i].firstobject     = _physpages[i].firstobject;
               physpages[i].protection = PROT_READ;
               physpages[i].cache_size = 0; physpages[i].cache = NULL;
+             #ifdef MULTITHREAD
+              spinlock_init(&physpages[i].cache_lock);
+             #endif
             }
           }
           FREE_DYNAMIC_ARRAY(_physpages);
@@ -1278,7 +1386,8 @@ local void loadmem_from_handle (Handle handle, const char* filename)
       begin_system_call();
       offset_pages = MALLOC(offset_pages_len,offset_pages_t);
       end_system_call();
-      if (offset_pages==NULL) ABORT_MEM;
+      if (offset_pages==NULL)
+        ABORT_MEM;
       {
         var uintL pagenr;
         for (pagenr=0; pagenr<offset_pages_len; pagenr++) {
@@ -1306,14 +1415,16 @@ local void loadmem_from_handle (Handle handle, const char* filename)
               var uintM size2 = size1 + sizeof_NODE + (varobject_alignment-1);
               var aint addr = (aint)mymalloc(size2);
               var Pages page;
-              if ((void*)addr == NULL) ABORT_MEM;
+              if ((void*)addr == NULL)
+                ABORT_MEM;
              #if !defined(AVL_SEPARATE)
               page = (Pages)addr;
              #else
               begin_system_call();
               page = (NODE*)malloc(sizeof(NODE));
               end_system_call();
-              if (page == NULL) ABORT_MEM;
+              if (page == NULL)
+                ABORT_MEM;
              #endif
               /* get page from operating system. */
               page->m_start = addr; page->m_length = size2;
@@ -1367,7 +1478,8 @@ local void loadmem_from_handle (Handle handle, const char* filename)
         var uintM map_len = round_up(misaligned+len,map_pagesize);
         heapptr->heap_limit = (heapptr->heap_start-misaligned) + map_len;
         if (map_len > 0) {
-          if (heapptr->heap_limit-1 > heapptr->heap_hardlimit-1) ABORT_MEM;
+          if (heapptr->heap_limit-1 > heapptr->heap_hardlimit-1)
+            ABORT_MEM;
          #if defined(HAVE_MMAP)
           /* if possible, we put the initialization file into memory.
              This should accelerate the start and delay unnecessary
@@ -1434,7 +1546,8 @@ local void loadmem_from_handle (Handle handle, const char* filename)
      #ifdef TRIVIALMAP_MEMORY
       var uintM map_len = round_up(len+varobjects_misaligned,map_pagesize);
       mem.varobjects.heap_limit = (mem.varobjects.heap_start-varobjects_misaligned) + map_len;
-      if (zeromap((void*)(mem.varobjects.heap_start-varobjects_misaligned),map_len) <0) ABORT_MEM;
+      if (zeromap((void*)(mem.varobjects.heap_start-varobjects_misaligned),map_len) <0)
+        ABORT_MEM;
      #endif
       READ(mem.varobjects.heap_start,len);
     }
@@ -1443,7 +1556,8 @@ local void loadmem_from_handle (Handle handle, const char* filename)
      #ifdef TRIVIALMAP_MEMORY
       var uintM map_len = round_up(len,map_pagesize);
       mem.conses.heap_limit = mem.conses.heap_end - map_len;
-      if (zeromap((void*)mem.conses.heap_limit,map_len) <0) ABORT_MEM;
+      if (zeromap((void*)mem.conses.heap_limit,map_len) <0)
+        ABORT_MEM;
      #endif
       READ(mem.conses.heap_start,len);
     }
@@ -1463,8 +1577,20 @@ local void loadmem_from_handle (Handle handle, const char* filename)
    #endif
     /* traverse all LISP-objects and update: */
     #define update  loadmem_update
-    /* update program constants: */
-    update_tables();
+    /* update program constants:
+       we should not update aktenv - it is not initialized.
+       in MT the current thread's _object_tab and _aktenv - they are
+       already initialized */
+    /* update_tables(); */
+    update_subr_tab();
+    update_symbol_tab();
+    for_all_constobjs( update(objptr); );  /* update object_tab */
+    #ifdef MULTITHREAD
+      /* and now the per thread symbol bindings of the thread */
+      var gcv_object_t* objptr = allthreads.head->_ptr_symvalues;
+      var uintC count;
+      dotimespC(count,num_symvalues,{ update(objptr); objptr++; });
+    #endif
    #ifdef SINGLEMAP_MEMORY_RELOCATE
     if (!offset_heaps_all_zero)
    #endif
@@ -1592,15 +1718,16 @@ local void loadmem_from_handle (Handle handle, const char* filename)
        #endif  /* SPVW_MIXED_BLOCKS_OPPOSITE */
        #ifdef SPVW_PURE_BLOCKS
         /* Don't need to rebuild the cache. */
-        xmmprotect_old_generation_cache(heapnr);
+        xmprotect_old_generation_cache(heapnr);
        #else
         if (!is_unused_heap(heapnr))
-          build_old_generation_cache(heapnr);
+          build_old_generation_cache(heapnr,NULL);
        #endif
       }
     }
     #ifdef SPVW_MIXED_BLOCKS_OPPOSITE
-    if (mem.varobjects.heap_end > mem.conses.heap_start) ABORT_MEM;
+    if (mem.varobjects.heap_end > mem.conses.heap_start)
+      ABORT_MEM;
     #endif
     /* now wee need the SIGSEGV-handler. */
     install_segv_handler();
@@ -1622,7 +1749,7 @@ local void loadmem_from_handle (Handle handle, const char* filename)
  #ifdef GENERATIONAL_GC
   O(gc_count) = Fixnum_0;  /* so far no GCs: */
  #endif
-  { # Initialize markwatchset:
+  {                             /* Initialize markwatchset: */
     var uintM need = 0;
     var object L;
     for (L = O(all_weakpointers);
@@ -1634,25 +1761,48 @@ local void loadmem_from_handle (Handle handle, const char* filename)
       begin_system_call();
       markwatchset = (markwatch_t*)malloc(markwatchset_allocated*sizeof(markwatch_t));
       end_system_call();
-      if (markwatchset==NULL) ABORT_MEM;
+      if (markwatchset==NULL)
+        ABORT_MEM;
     }
   }
-  /* Delete cache of standard file streams. */
-  O(standard_input_file_stream) = NIL;
-  O(standard_output_file_stream) = NIL;
-  O(standard_error_file_stream) = NIL;
- #ifdef MACHINE_KNOWN
-  /* declare (MACHINE-TYPE), (MACHINE-VERSION), (MACHINE-INSTANCE)
-     as unknown again: */
-  O(machine_type_string) = NIL;
-  O(machine_version_string) = NIL;
-  O(machine_instance_string) = NIL;
- #endif
- #ifndef LANGUAGE_STATIC
-  /* delete cache of (LISP-IMPLEMENTATION-VERSION)
-     (depends on (SYS::CURRENT-LANGUAGE) ): */
-  O(lisp_implementation_version_string) = NIL;
- #endif
+  { /* Delete cache of standard file streams. */
+    O(standard_input_file_stream) = NIL;
+    O(standard_output_file_stream) = NIL;
+    O(standard_error_file_stream) = NIL;
+   #ifdef MACHINE_KNOWN
+    /* declare (MACHINE-TYPE), (MACHINE-VERSION), (MACHINE-INSTANCE)
+       as unknown again: */
+    O(machine_type_string) = NIL;
+    O(machine_version_string) = NIL;
+    O(machine_instance_string) = NIL;
+   #endif
+   #ifndef LANGUAGE_STATIC
+    /* delete cache of (LISP-IMPLEMENTATION-VERSION)
+       (depends on (SYS::CURRENT-LANGUAGE) ): */
+    O(lisp_implementation_version_string) = NIL;
+   #endif
+  }
+  #ifdef MULTITHREAD
+  {
+    /* mutex and exemption objects are loaded from the mem file but do not
+       represent valid OS objects. We should recreate the OS objects here.
+       This is especially true for mutexes that are part of packages. */
+    var object list = O(all_mutexes);
+    while (!endp(list)) {
+      /* hope none of following to fail */
+      TheMutex(Car(list))->xmu_system = (xmutex_t *)malloc(sizeof(xmutex_t));
+      xmutex_init(TheMutex(Car(list))->xmu_system);
+      list = Cdr(list);
+    }
+    list = O(all_exemptions);
+    while (!endp(list)) {
+      TheExemption(Car(list))->xco_system =
+        (xcondition_t *)malloc(sizeof(xcondition_t));
+      xcondition_init(TheExemption(Car(list))->xco_system);
+      list = Cdr(list);
+    }
+  }
+  #endif
   CHECK_AVL_CONSISTENCY();
   CHECK_GC_CONSISTENCY();
   CHECK_GC_UNMARKED(); CHECK_NULLOBJ(); CHECK_GC_CACHE(); CHECK_GC_GENERATIONAL(); SAVE_GC_DATA();
@@ -1661,19 +1811,19 @@ local void loadmem_from_handle (Handle handle, const char* filename)
     #if 0
       char memdumptime[4+1+2+1+2 +1+ 2+1+2+1+2+1]; // YYYY-MM-DD HH:MM:SS
       sprintf(memdumptime,"%04u-%02u-%02u %02u:%02u:%02u",
-              (uintL)posfixnum_to_V(header._dumptime.Jahr),
-              (uintL)posfixnum_to_V(header._dumptime.Monat),
-              (uintL)posfixnum_to_V(header._dumptime.Tag),
-              (uintL)posfixnum_to_V(header._dumptime.Stunden),
-              (uintL)posfixnum_to_V(header._dumptime.Minuten),
-              (uintL)posfixnum_to_V(header._dumptime.Sekunden));
+              (uintL)posfixnum_to_V(header._dumptime.year),
+              (uintL)posfixnum_to_V(header._dumptime.month),
+              (uintL)posfixnum_to_V(header._dumptime.day),
+              (uintL)posfixnum_to_V(header._dumptime.hours),
+              (uintL)posfixnum_to_V(header._dumptime.minutes),
+              (uintL)posfixnum_to_V(header._dumptime.seconds));
     #endif
     char memdumptime[10+1];
     sprintf(memdumptime,"%u",header._dumptime);
     O(memory_image_timestamp) = ascii_to_string(memdumptime);
+    O(memory_image_host) = asciz_to_string(header._dumphost,
+                                           Symbol_value(S(utf_8)));
   }
-  O(memory_image_host) = asciz_to_string(header._dumphost,
-                                         Symbol_value(S(utf_8)));
   return;
 #undef ABORT_SYS
 #undef ABORT_INI
@@ -1686,41 +1836,17 @@ local void loadmem_from_handle (Handle handle, const char* filename)
   goto abort_quit;
  abort_ini:
   fprintf(stderr,GETTEXTL("%s: initialization file `%s' was not created by this version of CLISP runtime"),program_name,filename);
-  fputs("\n",stderr);
+  fputc('\n',stderr);
   goto abort_quit;
  abort_mem:
   fprintf(stderr,GETTEXTL("%s: not enough memory for initialization"),program_name);
-  fputs("\n",stderr);
+  fputc('\n',stderr);
   goto abort_quit;
  abort_quit:
   /* close the file beforehand. */
   begin_system_call(); CLOSE_HANDLE(handle); end_system_call();
-  quit_sofort(1);
+  quit_instantly(1);
 }
-
-#if defined(LOADMEM_TRY_SEARCH)
-/* find the marker of given size in the open file handle */
-local size_t find_marker (Handle handle, char* marker, size_t marker_len) {
-  char buf[BUFSIZ];
-  size_t marker_pos = 0;
-  size_t pos = 0;
-  while (1) {
-    size_t result = full_read(handle,(void*)buf,BUFSIZ);
-    size_t i;
-    if (result <= 0)
-      return (size_t)-1;
-    for (i = 0; i < result; i++) {
-      pos++;
-      if (buf[i] == marker[marker_pos]) {
-        if (++marker_pos == marker_len) /* found! */
-          return pos - marker_len;
-      } else
-        marker_pos = 0;
-    }
-  }
-  return (size_t)-1;
-}
-#endif
 
 /* find the memory image in the file
  there are two methods:
@@ -1733,7 +1859,7 @@ local size_t find_marker (Handle handle, char* marker, size_t marker_len) {
     and can increase the startup time by as much as a few seconds
  #endif
  Since we always record mem_start in every executable image we write,
- there is no reason to do search.
+ there is no reason to do the search.
  If "image size" somehow fails, we want a bug report right away.
  > fd : the open file descriptor (its position is changed)
  < set mem_start and mem_searched */
@@ -1749,14 +1875,20 @@ local void find_memdump (Handle fd) {
       && lseek(fd,mem_start,SEEK_SET) == mem_start) {
     var memdump_header_t header1;
     full_read(fd,(void*)&header1,header_size);
-    if (memcmp((void*)&header,(void*)&header1,header_size) != 0)
+   #if defined(MULTITHREAD)
+    /* restore the count of symvalues. this field should not be used for
+       validation by compare */
+    header._per_thread_symvalues_count = header1._per_thread_symvalues_count;
+   #endif
+    if (memcmp((void*)&header,(void*)&header1,header_size) != 0) {
       mem_start = (size_t)-1;   /* bad header => no image */
+    }
   } else {
    #if defined(LOADMEM_TRY_SEARCH)
     /* lseek+read does not work ==> use marker */
     lseek(fd,0,SEEK_SET);
-    mem_start = find_marker(fd,(char*)&header,header_size);
-    if (mem_start  != (size_t)-1)
+    mem_start = find_marker(fd,(const char*)&header,header_size);
+    if (mem_start != (size_t)-1)
       /* image size failed, but header is found -- this is fishy! */
       fprintf(stderr,GETTEXTL("%s: 'image size' method failed, but found image header at %d\n"),get_executable_name(),mem_start);
    #else

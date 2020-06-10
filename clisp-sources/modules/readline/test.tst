@@ -1,6 +1,9 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; some tests for READLINE
 ;; clisp -q -norc -i ../tests/tests -x '(run-test "readline/test")'
+
+(require "readline") NIL
+(listp (show (multiple-value-list (ext:module-info "readline" t)) :pretty t)) T
 
 (let ((ver-num (and (boundp 'readline:readline-version)
                     readline:readline-version)))
@@ -8,6 +11,10 @@
           (and (boundp 'readline:library-version) readline:library-version)
           ver-num ver-num ver-num))
 nil
+
+(integerp (show readline:gnu-readline-p)) T
+(typep (show readline:terminal-name) '(or null string)) T
+(integerp (show readline:prefer-env-winsize)) T
 
 (if (boundp 'readline:editing-mode) readline:editing-mode 1) 1
 (if (boundp 'readline:insert-mode)  readline:insert-mode 1)  1
@@ -38,10 +45,16 @@ NIL
 
 (readline:resize-terminal) NIL
 
+(readline:reset-screen-size) NIL
+
 (multiple-value-bind (rows cols) (readline:get-screen-size)
   (show (list rows cols))
   (readline:set-screen-size rows cols))
 NIL
+
+(equal (merge-pathnames (readline:tilde-expand "~/foo"))
+       (merge-pathnames "foo" (user-homedir-pathname)))
+T
 
 ;;; This tests readline-from-string, and indirectly getc-function
 (progn

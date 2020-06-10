@@ -1,4 +1,4 @@
-;; -*- lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 (FORMAT T "~%double-float arrays~%")   NIL
 

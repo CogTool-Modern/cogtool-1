@@ -63,7 +63,7 @@
 #define MULU32_INLINE  1  # 1: mulu32-Aufrufe inline in die Schleifen
 
 # extern uint32 mulu16_ (uint16 arg1, uint16 arg2);
-# ergebnis := arg1*arg2.
+# result := arg1*arg2.
 C(mulu16_:) # Input in %o0,%o1, Output in %o0
 #ifdef sparcv8
         umul    %o0,%o1,%o0
@@ -149,7 +149,7 @@ C(mulu32_:) # Input in %o0,%o1, Output in %o0,%g1
 #endif
 
 # extern uint32 mulu32_unchecked (uint32 x, uint32 y);
-# ergebnis := arg1*arg2 < 2^32.
+# result := arg1*arg2 < 2^32.
 C(mulu32_unchecked:) # Input in %o0,%o1, Output in %o0
 #ifdef sparcv8
         umul    %o0,%o1,%o0

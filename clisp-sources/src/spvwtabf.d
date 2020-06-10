@@ -1,16 +1,24 @@
-# Moved out of memory management:
-# table of all SUBRs
-# Bruno Haible 1990-2004
+/*
+ * Moved out of memory management:
+ * table of all SUBRs
+ * Bruno Haible 1990-2006
+ * Sam Steingold 2002-2009
+ */
 
 #include "lispbibl.c"
 
 #undef LISPFUN
 
-# table of all SUBRs
-global struct subr_tab_ subr_tab_data
-  #if defined(HEAPCODES) && (alignment_long < varobject_alignment) && defined(GNU)
-    # Force all Subrs to be allocated with a 4/8-byte alignment. GC needs this.
-    __attribute__ ((aligned (varobject_alignment)))
+/* table of all SUBRs */
+modexp struct subr_tab_ subr_tab_data
+  #if defined(HEAPCODES) && (alignment_long < varobject_alignment)
+/* Force all Subrs to be allocated with a 4/8-byte alignment. GC needs this. */
+    #if defined(GNU)
+      __attribute__ ((aligned (varobject_alignment)))
+    #endif
+    #if defined(__SUNPRO_C)
+      #pragma align varobject_alignment (subr_tab_data)
+    #endif
   #endif
   #if defined(INIT_SUBR_TAB)
     = {

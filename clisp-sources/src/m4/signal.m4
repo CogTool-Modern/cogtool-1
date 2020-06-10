@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2003 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -9,99 +9,6 @@ dnl the same distribution terms as the rest of that program.
 dnl From Bruno Haible, Marcus Daniels, Sam Steingold.
 
 AC_PREREQ(2.57)
-
-AC_DEFUN([RL_RETSIGTYPE],
-[AC_MSG_CHECKING(return type of signal handlers)
-CL_PROTO_RET(
-[#include <sys/types.h>
-#include <signal.h>
-#ifdef signal
-#undef signal
-#endif
-], [
-#ifdef __cplusplus
-int (*signal (int sig, void (*handler)(int))) ();
-#else
-int (*signal ()) ();
-#endif
-], [int (*signal ()) ();],
-cl_cv_proto_signal_ret, int, void)
-AC_MSG_RESULT($cl_cv_proto_signal_ret)
-AC_DEFINE_UNQUOTED(RETSIGTYPE,$cl_cv_proto_signal_ret,[return type of signal handlers (int or void)])
-if test $cl_cv_proto_signal_ret = void; then
-  AC_DEFINE_UNQUOTED(RETSIGTYPE_VOID,,[return type of signal handlers is void])
-fi
-])
-
-AC_DEFUN([CL_TYPE_SIGNAL],
-[AC_CACHE_CHECK([return type of signal handlers], cl_cv_type_signal,
-[AC_TRY_COMPILE([#include <sys/types.h>
-#include <signal.h>
-#ifdef signal
-#undef signal
-#endif
-extern
-#ifdef __cplusplus
-"C" void (*signal (int, void (*)(int)))(int);
-#else
-void (*signal ()) ();
-#endif
-],
-[], cl_cv_type_signal=void, [
-AC_TRY_COMPILE([#include <sys/types.h>
-#include <signal.h>
-#ifdef signal
-#undef signal
-#endif
-extern
-#ifdef __cplusplus
-"C" void (*signal (...))(...);
-#else
-void (*signal ()) ();
-#endif
-],
-[], cl_cv_type_signal=void, cl_cv_type_signal=int)])])
-AC_DEFINE_UNQUOTED(RETSIGTYPE, $cl_cv_type_signal, [return type of signal handlers (int or void)])
-AC_CACHE_CHECK([whether the signal handler function type needs dots], cl_cv_proto_signal_dots,
-[AC_TRY_COMPILE([#include <sys/types.h>
-#include <signal.h>
-#ifdef signal
-#undef signal
-#endif
-extern
-#ifdef __cplusplus
-"C" $cl_cv_type_signal (*signal (int, $cl_cv_type_signal (*)(int)))(int);
-#else
-$cl_cv_type_signal (*signal ()) ();
-#endif
-],
-[], cl_cv_proto_signal_dots=no, cl_cv_proto_signal_dots=yes)])
-if test $cl_cv_proto_signal_dots = yes; then
-AC_DEFINE(SIGTYPE_DOTS,,[declaration of the signal handler function type needs dots])
-fi
-])
-
-AC_DEFUN([CL_SIGNALBLOCK],
-[AC_BEFORE([$0], [CL_SIGNAL_UNBLOCK])dnl
-AC_BEFORE([$0], [CL_SIGNAL_BLOCK_OTHERS])dnl
-signalblocks=""
-AC_CHECK_FUNC(sighold, AC_DEFINE(SIGNALBLOCK_SYSV,,[how to block and unblock signals])
-signalblocks="$signalblocks SystemV", )dnl
-AC_EGREP_HEADER(sigset_t, signal.h, , signals_not_posix=1)dnl
-if test -z "$signals_not_posix"; then
-AC_CHECK_FUNC(sigprocmask, AC_DEFINE(SIGNALBLOCK_POSIX,,[how to block and unblock signals])
-signalblocks="$signalblocks POSIX", )dnl
-fi
-AC_CHECK_FUNC(sigblock, AC_DEFINE(SIGNALBLOCK_BSD,,[how to block and unblock signals])
-signalblocks="$signalblocks BSD", )dnl
-AC_CACHE_CHECK(for signal blocking interfaces, cl_cv_func_signalblocks, [
-if test -z "$signalblocks"; then
-  cl_cv_func_signalblocks="none"
-else
-  cl_cv_func_signalblocks=`echo $signalblocks`
-fi
-])
-])
 
 AC_DEFUN([CL_SIGNAL_REINSTALL],
 [AC_BEFORE([$0], [CL_SIGNAL_UNBLOCK])dnl
@@ -118,21 +25,10 @@ AC_TRY_RUN([
  * Let it fail instead. */
 #error "better fail than hang"
 #endif
-#if !defined(__STDC__) || __STDC__ != 1
-#define volatile
-#endif
 volatile int gotsig=0;
-RETSIGTYPE sigalrm_handler() { gotsig=1; }
+void sigalrm_handler() { gotsig=1; }
 int got_sig () { return gotsig; }
-#ifdef __cplusplus
-#ifdef SIGTYPE_DOTS
-typedef RETSIGTYPE (*signal_handler_t) (...);
-#else
-typedef RETSIGTYPE (*signal_handler_t) (int);
-#endif
-#else
-typedef RETSIGTYPE (*signal_handler_t) ();
-#endif
+typedef void (*signal_handler_t) (int);
 int main() { /* returns 0 if they need not to be reinstalled */
   signal(SIGALRM,(signal_handler_t)sigalrm_handler); alarm(1); while (!got_sig());
   exit(!( (signal_handler_t)signal(SIGALRM,(signal_handler_t)sigalrm_handler)
@@ -149,7 +45,7 @@ esac
 ])
 
 AC_DEFUN([CL_SIGNAL_UNBLOCK],
-[AC_REQUIRE([CL_SIGNAL_REINSTALL])AC_REQUIRE([CL_SIGNALBLOCK])dnl
+[AC_REQUIRE([CL_SIGNAL_REINSTALL])dnl
 case "$signalblocks" in
   *POSIX* | *BSD*)
 AC_CACHE_CHECK(whether signals are blocked when signal handlers are entered, cl_cv_func_signal_blocked, [
@@ -164,33 +60,18 @@ AC_TRY_RUN([
  * Let it fail instead. */
 #error "better fail than hang"
 #endif
-#if !defined(__STDC__) || __STDC__ != 1
-#define volatile
-#endif
 volatile int gotsig=0;
 volatile int wasblocked=0;
-#ifdef __cplusplus
-#ifdef SIGTYPE_DOTS
-typedef RETSIGTYPE (*signal_handler_t) (...);
-#else
-typedef RETSIGTYPE (*signal_handler_t) (int);
-#endif
-#else
-typedef RETSIGTYPE (*signal_handler_t) ();
-#endif
-RETSIGTYPE sigalrm_handler()
+typedef void (*signal_handler_t) (int);
+void sigalrm_handler()
 { gotsig=1;
 #ifdef SIGNAL_NEED_REINSTALL
   signal(SIGALRM,(signal_handler_t)sigalrm_handler);
 #endif
-#ifdef SIGNALBLOCK_POSIX
   { sigset_t blocked;
     sigprocmask(SIG_BLOCK, (sigset_t *) 0, &blocked);
     wasblocked = sigismember(&blocked,SIGALRM) ? 1 : 0;
   }
-#else
-  wasblocked = ((sigblock(0) & sigmask(SIGALRM)) != 0);
-#endif
 }
 int got_sig () { return gotsig; }
 int main() { /* returns 0 if they need not to be unblocked */
@@ -210,7 +91,7 @@ esac
 ])
 
 AC_DEFUN([CL_SIGNAL_BLOCK_OTHERS],
-[AC_REQUIRE([CL_SIGNAL_REINSTALL])AC_REQUIRE([CL_SIGNALBLOCK])dnl
+[AC_REQUIRE([CL_SIGNAL_REINSTALL])dnl
 case "$signalblocks" in
   *POSIX* | *BSD*)
 AC_CACHE_CHECK(whether other signals are blocked when signal handlers are entered, cl_cv_func_signal_blocked_others, [
@@ -225,26 +106,14 @@ AC_TRY_RUN([
  * Let it fail instead. */
 #error "better fail than hang"
 #endif
-#if !defined(__STDC__) || __STDC__ != 1
-#define volatile
-#endif
 volatile int gotsig=0;
 volatile int somewereblocked=0;
-#ifdef __cplusplus
-#ifdef SIGTYPE_DOTS
-typedef RETSIGTYPE (*signal_handler_t) (...);
-#else
-typedef RETSIGTYPE (*signal_handler_t) (int);
-#endif
-#else
-typedef RETSIGTYPE (*signal_handler_t) ();
-#endif
-RETSIGTYPE sigalrm_handler()
+typedef void (*signal_handler_t) (int);
+void sigalrm_handler()
 { gotsig=1;
 #ifdef SIGNAL_NEED_REINSTALL
   signal(SIGALRM,(signal_handler_t)sigalrm_handler);
 #endif
-#ifdef SIGNALBLOCK_POSIX
   { sigset_t blocked;
     int i;
     sigprocmask(SIG_BLOCK, (sigset_t *) 0, &blocked);
@@ -252,9 +121,6 @@ RETSIGTYPE sigalrm_handler()
       if (i!=SIGALRM && sigismember(&blocked,i))
         somewereblocked = 1;
   }
-#else
-  somewereblocked = ((sigblock(0) & ~sigmask(SIGALRM)) != 0);
-#endif
 }
 int got_sig () { return gotsig; }
 int main() { /* returns 0 if they need not to be unblocked */
@@ -279,8 +145,7 @@ AC_BEFORE([$0], [CL_SIGINTERRUPT])
 AC_CHECK_FUNCS(sigaction)])
 
 AC_DEFUN([CL_SIGACTION_REINSTALL],
-[AC_REQUIRE([CL_TYPE_SIGNAL])dnl
-AC_REQUIRE([CL_SIGACTION])dnl
+[AC_REQUIRE([CL_SIGACTION])dnl
 AC_BEFORE([$0], [CL_SIGACTION_UNBLOCK])dnl
 if test -n "$have_sigaction"; then
 AC_CACHE_CHECK(whether sigaction handlers need to be reinstalled, cl_cv_func_sigaction_reinstall, [
@@ -296,22 +161,8 @@ AC_TRY_RUN([
  * Let it fail instead. */
 #error "better fail than hang"
 #endif
-#ifdef __cplusplus
-#ifdef SIGTYPE_DOTS
-typedef RETSIGTYPE (*signal_handler_t) (...);
-#else
-typedef RETSIGTYPE (*signal_handler_t) (int);
-#endif
-#else
-typedef RETSIGTYPE (*signal_handler_t) ();
-#endif
-#if defined(__STDC__) || defined(__cplusplus)
+typedef void (*signal_handler_t) (int);
 signal_handler_t mysignal (int sig, signal_handler_t handler)
-#else
-signal_handler_t mysignal (sig, handler)
-     int sig;
-     signal_handler_t handler;
-#endif
 { struct sigaction old_sa;
   struct sigaction new_sa;
   memset(&new_sa,0,sizeof(new_sa));
@@ -319,11 +170,8 @@ signal_handler_t mysignal (sig, handler)
   if (sigaction(sig,&new_sa,&old_sa)<0) { return (signal_handler_t)SIG_IGN; }
   return (signal_handler_t)old_sa.sa_handler;
 }
-#if !defined(__STDC__) || __STDC__ != 1
-#define volatile
-#endif
 volatile int gotsig=0;
-RETSIGTYPE sigalrm_handler() { gotsig=1; }
+void sigalrm_handler() { gotsig=1; }
 int got_sig () { return gotsig; }
 int main() { /* returns 0 if they need not to be reinstalled */
   mysignal(SIGALRM,(signal_handler_t)sigalrm_handler); alarm(1); while (!got_sig());
@@ -342,10 +190,8 @@ fi
 ])
 
 AC_DEFUN([CL_SIGACTION_UNBLOCK],
-[AC_REQUIRE([CL_TYPE_SIGNAL])dnl
-AC_REQUIRE([CL_SIGACTION])dnl
+[AC_REQUIRE([CL_SIGACTION])dnl
 AC_REQUIRE([CL_SIGACTION_REINSTALL])dnl
-AC_REQUIRE([CL_SIGNALBLOCK])dnl
 if test -n "$have_sigaction"; then
 case "$signalblocks" in
   *POSIX* | *BSD*)
@@ -361,25 +207,8 @@ AC_TRY_RUN([
  * Let it fail instead. */
 #error "better fail than hang"
 #endif
-#if !defined(__STDC__) || __STDC__ != 1
-#define volatile
-#endif
-#ifdef __cplusplus
-#ifdef SIGTYPE_DOTS
-typedef RETSIGTYPE (*signal_handler_t) (...);
-#else
-typedef RETSIGTYPE (*signal_handler_t) (int);
-#endif
-#else
-typedef RETSIGTYPE (*signal_handler_t) ();
-#endif
-#if defined(__STDC__) || defined(__cplusplus)
+typedef void (*signal_handler_t) (int);
 signal_handler_t mysignal (int sig, signal_handler_t handler)
-#else
-signal_handler_t mysignal (sig, handler)
-     int sig;
-     signal_handler_t handler;
-#endif
 { struct sigaction old_sa;
   struct sigaction new_sa;
   memset(&new_sa,0,sizeof(new_sa));
@@ -389,19 +218,15 @@ signal_handler_t mysignal (sig, handler)
 }
 volatile int gotsig=0;
 volatile int wasblocked=0;
-RETSIGTYPE sigalrm_handler()
+void sigalrm_handler()
 { gotsig=1;
 #ifdef SIGNAL_NEED_REINSTALL
   mysignal(SIGALRM,(signal_handler_t)sigalrm_handler);
 #endif
-#ifdef SIGNALBLOCK_POSIX
   { sigset_t blocked;
     sigprocmask(SIG_BLOCK, (sigset_t *) 0, &blocked);
     wasblocked = sigismember(&blocked,SIGALRM) ? 1 : 0;
   }
-#else
-  wasblocked = ((sigblock(0) & sigmask(SIGALRM)) != 0);
-#endif
 }
 int got_sig () { return gotsig; }
 int main() { /* returns 0 if they need not to be unblocked */

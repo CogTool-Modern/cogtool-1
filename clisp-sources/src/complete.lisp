@@ -20,6 +20,7 @@
                             (equal (subseq string (- start1 2) start1) "#'")))
          ;; completion of a function or of any symbol?
          (functionalp (or (= start end) functionalp1 functionalp2))
+         (search-package-names nil) ; complete among package names
          ;; test for special case: nothing was entered to be completed,
          ;; so we try to DESCRIBE the last function symbol entered
          (void-completion
@@ -49,29 +50,23 @@
       ;; Extract the package name:
       (unless quotedp
         (let ((colon (position #\: string :start start :end end)))
-          (when colon
-            (let ((packname (subseq string start colon)))
+          (if colon
+            (let ((packname (subseq string start colon))) ; fresh!
               (case (readtable-case *readtable*)
-                (:UPCASE (setq packname (string-upcase packname)))
-                (:DOWNCASE (setq packname (string-downcase packname)))
-                (:INVERT
-                  (setq packname
-                    (map 'string
-                         #'(lambda (c)
-                             (cond ((lower-case-p c) (char-upcase c))
-                                   ((upper-case-p c) (char-downcase c))
-                                   (t c)))
-                         packname))))
+                (:upcase (nstring-upcase packname))
+                (:downcase (nstring-downcase packname))
+                (:invert (nstring-invertcase packname)))
               (when (equal packname "") (setq packname "KEYWORD"))
-              (setq package (find-package packname)))
-            (unless package
-              (return-from completion nil))
-            (incf colon)
-            (if (and (< colon end) (eql (char string colon) #\:))
+              (setq package (find-package packname))
+              (unless package
+                (return-from completion nil))
               (incf colon)
-              (setq mapfun #'sys::map-external-symbols))
-            (setq prefix (subseq string start colon))
-            (setq start colon))))
+              (if (and (< colon end) (eql (char string colon) #\:))
+                (incf colon)
+                (setq mapfun #'sys::map-external-symbols))
+              (setq prefix (subseq string start colon))
+              (setq start colon))
+            (setq search-package-names t))))
       (let* ((case-sensitive-p
                (or quotedp
                    (package-case-sensitive-p package)
@@ -86,26 +81,39 @@
              (char-cmp (if case-sensitive-p #'char= #'char-equal))
              (string-cmp (if case-sensitive-p #'string= #'string-equal))
              (return-list '())
+             (match-and-collect
+              (lambda (name)
+                (when (>= (length name) known-len)
+                  (when case-inverted-p
+                    (setq name (string-invertcase name)))
+                  (when (funcall string-cmp name known-part :end1 known-len)
+                    (push name return-list)))))
              (gatherer
                (if functionalp
-                 #'(lambda (sym)
-                     (when (fboundp sym)
-                       (let ((name (symbol-name sym)))
-                         (when (>= (length name) known-len)
-                           (when case-inverted-p
-                             (setq name (string-invertcase name)))
-                           (when (funcall string-cmp name known-part
-                                          :end1 known-len)
-                             (push name return-list))))))
-                 #'(lambda (sym)
-                     (let ((name (symbol-name sym)))
-                       (when (>= (length name) known-len)
-                         (when case-inverted-p
-                           (setq name (string-invertcase name)))
-                         (when (funcall string-cmp name known-part
-                                        :end1 known-len)
-                           (push name return-list))))))))
+                 (lambda (sym)
+                   (when (fboundp sym)
+                     (funcall match-and-collect (symbol-name sym))))
+                 (lambda (sym) (funcall match-and-collect (symbol-name sym))))))
         (funcall mapfun gatherer package)
+        (when (and search-package-names (null return-list))
+          (dolist (pack (list-all-packages))
+            (funcall match-and-collect (package-name pack))
+            (dolist (nick (package-nicknames pack))
+              (funcall match-and-collect nick)))
+          (when return-list
+            (setq return-list
+                  (mapcan (lambda (pack)
+                            (ext:with-collect (c)
+                              (do-external-symbols (s pack)
+                                (let ((ret (ext:string-concat
+                                            (package-name pack) ":"
+                                            (symbol-name s))))
+                                  (when case-inverted-p
+                                    (setq ret (nstring-invertcase ret)))
+                                  (c ret)))))
+                          (delete-duplicates 
+                           (map-into return-list #'find-package
+                                     return-list))))))
         ;; Now react depending on the list of matching symbols.
         (when (null return-list)
           (return-from completion nil))

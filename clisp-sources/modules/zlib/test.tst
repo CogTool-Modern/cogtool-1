@@ -1,6 +1,9 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; some tests for ZLIB
-;; clisp -K full -E 1:1 -q -norc -i ../tests/tests -x '(run-test "zlib/test")'
+;; clisp -E 1:1 -q -norc -i ../tests/tests -x '(run-test "zlib/test")'
+
+(list (require "zlib")) (#-ZLIB T #+ZLIB NIL)
+(listp (show (multiple-value-list (ext:module-info "zlib" t)) :pretty t)) t
 
 (format t "~&zlib version: ~S~%" (zlib:z-version))
 NIL

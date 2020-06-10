@@ -21,6 +21,7 @@
 ;;;; Hacked by me (Gilbert Baumann) to fit to my re-implementation of
 ;;;; CLX but most parts left unmodified (sans stripping some annoying
 ;;;; declares), so I leave the original copyright here.
+;;;; also hacked by Sam Steingold
 
 (require "clx")
 
@@ -32,8 +33,8 @@
 
 (defvar *image-unit* 32)
 (defvar *image-pad* 32)
-(defvar *image-bit-lsb-first-p* t)      ;what about these on big-endian systems? --GB
-(defvar *image-byte-lsb-first-p* t)
+(defvar *image-bit-lsb-first-p* (not sys::*big-endian*))
+(defvar *image-byte-lsb-first-p* (not sys::*big-endian*))
 (deftype buffer-bytes () `(simple-array (unsigned-byte 8) (*)))
 
 (deftype pixarray-1-element-type ()  'bit)
@@ -289,7 +290,8 @@
           (unless gcontext (xlib::required-arg gcontext))
         (error "Pixmap depth ~d incompatible with image depth ~d"
                depth image-depth)))
-    (put-image pixmap gc image :x 0 :y 0 :bitmap-p (and (= image-depth 1) gcontext))
+    (put-image pixmap gc image :x 0 :y 0 :width width :height height
+               :bitmap-p (and (= image-depth 1) gcontext))
     ;; Tile when image-width is less than the pixmap width, or
     ;; the image-height is less than the pixmap height.
     ;; ??? Would it be better to create a temporary pixmap and
@@ -304,4 +306,3 @@
       (incf image-height image-height))
     (unless gcontext (free-gcontext gc))
     pixmap))
-

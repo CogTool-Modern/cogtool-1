@@ -1,6 +1,6 @@
 ;;; CLISP i18n module
 ;;; Copyright (C) 1990-2004 Bruno Haible
-;;; Copyright (C) 1998-2005 Sam Steingold
+;;; Copyright (C) 1998-2009 Sam Steingold
 ;;
 ;; Interface to GNU gettext
 ;;
@@ -22,7 +22,7 @@
 (export
  '(i18n::gettext i18n::ngettext i18n::textdomain i18n::textdomaindir
    i18n::set-locale i18n::language-information
-   i18n::locale-conv i18n::locale-conv-p
+   i18n::locale-conv i18n::locale-conv-p i18n::copy-locale-conv
    i18n::locale-conv-decimal_point i18n::locale-conv-thousands_sep
    i18n::locale-conv-grouping  i18n::locale-conv-int_curr_symbol
    i18n::locale-conv-currency_symbol i18n::locale-conv-mon_decimal_point
@@ -41,6 +41,7 @@
 (defsetf i18n::textdomain i18n::set-textdomain)
 (defsetf i18n::textdomaindir i18n::set-textdomaindir)
 
+;; cannot use exporting:defstruct because it will also export mk-locale-conv
 (defstruct (i18n::locale-conv
              (:constructor i18n::mk-locale-conv
                            (i18n::decimal_point      i18n::thousands_sep
@@ -66,5 +67,5 @@
   i18n::int_p_sign_posn i18n::int_n_sign_posn)
 
 (pushnew "I18N" custom:*system-package-list* :test #'string=)
-(setf (package-lock custom:*system-package-list*) t)
 (pushnew :i18n *features*)
+(provide "i18n")

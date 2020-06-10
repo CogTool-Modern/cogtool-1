@@ -14,7 +14,7 @@ overhead and allowing for caching of data structures and other resources.  This
 is the same approach used is in other languages (e.g., <ulink
 url="http://perl.apache.org">mod_perl</ulink> for Perl).  </simpara>
 
-<simpara>When this module is present, &features-var; contains the
+<simpara>When this module is present, &features-my; contains the
  symbol <constant>:FASTCGI</constant>.</simpara>
 
 <section id="fcgi-overview"><title>Overview of &fastcgi-link;</title>
@@ -68,7 +68,7 @@ or large in-memory data structures.
 
 <variablelist>
 
-	<!-- IS-CGI -->
+<!-- IS-CGI -->
 <varlistentry><term><code>(FASTCGI:IS-CGI)</code></term>
 <listitem><simpara>
 Returns &t; if the &clisp; program has been launched as a traditional
@@ -78,7 +78,7 @@ Under &fastcgi-link;, I/O is done directly with the Web server via
 the &fastcgi-link; protocol.
 </simpara></listitem></varlistentry>
 
-	<!-- ACCEPT -->
+<!-- ACCEPT -->
 <varlistentry><term>
 <code>(FASTCGI:ACCEPT)</code> <replaceable>cgi-forms</replaceable>
 <code>(FASTCGI:FINISH)</code>
@@ -105,7 +105,7 @@ A typical &fastcgi-link; top-level server loop looks like:
 
 </para></listitem></varlistentry>
 
-	<!-- GETENV -->
+<!-- GETENV -->
 <varlistentry><term><code>(FASTCGI:GETENV
 <replaceable>varname</replaceable>)</code></term>
 <listitem><simpara>
@@ -122,7 +122,7 @@ list of useful variables.  You must first have called
 <function>ACCEPT</function> and not yet have called
 <function>FINISH</function>.  </simpara></listitem></varlistentry>
 
-	<!-- WRITE-STDOUT -->
+<!-- WRITE-STDOUT -->
 <varlistentry><term><code>(FASTCGI:WRITE-STDOUT
 &string-r;)</code></term>
 <listitem><simpara>
@@ -132,7 +132,7 @@ You must first have called <function>ACCEPT</function> and not yet have
 called <function>FINISH</function>.
 </simpara></listitem></varlistentry>
 
-	<!-- WRITE-STDERR -->
+<!-- WRITE-STDERR -->
 <varlistentry><term><code>(FASTCGI:WRITE-STDERR
 &string-r;)</code></term>
 <listitem><simpara>
@@ -143,7 +143,7 @@ collected by the Web server in its error log.  This is useful
 for diagnostic purposes.
 </simpara></listitem></varlistentry>
 
-	<!-- SLURP-STDIN -->
+<!-- SLURP-STDIN -->
 <varlistentry><term><code>(FASTCGI:SLURP-STDIN)</code></term>
 <listitem><simpara>
 Reads in the entirety of standard input and returns it as a string.
@@ -154,7 +154,7 @@ script via standard input rather than via the environment variable
 in pieces, which could be a problem, say, for &http; uploads of very large files.
 </simpara></listitem></varlistentry>
 
-	<!-- OUT -->
+<!-- OUT -->
 <varlistentry><term><code>(FASTCGI:OUT
 <replaceable>tree</replaceable>)</code></term>
 <listitem><simpara>
@@ -182,17 +182,14 @@ Below is a simple example CGI script using &fastcgi-link;.
 <programlisting language="lisp">
 #!/usr/local/bin/clisp -q -K full
 
-(defun newline () (format nil "~%"))
 (do ((count 1 (1+ count)))
-	((not (fastcgi:accept)) nil)
-
-    (fastcgi:out "Content-type: text/plain" (newline) (newline))
-    (fastcgi:out
-     "I am running in mode: " (if (fastcgi:is-cgi) "CGI" "FastCGI") (newline)
-     "This is execution no.: " count (newline)
-     "The browser string is '" (fastcgi:getenv "HTTP_USER_AGENT") "'" (newline))
-
-    (fastcgi:finish))
+    ((not (fastcgi:accept)) nil)
+  (fastcgi:out "Content-type: text/plain" #\Newline #\Newline)
+  (fastcgi:out
+   "I am running in mode: " (if (fastcgi:is-cgi) "CGI" "FastCGI") #\Newline
+   "This is execution no.: " count #\Newline
+   "The browser string is '" (fastcgi:getenv "HTTP_USER_AGENT") "'" #\Newline)
+  (fastcgi:finish))
 </programlisting>
 
 </para>

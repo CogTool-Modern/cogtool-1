@@ -704,9 +704,7 @@
           #-allegro
 	  (t
 	   (if #-clisp (port::wait-for-stream stream timeout)
-               #+clisp (multiple-value-bind (sec usec) (floor (or timeout 0))
-                         (ext:socket-status stream (and timeout sec)
-                                            (round usec 1d-6)))
+               #+clisp (ext:socket-status (cons stream :input) timeout)
 	       nil
 	       :timeout))
           #+allegro

@@ -15,17 +15,16 @@
     (funcall fun)
   #+UNIX
     (let ((mode nil))
+      (unless *keyboard-input*
+        (setq *keyboard-input* (sys::make-keyboard-stream))
+      )
       (unwind-protect
         (progn
-          (unless *keyboard-input*
-            (setq *keyboard-input* (sys::make-keyboard-stream))
-          )
-          (setq mode (sys::terminal-raw *terminal-io* t))
+          (setq mode (sys::terminal-raw *keyboard-input* t))
           (funcall fun)
         )
-        (sys::terminal-raw *terminal-io* mode)
-    ) )
-)
+        (sys::terminal-raw *keyboard-input* mode)
+)   ) )
 
 ; Used by spvw.d.
 (defun wait-keypress ()

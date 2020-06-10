@@ -108,7 +108,8 @@
     merge-resources min-char-ascent min-char-attributes min-char-descent
     min-char-left-bearing min-char-right-bearing min-char-width
     missing-parameter modifier-key modifier-mapping modifier-mask
-    motion-events name-error no-operation guess-display open-default-display open-display open-font
+    motion-events name-error no-operation guess-display open-display open-font
+    open-default-display with-open-display
     pixarray pixel pixmap pixmap-display pixmap-equal
     pixmap-error pixmap-format pixmap-format-bits-per-pixel
     pixmap-format-depth pixmap-format-p pixmap-format-scanline-pad

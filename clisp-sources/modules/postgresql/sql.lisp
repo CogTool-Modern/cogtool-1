@@ -1,6 +1,6 @@
 ;;; PostgreSQL higher level functions
 ;;;
-;;; Copyright (C) 1999-2005 by Sam Steingold
+;;; Copyright (C) 1999-2008 by Sam Steingold
 ;;; Distributed under the GNU GPL2 <http://www.gnu.org/copyleft/gpl.html>:
 ;;; No warranty; you may copy/modify/redistribute under the same
 ;;; conditions with the source code.
@@ -83,4 +83,3 @@
 (pushnew "SQL" custom:*system-package-list* :test #'string=)
 
 ;;; file sql.lisp ends here
-

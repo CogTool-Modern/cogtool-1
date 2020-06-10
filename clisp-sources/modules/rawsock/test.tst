@@ -1,49 +1,82 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; some tests for RAWSOCK
-;; clisp -K full -E 1:1 -q -norc -i ../tests/tests -x '(run-test "rawsock/test")'
+;; clisp -E 1:1 -q -norc -i ../tests/tests -x '(run-test "rawsock/test")'
 ;; relies on some functions in the syscalls module
 
+(list (require "rawsock")) (#-RAWSOCK T #+RAWSOCK NIL)
 (listp (show (multiple-value-list (ext:module-info "rawsock" t)) :pretty t)) T
 
 (progn
-  (defun to-bytes (string) (ext:convert-string-to-bytes string charset:ascii))
-  (defun from-bytes (vec &optional size)
-    (ext:convert-string-from-bytes vec charset:ascii :end size))
+  (defun to-bytes (string)
+    (ext:convert-string-to-bytes
+     string #+UNICODE charset:ascii #-UNICODE :default))
+  (defun from-bytes (vec &key (start 0) end)
+    (ext:convert-string-from-bytes
+     vec #+UNICODE charset:ascii #-UNICODE :default :start start :end end))
   (defun make-byte-vector (len)
     (make-array (etypecase len
                   (integer len)
                   (sequence (length len)))
                 :element-type '(unsigned-byte 8) :initial-element 0))
+  (defun show-he (he &aux (type (os:hostent-addrtype he)))
+    (show (cons he
+                (mapcar (lambda (ip)
+                          (let* ((numeric (rawsock:convert-address type ip))
+                                 (dotted (rawsock:convert-address
+                                          type numeric)))
+                            (assert (string= ip dotted))
+                            (list :address ip numeric
+                                  (handler-case
+                                      (os:resolve-host-ipaddr numeric)
+                                    (error (e) e)))))
+                        (posix:hostent-addr-list he)))
+          :pretty t))
+  (defun ip->ve (ip)
+    (read-from-string
+     (concatenate 'string "#(" (substitute #\Space #\. ip) ")")) )
+  (defun host->ip (host)
+    (let* ((he (os:resolve-host-ipaddr host)) all
+           (host1 (os:hostent-name he)))
+      (show-he he)
+      (or (handler-case
+              (loop :for ip :in (os:hostent-addr-list he)
+                :for h1 = (os:resolve-host-ipaddr ip)
+                :do (show-he h1) (push h1 all)
+                :when (string-equal host1 (os:hostent-name h1))
+                :return (show (cons (ip->ve ip) (os:hostent-addrtype h1))))
+            (error (e) (princ-error e) nil))
+          (if (eq host :default)
+              (let* ((l (rawsock:ifaddrs :flags-and '(:up :running :broadcast)))
+                     (i (find :INET (show l :pretty t)
+                              :key (lambda (i)
+                                     (rawsock:sockaddr-family
+                                      (rawsock:ifaddrs-address i)))))
+                     (sa (rawsock:ifaddrs-address
+                          (or (show i :pretty t)
+                              (error "~S: no running broadcast INET interface"
+                                     'host->ip)))))
+                (cons (subseq (rawsock:sockaddr-data (show sa :pretty t)) 2 6)
+                      :INET))
+              (error "~S(~S): no match in ~S and ~S" 'host->ip host he all)))))
   (defun host->sa (host &optional (port 0))
-    (let* ((he (posix:resolve-host-ipaddr host)) sa
-           (ip (first (posix:hostent-addr-list he)))
-           (type (posix:hostent-addrtype he))
-           (li (read-from-string
-                (concatenate 'string "(" (substitute #\Space #\. ip) ")")))
-           (ve (make-byte-vector (nth-value 1 (rawsock::sockaddr-slot :data)))))
-      (show he :pretty t)
+    (let ((ip+type (host->ip host)) sa
+          (ve (make-byte-vector (nth-value 1 (rawsock::sockaddr-slot :data)))))
       (setf port (rawsock:htons port)
             (aref ve 0) (ldb #.(byte 8 0) port)
             (aref ve 1) (ldb #.(byte 8 8) port))
-      (replace ve li :start1 2)
+      (replace ve (car ip+type) :start1 2)
       (show ve)
-      (setq sa (show (rawsock:make-sockaddr type ve)))
+      (setq sa (show (rawsock:make-sockaddr (cdr ip+type) ve)))
       (assert (equalp ve (rawsock:sockaddr-data sa)))
       (show (list 'rawsock:sockaddr-family
                   (multiple-value-list (rawsock:sockaddr-family sa))))
-      (show (mapcar (lambda (addr)
-                      (let* ((numeric (rawsock:convert-address type addr))
-                             (dotted (rawsock:convert-address type numeric)))
-                        (show (list :address addr numeric dotted))
-                        (assert (string= addr dotted))))
-                    (posix:hostent-addr-list he)))
       sa))
   (defun local-sa-check (sock sa-local)
     (let* ((sa (rawsock:getsockname sock T))
            (data (rawsock:sockaddr-data sa)))
       (show sa)
       (show (list 'port (+ (aref data 1) (ash (aref data 0) 8))))
-      (and (= (rawsock:sockaddr-family sa) (rawsock:sockaddr-family sa-local))
+      (and (eq (rawsock:sockaddr-family sa) (rawsock:sockaddr-family sa-local))
            (equalp (subseq data 2)
                    (subseq (rawsock:sockaddr-data sa-local) 2)))))
   (dolist (what '(nil :data :family))
@@ -60,8 +93,12 @@
         (setq size len)
         (show (list len sa-len sa (subseq ve 0 len)) :pretty t)))
     (assert (eq status (show (socket:socket-status so))))
-    (rawsock:sock-close *sock*)
+    (rawsock:sock-close so)
     size)
+  (defun my-bind (sock sa)
+    (handler-case (rawsock:bind sock sa)
+      (:no-error () (show (list 'my-bind sock sa) :pretty t) nil)
+      (error (e) (show (list 'my-bind sock sa e (princ-to-string e)) :pretty t))))
   T) T
 
 (progn (setq *sa-remote* (host->sa "ftp.gnu.org" 21)) T) T
@@ -69,11 +106,15 @@
 
 (catch 'type-error-handler
   (handler-bind ((type-error #'type-error-handler))
-    (rawsock:socket :INET :FOO nil)))
+    (rawsock:socket :INET t nil)))
 NIL
 (catch 'type-error-handler
   (handler-bind ((type-error #'type-error-handler))
-    (rawsock:socket :FOO :STREAM nil)))
+    (rawsock:socket t :STREAM nil)))
+NIL
+(catch 'type-error-handler
+  (handler-bind ((type-error #'type-error-handler))
+    (rawsock:socket :INET :STREAM t)))
 NIL
 
 (integerp (show (setq *sock* (rawsock:socket :INET :STREAM nil)))) T
@@ -83,6 +124,7 @@ NIL
   (not (local-sa-check *sock* *sa-local*)))
 NIL
 (rawsock:connect *sock* *sa-remote*) NIL
+;; fails when proxied
 (equalp (rawsock:getpeername *sock* T) *sa-remote*) T
 
 (listp (show (list (multiple-value-list (socket:socket-stream-local *sock*))
@@ -92,7 +134,7 @@ T
 (ext:socket-status (list (cons *sock* :input))) (:INPUT)
 
 (let ((size (rawsock:recv *sock* *buffer*)))
-  (show (setq *recv-ret* (list size (from-bytes *buffer* size))))
+  (show (setq *recv-ret* (list size (from-bytes *buffer* :end size))))
   (ext:socket-status *sock*))
 :OUTPUT
 
@@ -115,6 +157,16 @@ T
 
 (ext:socket-status *sock*) :OUTPUT
 (ext:socket-stream-shutdown *sock* :io) NIL
+
+(block foo
+  (handler-bind ((rawsock:rawsock-error
+                  (lambda (e)
+                    (princ-error e)
+                    (return-from foo (= (rawsock:rawsock-error-socket e)
+                                        *sock*)))))
+    (rawsock:sock-write *sock* #A((UNSIGNED-BYTE 8) (2) (1 2)))))
+T
+
 (rawsock:sock-close *sock*) 0
 
 ;; re-create the socket after it has been closed
@@ -128,13 +180,14 @@ T
   (not (local-sa-check *sock* *sa-local*)))
 NIL
 (rawsock:connect *sock* *sa-remote*) NIL
+;; fails when proxied
 (equalp (rawsock:getpeername *sock* T) *sa-remote*) T
 
 (ext:socket-status (list (cons *sock* :input))) (:INPUT)
 
 #-:win32 ;; on win32, read() cannot be called on a socket!
 (let ((size (rawsock:sock-read *sock* *buffer*)))
-  (show (setq *read-ret* (list size (from-bytes *buffer* size))))
+  (show (setq *read-ret* (list size (from-bytes *buffer* :end size))))
   (ext:socket-status *sock*))
 #-:win32 :OUTPUT
 
@@ -155,7 +208,7 @@ NIL
 (rawsock:connect *sock* *sa-remote*) NIL
 
 (let ((size (my-recvfrom *sock* *buffer* *sa-remote*)))
-  (show (setq *recvfrom-ret* (list size (from-bytes *buffer* size))))
+  (show (setq *recvfrom-ret* (list size (from-bytes *buffer* :end size))))
   (equal *recv-ret* *recvfrom-ret*))
 T
 
@@ -176,8 +229,8 @@ T
 
 (let ((message "abazonk"))
   (rawsock:sock-write *sock1* (to-bytes message))
-  (string= message (from-bytes *buffer* (rawsock:sock-read
-                                         *sock2* *buffer*))))
+  (string= message (from-bytes *buffer*
+                               :end (rawsock:sock-read *sock2* *buffer*))))
 T
 
 #-:win32 ;; on win32, read()/write() cannot be called on a socket!
@@ -221,12 +274,12 @@ NIL
 (socket:socket-status *sock*) :OUTPUT
 
 (rawsock:send *sock* (to-bytes "dog bites man")) 13
-(rawsock:recv *sock1* *buffer*) 13
-(from-bytes *buffer* 13) "dog bites man"
+(rawsock:recv *sock1* *buffer* :start 17 :end 30) 13
+(from-bytes *buffer* :start 17 :end 30) "dog bites man"
 
 (rawsock:send *sock1* (to-bytes "man bites dog")) 13
-(rawsock:recv *sock* *buffer*) 13
-(from-bytes *buffer* 13) "man bites dog"
+(rawsock:recv *sock* *buffer* :start 1000 :end 1013) 13
+(from-bytes *buffer* :start 1000 :end 1013) "man bites dog"
 
 (rawsock:sock-close *sock*)  0
 (rawsock:sock-close *sock1*) 0
@@ -254,14 +307,14 @@ NIL
     (assert (equalp (rawsock:message-iovec message1)
                     (rawsock:message-iovec message2)))
     (when (fboundp 'rawsock:getnameinfo)
-      (show (list 'rawsock:getnameinfo 
+      (show (list 'rawsock:getnameinfo
                   (multiple-value-list
                    (rawsock:getnameinfo (rawsock:message-addr message1)))
                   (multiple-value-list
                    (rawsock:getnameinfo (rawsock:message-addr message2))))))
     ;; I get "(EFAULT): Bad address" on Linux 2.6.14-1.1637_FC4
-    ;; (when (fboundp 'rawsock:sockatmark) 
-    ;;   (show (list 'rawsock:sockatmark 
+    ;; (when (fboundp 'rawsock:sockatmark)
+    ;;   (show (list 'rawsock:sockatmark
     ;;               (rawsock:sockatmark *sock1*)
     ;;               (rawsock:sockatmark *sock2*))))
     (rawsock:sock-close *sock1*) (rawsock:sock-close *sock2*))
@@ -298,6 +351,30 @@ NIL
     (listp (show (rawsock:protocol) :pretty t))) T
 (or (not (fboundp 'rawsock:network))
     (listp (show (rawsock:network) :pretty t))) T
+(or (not (fboundp 'rawsock:if-name-index))
+    (listp (show (rawsock:if-name-index) :pretty t))) T
+
+(when (fboundp 'rawsock:if-name-index)
+  (dolist (i-n (rawsock:if-name-index))
+    (assert (= (rawsock:if-name-index (cdr i-n)) (car i-n)))
+    (assert (string= (rawsock:if-name-index (car i-n)) (cdr i-n)))))
+NIL
+
+(or (not (fboundp 'rawsock:ifaddrs))
+    (listp (show (rawsock:ifaddrs) :pretty t))) T
+(or (not (fboundp 'rawsock:ifaddrs))
+    (listp (show (rawsock:ifaddrs :flags-and '(:BROADCAST)) :pretty t))) T
+(or (not (fboundp 'rawsock:ifaddrs))
+    (flet ((drop-data (l)
+             (dolist (i l l)
+               (setf (rawsock:ifaddrs-data i) nil))))
+      (equalp (drop-data (rawsock:ifaddrs :flags-and '(:BROADCAST)))
+              (drop-data (rawsock:ifaddrs :flags-or '(:BROADCAST)))))) T
+(or (not (fboundp 'rawsock:ifaddrs))
+    (listp (show (rawsock:ifaddrs :flags-or '(:BROADCAST :MULTICAST)
+                                  :flags-and '(:UP :RUNNING)) :pretty t))) T
+(or (not (fboundp 'rawsock:ifaddrs))
+    (null (rawsock:ifaddrs :flags-and '(:LOOPBACK :BROADCAST)))) T
 
 (or (not (fboundp 'rawsock:getaddrinfo))
     (listp (show (rawsock:getaddrinfo :node "localhost") :pretty t))) T
@@ -313,7 +390,7 @@ NIL
 
 #+unix                          ; for Don Cohen
 (when (and (string-equal (posix:uname-sysname (posix:uname)) "linux")
-           (zerop (posix:getuid))) ; root?
+           (zerop (posix:uid))) ; root?
   (show (setq *sock* (rawsock:socket :INET :PACKET 3)))
   (show (setq *sa-local* (rawsock:make-sockaddr :PACKET)))
   (my-recvfrom *sock* *buffer* *sa-local*)
@@ -322,7 +399,7 @@ NIL
 
 #+unix           ; http://article.gmane.org/gmane.lisp.clisp.devel:14852
 (when (and (string-equal (posix:uname-sysname (posix:uname)) "linux")
-           (zerop (posix:getuid))) ; root?
+           (zerop (posix:uid))) ; root?
   (show (setq *sock* (rawsock:socket :INET :RAW :IPPROTO-ICMP)))
   (shell "ping -c 1 localhost") ; generate one icmp packet
   (show (setq *sa-local* (rawsock:make-sockaddr :PACKET 20)))
@@ -348,3 +425,13 @@ NIL
   (loop :for i :below 256 :do (assert (= (aref buf i) i)))
   len)
 256
+
+;; os:hostid sometimes appears to be a mangled IP address
+(and (fboundp 'os:hostid)
+     (let ((id (os:hostid)))
+       (listp (show (cons (if (< 32 (integer-length id))
+                              (rawsock:convert-address :inet6 id)
+                              (rawsock:convert-address :inet id))
+                          (os:hostent-addr-list
+                           (os:resolve-host-ipaddr :default)))))))
+T

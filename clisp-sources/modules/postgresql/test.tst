@@ -1,13 +1,29 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; tests for PostGreSQL
-;; clisp -K full -E 1:1 -q -norc -i ../tests/tests -x '(run-test "postgresql/test")'
+;; clisp -E 1:1 -q -norc -i ../tests/tests -x '(run-test "postgresql/test")'
+
+(list (require "postgresql")) (#-POSTGRESQL T #+POSTGRESQL NIL)
+(listp (show (multiple-value-list (ext:module-info "postgresql" t)) :pretty t)) T
 
 ;;; Based on the examples distributed with PostgreSQL (man libpq)
 
-;;; if you get "FATAL: database \"postgres\" does not exist":
+;;; == Troubleshooting:
+;;; ** if you get "could not connect to server:"
+;;; # service postgresql initdb
+;;; # service postgresql start
+;;; ** if you get "FATAL:  Ident authentication failed for user \"postgres\""
+;;; 1. edit /var/lib/pgsql/data/pg_hba.conf and make sure that METHOD for
+;;;    "local" is "trust"
+;;; 2. sudo -u postgres psql
+;;;    # alter user postgres set password 'postgres'
+;;; 3. service postgresql restart
+;;; ** if you get "FATAL: database \"postgres\" does not exist":
 ;;; $ createdb -U postgres postgres
 
+(defparameter *trace* (os:fopen "postgres.log" "w")) *trace*
+
 (sql:with-sql-connection (conn :name "template1" :log *standard-output*)
+  (sql:PQtrace conn *trace*)
   (sql:sql-transaction conn "BEGIN" sql:PGRES_COMMAND_OK)
   ;; fetch instances from the pg_database, the system catalog of databases
   (sql:sql-transaction
@@ -33,8 +49,12 @@
   (sql:sql-transaction conn "CLOSE mycursor" sql:PGRES_COMMAND_OK)
   ;; commit the transaction
   (sql:sql-transaction conn "COMMIT" sql:PGRES_COMMAND_OK)
+  (sql:PQuntrace conn)
   NIL)
 NIL
+
+(os:fclose *trace*) NIL
+(integerp (show (finish-file "postgres.log"))) T
 
 ;;;
 ;;; asynchronous notification interface
@@ -61,7 +81,7 @@ NIL
 ;;; test the binary cursor interface
 ;;;
 ;;; *** this is not supported by CLISP at the moment:
-;;; *** need to include geo_decls.h
+;;; *** need to include /usr/include/pgsql/server/utils/geo_decls.h
 ;;;
 ;;; populate a database by doing the following:
 ;;;

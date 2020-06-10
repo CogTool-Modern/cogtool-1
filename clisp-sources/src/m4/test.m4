@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 2005 Free Software Foundation, Inc.
+dnl Copyright (C) 2005-2006 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -15,7 +15,7 @@ AC_CACHE_CHECK(whether test -nt works, cl_cv_test_nt, [
 rm -f conftestfile1 conftestfile2
 touch conftestfile1
 # see makemake.in, rule "anymodule":
-if eval 'test -f conftestfile1 -a conftestfile1 -nt conftestfile2 2>/dev/null'
+if (test -f conftestfile1 -a conftestfile1 -nt conftestfile2) 1>&5 2>&5
 then cl_cv_test_nt=yes
 else cl_cv_test_nt=no
 fi

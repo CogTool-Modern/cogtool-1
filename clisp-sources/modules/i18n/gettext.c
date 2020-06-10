@@ -1,23 +1,16 @@
 /*
  * ======= General internationalization, for Lisp programs too =======
  * Copyright (C) 1990-2005 Bruno Haible
- * Copyright (C) 1998-2006 Sam Steingold
+ * Copyright (C) 1998-2008, 2010 Sam Steingold
  * GPL2
  */
-
-#if defined(_WIN32)
-/* get ASCII functions */
-# undef UNICODE
-#endif
 
 #include "clisp.h"
 #include "config.h"
 
 #include <string.h>             /* strncpy() */
 #include <locale.h>
-#if defined(HAVE_LANGINFO_H)
-# include <langinfo.h>
-#endif
+#include <langinfo.h>
 #include <limits.h>            /* for CHAR_MAX */
 
 #ifdef CLISP_UNICODE
@@ -30,8 +23,8 @@ DEFMODULE(i18n,"I18N")
 
 /* Returns the <locale.h> value corresponding to a LC_... constant. */
 DEFCHECKER(check_locale_category,prefix=LC,default=LC_MESSAGES, \
-           ALL COLLATE CTYPE MESSAGES MONETARY NUMERIC TIME \
-           PAPER NAME ADDRESS TELEPHONE MEASUREMENT IDENTIFICATION)
+           :ALL COLLATE CTYPE MESSAGES MONETARY NUMERIC TIME            \
+           PAPER :NAME ADDRESS TELEPHONE MEASUREMENT IDENTIFICATION)
 
 #ifdef GNU_GETTEXT
 
@@ -42,13 +35,13 @@ static inline object do_gettext (const char* msgid,
   if (msgid[0] == '\0') {
     translated_msg = "";  /* Don't return the catalog's header entry. */
   } else {
-    begin_system_call();
+    begin_blocking_system_call();
 #  ifdef CLISP_UNICODE
     if (domain != NULL)
       bind_textdomain_codeset(domain,"UTF-8");
 #  endif
     translated_msg = dcgettext(domain,msgid,category);
-    end_system_call();
+    end_blocking_system_call();
   }
   return asciz_to_string(translated_msg,Symbol_value(S(utf_8)));
 }
@@ -57,13 +50,13 @@ static inline object do_ngettext (const char* msgid, const char* msgid_plural,
                                   const char* domain, uint32 n, int category)
 {
   const char* translated_msg;
-  begin_system_call();
+  begin_blocking_system_call();
 # ifdef CLISP_UNICODE
   if (domain != NULL)
     bind_textdomain_codeset(domain,"UTF-8");
 # endif
   translated_msg = dcngettext(domain,msgid,msgid_plural,n,category);
-  end_system_call();
+  end_blocking_system_call();
   return asciz_to_string(translated_msg,Symbol_value(S(utf_8)));
 }
 
@@ -182,17 +175,18 @@ DEFUN(I18N:TEXTDOMAINDIR, domain)
 
 DEFUN(I18N:SET-TEXTDOMAINDIR, domain directory)
 { /* sets the message catalog directory for the given domain. */
-  object domain = (STACK_1=check_string(STACK_1));
+  STACK_1 = check_string(STACK_1);
  #ifdef GNU_GETTEXT
-  /* Check and use default directory, because the bindtextdomain()
-     documentation recommends that the argument be an absolute pathname,
-     to protect against later chdir() calls. */
-  object directory = pathname_to_OSdir(STACK_0,true);
-  with_string_0(STACK_1/*domain*/,Symbol_value(S(ascii)),domain_asciz, {
-    begin_system_call();
-    bindtextdomain(domain_asciz,TheAsciz(directory));
-    end_system_call();
-  });
+  { /* Check and use default directory, because the bindtextdomain()
+       documentation recommends that the argument be an absolute pathname,
+       to protect against later chdir() calls. */
+    object directory = pathname_to_OSdir(STACK_0,true);
+    with_string_0(STACK_1/*domain*/,Symbol_value(S(ascii)),domain_asciz, {
+        begin_system_call();
+        bindtextdomain(domain_asciz,TheAsciz(directory));
+        end_system_call();
+      });
+  }
  #endif
   VALUES1(STACK_0);
   skipSTACK(2);
@@ -200,7 +194,6 @@ DEFUN(I18N:SET-TEXTDOMAINDIR, domain directory)
 
 
 /* ======================== locale ======================== */
-
 DEFUN(I18N:SET-LOCALE, &optional category locale)
 { /* call setlocale(3) */
   gcv_object_t *category = &STACK_1;
@@ -214,7 +207,7 @@ DEFUN(I18N:SET-LOCALE, &optional category locale)
         res = setlocale(check_locale_category_map.table[pos].c_const,NULL);
         end_system_call();
         pushSTACK(*check_locale_category_map.table[pos].l_const);
-        pushSTACK(res ? asciz_to_string(res,GLO(misc_encoding)) : NIL);
+        pushSTACK(safe_to_string(res));
       }
     } else {
       *locale = check_string(*locale);
@@ -224,7 +217,7 @@ DEFUN(I18N:SET-LOCALE, &optional category locale)
             res = setlocale(check_locale_category_map.table[pos].c_const,loc_z);
             end_system_call();
             pushSTACK(*check_locale_category_map.table[pos].l_const);
-            pushSTACK(res ? asciz_to_string(res,GLO(misc_encoding)) : NIL);
+            pushSTACK(safe_to_string(res));
           }
         });
     }
@@ -243,7 +236,7 @@ DEFUN(I18N:SET-LOCALE, &optional category locale)
           end_system_call();
         });
     }
-    VALUES1(res ? asciz_to_string(res,GLO(misc_encoding)) : NIL);
+    VALUES1(safe_to_string(res));
   }
   skipSTACK(2);
 }
@@ -253,20 +246,23 @@ DEFUN(I18N:SET-LOCALE, &optional category locale)
  res is a malloc'ed area of size res_size
  it may be increased as a result of calling this function */
 # define GET_LOCALE_INFO_BUF_SIZE 256
-static void get_locale_info (int what, char**res, int *res_size) {
+static int get_locale_info (int what, char**res, int *res_size, int errorp) {
   int val;
   begin_system_call();
   val = GetLocaleInfo(LOCALE_SYSTEM_DEFAULT,what,*res,*res_size);
   end_system_call();
-  if (val == 0) OS_error();
+  if (val == 0)
+    if (errorp) OS_error();
+    else return 1;
   if (val > *res_size) {
-    *res = (char*)my_realloc(*res,val);
+    *res = (char*)clisp_realloc(*res,val);
     if (*res == NULL) OS_error();
     *res_size = val;
     begin_system_call();
     GetLocaleInfo(LOCALE_SYSTEM_DEFAULT,what,*res,*res_size);
     end_system_call();
   }
+  return 0;
 }
 #endif
 
@@ -360,7 +356,7 @@ static void thousands_sep_to_STACK (int what, char** gres, int* res_size) {
   /* "1;2;3" ==> #(1 2 3) */
   int start = 0, end = 0, count = 0, limit;
   char *res;
-  get_locale_info(what,gres,res_size);
+  get_locale_info(what,gres,res_size,1);
   res = *gres; limit = *res_size;
   while (res[end] && (end < limit)) {
     while (res[end] && (res[end] != ';') && (end < limit)) end++;
@@ -371,21 +367,21 @@ static void thousands_sep_to_STACK (int what, char** gres, int* res_size) {
   value1 = vectorof(count); pushSTACK(value1);
 }
 static void locale_string_to_STACK (int what, char**res, int* res_size) {
-  get_locale_info(what,res,res_size);
+  get_locale_info(what,res,res_size,1);
   pushSTACK(asciz_to_string(*res,GLO(misc_encoding)));
 }
 static void locale_int_to_STACK (int what, char**res, int* res_size) {
-  get_locale_info(what,res,res_size);
+  get_locale_info(what,res,res_size,1);
   pushSTACK(fixnum(my_atoi(*res)));
 }
 static void locale_bool_to_STACK (int what, char**res, int* res_size) {
-  get_locale_info(what,res,res_size);
+  get_locale_info(what,res,res_size,1);
   pushSTACK(my_atoi(*res) ? T : NIL);
 }
 DEFUN(I18N:LOCALE-CONV,)
 { /* call GetLocaleInfo(3) */
   int res_size = GET_LOCALE_INFO_BUF_SIZE;
-  char *res = my_malloc(res_size);
+  char *res = clisp_malloc(res_size);
   locale_string_to_STACK(LOCALE_SDECIMAL,&res,&res_size);
   locale_string_to_STACK(LOCALE_STHOUSAND,&res,&res_size);
   thousands_sep_to_STACK(LOCALE_SGROUPING,&res,&res_size);
@@ -415,7 +411,6 @@ DEFUN(I18N:LOCALE-CONV,)
 }
 #endif
 
-#if defined(HAVE_NL_LANGINFO) || defined(WIN32_NATIVE)
 DEFCHECKER(check_nl_item,CODESET                                        \
            D_T_FMT D_FMT T_FMT T_FMT_AMPM AM_STR PM_STR                 \
            DAY_1 DAY_2 DAY_3 DAY_4 DAY_5 DAY_6 DAY_7                    \
@@ -471,17 +466,18 @@ DEFCHECKER(check_nl_item,CODESET                                        \
            LOCALE_SNEGATIVESIGN LOCALE_SPOSITIVESIGN                    \
            LOCALE_SSHORTDATE LOCALE_SSORTNAME LOCALE_STHOUSAND          \
            LOCALE_STIME LOCALE_STIMEFORMAT LOCALE_SYEARMONTH)
-#if defined(HAVE_NL_LANGINFO)
-# define get_lang_info(what)                                            \
-  begin_system_call(); res = nl_langinfo(what); end_system_call()
-# define res_to_obj() (res ? asciz_to_string(res,GLO(misc_encoding)) : NIL)
+#if defined(WIN32_NATIVE)
+# define get_lang_info(what,errorp)                                     \
+  if (get_locale_info(what,&res,&res_size,errorp)) funcall(`OS::ERRNO`,0); \
+  else VALUES1(asciz_to_string(res,GLO(misc_encoding)))
+# define DECLARE_RES  int res_size=GET_LOCALE_INFO_BUF_SIZE; char *res=(char*)clisp_malloc(res_size)
+# define FINISH_RES   begin_system_call(); free(res); end_system_call()
+#else
+# define get_lang_info(what,errorp)                                     \
+  begin_system_call(); res = nl_langinfo(what); end_system_call();      \
+  VALUES1(safe_to_string(res))
 # define DECLARE_RES  char* res
 # define FINISH_RES
-#elif defined(WIN32_NATIVE)
-# define get_lang_info(what)  get_locale_info(what,&res,&res_size)
-# define res_to_obj() (asciz_to_string(res,GLO(misc_encoding)))
-# define DECLARE_RES  int res_size=GET_LOCALE_INFO_BUF_SIZE; char *res=(char*)my_malloc(res_size)
-# define FINISH_RES   begin_system_call(); free(res); end_system_call()
 #endif
 DEFUNR(I18N:LANGUAGE-INFORMATION,&optional item)
 { /* call nl_langinfo(3) or GetLocaleInfo() */
@@ -490,18 +486,16 @@ DEFUNR(I18N:LANGUAGE-INFORMATION,&optional item)
     int pos = 0;
     DECLARE_RES;
     for (; pos < check_nl_item_map.size; pos++) {
-      get_lang_info(check_nl_item_map.table[pos].c_const);
       pushSTACK(*check_nl_item_map.table[pos].l_const);
-      pushSTACK(res_to_obj());
+      get_lang_info(check_nl_item_map.table[pos].c_const,0);
+      pushSTACK(value1);
     }
     FINISH_RES;
     VALUES1(listof(2*check_nl_item_map.size));
   } else {
     int item = check_nl_item(what);
     DECLARE_RES;
-    get_lang_info(item);
-    VALUES1(res_to_obj());
+    get_lang_info(item,1);
     FINISH_RES;
   }
 }
-#endif

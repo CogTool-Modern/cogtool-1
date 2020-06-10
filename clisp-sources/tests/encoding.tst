@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 ;;(with-open-file (f "ucs" :direction :output #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede :element-type '(unsigned-byte 8))
 ;;  (write-byte-sequence #(0 65 0) f))
@@ -104,6 +104,28 @@ ERROR
   (ext:convert-string-from-bytes vec charset:utf-8))
 "Hello"
 
+(mapcar (lambda (s) (ext:convert-string-to-bytes
+                     (string (code-char s)) charset:utf-8))
+        '(#x80 #x07ff #x800 #xfffd #x10ffff))
+;;(#(C2 80) #(DF BF) #(E0 A0 80) #(EF BF BD) #(F4 8F BF BF))
+(#(194 128) #(223 191) #(224 160 128) #(239 191 189) #(244 143 191 191))
+
+(loop for i below #xD800 ; avoid surrogate code points
+      as c = (code-char i)
+      as s = (ext:convert-string-to-bytes (string c) charset:utf-8)
+      as lp = 1 then l
+      as l = (length s)
+      always (<= 1 lp l 4))
+T
+
+(loop for i from #xE000 below char-code-limit
+      as c = (code-char i)
+      as s = (ext:convert-string-to-bytes (string c) charset:utf-8)
+      as lp = 3 then l
+      as l = (length s)
+      always (<= 3 lp l 4))
+T
+
 (list (sys::charset-range charset:base64 #\+ #\+ 2)
       (sys::charset-range charset:base64 #\+ #\/ 10)
       (sys::charset-range charset:base64 #\A #\Z 2)
@@ -159,7 +181,7 @@ NIL
 T
 
 ;; http://clisp.cons.org/impnotes/clhs-newline.html
-(let ((file "foo"))
+(let ((file "encoding-tst"))
   (unwind-protect
        (progn
          (with-open-file (out file :direction :output
@@ -178,3 +200,37 @@ T
                  (read-line in nil :eof))))
     (delete-file file)))
 ("foo" "bar" :EOF)
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1564818&group_id=1355&atid=101355
+(let* ((f "encoding-tst-crlf-test-file")
+       (l1 "line1") (l2 "line2") (all (list f l1 l2)))
+  (unwind-protect
+       (loop :for s :being :each :external-symbol :in "CHARSET"
+         :for e-dos = (ext:make-encoding :charset s :line-terminator :dos)
+         :for e-unix = (ext:make-encoding :charset s :line-terminator :unix)
+         :for e-mac = (ext:make-encoding :charset s :line-terminator :mac)
+         :when (ignore-errors
+                 (with-open-file (o f :direction :output :external-format e-dos)
+                   (write-line f o)
+                   (setf (stream-external-format o) e-mac)
+                   (write-line l1 o)
+                   (setf (stream-external-format o) e-unix)
+                   (write-line l2 o)))
+         :nconc
+         (loop :for b :in '(nil t) :nconc
+           (with-open-file (i f :direction :input :external-format e-dos
+                              :buffered b)
+             (dolist (ll all)
+               (handler-case (let ((l (read-line i)))
+                               (if (string= ll l) ()
+                                   (list (list s b 'read-line ll l))))
+                 (error (c)
+                   (list (list s b 'read-line ll (princ-to-string c))))))
+             (handler-case (let ((c (read-char i nil nil)))
+                             (and c (list (list s b 'read-char c))))
+               (error (c) (list (list s b 'read-char (princ-to-string c))))))))
+    (delete-file f)))
+()
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1632718&group_id=1355&atid=101355
+(convert-string-from-bytes #(195) charset:utf-8) ERROR

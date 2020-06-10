@@ -1,6 +1,6 @@
 ;; Module for wildcard matching in CLISP
 ;; Bruno Haible 18.4.1995
-;; Sam Steingold 2001-2005
+;; Sam Steingold 2001-2008
 
 (defpackage "WILDCARD"
   (:modern t)
@@ -9,12 +9,12 @@
 (in-package "WILDCARD")
 (pushnew "WILDCARD" custom:*system-package-list* :test #'string=)
 (pushnew :wildcard *features*)
+(provide "wildcard")
 (setf (documentation (find-package "WILDCARD") 'sys::impnotes) "wildcard")
 
 (default-foreign-language :stdc)
 
-(c-lines "#include <config.h>~%")
-(c-lines "#include <fnmatch.h>~%")
+(c-lines "#include \"config.h\"~%#include \"fnmatch.h\"~%")
 
 (def-call-out fnmatch
     (:arguments (pattern c-string)

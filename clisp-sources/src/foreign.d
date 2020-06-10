@@ -1,7 +1,7 @@
 /* Foreign language interface for CLISP
  * Marcus Daniels 8.4.1994
  * Bruno Haible 1995-2005
- * Sam Steingold 2000-2005
+ * Sam Steingold 2000-2009
  */
 
 #include "lispbibl.c"
@@ -10,14 +10,26 @@
 
 #ifdef DYNAMIC_FFI
 
-#include "avcall.h"        /* Low level support for call-out */
-#include "callback.h"      /* Low level support for call-in */
+BEGIN_DECLS
+#include <avcall.h>        /* Low level support for call-out */
+#include <callback.h>      /* Low level support for call-in */
+END_DECLS
 
 /* complain about non-foreign object */
-nonreturning_function(local, fehler_foreign_object, (object arg)) {
+nonreturning_function(local, error_foreign_object, (object arg)) {
   pushSTACK(arg); pushSTACK(TheSubr(subr_self)->name);
-  fehler(error,GETTEXT("~S: argument is not a foreign object: ~S"));
+  error(error_condition,GETTEXT("~S: argument is not a foreign object: ~S"));
 }
+
+/* foreign address vs foreign pointer
+ - foreign pointers are available even when FFI is not
+   (used by berkeley-db and new-clx modules)
+ - foreign addresses can share the base which enables controlling validity
+   of resources (see impnotes.html#ex-dffi-validity)
+
+ Historically, the heavy weight foreign address objects come from Amiga:
+ A library entry point is a known (negative) offset towards the library
+ base pointer -- much like today's COM objects or vtables. */
 
 /* Allocate a foreign address.
  make_faddress(base,offset)
@@ -25,7 +37,7 @@ nonreturning_function(local, fehler_foreign_object, (object arg)) {
  > offset: offset relative to the base address
  < result: Lisp object
  can trigger GC */
-local maygc object make_faddress (object base, uintP offset)
+modexp maygc object make_faddress (object base, uintP offset)
 {
   pushSTACK(base);
   var object result = allocate_faddress();
@@ -47,7 +59,8 @@ local /*maygc*/ object foreign_address (object obj, bool allocate_p)
         pushSTACK(S(foreign_function));
         pushSTACK(S(foreign_address));
         pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-        fehler(error,GETTEXT("~S: argument ~S should be a ~S, ~S or ~S"));
+        error(error_condition,
+              GETTEXT("~S: argument ~S should be a ~S, ~S or ~S"));
       case Rectype_Faddress:
         return obj;
       case Rectype_Fvariable:
@@ -56,7 +69,7 @@ local /*maygc*/ object foreign_address (object obj, bool allocate_p)
         return TheFfunction(obj)->ff_address;
     }
   }
-  fehler_foreign_object(obj);
+  error_foreign_object(obj);
 }
 
 /* return the foreign pointer of the foreign object
@@ -84,7 +97,7 @@ local object foreign_pointer (object obj)
 local object foreign_pointer_strict (object obj)
 {
   var object fp = foreign_pointer(obj);
-  if (eq(fp,nullobj)) fehler_foreign_object(obj);
+  if (eq(fp,nullobj)) error_foreign_object(obj);
   return fp;
 }
 
@@ -100,19 +113,18 @@ LISPFUNN(set_validp,2)
   var object arg = popSTACK();
   var object fp = foreign_pointer(arg);
   if (eq(fp,nullobj)) /* permit new_value=true ? */
-    fehler_foreign_object(arg);
+    error_foreign_object(arg);
   if (fp_validp(TheFpointer(fp))) {
     if (!new_value) {
       if (eq(fp,O(fp_zero))) {
         pushSTACK(TheSubr(subr_self)->name);
-        fehler(error,
-               GETTEXT("~S: must not invalidate the sole FFI session pointer"));
+        error(error_condition,GETTEXT("~S: must not invalidate the sole FFI session pointer"));
       }
       mark_fp_invalid(TheFpointer(fp));
     }
   } else if (new_value) {
     pushSTACK(fp); pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: cannot resurrect the zombie ~S"));
+    error(error_condition,GETTEXT("~S: cannot resurrect the zombie ~S"));
   }
   VALUES_IF(new_value);
 }
@@ -147,7 +159,7 @@ LISPFUNN(set_foreign_pointer,2)
 /* (FFI:UNSIGNED-FOREIGN-ADDRESS integer)
  makes a FOREIGN-ADDRESS object out of an unsigned integer */
 LISPFUNNR(unsigned_foreign_address,1) {
-  VALUES1(make_faddress(O(fp_zero),I_to_UL(popSTACK())));
+  VALUES1(make_faddress(O(fp_zero),I_to_ulong(popSTACK())));
 }
 
 /* (FFI:FOREIGN-ADDRESS-UNSIGNED foreign-address)
@@ -158,9 +170,9 @@ LISPFUNNR(foreign_address_unsigned,1) {
   if (fvariablep(arg)) arg = TheFvariable(arg)->fv_address;
   else if (ffunctionp(arg)) arg = TheFfunction(arg)->ff_address;
   /* address --> integer */
-  if (faddressp(arg)) value1 = UL_to_I((uintP)Faddress_value(arg));
-  else if (fpointerp(arg)) value1 = UL_to_I((uintP)Fpointer_value(arg));
-  else fehler_foreign_object(arg);
+  if (faddressp(arg)) value1 = ulong_to_I((uintP)Faddress_value(arg));
+  else if (fpointerp(arg)) value1 = ulong_to_I((uintP)Fpointer_value(arg));
+  else error_foreign_object(arg);
   mv_count = 1;
 }
 
@@ -177,10 +189,8 @@ LISPFUNNR(foreign_address,1)
  > flags: fv_readonly for read-only variables
  > size: its size in bytes
  can trigger GC */
-global maygc void register_foreign_variable (void* address,
-                                             const char * name_asciz,
-                                             uintBWL flags, uintL size)
-{
+modexp maygc void register_foreign_variable
+(void* address, const char * name_asciz, uintBWL flags, uintL size) {
   var object name = asciz_to_string(name_asciz,O(internal_encoding));
   var object obj = gethash(name,O(foreign_variable_table),false);
   if (!eq(obj,nullobj)) {
@@ -188,7 +198,7 @@ global maygc void register_foreign_variable (void* address,
     obj = TheFaddress(obj)->fa_base;
     if (fp_validp(TheFpointer(obj))) {
       pushSTACK(name);
-      fehler(error,GETTEXT("Foreign variable ~S already exists"));
+      error(error_condition,GETTEXT("Foreign variable ~S already exists"));
     } else {
       /* Variable already existed in a previous Lisp session.
          Update the address, and make it and any of its subvariables valid. */
@@ -213,10 +223,8 @@ global maygc void register_foreign_variable (void* address,
  > name: its name
  > flags: its language and parameter passing convention
  can trigger GC */
-global maygc void register_foreign_function (void* address,
-                                             const char * name_asciz,
-                                             uintWL flags)
-{
+modexp maygc void register_foreign_function
+(void* address, const char * name_asciz, uintWL flags) {
   var object name = asciz_to_string(name_asciz,O(internal_encoding));
   var object obj = gethash(name,O(foreign_function_table),false);
   if (!eq(obj,nullobj)) {
@@ -224,7 +232,7 @@ global maygc void register_foreign_function (void* address,
     obj = TheFaddress(obj)->fa_base;
     if (fp_validp(TheFpointer(obj))) {
       pushSTACK(name);
-      fehler(error,GETTEXT("Foreign function ~S already exists"));
+      error(error_condition,GETTEXT("Foreign function ~S already exists"));
     } else {
       /* Function already existed in a previous Lisp session.
          Update the address, and make it valid. */
@@ -242,6 +250,44 @@ global maygc void register_foreign_function (void* address,
   }
 }
 
+/* determine the integer type that corresponds to the given type */
+local object parse_foreign_inttype (uintL size, bool signed_p) {
+  switch (size) {
+    case 1: return signed_p ? S(sint8) : S(uint8);
+    case 2: return signed_p ? S(sint16) : S(uint16);
+    case 4: return signed_p ? S(sint32) : S(uint32);
+    case 8: return signed_p ? S(sint64) : S(uint64);
+  }
+  pushSTACK(fixnum(size));
+  error(error_condition,GETTEXT("No foreign int type of size ~S"));
+}
+
+/* Registers a foreign type.
+ register_foreign_type (const char * name_asciz, uintL size, uintL alignment)
+ > name_asciz: C type name
+ > size : sizeof(name_asciz)
+ > alignment : alignof(name_asciz)
+ can trigger GC */
+modexp maygc void register_foreign_inttype
+(const char * name_asciz, uintL size, bool signed_p) {
+  object name = asciz_to_string(name_asciz,O(internal_encoding));
+  object obj = gethash(name,O(foreign_inttype_table),false);
+  object inttype = parse_foreign_inttype(size, signed_p);
+  if (!eq(obj,nullobj)) {
+    if (!eq(inttype,obj)) {
+      pushSTACK(inttype); pushSTACK(obj); pushSTACK(name);
+      error(error_condition,GETTEXT("Cannot redefine foreign type ~S from ~S to ~S"));
+    }
+  } else shifthash(O(foreign_inttype_table),name,inttype,true);
+}
+
+LISPFUNNF(parse_foreign_inttype,1) { /* "size_t" --> FFI:UINT64 */
+  object inttype = gethash(STACK_0,O(foreign_inttype_table),false);
+  if (eq(inttype,nullobj))
+    error(error_condition,GETTEXT("No foreign int type named ~S"));
+  VALUES1(inttype);
+  skipSTACK(1);
+}
 
 /* A foreign value descriptor describes an item of foreign data.
  <c-type> ::=
@@ -265,28 +311,44 @@ global maygc void register_foreign_function (void* address,
 #define C_UNION_C_TYPE_START   (C_UNION_ALT+1)
 
 /* Error message. */
-nonreturning_function(local, fehler_foreign_type, (object fvd)) {
+nonreturning_function(local, error_foreign_type, (object fvd)) {
   dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T */
-  pushSTACK(fvd);
-  fehler(error,GETTEXT("illegal foreign data type ~S"));
+  pushSTACK(fvd); pushSTACK(TheSubr(subr_self)->name);
+  error(error_condition,GETTEXT("~S: illegal foreign data type ~S"));
 }
 
 /* Error message. */
-nonreturning_function(local, fehler_convert, (object fvd, object obj)) {
+nonreturning_function(local, error_convert, (object fvd, object obj)) {
   dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T */
-  pushSTACK(fvd);
-  pushSTACK(obj);
-  fehler(error,GETTEXT("~S cannot be converted to the foreign type ~S"));
+  pushSTACK(fvd); pushSTACK(obj);
+  pushSTACK(TheSubr(subr_self)->name);
+  error(error_condition,GETTEXT("~S: ~S cannot be converted to the foreign type ~S"));
 }
 
-#if !defined(HAVE_LONGLONG)
+#if !defined(HAVE_LONG_LONG_INT)
 /* Error message. */
-nonreturning_function(local, fehler_64bit, (object fvd)) {
+nonreturning_function(local, error_64bit, (object fvd)) {
   dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T */
-  pushSTACK(fvd);
-  fehler(error,GETTEXT("64 bit integers are not supported on this platform and with this C compiler: ~S"));
+  pushSTACK(fvd); pushSTACK(TheSubr(subr_self)->name);
+  error(error_condition,GETTEXT("~S: 64 bit integers are not supported on this platform and with this C compiler: ~S"));
 }
 #endif
+
+/* check that fvd is a valid foreign function type specification
+ can trigger GC */
+local maygc object check_foreign_function_type (object fvd) {
+  while (!(simple_vector_p(fvd)
+           && (Svector_length(fvd) == 4)
+           && eq(TheSvector(fvd)->data[0],S(c_function))
+           && simple_vector_p(TheSvector(fvd)->data[2]))) {
+    dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T */
+    pushSTACK(NIL);                  /* no PLACE */
+    pushSTACK(fvd); pushSTACK(TheSubr(subr_self)->name);
+    check_value(error_condition,GETTEXT("~S: illegal foreign function type ~S"));
+    fvd = value1;
+  }
+  return fvd;
+}
 
 /* Comparison of two fvd's.
  According to the ANSI C rules, two "c-struct"s are only equivalent if they
@@ -412,7 +474,7 @@ local void check_cc_match (object fun, object resulttype,
         && equal_argfvds(argtypes,TheFfunction(fun)->ff_argtypes)
         && eq(flags,TheFfunction(fun)->ff_flags))) {
     pushSTACK(fun);
-    fehler(error,GETTEXT("~S cannot be converted to a foreign function with another calling convention."));
+    error(error_condition,GETTEXT("~S cannot be converted to a foreign function with another calling convention."));
   }
 }
 
@@ -478,11 +540,11 @@ local maygc object convert_function_to_foreign (object fun, object resulttype,
       var object dv = TheIarray(O(foreign_callin_vector))->data;
       TheSvector(dv)->data[0] = TheSvector(dv)->data[3*f_index];
     } else { /* free list exhausted */
-      var uintC i;
-      dotimesC(i,3, {
+      var uintC i = 3;
+      while (i--) {
         pushSTACK(NIL); pushSTACK(O(foreign_callin_vector));
         funcall(L(vector_push_extend),2);
-      });
+      }
       f_index = floor(vector_length(O(foreign_callin_vector)),3);
     }
     { /* Next allocate the trampoline. */
@@ -500,7 +562,7 @@ local maygc object convert_function_to_foreign (object fun, object resulttype,
       TheFfunction(obj)->ff_flags = STACK_0;
       STACK_3 = obj;
     }
-    pushSTACK(fixnum(f_index)); funcall(L(liststern),4); pushSTACK(value1);
+    pushSTACK(fixnum(f_index)); funcall(L(liststar),4); pushSTACK(value1);
     /* Stack layout: fun, obj, acons. */
     { /* Put it into the hash table. */
       var object new_cons = allocate_cons();
@@ -603,11 +665,13 @@ local object convert_function_from_foreign (void* address, object resulttype,
 /* ensure that the Faddress is valid
  < fa: foreign address
  can trigger GC */
-local inline maygc void validate_fpointer (object obj);
+local inline maygc object validate_fpointer (object obj);
 global maygc object check_faddress_valid (object fa) {
   object fp = TheFaddress(fa)->fa_base;
   if (!fp_validp(TheFpointer(fp))) {
-    pushSTACK(fa); validate_fpointer(fp); fa=popSTACK();
+    pushSTACK(fa);              /* save */
+    check_fpointer(validate_fpointer(fp),false);
+    fa = popSTACK();            /* restore */
   }
   return fa;
 }
@@ -615,6 +679,7 @@ global maygc object check_faddress_valid (object fa) {
 /* (FFI:FOREIGN-FUNCTION address c-type &key name) constructor */
 LISPFUN(foreign_function,seclass_read,2,0,norest,key,1,(kw(name)) )
 {
+  STACK_1 = check_foreign_function_type(STACK_1);
  foreign_function_restart:
   var object fa = STACK_2;
   if (ffunctionp(fa)) {
@@ -636,29 +701,26 @@ LISPFUN(foreign_function,seclass_read,2,0,norest,key,1,(kw(name)) )
   }
   fa = check_faddress_valid(fa);
   var object fvd = STACK_1;
-  if (simple_vector_p(fvd)
-      && eq(TheSvector(fvd)->data[0],S(c_function))
-      && (4 == Svector_length(fvd))) {
-    var object ff =
-      convert_function_from_foreign(Faddress_value(fa),
-                                    TheSvector(fvd)->data[1],
-                                    TheSvector(fvd)->data[2],
-                                    TheSvector(fvd)->data[3]);
-    /* TODO need to visit callback interaction */
-    if (nullp(TheFfunction(ff)->ff_name) && !missingp(STACK_0)) {
-      pushSTACK(ff);
-      STACK_1 = coerce_ss(STACK_1);
-      ff = popSTACK();
-      TheFfunction(ff)->ff_name = STACK_0;
-    }
-    VALUES1(ff); skipSTACK(3);
+  var object ff = convert_function_from_foreign(Faddress_value(fa),
+                                                TheSvector(fvd)->data[1],
+                                                TheSvector(fvd)->data[2],
+                                                TheSvector(fvd)->data[3]);
+  /* TODO need to visit callback interaction */
+  if (nullp(TheFfunction(ff)->ff_name) && !missingp(STACK_0)) {
+    pushSTACK(ff);
+    STACK_1 = coerce_ss(STACK_1);
+    ff = popSTACK();
+    TheFfunction(ff)->ff_name = STACK_0;
   }
-  else fehler_foreign_type(fvd);
+  VALUES1(ff); skipSTACK(3);
 }
 
 
-#if (long_bitsize<64)
-  /* 64-bit integers are passed as structs. */
+#if (long_bitsize<64) && !defined(HAVE_LONG_LONG_INT)
+  /* use long long type with ffcall when possible, otherwise pass
+     64-bit integers as structs.  Note that long long is incompatible
+     with struct passing/returning with gcc/i386/Linux, whereas struct
+     passing was tested compatible with MSVC6' __int64 type. */
   #if BIG_ENDIAN_P
     typedef struct { uint32 hi; uint32 lo; } struct_uint64;
     typedef struct { sint32 hi; uint32 lo; } struct_sint64;
@@ -725,25 +787,23 @@ local void foreign_layout (object fvd, struct foreign_layout *data)
       data->size = sizeof(uint32); data->alignment = alignof(uint32);
       data->splittable = true; return;
     } else if (eq(fvd,S(sint64))) {
-     #ifdef HAVE_LONGLONG
-      data->size = sizeof(sint64); data->alignment = alignof(sint64);
-      data->splittable = (long_bitsize<64 ? av_word_splittable_2(uint32,uint32)
-                         : av_word_splittable_1(uint64)); /* always true */
-     #else
+     #if (long_bitsize<64) && !defined(HAVE_LONG_LONG_INT)
       data->size = sizeof(struct_sint64);
       data->alignment = alignof(struct_sint64);
-      data->splittable = av_word_splittable_2(uint32,uint32); /* always true */
+      data->splittable = av_word_splittable_2(sint32,sint32); /* always true */
+     #else
+      data->size = sizeof(sint64); data->alignment = alignof(sint64);
+      data->splittable = av_word_splittable_1(sint64); /* always true */
      #endif
       return;
     } else if (eq(fvd,S(uint64))) {
-     #ifdef HAVE_LONGLONG
-      data->size = sizeof(uint64); data->alignment = alignof(uint64);
-      data->splittable = (long_bitsize<64 ? av_word_splittable_2(uint32,uint32)
-                         : av_word_splittable_1(uint64)); /* always true */
-     #else
+     #if (long_bitsize<64) && !defined(HAVE_LONG_LONG_INT)
       data->size = sizeof(struct_uint64);
       data->alignment = alignof(struct_uint64);
       data->splittable = av_word_splittable_2(uint32,uint32); /* always true */
+     #else
+      data->size = sizeof(uint64); data->alignment = alignof(uint64);
+      data->splittable = av_word_splittable_1(uint64); /* always true */
      #endif
       return;
     } else if (eq(fvd,S(int))) {
@@ -828,7 +888,7 @@ local void foreign_layout (object fvd, struct foreign_layout *data)
         for (i = 2; i < fvdlen; i++) {
           var object dim = TheSvector(fvd)->data[i];
           if (!uint32_p(dim))
-            fehler_foreign_type(fvd);
+            error_foreign_type(fvd);
           data->size = data->size * I_to_uint32(dim);
         }
         data->splittable = (data->size <= sizeof(long));
@@ -843,8 +903,14 @@ local void foreign_layout (object fvd, struct foreign_layout *data)
         data->splittable = true; return;
       }
     }
+  } else {
+    object inttype = gethash(fvd,O(foreign_inttype_table),false);
+    if (!eq(inttype,nullobj)) {
+      foreign_layout(inttype,data);
+      return;
+    }
   }
-  fehler_foreign_type(fvd);
+  error_foreign_type(fvd);
 }
 
 /* compute the size of the foreign data
@@ -961,7 +1027,7 @@ local object convert_from_foreign_array_fill (object eltype, uintL size,
   if (eq(eltype,S(character))) {
     if (size > 0) {
       var const uintB* ptr1 = (const uintB*)data;
-     #ifdef UNICODE
+     #ifdef ENABLE_UNICODE
       pushSTACK(array);
       var object encoding = O(foreign_8bit_encoding);
       ASSERT(Encoding_mblen(encoding)(encoding,ptr1,ptr1+size) == size);
@@ -976,14 +1042,14 @@ local object convert_from_foreign_array_fill (object eltype, uintL size,
       sstring_un_realloc(array);
      #else
       var chart* ptr2 = &TheSnstring(array)->data[0];
-      dotimespL(size,size, { *ptr2++ = as_chart(*ptr1++); } );
+      do { *ptr2++ = as_chart(*ptr1++); } while(--size);
      #endif
     }
   } else if (eq(eltype,S(uint8))) {
     if (size > 0) {
       var const uint8* ptr1 = (const uint8*)data;
       var uint8* ptr2 = (uint8*)&TheSbvector(array)->data[0];
-      dotimespL(size,size, { *ptr2++ = *ptr1++; } );
+      do { *ptr2++ = *ptr1++; } while(--size);
     }
   }
  #if 0
@@ -991,7 +1057,7 @@ local object convert_from_foreign_array_fill (object eltype, uintL size,
     if (size > 0) {
       var const sint8* ptr1 = (const sint8*)data;
       var sint8* ptr2 = (sint8*)&TheSbvector(array)->data[0];
-      dotimespL(size,size, { *ptr2++ = *ptr1++; } );
+      do { *ptr2++ = *ptr1++; } while(--size);
     }
   }
  #endif
@@ -999,7 +1065,7 @@ local object convert_from_foreign_array_fill (object eltype, uintL size,
     if (size > 0) {
       var const uint16* ptr1 = (const uint16*)data;
       var uint16* ptr2 = (uint16*)&TheSbvector(array)->data[0];
-      dotimespL(size,size, { *ptr2++ = *ptr1++; } );
+      do { *ptr2++ = *ptr1++; } while(--size);
     }
   }
  #if 0
@@ -1007,7 +1073,7 @@ local object convert_from_foreign_array_fill (object eltype, uintL size,
     if (size > 0) {
       var const sint16* ptr1 = (const sint16*)data;
       var sint16* ptr2 = (sint16*)&TheSbvector(array)->data[0];
-      dotimespL(size,size, { *ptr2++ = *ptr1++; } );
+      do { *ptr2++ = *ptr1++; } while(--size);
     }
   }
  #endif
@@ -1015,7 +1081,7 @@ local object convert_from_foreign_array_fill (object eltype, uintL size,
     if (size > 0) {
       var const uint32* ptr1 = (const uint32*)data;
       var uint32* ptr2 = (uint32*)&TheSbvector(array)->data[0];
-      dotimespL(size,size, { *ptr2++ = *ptr1++; } );
+      do { *ptr2++ = *ptr1++; } while(--size);
     }
   }
  #if 0
@@ -1023,7 +1089,7 @@ local object convert_from_foreign_array_fill (object eltype, uintL size,
     if (size > 0) {
       var const sint32* ptr1 = (const sint32*)data;
       var sint32* ptr2 = (sint32*)&TheSbvector(array)->data[0];
-      dotimespL(size,size, { *ptr2++ = *ptr1++; } );
+      do { *ptr2++ = *ptr1++; } while(--size);
     }
   }
  #endif
@@ -1032,18 +1098,22 @@ local object convert_from_foreign_array_fill (object eltype, uintL size,
   return array;
 }
 /* Error message */
-nonreturning_function (local, fehler_eltype_zero_size, (object fvd)) {
+nonreturning_function (local, error_eltype_zero_size, (object fvd)) {
   pushSTACK(fvd);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(error,GETTEXT("~S: element type has size 0: ~S"));
+  error(error_condition,GETTEXT("~S: element type has size 0: ~S"));
 }
-global maygc object convert_from_foreign (object fvd, const void* data)
-{
+modexp maygc object convert_from_foreign (object fvd, const void* data)
+{ /* keep in sync with foreign1.lisp:convert-from-foreign */
   check_SP();
   check_STACK();
+  if (NULL == data) {
+    pushSTACK(fvd); pushSTACK(TheSubr(subr_self)->name);
+    error(error_condition,GETTEXT("~S: trying to read an object of type ~S from NULL address"));
+  }
   if (symbolp(fvd)) {
     if (eq(fvd,S(nil)))
-      /* If we are presented the empty type, we take it as "ignore"
+     /* If we are presented the empty type, we take it as "ignore"
          and return NIL. */
       return NIL;
     else if (eq(fvd,S(boolean))) {
@@ -1052,7 +1122,7 @@ global maygc object convert_from_foreign (object fvd, const void* data)
     } else if (eq(fvd,S(character))) {
       var const uintB* pdata = (const unsigned char *)data;
       var chart ch;
-     #ifdef UNICODE
+     #ifdef ENABLE_UNICODE
       var object encoding = O(foreign_8bit_encoding);
       var chart chbuf[1];
       var const uintB* ptr1 = pdata;
@@ -1084,30 +1154,18 @@ global maygc object convert_from_foreign (object fvd, const void* data)
       return uint32_to_I(*pdata);
     } else if (eq(fvd,S(sint64))) {
       var const struct_sint64* pdata = (const struct_sint64*)data;
-    #ifdef HAVE_LONGLONG
-      var sint64 val;
-     #if (long_bitsize<64)
-      val = ((sint64)(pdata->hi)<<32) | (sint64)(pdata->lo);
-     #else
-      val = *pdata;
-     #endif
-      return sint64_to_I(val);
-    #else
+     #if (long_bitsize<64) && !defined(HAVE_LONG_LONG_INT)
       return L2_to_I(pdata->hi,pdata->lo);
-    #endif
+     #else
+      return sint64_to_I(*pdata);
+     #endif
     } else if (eq(fvd,S(uint64))) {
       var const struct_uint64* pdata = (const struct_uint64*)data;
-    #ifdef HAVE_LONGLONG
-      var uint64 val;
-     #if (long_bitsize<64)
-      val = ((uint64)(pdata->hi)<<32) | (uint64)(pdata->lo);
-     #else
-      val = *pdata;
-     #endif
-      return uint64_to_I(val);
-    #else
+     #if (long_bitsize<64) && !defined(HAVE_LONG_LONG_INT)
       return UL2_to_I(pdata->hi,pdata->lo);
-    #endif
+     #else
+      return uint64_to_I(*pdata);
+     #endif
     } else if (eq(fvd,S(int))) {
       var const int* pdata = (const int*)data;
       return sint_to_I(*pdata);
@@ -1173,7 +1231,7 @@ global maygc object convert_from_foreign (object fvd, const void* data)
         if (fvdlen == 3 && eq(TheSvector(fvd)->data[1],S(character))) {
           /* 1-dimensional array of CHARACTER. */
           var uintL dim1 = I_to_UL(TheSvector(fvd)->data[2]);
-         #ifdef UNICODE
+         #ifdef ENABLE_UNICODE
           var object encoding = O(foreign_encoding);
           var uintL clen =
             Encoding_mblen(encoding)(encoding,
@@ -1186,14 +1244,14 @@ global maygc object convert_from_foreign (object fvd, const void* data)
           if (clen > 0) {
             var chart* cptr = &TheSnstring(string)->data[0];
             var const uintB* bptr = (const uintB*)data;
-           #ifdef UNICODE
+           #ifdef ENABLE_UNICODE
             var const uintB* bendptr = bptr+dim1;
             encoding = O(foreign_encoding);
             var chart* cendptr = cptr+clen;
             Encoding_mbstowcs(encoding)(encoding,nullobj,&bptr,bendptr,&cptr,cendptr);
             ASSERT(cptr == cendptr);
            #else
-            dotimespL(clen,clen, { *cptr++ = as_chart(*bptr++); } );
+            do { *cptr++ = as_chart(*bptr++); } while(--clen);
            #endif
           }
           return string;
@@ -1244,7 +1302,7 @@ global maygc object convert_from_foreign (object fvd, const void* data)
       } else if (eq(fvdtype,S(c_array_max)) && (fvdlen == 3)) {
         var object eltype = TheSvector(fvd)->data[1];
         var uintL eltype_size = foreign_size(eltype);
-        if (eltype_size == 0) fehler_eltype_zero_size(fvd);
+        if (eltype_size == 0) error_eltype_zero_size(fvd);
         /* Determine length of array: */
         var uintL len = 0;
         {
@@ -1257,7 +1315,7 @@ global maygc object convert_from_foreign (object fvd, const void* data)
         }
         if (eq(eltype,S(character))) {
           /* 1-dimensional array of CHARACTER. */
-         #ifdef UNICODE
+         #ifdef ENABLE_UNICODE
           var object encoding = O(foreign_encoding);
           var uintL clen =
             Encoding_mblen(encoding)(encoding,
@@ -1270,14 +1328,14 @@ global maygc object convert_from_foreign (object fvd, const void* data)
           if (clen > 0) {
             var chart* cptr = &TheSnstring(string)->data[0];
             var const uintB* bptr = (const uintB*)data;
-           #ifdef UNICODE
+           #ifdef ENABLE_UNICODE
             var const uintB* bendptr = bptr+len;
             encoding = O(foreign_encoding);
             var chart* cendptr = cptr+clen;
             Encoding_mbstowcs(encoding)(encoding,nullobj,&bptr,bendptr,&cptr,cendptr);
             ASSERT(cptr == cendptr);
            #else
-            dotimespL(clen,clen, { *cptr++ = as_chart(*bptr++); } );
+            do { *cptr++ = as_chart(*bptr++); } while(--clen);
            #endif
           }
           return string;
@@ -1342,7 +1400,7 @@ global maygc object convert_from_foreign (object fvd, const void* data)
         else {
           var object eltype = TheSvector(fvd)->data[1];
           var uintL eltype_size = foreign_size(eltype);
-          if (eltype_size == 0) fehler_eltype_zero_size(fvd);
+          if (eltype_size == 0) error_eltype_zero_size(fvd);
           /* Determine length of array: */
           var uintL len = 0;
           {
@@ -1354,7 +1412,7 @@ global maygc object convert_from_foreign (object fvd, const void* data)
           }
           if (eq(eltype,S(character))) {
             /* 1-dimensional array of CHARACTER. */
-           #ifdef UNICODE
+           #ifdef ENABLE_UNICODE
             var object encoding = O(foreign_encoding);
             var uintL clen =
               Encoding_mblen(encoding)(encoding,
@@ -1367,14 +1425,14 @@ global maygc object convert_from_foreign (object fvd, const void* data)
             if (clen > 0) {
               var chart* cptr = &TheSnstring(string)->data[0];
               var const uintB* bptr = *(const uintB**)data;
-             #ifdef UNICODE
+             #ifdef ENABLE_UNICODE
               var const uintB* bendptr = bptr+len;
               encoding = O(foreign_encoding);
               var chart* cendptr = cptr+clen;
               Encoding_mbstowcs(encoding)(encoding,nullobj,&bptr,bendptr,&cptr,cendptr);
               ASSERT(cptr == cendptr);
              #else
-              dotimespL(clen,clen, { *cptr++ = as_chart(*bptr++); } );
+              do { *cptr++ = as_chart(*bptr++); } while(--clen);
              #endif
             }
             return string;
@@ -1398,8 +1456,12 @@ global maygc object convert_from_foreign (object fvd, const void* data)
         }
       }
     }
+  } else {
+    object inttype = gethash(fvd,O(foreign_inttype_table),false);
+    if (!eq(inttype,nullobj))
+      return convert_from_foreign(inttype,data);
   }
-  fehler_foreign_type(fvd);
+  error_foreign_type(fvd);
 }
 
 /* Test whether a foreign type contained C-PTRs (recursively). */
@@ -1410,6 +1472,8 @@ local bool foreign_with_pointers_p (object fvd)
     if (eq(fvd,S(c_string)))
       return true;
     return false;
+  } else if (stringp(fvd)) {
+    return false; /* inttype */
   } else if (simple_vector_p(fvd)) {
     var uintL fvdlen = Svector_length(fvd);
     if (fvdlen > 0) {
@@ -1440,7 +1504,7 @@ local bool foreign_with_pointers_p (object fvd)
       }
     }
   }
-  fehler_foreign_type(fvd);
+  error_foreign_type(fvd);
 }
 
 struct walk_foreign {
@@ -1507,7 +1571,7 @@ local void walk_foreign_pointers (object fvd, void* data,
           for (i = 2; i < fvdlen; i++) {
             var object dim = TheSvector(fvd)->data[i];
             if (!uint32_p(dim))
-              fehler_foreign_type(fvd);
+              error_foreign_type(fvd);
             size *= I_to_uint32(dim);
           }
         }
@@ -1523,7 +1587,7 @@ local void walk_foreign_pointers (object fvd, void* data,
       } else if (eq(fvdtype,S(c_array_max)) && (fvdlen == 3)) {
         var object eltype = TheSvector(fvd)->data[1];
         var uintL eltype_size = foreign_size(eltype);
-        if (eltype_size == 0) fehler_eltype_zero_size(fvd);
+        if (eltype_size == 0) error_eltype_zero_size(fvd);
         {
           var uintL maxdim = I_to_UL(TheSvector(fvd)->data[2]);
           var uintL len = 0;
@@ -1565,7 +1629,7 @@ local void walk_foreign_pointers (object fvd, void* data,
         (*walk->pre_hook)(elfvd,(void**)data,walk);
         {
           var uintL eltype_size = foreign_size(elfvd);
-          if (eltype_size == 0) fehler_eltype_zero_size(fvd);
+          if (eltype_size == 0) error_eltype_zero_size(fvd);
           var void* ptr = *(void**)data;
           while (!blockzerop(ptr,eltype_size)) {
             walk_foreign_pointers(elfvd,ptr,walk);
@@ -1577,7 +1641,7 @@ local void walk_foreign_pointers (object fvd, void* data,
       }
     }
   }
-  fehler_foreign_type(fvd);
+  error_foreign_type(fvd);
 }
 
 /* Free the storage used by foreign data. */
@@ -1644,7 +1708,7 @@ local maygc void walk_lisp_pointers (object fvd, object obj,
         var object constructor = TheSvector(fvd)->data[C_STRUCT_CONSTRUCTOR];
         if (!(simple_vector_p(slots)
               && (Svector_length(slots)==fvdlen-C_STRUCT_C_TYPE_START)))
-          fehler_foreign_type(fvd);
+          error_foreign_type(fvd);
         if (eq(constructor,L(vector))) {
           if (!(simple_vector_p(obj)
                 && (Svector_length(obj)==fvdlen-C_STRUCT_C_TYPE_START)))
@@ -1705,7 +1769,7 @@ local maygc void walk_lisp_pointers (object fvd, object obj,
           for (i = 2; i < fvdlen; i++) {
             var object dim = TheSvector(fvd)->data[i];
             if (!uint32_p(dim))
-              fehler_foreign_type(fvd);
+              error_foreign_type(fvd);
             size *= I_to_uint32(dim);
           }
         }
@@ -1788,9 +1852,9 @@ local maygc void walk_lisp_pointers (object fvd, object obj,
       }
     }
   }
-  fehler_foreign_type(fvd);
+  error_foreign_type(fvd);
  bad_obj:
-  fehler_convert(fvd,obj);
+  error_convert(fvd,obj);
 }
 
 /* Determine amount of additional storage needed
@@ -1858,17 +1922,23 @@ local maygc void convert_to_foreign_needs (object fvd, object obj,
    Storage is allocated through converter_malloc().
  Only the toplevel storage must already exist; its address is given.
  can trigger GC */
-global maygc void convert_to_foreign (object fvd, object obj, void* data,
-                                      converter_malloc_t converter_malloc)
-{
+modexp maygc void convert_to_foreign
+(object fvd, object obj, void* data, converter_malloc_t *converter_malloc,
+ void** state) { /* keep in sync with foreign1.lisp:convert-to-foreign */
   check_SP();
   check_STACK();
+  if (NULL == data) {
+    pushSTACK(fvd); pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
+    error(error_condition,GETTEXT("~S: trying to write object ~S of type ~S into NULL address"));
+  }
   if (symbolp(fvd)) {
     if (eq(fvd,S(c_pointer))) {
       if (fvariablep(obj))
         obj = TheFvariable(obj)->fv_address;
       else if (nullp(obj)) { *(void**)data = NULL; return; }
-      else if (!faddressp(obj)) goto bad_obj;
+      else if (fpointerp(obj)) {
+        *(void**)data = Fpointer_value(validate_fpointer(obj)); return;
+      } else if (!faddressp(obj)) goto bad_obj;
       obj = check_faddress_valid(obj);
       *(void**)data = Faddress_value(obj);
       return;
@@ -1885,7 +1955,8 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
       unpack_sstring_alloca(string,len,offset, ptr1=);
       var uintL bytelen = cslen(O(foreign_encoding),ptr1,len);
       /* bytelen is the same as computed earlier in count_walk_pre. */
-      var char* asciz = (char*)converter_malloc(*(char**)data,bytelen+1,1);
+      var char* asciz =
+        (char*)converter_malloc(*(char**)data,bytelen+1,1,state);
       cstombs(O(foreign_encoding),ptr1,len,(uintB*)asciz,bytelen);
       asciz[bytelen] = '\0';
       *(char**)data = asciz;
@@ -1921,12 +1992,12 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
       *pdata = I_to_uint32(obj);
       return;
     }
-   #ifdef HAVE_LONGLONG
+   #ifdef HAVE_LONG_LONG_INT
     else if (eq(fvd,S(sint64))) {
       var struct_sint64* pdata = (struct_sint64*)data;
       if (!sint64_p(obj)) goto bad_obj;
       var sint64 val = I_to_sint64(obj);
-     #if (long_bitsize<64)
+     #if (long_bitsize<64) && !defined(HAVE_LONG_LONG_INT)
       pdata->hi = (sint32)(val>>32); pdata->lo = (uint32)val;
      #else
       *pdata = val;
@@ -1936,7 +2007,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
       var struct_uint64* pdata = (struct_uint64*)data;
       if (!uint64_p(obj)) goto bad_obj;
       var uint64 val = I_to_uint64(obj);
-     #if (long_bitsize<64)
+     #if (long_bitsize<64) && !defined(HAVE_LONG_LONG_INT)
       pdata->hi = (uint32)(val>>32); pdata->lo = (uint32)val;
      #else
       *pdata = val;
@@ -1945,7 +2016,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
     }
    #else
     else if (eq(fvd,S(sint64)) || eq(fvd,S(uint64))) {
-      fehler_64bit(fvd);
+      error_64bit(fvd);
     }
    #endif
     else if (eq(fvd,S(int))) {
@@ -1991,7 +2062,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
       var uintB* pdata = (unsigned char *)data;
       if (!charp(obj)) goto bad_obj;
       var chart ch = char_code(obj);
-     #ifdef UNICODE
+     #ifdef ENABLE_UNICODE
       ASSERT(cslen(O(foreign_8bit_encoding),&ch,1) == 1);
       cstombs(O(foreign_8bit_encoding),&ch,1,pdata,1);
      #else
@@ -2010,7 +2081,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
         var object constructor = TheSvector(fvd)->data[C_STRUCT_CONSTRUCTOR];
         if (!(simple_vector_p(slots)
               && (Svector_length(slots)==fvdlen-C_STRUCT_C_TYPE_START)))
-          fehler_foreign_type(fvd);
+          error_foreign_type(fvd);
         if (eq(constructor,L(vector))) {
           if (!(simple_vector_p(obj)
                 && (Svector_length(obj)==fvdlen-C_STRUCT_C_TYPE_START)))
@@ -2053,14 +2124,14 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
             cumul_alignment = sas.alignment;
           /* Now we are finished with sas.size and sas.alignment.
              Descend into the structure slot: */
-          convert_to_foreign(fvdi,obji,pdata,converter_malloc);
+          convert_to_foreign(fvdi,obji,pdata,converter_malloc,state);
         }
         skipSTACK(4);
         return;
       } else if (eq(fvdtype,S(c_union)) && (fvdlen > 1)) {
         /* Use the union's first component. */
         convert_to_foreign(fvdlen > 2 ? (object)TheSvector(fvd)->data[2] : NIL,
-                           obj,data,converter_malloc);
+                           obj,data,converter_malloc,state);
         return;
       } else if (eq(fvdtype,S(c_array)) && (fvdlen > 1)) {
         var object eltype = TheSvector(fvd)->data[1];
@@ -2084,7 +2155,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
           for (i = 2; i < fvdlen; i++) {
             var object dim = TheSvector(fvd)->data[i];
             if (!uint32_p(dim))
-              fehler_foreign_type(fvd);
+              error_foreign_type(fvd);
             size *= I_to_uint32(dim);
           }
         }
@@ -2104,8 +2175,8 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
             obj = array_displace_check(obj,size,&offset);
             var const uint8* ptr1 = &TheSbvector(obj)->data[offset];
             var uint8* ptr2 = (uint8*)data;
-            var uintL count;
-            dotimespL(count,size, { *ptr2++ = *ptr1++; } );
+            var uintL count = size;
+            do { *ptr2++ = *ptr1++; } while(--count);
           }
         } else if (eq(eltype,S(uint16)) && bit_vector_p(Atype_16Bit,obj)) {
           if (size > 0) {
@@ -2114,8 +2185,8 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
             var const uint16* ptr1 =
               (uint16*)&TheSbvector(obj)->data[2*offset];
             var uint16* ptr2 = (uint16*)data;
-            var uintL count;
-            dotimespL(count,size, { *ptr2++ = *ptr1++; } );
+            var uintL count = size;
+            do { *ptr2++ = *ptr1++; } while(--count);
           }
         } else if (eq(eltype,S(uint32)) && bit_vector_p(Atype_32Bit,obj)) {
           if (size > 0) {
@@ -2124,8 +2195,8 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
             var const uint32* ptr1 =
               (uint32*)&TheSbvector(obj)->data[4*offset];
             var uint32* ptr2 = (uint32*)data;
-            var uintL count;
-            dotimespL(count,size, { *ptr2++ = *ptr1++; } );
+            var uintL count = size;
+            do { *ptr2++ = *ptr1++; } while(--count);
           }
         } else {
           pushSTACK(eltype);
@@ -2137,7 +2208,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
               /* pdata = (char*)data + i*eltype_size */
               pushSTACK(STACK_0); pushSTACK(fixnum(i));
               funcall(L(row_major_aref),2);
-              convert_to_foreign(STACK_1,value1,pdata,converter_malloc);
+              convert_to_foreign(STACK_1,value1,pdata,converter_malloc,state);
             }
           }
           skipSTACK(2);
@@ -2157,7 +2228,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
           if (blen > maxdim)
             blen = maxdim;
           var uintB* ptr2 = (uintB*)data;
-         #ifdef UNICODE
+         #ifdef ENABLE_UNICODE
           var object encoding = O(foreign_encoding);
           Encoding_wcstombs(encoding)(encoding,nullobj,&ptr1,ptr1+clen,&ptr2,ptr2+blen);
          #else
@@ -2180,8 +2251,8 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
             var uintL offset = 0;
             obj = array_displace_check(obj,len,&offset);
             var const uint8* ptr1 = &TheSbvector(obj)->data[offset];
-            var uintL count;
-            dotimespL(count,len, { *ptr2++ = *ptr1++; } );
+            var uintL count = len;
+            do { *ptr2++ = *ptr1++; } while(--count);
           }
           if (len < maxdim)
             *ptr2 = 0;
@@ -2192,8 +2263,8 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
             obj = array_displace_check(obj,len,&offset);
             var const uint16* ptr1 =
               (uint16*)&TheSbvector(obj)->data[2*offset];
-            var uintL count;
-            dotimespL(count,len, { *ptr2++ = *ptr1++; } );
+            var uintL count = len;
+            do { *ptr2++ = *ptr1++; } while(--count);
           }
           if (len < maxdim)
             *ptr2 = 0;
@@ -2204,8 +2275,8 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
             obj = array_displace_check(obj,len,&offset);
             var const uint32* ptr1 =
               (uint32*)&TheSbvector(obj)->data[4*offset];
-            var uintL count;
-            dotimespL(count,len, { *ptr2++ = *ptr1++; } );
+            var uintL count = len;
+            do { *ptr2++ = *ptr1++; } while(--count);
           }
           if (len < maxdim)
             *ptr2 = 0;
@@ -2219,7 +2290,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
               /* pdata = (char*)data + i*eltype_size */
               pushSTACK(STACK_0); pushSTACK(fixnum(i));
               funcall(L(aref),2);
-              convert_to_foreign(STACK_1,value1,pdata,converter_malloc);
+              convert_to_foreign(STACK_1,value1,pdata,converter_malloc,state);
             }
             if (len < maxdim)
               blockzero(pdata,eltype_size);
@@ -2249,9 +2320,10 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
         fvd = TheSvector(fvd)->data[1];
         var struct foreign_layout sas;
         foreign_layout(fvd,&sas);
-        var void* p = converter_malloc(*(void**)data,sas.size,sas.alignment);
+        var void* p =
+          converter_malloc(*(void**)data,sas.size,sas.alignment,state);
         *(void**)data = p;
-        convert_to_foreign(fvd,obj,p,converter_malloc);
+        convert_to_foreign(fvd,obj,p,converter_malloc,state);
         return;
       } else if (eq(fvdtype,S(c_pointer)) && (fvdlen == 2)) {
         if (faddressp(obj)) {
@@ -2282,7 +2354,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
           var const chart* ptr1;
           unpack_sstring_alloca(string,clen,offset, ptr1=);
           var uintL blen = cslen(O(foreign_encoding),ptr1,clen);
-          var void* p = converter_malloc(*(void**)data,blen+1,1);
+          var void* p = converter_malloc(*(void**)data,blen+1,1,state);
           *(void**)data = p;
           cstombs(O(foreign_encoding),ptr1,clen,(uintB*)p,blen);
           ((uintB*)p)[blen] = '\0';
@@ -2294,7 +2366,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
         foreign_layout(eltype,&sas);
         var uintL eltype_size = sas.size;
         var void* p = converter_malloc(*(void**)data,(len+1)*eltype_size,
-                                       sas.alignment);
+                                       sas.alignment,state);
         *(void**)data = p;
         pushSTACK(eltype);
         pushSTACK(obj);
@@ -2303,7 +2375,7 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
           for (i = 0; i < len; i++, p = (void*)((char*)p + eltype_size)) {
             pushSTACK(STACK_0); pushSTACK(fixnum(i));
             funcall(L(aref),2);
-            convert_to_foreign(STACK_1,value1,p,converter_malloc);
+            convert_to_foreign(STACK_1,value1,p,converter_malloc,state);
           }
         }
         skipSTACK(2);
@@ -2311,10 +2383,16 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
         return;
       }
     }
+  } else {
+    object inttype = gethash(fvd,O(foreign_inttype_table),false);
+    if (!eq(inttype,nullobj)) {
+      convert_to_foreign(inttype,obj,data,converter_malloc,state);
+      return;
+    }
   }
-  fehler_foreign_type(fvd);
+  error_foreign_type(fvd);
  bad_obj:
-  fehler_convert(fvd,obj);
+  error_convert(fvd,obj);
 }
 
 /* Convert Lisp data to foreign data.
@@ -2322,15 +2400,15 @@ global maygc void convert_to_foreign (object fvd, object obj, void* data,
  1. convert_to_foreign_need(fvd,obj);
  2. make room according to sas.size and sas.alignment,
     set allocaing_room_pointer.
- 3. convert_to_foreign(fvd,obj,data,room_pointer,&allocaing);
+ 3. convert_to_foreign(fvd,obj,data,room_pointer,&allocaing,
+                       &allocaing_room_pointer);
     can trigger GC */
-local var void* allocaing_room_pointer;
-local void* allocaing (void* old_data, uintL size, uintL alignment)
-{
-  allocaing_room_pointer = (void*)(((uintP)allocaing_room_pointer
-                                    + alignment-1) & -(long)alignment);
-  var void* result = allocaing_room_pointer;
-  allocaing_room_pointer = (void*)((uintP)allocaing_room_pointer + size);
+local void* allocaing (void* old_data, uintL size, uintL alignment,
+                       void** allocaing_room_pointer) {
+  *allocaing_room_pointer = (void*)(((uintP)*allocaing_room_pointer
+                                     + alignment-1) & -(long)alignment);
+  var void* result = *allocaing_room_pointer;
+  *allocaing_room_pointer = (void*)((uintP)*allocaing_room_pointer + size);
   return result;
 }
 
@@ -2339,82 +2417,77 @@ local void* allocaing (void* old_data, uintL size, uintL alignment)
  extent. (Not exactly indefinite extent: It is deallocated the next time
  free_foreign() is called on it.)
  can trigger GC */
-local void* mallocing (void* old_data, uintL size, uintL alignment)
-{
-  return my_malloc(size);
-}
+modexp void* mallocing (void* old_data, uintL size, uintL alignment,
+                        void** state)
+{ return clisp_malloc(size); }
 
 /* Convert Lisp data to foreign data.
  The foreign data storage is reused.
  DANGEROUS, especially for type C-STRING !!
  Also beware against NULL pointers! They are not treated specially.
  can trigger GC */
-local void* nomalloc (void* old_data, uintL size, uintL alignment)
-{
-  return old_data;
-}
+modexp void* nomalloc (void* old_data, uintL size, uintL alignment,
+                       void** state)
+{ return old_data; }
 
 /* Error messages. */
-nonreturning_function(local, fehler_foreign_variable, (object obj)) {
+nonreturning_function(local, error_foreign_variable, (object obj)) {
   pushSTACK(NIL);                 /* no PLACE */
   pushSTACK(obj);                 /* TYPE-ERROR slot DATUM */
   pushSTACK(S(foreign_variable)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(STACK_0); pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: ~S is not of type ~S"));
+  error(type_error,GETTEXT("~S: ~S is not of type ~S"));
 }
-nonreturning_function(local, fehler_variable_no_fvd, (object obj)) {
+nonreturning_function(local, error_variable_no_fvd, (object obj)) {
   pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(error,GETTEXT("~S: foreign variable with unknown type, missing DEF-C-VAR: ~S"));
+  error(error_condition,GETTEXT("~S: foreign variable with unknown type, missing DEF-C-VAR: ~S"));
 }
 
-/* (FFI::LOOKUP-FOREIGN-VARIABLE foreign-variable-name foreign-type)
- looks up a foreign variable, given its Lisp name. */
-LISPFUNN(lookup_foreign_variable,2)
-{
-  var object fvd = STACK_0;
-  var object name = STACK_1;
-  var object fvar = gethash(name,O(foreign_variable_table),false);
+/* UP: looks up a foreign variable, given its Lisp name.
+ > name -- lisp name
+ > fvd --- FFI type
+ can trigger GC */
+local maygc object lookup_foreign_variable
+(gcv_object_t *name, gcv_object_t *fvd) {
+  var object fvar = gethash(*name,O(foreign_variable_table),false);
   if (eq(fvar,nullobj)) {
     pushSTACK(NIL);             /* 4 continue-format-string */
     pushSTACK(S(error));        /* 3 error type */
     pushSTACK(NIL);             /* 2 error-format-string */
-    pushSTACK(S(lookup_foreign_variable)); /* 1 */
-    pushSTACK(name);            /* 0 */
+    pushSTACK(S(find_foreign_variable)); /* 1 */
+    pushSTACK(*name);                    /* 0 */
     STACK_2 = CLSTEXT("~S: foreign variable ~S does not exist");
     STACK_4 = CLSTEXT("Skip foreign variable creation");
     funcall(L(cerror_of_type),5);
-    skipSTACK(2); VALUES1(NIL); return;
+    return NIL;
   }
-  /* The first LOOKUP-FOREIGN-VARIABLE determines the variable's type. */
+  /* The first lookup_foreign_variable determines the variable's type. */
   if (nullp(TheFvariable(fvar)->fv_type)) {
     var struct foreign_layout sas;
-    foreign_layout(fvd,&sas);
+    foreign_layout(*fvd,&sas);
     var object fa = TheFvariable(fvar)->fv_address;
-    pushSTACK(fvar); fa = check_faddress_valid(fa);
-    fvar = popSTACK(); fvd = STACK_0; /* restore after GC-unsafe call */
+    pushSTACK(fvar); fa = check_faddress_valid(fa); fvar = popSTACK();
     if (!((posfixnum_to_V(TheFvariable(fvar)->fv_size) == sas.size)
           && (((long)Faddress_value(fa) & (sas.alignment-1)) == 0))) {
       pushSTACK(fvar);
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(error,GETTEXT("~S: foreign variable ~S does not have the required size or alignment"));
+      error(error_condition,GETTEXT("~S: foreign variable ~S does not have the required size or alignment"));
     }
-    TheFvariable(fvar)->fv_type = fvd;
-  }
-  /* Subsequent LOOKUP-FOREIGN-VARIABLE calls only compare the type. */
-  else if (!equal_fvd(TheFvariable(fvar)->fv_type,fvd)) {
-    if (!equalp_fvd(TheFvariable(fvar)->fv_type,fvd)) {
+    TheFvariable(fvar)->fv_type = *fvd;
+  } else if (!equal_fvd(TheFvariable(fvar)->fv_type,*fvd)) {
+    /* Subsequent lookup_foreign_variable calls only compare the type. */
+    if (!equalp_fvd(TheFvariable(fvar)->fv_type,*fvd)) {
       dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T */
-      pushSTACK(fvd);
+      pushSTACK(*fvd);
       pushSTACK(TheFvariable(fvar)->fv_type);
       pushSTACK(fvar);
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(error,GETTEXT("~S: type specifications for foreign variable ~S conflict: ~S and ~S"));
+      error(error_condition,GETTEXT("~S: type specifications for foreign variable ~S conflict: ~S and ~S"));
     }
     /* If the types are not exactly the same but still compatible,
        allocate a new foreign variable with the given fvd. */
-    pushSTACK(fvd);
     pushSTACK(fvar);
     var object new_fvar = allocate_fvariable();
     fvar = popSTACK();
@@ -2423,10 +2496,42 @@ LISPFUNN(lookup_foreign_variable,2)
     TheFvariable(new_fvar)->fv_name    = TheFvariable(fvar)->fv_name;
     TheFvariable(new_fvar)->fv_address = TheFvariable(fvar)->fv_address;
     TheFvariable(new_fvar)->fv_size    = TheFvariable(fvar)->fv_size;
-    TheFvariable(new_fvar)->fv_type    = popSTACK();
+    TheFvariable(new_fvar)->fv_type    = *fvd;
     fvar = new_fvar;
   }
-  VALUES1(fvar); skipSTACK(2);
+  return fvar;
+}
+
+/* forvard declaration -- defined later */
+static maygc object foreign_library_variable
+(gcv_object_t *name, gcv_object_t* fvd,
+ gcv_object_t *library, gcv_object_t *version, gcv_object_t *offset);
+
+nonreturning_function(local, error_version_nonlibrary,
+                      (object name, object version)) {
+  pushSTACK(version); pushSTACK(name), pushSTACK(TheSubr(subr_self)->name);
+  error(error_condition,
+        GETTEXT("~S(~S): version ~S without library does not make sense"));
+}
+
+/* (FFI::FIND-FOREIGN-VARIABLE foreign-variable-name foreign-type
+     foreign-library version foreign-offset) */
+LISPFUNN(find_foreign_variable,5) {
+  STACK_4 = coerce_ss(STACK_4); /* name */
+  if (nullp(STACK_2)) { /* library */
+    if (!nullp(STACK_1)) /* version */
+      error_version_nonlibrary(STACK_4,STACK_1);
+    VALUES1(lookup_foreign_variable(&STACK_4,&STACK_3));
+  } else VALUES1(foreign_library_variable(&STACK_4,&STACK_3,&STACK_2,
+                                          &STACK_1,&STACK_0));
+  skipSTACK(5);
+}
+
+static void check_fvar_alignment (object fvar, uintL alignment) {
+  if (((uintP)Faddress_value(TheFvariable(fvar)->fv_address) & (alignment-1))) {
+    pushSTACK(fvar); pushSTACK(TheSubr(subr_self)->name);
+    error(error_condition,GETTEXT("~S: foreign variable ~S does not have the required alignment"));
+  }
 }
 
 /* (FFI:FOREIGN-VARIABLE address c-type &key name) constructor */
@@ -2470,12 +2575,7 @@ LISPFUN(foreign_variable,seclass_read,2,0,norest,key,1,(kw(name)) )
     TheFvariable(fvar)->fv_address = STACK_2;
     record_flags_replace(TheFvariable(fvar), 0);
   }
-  if (((uintP)Faddress_value(TheFvariable(fvar)->fv_address)
-       & (sas.alignment-1))) {
-    pushSTACK(fvar);
-    pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: foreign variable ~S does not have the required alignment"));
-  }
+  check_fvar_alignment(fvar,sas.alignment);
   VALUES1(fvar); skipSTACK(3);
 }
 
@@ -2484,12 +2584,12 @@ LISPFUN(foreign_variable,seclass_read,2,0,norest,key,1,(kw(name)) )
 LISPFUNN(foreign_value,1)
 {
   var object fvar = STACK_0;
-  if (!fvariablep(fvar)) fehler_foreign_variable(fvar);
+  if (!fvariablep(fvar)) error_foreign_variable(fvar);
   var object fa = TheFvariable(fvar)->fv_address;
   fa = check_faddress_valid(fa); fvar = STACK_0;
   var void* address = Faddress_value(fa);
   var object fvd = TheFvariable(fvar)->fv_type;
-  if (nullp(fvd)) fehler_variable_no_fvd(fvar);
+  if (nullp(fvd)) error_variable_no_fvd(fvar);
   VALUES1(convert_from_foreign(fvd,address)); skipSTACK(1);
 }
 
@@ -2498,27 +2598,27 @@ LISPFUNN(foreign_value,1)
 LISPFUNN(set_foreign_value,2)
 {
   var object fvar = STACK_1;
-  if (!fvariablep(fvar)) fehler_foreign_variable(fvar);
+  if (!fvariablep(fvar)) error_foreign_variable(fvar);
   var object fa = TheFvariable(fvar)->fv_address;
   fa = check_faddress_valid(fa); fvar = STACK_1;
   var void* address = Faddress_value(fa);
   var object fvd = TheFvariable(fvar)->fv_type;
-  if (nullp(fvd)) fehler_variable_no_fvd(fvar);
+  if (nullp(fvd)) error_variable_no_fvd(fvar);
   if (record_flags(TheFvariable(fvar)) & fv_readonly) {
     pushSTACK(fvar);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: foreign variable ~S may not be modified"));
+    error(error_condition,GETTEXT("~S: foreign variable ~S may not be modified"));
   }
   if (record_flags(TheFvariable(fvar)) & fv_malloc) {
     /* Protect this using a semaphore??
        Free old value: */
     free_foreign(fvd,address);
     /* Put in new value: */
-    convert_to_foreign(fvd,STACK_0,address,&mallocing);
+    convert_to_foreign(fvd,STACK_0,address,&mallocing,NULL);
   } else {
     /* Protect this using a semaphore??
        Put in new value, reusing the old value's storage: */
-    convert_to_foreign(fvd,STACK_0,address,&nomalloc);
+    convert_to_foreign(fvd,STACK_0,address,&nomalloc,NULL);
   }
   VALUES1(STACK_0);
   skipSTACK(2);
@@ -2528,9 +2628,9 @@ LISPFUNN(foreign_type,1)
 { /* (FFI::FOREIGN-TYPE foreign-variable) */
   var object fvar = popSTACK();
   if (!fvariablep(fvar))
-    fehler_foreign_variable(fvar);
+    error_foreign_variable(fvar);
   if (nullp((value1 = TheFvariable(fvar)->fv_type)))
-    fehler_variable_no_fvd(fvar);
+    error_variable_no_fvd(fvar);
   mv_count=1;
 }
 
@@ -2541,7 +2641,7 @@ LISPFUN(element,seclass_default,1,0,rest,nokey,0,NIL)
   var object fvar = Before(rest_args_pointer);
   /* Check that fvar is a foreign variable: */
   if (!fvariablep(fvar))
-    fehler_foreign_variable(fvar);
+    error_foreign_variable(fvar);
   /* Check that fvar is a foreign array: */
   var object fvd = TheFvariable(fvar)->fv_type;
   var uintL fvdlen;
@@ -2553,7 +2653,7 @@ LISPFUN(element,seclass_default,1,0,rest,nokey,0,NIL)
     pushSTACK(fvd);
     pushSTACK(fvar);
     pushSTACK(S(element));
-    fehler(error,GETTEXT("~S: foreign variable ~S of type ~S is not an array"));
+    error(error_condition,GETTEXT("~S: foreign variable ~S of type ~S is not an array"));
   }
   /* Check the subscript count: */
   if (!(argcount == fvdlen-2)) {
@@ -2561,22 +2661,22 @@ LISPFUN(element,seclass_default,1,0,rest,nokey,0,NIL)
     pushSTACK(fvar);
     pushSTACK(fixnum(argcount));
     pushSTACK(S(element));
-    fehler(error,GETTEXT("~S: got ~S subscripts, but ~S has rank ~S"));
+    error(error_condition,GETTEXT("~S: got ~S subscripts, but ~S has rank ~S"));
   }
   /* Check the subscripts: */
   var uintL row_major_index = 0;
   if (argcount > 0) {
     var gcv_object_t* args_pointer = rest_args_pointer;
     var gcv_object_t* dimptr = &TheSvector(fvd)->data[2];
-    var uintC count;
-    dotimespC(count,argcount, {
+    var uintC count = argcount;
+    do {
       var object subscriptobj = NEXT(args_pointer);
       if (!posfixnump(subscriptobj)) {
         var object list = listof(argcount);
         /* STACK_0 is fvar now. */
         pushSTACK(list);
         pushSTACK(S(element));
-        fehler(error,GETTEXT("~S: subscripts ~S for ~S are not of type `(INTEGER 0 (,ARRAY-DIMENSION-LIMIT))"));
+        error(error_condition,GETTEXT("~S: subscripts ~S for ~S are not of type `(INTEGER 0 (,ARRAY-DIMENSION-LIMIT))"));
       }
       var uintV subscript = posfixnum_to_V(subscriptobj);
       var uintL dim = I_to_uint32(*dimptr);
@@ -2585,12 +2685,12 @@ LISPFUN(element,seclass_default,1,0,rest,nokey,0,NIL)
         /* STACK_0 is fvar now. */
         pushSTACK(list);
         pushSTACK(S(element));
-        fehler(error,GETTEXT("~S: subscripts ~S for ~S are out of range"));
+        error(error_condition,GETTEXT("~S: subscripts ~S for ~S are out of range"));
       }
       /* Compute row_major_index := row_major_index*dim+subscript: */
       row_major_index = mulu32_unchecked(row_major_index,dim)+subscript;
-      *dimptr++;
-    });
+      dimptr++;
+    } while (--count);
   }
   set_args_end_pointer(rest_args_pointer);
   fvd = TheSvector(fvd)->data[1]; /* the element's foreign type */
@@ -2617,7 +2717,7 @@ LISPFUNN(deref,1)
 {
   var object fvar = STACK_0;
   /* Check that fvar is a foreign variable: */
-  if (!fvariablep(fvar)) fehler_foreign_variable(fvar);
+  if (!fvariablep(fvar)) error_foreign_variable(fvar);
   /* Check that fvar is a foreign pointer: */
   var object fvd = TheFvariable(fvar)->fv_type;
   if (!(simple_vector_p(fvd)
@@ -2629,7 +2729,7 @@ LISPFUNN(deref,1)
     pushSTACK(fvd);
     pushSTACK(fvar);
     pushSTACK(S(element));
-    fehler(error,GETTEXT("~S: foreign variable ~S of type ~S is not a pointer"));
+    error(error_condition,GETTEXT("~S: foreign variable ~S of type ~S is not a pointer"));
   }
   fvd = TheSvector(fvd)->data[1]; /* the target's foreign type */
   pushSTACK(fvd);
@@ -2665,7 +2765,7 @@ LISPFUNN(slot,2)
   var object slot = STACK_0;
   /* Check that fvar is a foreign variable: */
   if (!fvariablep(fvar))
-    fehler_foreign_variable(fvar);
+    error_foreign_variable(fvar);
   /* Check that fvar is a foreign struct or a foreign union: */
   var object fvd = TheFvariable(fvar)->fv_type;
   var uintL fvdlen;
@@ -2676,7 +2776,7 @@ LISPFUNN(slot,2)
       var object slots = TheSvector(fvd)->data[C_STRUCT_SLOTS];
       if (!(simple_vector_p(slots)
             && (Svector_length(slots)==fvdlen-C_STRUCT_C_TYPE_START)))
-        fehler_foreign_type(fvd);
+        error_foreign_type(fvd);
       var uintL cumul_size = 0;
       var uintL i;
       for (i = C_STRUCT_C_TYPE_START; i < fvdlen; i++) {
@@ -2710,7 +2810,7 @@ LISPFUNN(slot,2)
     if (eq(TheSvector(fvd)->data[0],S(c_union)) && (fvdlen > 1)) {
       var object slots = TheSvector(fvd)->data[1];
       if (!(simple_vector_p(slots) && (Svector_length(slots)==fvdlen-2)))
-        fehler_foreign_type(fvd);
+        error_foreign_type(fvd);
       var uintL i;
       for (i = 2; i < fvdlen; i++) {
         if (eq(TheSvector(slots)->data[i-2],slot))
@@ -2737,14 +2837,14 @@ LISPFUNN(slot,2)
   pushSTACK(fvd);
   pushSTACK(fvar);
   pushSTACK(S(slot));
-  fehler(error,GETTEXT("~S: foreign variable ~S of type ~S is not a struct or union"));
+  error(error_condition,GETTEXT("~S: foreign variable ~S of type ~S is not a struct or union"));
  bad_slot:
   dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T  */
   pushSTACK(slot);
   pushSTACK(fvd);
   pushSTACK(fvar);
   pushSTACK(S(slot));
-  fehler(error,GETTEXT("~S: foreign variable ~S of type ~S has no component with name ~S"));
+  error(error_condition,GETTEXT("~S: foreign variable ~S of type ~S has no component with name ~S"));
 }
 
 /* (FFI::%CAST foreign-variable c-type)
@@ -2754,13 +2854,13 @@ LISPFUNN(cast,2)
 {
   var object fvar = STACK_1;
   if (!fvariablep(fvar))
-    fehler_foreign_variable(fvar);
+    error_foreign_variable(fvar);
   var object fvd = TheFvariable(fvar)->fv_type;
   if (nullp(fvd))
-    fehler_variable_no_fvd(fvar);
+    error_variable_no_fvd(fvar);
   /* The old and the new type must have the same size. */
   if (!eq(TheFvariable(fvar)->fv_size,fixnum(foreign_size(STACK_0))))
-    fehler_convert(STACK_0,fvar);
+    error_convert(STACK_0,fvar);
   /* Allocate a new foreign variable. */
   var object new_fvar = allocate_fvariable();
   fvar = STACK_1;
@@ -2783,11 +2883,11 @@ LISPFUNN(cast,2)
 LISPFUNN(offset,3) {
   var object fvar = STACK_2;
   if (!fvariablep(fvar))
-    fehler_foreign_variable(fvar);
+    error_foreign_variable(fvar);
   {
     var object fvd = TheFvariable(fvar)->fv_type;
     if (nullp(fvd))
-      fehler_variable_no_fvd(fvar);
+      error_variable_no_fvd(fvar);
   }
   STACK_1 = check_sint32(STACK_1);
   var struct foreign_layout sas;
@@ -2811,15 +2911,11 @@ LISPFUNN(offset,3) {
   TheFvariable(new_fvar)->fv_address = STACK_0;
   TheFvariable(new_fvar)->fv_size    = fixnum(size);
   TheFvariable(new_fvar)->fv_type    = STACK_(0+1);
-  if (((uintP)Faddress_value(TheFvariable(new_fvar)->fv_address)
-       & (alignment-1))) {
-    pushSTACK(new_fvar);
-    pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: foreign variable ~S does not have the required alignment"));
-  }
+  check_fvar_alignment(new_fvar,alignment);
   VALUES1(new_fvar);
   skipSTACK(3+1);
 }
+
 
 /* Low-level, little consing accessors */
 
@@ -2852,7 +2948,7 @@ LISPFUN(write_memory_as,seclass_default,3,1,norest,nokey,0,NIL)
     STACK_0 = check_sint32(STACK_0);
     address = (void*)((uintP)address + (sintP)I_to_sint32(STACK_0));
   }
-  convert_to_foreign(STACK_1,STACK_3,address,&nomalloc);
+  convert_to_foreign(STACK_1,STACK_3,address,&nomalloc,NULL);
   VALUES1(STACK_3); skipSTACK(4);
 }
 
@@ -2890,8 +2986,9 @@ LISPFUN(exec_on_stack,seclass_default,2,1,norest,nokey,0,NIL) {
   var void* result_address = (void*)((uintP)(total_room+result_alignment-1)
                                      & -(long)result_alignment);
   if (init) {
-    allocaing_room_pointer = (void*)((uintP)result_address + result_size);
-    convert_to_foreign(fvd,STACK_0,result_address,&allocaing);
+    void *allocaing_room_pointer = (void*)((uintP)result_address + result_size);
+    convert_to_foreign(fvd,STACK_0,result_address,&allocaing,
+                       &allocaing_room_pointer);
   } else {
     blockzero(result_address,result_size);
   }
@@ -2938,7 +3035,7 @@ LISPFUNN(call_with_foreign_string,6)
 {
   var uintV zeroes = posfixnum_to_V(check_posfixnum(popSTACK()));
   STACK_4 = check_function(STACK_4);
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   STACK_3 = check_encoding(STACK_3,&O(foreign_encoding),false);
  #else
   STACK_3 = check_encoding(STACK_3,&O(default_file_encoding),false);
@@ -3008,9 +3105,9 @@ LISPFUN(foreign_allocate,seclass_default,1,0,norest,key,3,
   foreign_layout(arg_fvd,&sas);
   var uintL arg_size = sas.size;
   var uintL arg_alignment = sas.alignment;
-  if (arg_size == 0) { fehler_eltype_zero_size(arg_fvd); }
+  if (arg_size == 0) { error_eltype_zero_size(arg_fvd); }
   /* Perform top-level allocation of sizeof(fvd), sublevel allocations follow */
-  var void* arg_address = my_malloc(arg_size);
+  var void* arg_address = clisp_malloc(arg_size);
   blockzero(arg_address,arg_size);
   /* Create FOREIGN-VARIABLE now so that it may be used in error message */
   pushSTACK(make_faddress(allocate_fpointer(arg_address),0));
@@ -3025,17 +3122,12 @@ LISPFUN(foreign_allocate,seclass_default,1,0,norest,key,3,
     /* Must not set fv_malloc flag since it applies
        to sublevel structures only. */
   }
-  /* Check alignment */
-  if (!(((uintP)arg_address & (arg_alignment-1)) == 0)) {
-    pushSTACK(fvar);
-    pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: foreign variable ~S does not have the required alignment"));
-  }
+  check_fvar_alignment(fvar,arg_alignment);
   { /* :INITIAL-CONTENTS NIL also causes an initialization! */
     var object initarg = STACK_3;
     if (boundp(initarg)) {
       STACK_0 = fvar;
-      convert_to_foreign(arg_fvd,initarg,arg_address,&mallocing);
+      convert_to_foreign(arg_fvd,initarg,arg_address,&mallocing,NULL);
       /* subr-self name is lost and GC may happen */
       fvar = STACK_0;
     }
@@ -3066,7 +3158,8 @@ LISPFUN(foreign_free,seclass_default,1,0,norest,key,1,(kw(full)))
         free_foreign_callin(address);
         /* make the function invalid */
         pushSTACK(addr_obj);
-        TheFaddress(STACK_0)->fa_base = allocate_fpointer(address);
+        var object fp = allocate_fpointer(address);
+        TheFaddress(STACK_0)->fa_base = fp;
         TheFaddress(STACK_0)->fa_offset = 0;
         mark_fp_invalid(TheFpointer(TheFaddress(popSTACK())->fa_base));
         VALUES1(NIL);
@@ -3088,7 +3181,7 @@ LISPFUN(foreign_free,seclass_default,1,0,norest,key,1,(kw(full)))
         if (full_recurse) {
           pushSTACK(obj);
           pushSTACK(TheSubr(subr_self)->name);
-          fehler(error,GETTEXT("~S: ~S has no type, :FULL is illegal"));
+          error(error_condition,GETTEXT("~S: ~S has no type, :FULL is illegal"));
         }
       free_address:
         begin_system_call();
@@ -3098,62 +3191,76 @@ LISPFUN(foreign_free,seclass_default,1,0,norest,key,1,(kw(full)))
         return;
     }
   }
-  fehler_foreign_object(obj);
+  error_foreign_object(obj);
 }
 
 /* Error messages. */
-nonreturning_function(local, fehler_foreign_function, (object obj)) {
+nonreturning_function(local, error_foreign_function, (object obj)) {
   pushSTACK(NIL);                 /* no PLACE */
   pushSTACK(obj);                 /* TYPE-ERROR slot DATUM */
   pushSTACK(S(foreign_function)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(STACK_0); pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: ~S is not of type ~S"));
+  error(type_error,GETTEXT("~S: ~S is not of type ~S"));
 }
-nonreturning_function(local, fehler_function_no_fvd,
+nonreturning_function(local, error_function_no_fvd,
                       (object obj, object caller)) {
   pushSTACK(obj);
   pushSTACK(caller);
-  fehler(error,GETTEXT("~S: foreign function with unknown calling convention, missing DEF-CALL-OUT: ~S"));
+  error(error_condition,GETTEXT("~S: foreign function with unknown calling convention, missing DEF-CALL-OUT: ~S"));
 }
 
-/* (FFI::LOOKUP-FOREIGN-FUNCTION foreign-function-name foreign-type)
- looks up a foreign function, given its Lisp name. */
-LISPFUNN(lookup_foreign_function,2)
-{
+/* UP: looks up a foreign function, given its Lisp name.
+ can trigger GC */
+local maygc object lookup_foreign_function
+(gcv_object_t *name_, gcv_object_t *fvd_, gcv_object_t *properties_) {
   var object ffun = allocate_ffunction();
-  var object fvd = popSTACK();
-  var object name = popSTACK();
-  if (!(simple_vector_p(fvd) && (Svector_length(fvd) == 4)
-        && eq(TheSvector(fvd)->data[0],S(c_function)))) {
-    dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T */
-    pushSTACK(fvd);
-    pushSTACK(S(lookup_foreign_function));
-    fehler(error,GETTEXT("~S: illegal foreign function type ~S"));
-  }
+  var object props = *properties_;
+  var object fvd = *fvd_;
+  var object name = *name_;
   var object oldffun = gethash(name,O(foreign_function_table),false);
   if (eq(oldffun,nullobj)) {
     pushSTACK(NIL);             /* 4 continue-format-string */
     pushSTACK(S(error));        /* 3 error type */
     pushSTACK(NIL);             /* 2 error-format-string */
-    pushSTACK(S(lookup_foreign_function)); /* 1 */
+    pushSTACK(TheSubr(subr_self)->name); /* 1 */
     pushSTACK(name);            /* 0 */
     STACK_2 = CLSTEXT("~S: foreign function ~S does not exist");
     STACK_4 = CLSTEXT("Skip foreign function creation");
     funcall(L(cerror_of_type),5);
-    VALUES1(NIL); return;
+    return NIL;
   }
   if (!eq(TheFfunction(oldffun)->ff_flags,TheSvector(fvd)->data[3])) {
     pushSTACK(oldffun);
-    pushSTACK(S(lookup_foreign_function));
-    fehler(error,GETTEXT("~S: calling conventions for foreign function ~S conflict"));
+    pushSTACK(TheSubr(subr_self)->name);
+    error(error_condition,GETTEXT("~S: calling conventions for foreign function ~S conflict"));
   }
   TheFfunction(ffun)->ff_name = TheFfunction(oldffun)->ff_name;
   TheFfunction(ffun)->ff_address = TheFfunction(oldffun)->ff_address;
   TheFfunction(ffun)->ff_resulttype = TheSvector(fvd)->data[1];
   TheFfunction(ffun)->ff_argtypes = TheSvector(fvd)->data[2];
   TheFfunction(ffun)->ff_flags = TheSvector(fvd)->data[3];
-  VALUES1(ffun);
+  TheFfunction(ffun)->ff_properties = props;
+  return ffun;
+}
+
+/* forvard declaration -- defined later */
+local maygc object foreign_library_function
+(gcv_object_t *name, gcv_object_t *fvd, gcv_object_t *properties,
+ gcv_object_t *library, gcv_object_t *version, gcv_object_t *offset);
+
+/* (FFI::FIND-FOREIGN-FUNCTION foreign-function-name foreign-type properties
+     foreign-library version foreign-offset) */
+LISPFUNN(find_foreign_function,6) {
+  STACK_5 = coerce_ss(STACK_5); /* name */
+  STACK_4 = check_foreign_function_type(STACK_4); /* type */
+  if (nullp(STACK_2)) { /* library */
+    if (!nullp(STACK_1)) /* version */
+      error_version_nonlibrary(STACK_5,STACK_1);
+    VALUES1(lookup_foreign_function(&STACK_5,&STACK_4,&STACK_3));
+  } else VALUES1(foreign_library_function(&STACK_5,&STACK_4,&STACK_3,
+                                          &STACK_2,&STACK_1,&STACK_0));
+  skipSTACK(6);
 }
 
 /* Here is the point where we use the AVCALL package. */
@@ -3161,8 +3268,8 @@ LISPFUNN(lookup_foreign_function,2)
 /* Call the appropriate av_start_xxx macro for the result.
  do_av_start(flags,result_fvd,&alist,address,result_address,
              result_size,result_splittable); */
-local void do_av_start (uintWL flags, object result_fvd, av_alist * alist,
-                        void* address, void* result_address, uintL result_size,
+local void do_av_start (uintWL flags, object result_fvd, av_alist *alist,
+                        void *address, void *result_address, uintL result_size,
                         bool result_splittable)
 {
   if (symbolp(result_fvd)) {
@@ -3225,13 +3332,21 @@ local void do_av_start (uintWL flags, object result_fvd, av_alist * alist,
       av_start_ulong(*alist,address,result_address);
     }
    #if (long_bitsize<64)
+    #if defined(HAVE_LONG_LONG_INT)
+    else if (eq(result_fvd,S(sint64))) {
+      av_start_longlong(*alist,address,result_address);
+    } else if (eq(result_fvd,S(uint64))) {
+      av_start_ulonglong(*alist,address,result_address);
+    }
+    #else
     else if (eq(result_fvd,S(sint64))) {
       av_start_struct(*alist,address,struct_sint64,
-                      av_word_splittable_2(uint32,uint32),result_address);
+                      av_word_splittable_2(sint32,sint32),result_address);
     } else if (eq(result_fvd,S(uint64))) {
       av_start_struct(*alist,address,struct_uint64,
                       av_word_splittable_2(uint32,uint32),result_address);
     }
+    #endif
    #endif
     else if (eq(result_fvd,S(single_float))) {
       if (flags & ff_lang_ansi_c) {
@@ -3244,7 +3359,7 @@ local void do_av_start (uintWL flags, object result_fvd, av_alist * alist,
     } else if (eq(result_fvd,S(c_pointer)) || eq(result_fvd,S(c_string))) {
       av_start_ptr(*alist,address,void*,result_address);
     } else {
-      fehler_foreign_type(result_fvd);
+      error_foreign_type(result_fvd);
     }
   } else if (simple_vector_p(result_fvd)) {
     var object result_fvdtype = TheSvector(result_fvd)->data[0];
@@ -3259,10 +3374,14 @@ local void do_av_start (uintWL flags, object result_fvd, av_alist * alist,
                || eq(result_fvdtype,S(c_array_ptr))) {
       av_start_ptr(*alist,address,void*,result_address);
     } else {
-      fehler_foreign_type(result_fvd);
+      error_foreign_type(result_fvd);
     }
   } else {
-    fehler_foreign_type(result_fvd);
+    object inttype = gethash(result_fvd,O(foreign_inttype_table),false);
+    if (!eq(inttype,nullobj))
+      do_av_start (flags, inttype, alist, address, result_address,
+                   result_size, result_splittable);
+    else error_foreign_type(result_fvd);
   }
   if (flags & ff_lang_stdcall)
     alist->flags |= __AV_STDCALL_CLEANUP;
@@ -3333,11 +3452,19 @@ local void do_av_arg (uintWL flags, object arg_fvd, av_alist * alist,
       av_ulong(*alist,*(unsigned long *)arg_address);
     }
    #if (long_bitsize<64)
+    #if defined(HAVE_LONG_LONG_INT)
+    else if (eq(arg_fvd,S(sint64))) {
+      av_longlong(*alist,*(sint64*)arg_address);
+    } else if (eq(arg_fvd,S(uint64))) {
+      av_ulonglong(*alist,*(uint64*)arg_address);
+    }
+    #else
     else if (eq(arg_fvd,S(sint64))) {
       av_struct(*alist,struct_sint64,*(struct_sint64*)arg_address);
     } else if (eq(arg_fvd,S(uint64))) {
       av_struct(*alist,struct_uint64,*(struct_uint64*)arg_address);
     }
+    #endif
    #endif
     else if (eq(arg_fvd,S(single_float))) {
       if (flags & ff_lang_ansi_c) {
@@ -3352,7 +3479,7 @@ local void do_av_arg (uintWL flags, object arg_fvd, av_alist * alist,
     } else if (eq(arg_fvd,S(c_string))) {
       av_ptr(*alist,char*,*(char**)arg_address);
     } else {
-      fehler_foreign_type(arg_fvd);
+      error_foreign_type(arg_fvd);
     }
   } else if (simple_vector_p(arg_fvd)) {
     var object arg_fvdtype = TheSvector(arg_fvd)->data[0];
@@ -3366,10 +3493,13 @@ local void do_av_arg (uintWL flags, object arg_fvd, av_alist * alist,
                || eq(arg_fvdtype,S(c_array_ptr))) {
       av_ptr(*alist,void*,*(void**)arg_address);
     } else {
-      fehler_foreign_type(arg_fvd);
+      error_foreign_type(arg_fvd);
     }
   } else {
-    fehler_foreign_type(arg_fvd);
+    object inttype = gethash(arg_fvd,O(foreign_inttype_table),false);
+    if (!eq(inttype,nullobj))
+      do_av_arg (flags, inttype, alist, arg_address, arg_size, arg_alignment);
+    else error_foreign_type(arg_fvd);
   }
 }
 
@@ -3379,10 +3509,10 @@ local void do_av_arg (uintWL flags, object arg_fvd, av_alist * alist,
 LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
   var object ffun = Before(rest_args_pointer);
   if (!ffunctionp(ffun))
-    fehler_foreign_function(ffun);
+    error_foreign_function(ffun);
   var object argfvds_top = TheFfunction(ffun)->ff_argtypes;
   if (!simple_vector_p(argfvds_top))
-    fehler_function_no_fvd(ffun,S(foreign_call_out));
+    error_function_no_fvd(ffun,S(foreign_call_out));
   var uintWL flags = posfixnum_to_V(TheFfunction(ffun)->ff_flags);
   switch (flags & 0x7F00) {
     /* For the moment, the only supported languages are "C" and "ANSI C". */
@@ -3390,7 +3520,7 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
     case ff_lang_ansi_c:
       break;
     default:
-      fehler_function_no_fvd(ffun,S(foreign_call_out));
+      error_function_no_fvd(ffun,S(foreign_call_out));
   }
   {
     var av_alist alist;
@@ -3421,7 +3551,8 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
         if (!(arg_flags & ff_out)) {
           inargcount++;
           if (inargcount > argcount)
-            fehler_too_few_args(S(foreign_call_out),Before(rest_args_pointer),argcount,inargcount);
+            error_too_few_args(S(foreign_call_out),Before(rest_args_pointer),
+                               argcount,inargcount);
         }
         if (arg_flags & (ff_out | ff_inout)) {
           if (!(simple_vector_p(arg_fvd) && (Svector_length(arg_fvd) == 2)
@@ -3429,7 +3560,7 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
             dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T */
             pushSTACK(arg_fvd);
             pushSTACK(S(foreign_call_out));
-            fehler(error,GETTEXT("~S: :OUT argument is not a pointer: ~S"));
+            error(error_condition,GETTEXT("~S: :OUT argument is not a pointer: ~S"));
           }
           outargcount++;
         }
@@ -3469,7 +3600,7 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
         }
       }
       if (argcount != inargcount)
-        fehler_too_many_args(S(foreign_call_out),Before(rest_args_pointer),argcount,inargcount);
+        error_too_many_args(S(foreign_call_out),Before(rest_args_pointer),argcount,inargcount);
     }
     var uintL result_count = 0;
     typedef struct { void* address; } result_descr; /* fvd is pushed onto the STACK */
@@ -3477,7 +3608,7 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
     cumul_size += (-cumul_size) & (cumul_alignment-1);
     var DYNAMIC_ARRAY(total_room,char,cumul_size+cumul_alignment/*-1*/);
     var void* result_address = (void*)((uintP)(total_room+result_alignment-1) & -(long)result_alignment);
-    allocaing_room_pointer = (void*)((uintP)result_address + result_size);
+    void *allocaing_room_pointer = (void*)((uintP)result_address + result_size);
     if (!eq(result_fvd,S(nil))) {
       pushSTACK(result_fvd);
       results[0].address = result_address;
@@ -3531,7 +3662,8 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
           } else {
             /* Convert argument: */
             pushSTACK(arg_fvd); /* save */
-            convert_to_foreign(arg_fvd,arg,arg_address,&allocaing);
+            convert_to_foreign(arg_fvd,arg,arg_address,&allocaing,
+                               &allocaing_room_pointer);
             arg_fvd = popSTACK(); /* restore */
             if (arg_flags & ff_inout) {
               pushSTACK(TheSvector(arg_fvd)->data[1]);
@@ -3552,9 +3684,9 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
             /* Convert argument: */
             pushSTACK(arg_fvd); /* save */
             if (arg_flags & ff_malloc)
-              convert_to_foreign(arg_fvd,arg,arg_address,&mallocing);
+              convert_to_foreign(arg_fvd,arg,arg_address,&mallocing,NULL);
             else
-              convert_to_foreign(arg_fvd,arg,arg_address,&nomalloc);
+              convert_to_foreign(arg_fvd,arg,arg_address,&nomalloc,NULL);
             arg_fvd = popSTACK(); /* restore */
             if (arg_flags & ff_inout) {
               pushSTACK(TheSvector(arg_fvd)->data[1]);
@@ -3573,8 +3705,8 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
     if (av_overflown(alist))
       /* avcall has limited buffer space
        __AV_ALIST_WORDS is only an approximation in number of arguments */
-      fehler_too_many_args(S(foreign_call_out),Before(rest_args_pointer),allargcount,
-                           __AV_ALIST_WORDS);
+      error_too_many_args(S(foreign_call_out),Before(rest_args_pointer),
+                          allargcount,__AV_ALIST_WORDS);
     /* Finally call the function. */
     begin_call();
     av_call(alist);
@@ -3589,7 +3721,7 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
     }
     /* Return them as multiple values. */
     if (result_count >= mv_limit)
-      fehler_mv_zuviel(S(foreign_call_out));
+      error_mv_toomany(S(foreign_call_out));
     STACK_to_mv(result_count);
     if (flags & ff_alloca) {
       /* The C functions we passed also have dynamic extent. Free them.
@@ -3602,7 +3734,7 @@ LISPFUN(foreign_call_out,seclass_default,1,0,rest,nokey,0,NIL) {
     FREE_DYNAMIC_ARRAY(total_room);
     FREE_DYNAMIC_ARRAY(results);
   }
-  set_args_end_pointer(rest_args_pointer STACKop 1); /* STACK aufräumen */
+  set_args_end_pointer(rest_args_pointer STACKop 1); /* STACK cleanup */
 }
 
 /* Here is the point where we use the VACALL package. */
@@ -3674,11 +3806,19 @@ local void do_va_start (uintWL flags, object result_fvd, va_alist alist,
       va_start_ulong(alist);
     }
    #if (long_bitsize<64)
+    #if defined(HAVE_LONG_LONG_INT)
     else if (eq(result_fvd,S(sint64))) {
-      va_start_struct(alist,struct_sint64,va_word_splittable_2(uint32,uint32));
+      va_start_longlong(alist);
+    } else if (eq(result_fvd,S(uint64))) {
+      va_start_ulonglong(alist);
+    }
+    #else
+    else if (eq(result_fvd,S(sint64))) {
+      va_start_struct(alist,struct_sint64,va_word_splittable_2(sint32,sint32));
     } else if (eq(result_fvd,S(uint64))) {
       va_start_struct(alist,struct_uint64,va_word_splittable_2(uint32,uint32));
     }
+    #endif
    #endif
     else if (eq(result_fvd,S(single_float))) {
       if (flags & ff_lang_ansi_c) {
@@ -3691,7 +3831,7 @@ local void do_va_start (uintWL flags, object result_fvd, va_alist alist,
     } else if (eq(result_fvd,S(c_pointer)) || eq(result_fvd,S(c_string))) {
       va_start_ptr(alist,void*);
     } else {
-      fehler_foreign_type(result_fvd);
+      error_foreign_type(result_fvd);
     }
   } else if (simple_vector_p(result_fvd)) {
     var object result_fvdtype = TheSvector(result_fvd)->data[0];
@@ -3705,10 +3845,14 @@ local void do_va_start (uintWL flags, object result_fvd, va_alist alist,
                || eq(result_fvdtype,S(c_array_ptr))) {
       va_start_ptr(alist,void*);
     } else {
-      fehler_foreign_type(result_fvd);
+      error_foreign_type(result_fvd);
     }
   } else {
-    fehler_foreign_type(result_fvd);
+    object inttype = gethash(result_fvd,O(foreign_inttype_table),false);
+    if (!eq(inttype,nullobj))
+      do_va_start (flags, inttype, alist, result_size, result_alignment,
+                   result_splittable);
+    else error_foreign_type(result_fvd);
   }
   if (flags & ff_lang_stdcall)
     alist->flags |= __VA_STDCALL_CLEANUP;
@@ -3787,11 +3931,21 @@ local void* do_va_arg (uintWL flags, object arg_fvd, va_alist alist)
       return &alist->tmp._ulong;
     }
    #if (long_bitsize<64)
+    #if defined(HAVE_LONG_LONG_INT)
+    else if (eq(arg_fvd,S(sint64))) {
+      alist->tmp._longlong = va_arg_longlong(alist);
+      return &alist->tmp._longlong;
+    } else if (eq(arg_fvd,S(uint64))) {
+      alist->tmp._ulonglong = va_arg_ulonglong(alist);
+      return &alist->tmp._ulonglong;
+    }
+    #else
     else if (eq(arg_fvd,S(sint64))) {
       return &va_arg_struct(alist,struct_sint64);
     } else if (eq(arg_fvd,S(uint64))) {
       return &va_arg_struct(alist,struct_uint64);
     }
+    #endif
    #endif
     else if (eq(arg_fvd,S(single_float))) {
       alist->tmp._float =
@@ -3807,7 +3961,7 @@ local void* do_va_arg (uintWL flags, object arg_fvd, va_alist alist)
       alist->tmp._ptr = va_arg_ptr(alist,void*);
       return &alist->tmp._ptr;
     } else {
-      fehler_foreign_type(arg_fvd);
+      error_foreign_type(arg_fvd);
     }
   } else if (simple_vector_p(arg_fvd)) {
     var object arg_fvdtype = TheSvector(arg_fvd)->data[0];
@@ -3826,10 +3980,13 @@ local void* do_va_arg (uintWL flags, object arg_fvd, va_alist alist)
       alist->tmp._ptr = va_arg_ptr(alist,void*);
       return &alist->tmp._ptr;
     } else {
-      fehler_foreign_type(arg_fvd);
+      error_foreign_type(arg_fvd);
     }
   } else {
-    fehler_foreign_type(arg_fvd);
+    object inttype = gethash(arg_fvd,O(foreign_inttype_table),false);
+    if (!eq(inttype,nullobj))
+      return do_va_arg (flags, inttype, alist);
+    else error_foreign_type(arg_fvd);
   }
 }
 
@@ -3897,11 +4054,19 @@ local void do_va_return (uintWL flags, object result_fvd, va_alist alist, void* 
       va_return_ulong(alist,*(unsigned long *)result_address);
     }
    #if (long_bitsize<64)
+    #if defined(HAVE_LONG_LONG_INT)
+    else if (eq(result_fvd,S(sint64))) {
+      va_return_longlong(alist,*(sint64*)result_address);
+    } else if (eq(result_fvd,S(uint64))) {
+      va_return_ulonglong(alist,*(uint64*)result_address);
+    }
+    #else
     else if (eq(result_fvd,S(sint64))) {
       va_return_struct(alist,struct_sint64,*(struct_sint64*)result_address);
     } else if (eq(result_fvd,S(uint64))) {
       va_return_struct(alist,struct_uint64,*(struct_uint64*)result_address);
     }
+    #endif
    #endif
     else if (eq(result_fvd,S(single_float))) {
       if (flags & ff_lang_ansi_c) {
@@ -3914,7 +4079,7 @@ local void do_va_return (uintWL flags, object result_fvd, va_alist alist, void* 
     } else if (eq(result_fvd,S(c_pointer)) || eq(result_fvd,S(c_string))) {
       va_return_ptr(alist,void*,*(void**)result_address);
     } else {
-      fehler_foreign_type(result_fvd);
+      error_foreign_type(result_fvd);
     }
   } else if (simple_vector_p(result_fvd)) {
     var object result_fvdtype = TheSvector(result_fvd)->data[0];
@@ -3930,9 +4095,14 @@ local void do_va_return (uintWL flags, object result_fvd, va_alist alist, void* 
                || eq(result_fvdtype,S(c_array_ptr))) {
       va_return_ptr(alist,void*,*(void**)result_address);
     } else
-      fehler_foreign_type(result_fvd);
-  } else
-    fehler_foreign_type(result_fvd);
+      error_foreign_type(result_fvd);
+  } else {
+    object inttype = gethash(result_fvd,O(foreign_inttype_table),false);
+    if (!eq(inttype,nullobj))
+      do_va_return (flags, inttype, alist, result_address,
+                    result_size, result_alignment);
+    else error_foreign_type(result_fvd);
+  }
 }
 
 /* This is the CALL-IN function called by the trampolines. */
@@ -3955,7 +4125,7 @@ local void callback (void* data, va_alist alist)
     case ff_lang_ansi_c:
       break;
     default:
-      fehler_function_no_fvd(ffun,S(foreign_call_in));
+      error_function_no_fvd(ffun,S(foreign_call_in));
   }
   var struct foreign_layout sas;
   foreign_layout(result_fvd,&sas);
@@ -3990,7 +4160,7 @@ local void callback (void* data, va_alist alist)
                                      & -(long)result_alignment);
   /* Convert the result: */
   convert_to_foreign(STACK_2,value1,result_address,
-                     (flags & ff_malloc) ? &mallocing : &nomalloc);
+                     (flags & ff_malloc) ? &mallocing : &nomalloc,NULL);
   /* Call va_return_xxx: */
   begin_system_call();
   do_va_return(flags,STACK_2,alist,result_address,result_size,
@@ -4007,27 +4177,24 @@ local void callback (void* data, va_alist alist)
 #include <dlfcn.h>
 #endif
 
-/* O(foreign_libraries) is an alist of all open libraries.
- It is a list ((string fpointer function ...) ...)
- although it could have been a list ((string faddress ...) ...)
- with all fa_offsets being 0. */
+/* O(foreign_libraries) is an alist of all open foreign library specifiers.
+ a library specifier is a list (library-name fpointer object1 object2 ...) */
 
 #if defined(HAVE_DLERROR)
 /* return the string object for dlerror() value */
 local object dlerror_string (void)
 {
-  var const char* error;
-  begin_system_call(); error = dlerror(); end_system_call();
-  return error == NULL ? NIL : asciz_to_string(error,O(misc_encoding));
+  var const char* errmesg;
+  begin_system_call(); errmesg = dlerror(); end_system_call();
+  return safe_to_string(errmesg);
 }
 #endif
 
-/* Open a library with the given name and version
- name: pointer to a Lisp string
- version: library version, not used (a holdover from Amiga?)
+/* Open a library with the given name
+ name: pointer to a Lisp string (corrected on error) or :DEFAULT or :NEXT
  returns a dlopen() handle to the DLL
  can trigger GC -- only on error */
-local maygc void * open_library (gcv_object_t* name, uintL version)
+local maygc void * open_library (gcv_object_t* name)
 {
   var void * handle;
  open_library_restart:
@@ -4044,16 +4211,16 @@ local maygc void * open_library (gcv_object_t* name, uintL version)
    #else
     pushSTACK(NIL); /* no PLACE */
     pushSTACK(S(Knext));
-    pushSTACK(S(foreign_library));
-    check_value(error,GETTEXT("~S: ~S is not supported on this platform."));
+    pushSTACK(TheSubr(subr_self)->name);
+    check_value(error_condition,GETTEXT("~S: ~S is not supported on this platform."));
     *name = value1;
     goto open_library_restart;
    #endif
   }
   with_string_0(*name = check_string(*name),O(misc_encoding),libname, {
-    begin_system_call();
+    begin_blocking_system_call();
     handle = libopen(libname);
-    end_system_call();
+    end_blocking_system_call();
   });
   if (handle == NULL) {
     pushSTACK(NIL); /* no PLACE */
@@ -4062,11 +4229,11 @@ local maygc void * open_library (gcv_object_t* name, uintL version)
     pushSTACK(STACK_0);
     STACK_1 = dlerror_string();
    #endif
-    pushSTACK(S(foreign_library));
+    pushSTACK(TheSubr(subr_self)->name);
    #if defined(HAVE_DLERROR)
-    check_value(error,GETTEXT("~S: Cannot open library ~S: ~S"));
+    check_value(error_condition,GETTEXT("~S: Cannot open library ~S: ~S"));
    #else
-    check_value(error,GETTEXT("~S: Cannot open library ~S"));
+    check_value(error_condition,GETTEXT("~S: Cannot open library ~S"));
    #endif
     *name = value1;
     goto open_library_restart;
@@ -4087,72 +4254,68 @@ local void close_library (object fp) {
   mark_fp_invalid(TheFpointer(fp));
 }
 
-/* FIXME: BETTER COMMENT! */
-/* return the handle of the object (string) in the library (name fpointer ...)
+/* find versioned symbol in the dynamic library.
+ If this functionality is not supported, then the symbol
+ is not found, even if the name does exist in the library. */
+local void *find_name_version (void *handle, const char *name,
+                               const char *ver) {
+  var void *ret = NULL;
+#ifdef HAVE_DLVSYM
+  ret = dlvsym(handle,name,ver);
+#else
+  unused(ver); unused(name);
+#endif
+  return ret;
+}
+
+/* return the object handle
+ > library - library specifier (lib addr obj...)
+ > name    - object name (string)
+ < address - the foreign library handle (in the C sense)
  can trigger GC */
-local maygc void* object_handle (object library, object name) {
+local maygc void* object_handle (object library, object name, object version) {
   var void * address;
-  with_string_0(name,O(foreign_encoding),namez, {
-    begin_system_call();
-    address = find_name(TheFpointer(Car(Cdr(library)))->fp_pointer, namez);
-    end_system_call();
-  });
+  if (nullp(version)) {
+    with_string_0(name,O(foreign_encoding),namez, {
+      begin_system_call();
+      address = find_name(TheFpointer(Car(Cdr(library)))->fp_pointer, namez);
+      end_system_call();
+    });
+  } else {
+    with_string_0(name,O(foreign_encoding),namez, {
+      with_string_0(version,O(foreign_encoding),verz, {
+        begin_system_call();
+        address = find_name_version(TheFpointer(Car(Cdr(library)))->fp_pointer,
+                                    namez, verz);
+        end_system_call();
+      });
+    });
+  }
   if (address == NULL) {
-    pushSTACK(NIL);             /* 5 continue-format-string */
-    pushSTACK(S(error));        /* 4 error type */
-    pushSTACK(NIL);             /* 3 error-format-string */
-    pushSTACK(TheSubr(subr_self)->name); /* 2 */
-    pushSTACK(name);                     /* 1 */
-    pushSTACK(Car(library));             /* 0 */
-    STACK_3 = CLSTEXT("~S: no dynamic object named ~S in library ~S");
-    STACK_5 = CLSTEXT("Skip foreign object creation");
-    funcall(L(cerror_of_type),6);
+    uintC argcount = 6;
+    gcv_object_t *cfs, *efs;
+    pushSTACK(NIL); cfs=&STACK_0; /* continue-format-string */
+    pushSTACK(S(error));          /* error type */
+    pushSTACK(NIL); efs=&STACK_0; /* error-format-string */
+    pushSTACK(TheSubr(subr_self)->name); pushSTACK(name);
+    if (!nullp(version)) {
+      pushSTACK(version); argcount++;
+    }
+    pushSTACK(Car(library));
+    *efs = nullp(version)
+      ? CLSTEXT("~S: no dynamic object named ~S in library ~S")
+      : CLSTEXT("~S: no dynamic object named ~S (version ~S) in library ~S");
+    *cfs = CLSTEXT("Skip foreign object creation");
+    funcall(L(cerror_of_type),argcount);
   }
   return address;
 }
 
-/* update the DLL pointer and all related objects: re-open the library,
- and update the base fp_pointer of fpointer-library-handle and all objects in
- acons = (library-name fpointer-library-handle object1 object2 ...)
- version = library version, not used (a holdover from Amiga?)
- can trigger GC -- only on error in open_library() or object_handle() */
-local maygc void update_library (object acons, uintL version) {
-  pushSTACK(acons);
-  var gcv_object_t *acons_ = &STACK_0;
-  var void *lib_handle = open_library(&Car(*acons_),version);
-  pushSTACK(Car(Cdr(*acons_))); /* library address - Fpointer */
-  var gcv_object_t *lib_addr_ = &STACK_0; /* presumably invalid */
-  TheFpointer(*lib_addr_)->fp_pointer = lib_handle;
-  mark_fp_valid(TheFpointer(*lib_addr_));
-  pushSTACK(NIL);
-  var gcv_object_t *fa_ = &STACK_0; /* place to keep foreign address */
-  pushSTACK(Cdr(*acons_));          /* library list */
-  while (consp(Cdr(STACK_0))) {
-    var object fo = Car(Cdr(STACK_0)); /* foreign object */
-    *fa_ = foreign_address(fo,false);  /* its foreign address */
-    var object fn;                     /* its name */
-    switch (Record_type(fo)) {
-      case Rectype_Fvariable: fn = (TheFvariable(fo)->fv_name); break;
-      case Rectype_Ffunction: fn = (TheFfunction(fo)->ff_name); break;
-      default: NOTREACHED;
-    }
-    ASSERT(eq(TheFaddress(*fa_)->fa_base,*lib_addr_));
-    var void* handle = object_handle(*acons_,fn);
-    if (handle) {               /* found -- fix Faddress */
-      TheFaddress(*fa_)->fa_offset = (sintP)handle - (sintP)lib_handle;
-      STACK_0 = Cdr(STACK_0);
-    } else {                    /* not found - drop object */
-      Cdr(STACK_0) = Cdr(Cdr(STACK_0));
-    }
-  }
-  skipSTACK(4);                /* drop acons, library list & lib_addr */
-}
-
 /* find the library in O(foreign_libraries):
-   (ASSOC name O(foreign_libraries))
+   (ASSOC name O(foreign_libraries) :TEST (FUNCTION EQUAL))
  > name: the name of the library
- < list (library fpointer object1 object2 ...) or NIL */
-local object find_library (object name) {
+ < library specifier (library fpointer deps object1 object2 ...) or NIL */
+local object find_library_by_name (object name) {
   var object alist = O(foreign_libraries);
   while (consp(alist)) {
     if (equal(name,Car(Car(alist))))
@@ -4161,52 +4324,123 @@ local object find_library (object name) {
   }
   return NIL;
 }
-
-/* (FFI::FOREIGN-LIBRARY name [required-version])
- returns a foreign library specifier. */
-LISPFUN(foreign_library,seclass_default,1,1,norest,nokey,0,NIL)
-{
-  var uintL v = 0;
-  if (boundp(STACK_0))
-    v = I_to_uint32(check_uint32(STACK_0));
-  { /* Check whether the library is on the alist or has already been opened. */
-    var object lib_cons = find_library(STACK_1);
-    if (consp(lib_cons)) {
-      var object lib = Car(Cdr(lib_cons));
-      if (!fp_validp(TheFpointer(lib))) {
-        /* Library already existed in a previous Lisp session.
-           Update the address, and make it valid. */
-        STACK_0 = lib;          /* save */
-        update_library(lib_cons,v);
-        lib = STACK_0;          /* restore */
-      }
-      value1 = lib;
-      goto done;
-    }
+/* find the library in O(foreign_libraries):
+   (FIND address O(foreign_libraries) :KEY (FUNCTION SECOND))
+ > addr: the address of the library
+ < library specifier (library fpointer object1 object2 ...) or NIL */
+local object find_library_by_address (object addr) {
+  var object alist = O(foreign_libraries);
+  while (consp(alist)) {
+    if (eq(addr,Car(Cdr(Car(alist)))))
+      return Car(alist);
+    alist = Cdr(alist);
   }
-  /* Pre-allocate room: */
-  pushSTACK(allocate_cons()); pushSTACK(allocate_cons());
-  pushSTACK(allocate_cons()); pushSTACK(allocate_fpointer((void*)0));
-  { /* Open the library: */
-    var void * libaddr = open_library(&(STACK_(1+4)),v);
-    var object lib = popSTACK();
-    var object acons = popSTACK();
-    var object new_cons = popSTACK();
-    var object tail_cons = popSTACK();
-    TheFpointer(lib)->fp_pointer = libaddr;
-    value1 = lib;
-    Car(acons) = STACK_1; Cdr(acons) = tail_cons;
-    Car(new_cons) = acons; Cdr(new_cons) = O(foreign_libraries);
-    Car(tail_cons) = lib; /* Cdr(tail_cons) = NIL; */
-    O(foreign_libraries) = new_cons;
-  }
- done:
-  mv_count=1; skipSTACK(2);
+  return NIL;
 }
 
-/* (FFI:CLOSE-FOREIGN-LIBRARY name [required-version]) */
+/* update the DLL pointer and all related objects: re-open the library,
+ and update the base fp_pointer of fpointer-library-handle and all objects in
+ lib_spec = (library-name fpointer-library-handle deps object1 object2 ...)
+ can trigger GC -- only on error in open_library() or object_handle() */
+local maygc void update_library (object lib_spec) {
+  pushSTACK(lib_spec);
+  var gcv_object_t *lib_spec_ = &STACK_0;
+  /* update dependencies */
+  for (pushSTACK(Car(Cdr(Cdr(*lib_spec_)))); consp(STACK_0);
+       STACK_0 = Cdr(STACK_0))
+    /* dependencies are strings */
+    update_library(find_library_by_name(Car(STACK_0)));
+  skipSTACK(1);
+  /* open the library */
+  pushSTACK(Car(*lib_spec_));
+  var void *lib_handle = open_library(&STACK_0);
+  Car(*lib_spec_) = popSTACK();
+  pushSTACK(Car(Cdr(*lib_spec_))); /* library address - Fpointer */
+  var gcv_object_t *lib_addr_ = &STACK_0; /* presumably invalid */
+  TheFpointer(*lib_addr_)->fp_pointer = lib_handle;
+  mark_fp_valid(TheFpointer(*lib_addr_));
+  /* update objects */
+  pushSTACK(NIL);
+  var gcv_object_t *fa_ = &STACK_0; /* place to keep foreign address */
+  pushSTACK(Cdr(Cdr(*lib_spec_)));  /* library list */
+  while (consp(Cdr(STACK_0))) {
+    var object fo = Car(Cdr(STACK_0)); /* foreign object */
+    *fa_ = foreign_address(fo,false);  /* its foreign address */
+    var object fn;                     /* its name */
+    var object ve;                     /* its version */
+    switch (Record_type(fo)) {
+      case Rectype_Fvariable:
+        fn = TheFvariable(fo)->fv_name;
+        ve = TheFvariable(fo)->fv_version;
+        break;
+      case Rectype_Ffunction:
+        fn = TheFfunction(fo)->ff_name;
+        ve = TheFfunction(fo)->ff_version;
+        break;
+      default: NOTREACHED;
+    }
+    ASSERT(eq(TheFaddress(*fa_)->fa_base,*lib_addr_));
+    var void* handle = object_handle(*lib_spec_,fn,ve);
+    if (handle) {               /* found -- fix Faddress */
+      TheFaddress(*fa_)->fa_offset = (sintP)handle - (sintP)lib_handle;
+      STACK_0 = Cdr(STACK_0);
+    } else {                    /* not found - drop object */
+      Cdr(STACK_0) = Cdr(Cdr(STACK_0));
+      var object fp = allocate_fpointer((void*)0);
+      TheFaddress(*fa_)->fa_base = fp;
+      mark_fp_invalid(TheFpointer(TheFaddress(*fa_)->fa_base));
+    }
+  }
+  skipSTACK(4);                /* drop lib_spec, library list & lib_addr */
+}
+
+/* Check a foreign library argument: an address or a string
+ > obj ----- library name (will be opened) or address (will be updated)
+ < Return the library specifier (name fpointer object...)
+    if obj was the name, it is checked and updated by open_library
+ can trigger GC */
+local maygc object check_library (gcv_object_t *obj) {
+  var object lib_spec = (fpointerp(*obj) ? find_library_by_address(*obj)
+                         : stringp(*obj) ? find_library_by_name(*obj) : NIL);
+  if (nullp(lib_spec)) {        /* open new */
+    pushSTACK(*obj);
+    pushSTACK(allocate_fpointer(open_library(obj)));
+    pushSTACK(NIL);             /* dependencies */
+    lib_spec = allocate_cons();
+    Cdr(lib_spec) = O(foreign_libraries);
+    O(foreign_libraries) = lib_spec;
+    Car(O(foreign_libraries)) = lib_spec = listof(3);
+    return lib_spec;
+  } else { /* lib_spec = (library-name library-addr deps obj1 obj2 ...) */
+    if (!fp_validp(TheFpointer(Car(Cdr(lib_spec))))) {
+      /* Library already existed in a previous Lisp session.
+         Update the address, and make it valid. */
+      pushSTACK(lib_spec);      /* save */
+      update_library(lib_spec);
+      lib_spec = popSTACK();    /* restore */
+    }
+    return lib_spec;
+  }
+}
+
+/* (FFI:OPEN-FOREIGN-LIBRARY name &require dependencies)
+ returns a foreign library specifier (fpointer). */
+LISPFUN(open_foreign_library,seclass_read,1,0,norest,key,1,(kw(require))) {
+  /* open the dependencies */
+  for (pushSTACK(STACK_0); consp(STACK_0); STACK_0 = Cdr(STACK_0)) {
+    pushSTACK(Car(STACK_0));
+    check_library(&STACK_0);
+    var object tmp = popSTACK(); Car(STACK_1) = tmp;
+  }
+  var object lib_spec = check_library(&STACK_2);
+  Car(Cdr(Cdr(lib_spec))) = STACK_1; /* save dependencies */
+  VALUES1(Car(Cdr(lib_spec)));
+  skipSTACK(3);                 /* name, dependencies, tail */
+}
+
+/* (FFI:CLOSE-FOREIGN-LIBRARY name) */
 LISPFUNN(close_foreign_library,1) {
-  var object lib_cons = find_library(popSTACK());
+  var object lib_cons = find_library_by_name(popSTACK());
   if (consp(lib_cons)) {
     var object library = Car(Cdr(lib_cons));
     if (fp_validp(TheFpointer(library)))
@@ -4217,57 +4451,37 @@ LISPFUNN(close_foreign_library,1) {
   mv_count = 1;
 }
 
-/* Try to make a Foreign-Pointer valid again.
+/* Try to make a Foreign-Pointer valid again, returning the argument.
  validate_fpointer(obj);
  can trigger GC */
-local maygc void validate_fpointer (object obj)
+local maygc object validate_fpointer (object obj)
 { /* If the foreign pointer belongs to a foreign library from a previous
      session, we reopen the library. */
   pushSTACK(obj);
   pushSTACK(O(foreign_libraries));
   while (consp(STACK_0)) {
-    var object acons = Car(STACK_0); STACK_0 = Cdr(STACK_0);
-    if (eq(Car(Cdr(acons)),STACK_1)) {
-      update_library(acons,0);  /*version??*/
-      skipSTACK(2); return;
+    var object lib_spec = Car(STACK_0); STACK_0 = Cdr(STACK_0);
+    if (eq(Car(Cdr(lib_spec)),STACK_1)) {
+      update_library(lib_spec);
+      skipSTACK(1); return popSTACK();
     }
   }
   skipSTACK(1);                 /* drop tail */
-  check_fpointer(popSTACK()/*obj*/,false);
+  return check_fpointer(popSTACK()/*obj*/,false);
 }
 
-/* FIXME: BETTER COMMENT! */
-/* Check for a library argument.
-   Return (lib addr obj ...).
-   can trigger GC */
-local maygc object check_library (object obj)
-{
- restart:
-  if (fpointerp(obj)) {
-    var object alist = O(foreign_libraries);
-    while (consp(alist)) {
-      if (eq(obj,Car(Cdr(Car(alist)))))
-        return Car(alist);
-      alist = Cdr(alist);
-    }
-  }
-  pushSTACK(NIL); /* no PLACE */
-  pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-  check_value(error,GETTEXT("~S: ~S is not a library"));
-  obj = value1;
-  goto restart;
-}
-
-/* FIXME: BETTER COMMENT! */
 /* return the foreign address of the foreign object named 'name'
+ > library - foreign library specifier (name fpointer obj...)
+ > name - string (C name)
+ > offset - integer or NIL, if supplied, name is ignored
  can trigger GC */
-local maygc object object_address (object library, object name, object offset)
-{ /* return the foreign address of the foreign object named `name' */
-  var object lib_addr = Car(Cdr(library));
+local maygc object object_address (object library, object name,
+                                   object version, object offset)
+{ var object lib_addr = Car(Cdr(library));
   var sintP result_offset;
   if (nullp(offset)) {
     pushSTACK(lib_addr);
-    var void* name_handle = object_handle(library,name);
+    var void* name_handle = object_handle(library,name,version);
     lib_addr = popSTACK();
     if (NULL == name_handle) return nullobj;
     result_offset =
@@ -4278,98 +4492,121 @@ local maygc object object_address (object library, object name, object offset)
   return make_faddress(lib_addr,result_offset);
 }
 
-/* add foreign object obj to the acons (name addr obj1 ...)
+/* add foreign object obj to the lib_spec (name addr obj1 ...)
  can trigger GC */
-local maygc void push_foreign_object (object obj, object acons) {
-  pushSTACK(obj); pushSTACK(acons);
+local maygc void push_foreign_object (object obj, object lib_spec) {
+  pushSTACK(obj); pushSTACK(lib_spec);
   var object new_cons = allocate_cons();
-  acons = popSTACK();
-  Car(new_cons) = popSTACK()/*obj*/; Cdr(new_cons) = Cdr(Cdr(acons));
-  Cdr(Cdr(acons)) = new_cons;
+  lib_spec = popSTACK();
+  Car(new_cons) = popSTACK()/*obj*/; Cdr(new_cons) = Cdr(Cdr(Cdr(lib_spec)));
+  Cdr(Cdr(Cdr(lib_spec))) = new_cons;
 }
 
-/* (FFI::FOREIGN-LIBRARY-VARIABLE name library offset c-type)
- returns a foreign variable. */
-LISPFUNN(foreign_library_variable,4)
-{
-  STACK_3 = coerce_ss(STACK_3);
-  STACK_2 = check_library(STACK_2);
-  if (!nullp(STACK_1)) STACK_1 = check_sint32(STACK_1);
+/* UP: check foreign_library_* arguments and create the foreign object
+ > name    - object name (pre-checked)
+ > library - library name --> library specifier
+ > version - object version (checked here)
+ > offset  - address offset in the library or NIL
+ < new object address
+ can trigger GC */
+local maygc object foreign_library_check
+(gcv_object_t *name, gcv_object_t *library,
+ gcv_object_t *version, gcv_object_t *offset) {
+  *library = check_library(library);
+  if (!nullp(*offset)) *offset = check_sint32(*offset);
+  if (!nullp(*version)) *version = coerce_ss(*version);
+  return object_address(*library,*name,*version,*offset);
+}
+#define push_foreign_library_object(n,l,v,o)                    \
+  pushSTACK(foreign_library_check(n,l,v,o));                    \
+  if (eq(nullobj,STACK_0)) {    /* not found and ignored  */    \
+    skipSTACK(1); return NIL;                                   \
+  }
+
+/* UP: find and allocate a foreign variable in a dynamic library
+ > name     - variable C name (string - prechecked)
+ > library  - library C name (string - checked here)
+ > version  - object version (NIL or string - checked here)
+ > offset   - address offset in the library or NIL
+ > fvd      - function type
+ can trigger GC */
+local maygc object foreign_library_variable
+(gcv_object_t *name, gcv_object_t* fvd,
+ gcv_object_t *library, gcv_object_t *version, gcv_object_t *offset) {
+  push_foreign_library_object(name,library,version,offset);
   var struct foreign_layout sas;
-  foreign_layout(STACK_0,&sas);
+  foreign_layout(*fvd,&sas);
   var uintL size = sas.size;
   var uintL alignment = sas.alignment;
-  pushSTACK(object_address(STACK_2,STACK_3,STACK_1)); /* valid! */
-  if (eq(nullobj,STACK_0)) {    /* not found and ignored  */
-    skipSTACK(4+1); VALUES1(NIL); return;
-  }
   var object fvar = allocate_fvariable();
-  TheFvariable(fvar)->fv_name = STACK_(3+1);
+  TheFvariable(fvar)->fv_name = *name;
+  TheFvariable(fvar)->fv_version = *version;
   TheFvariable(fvar)->fv_address = STACK_0;
   TheFvariable(fvar)->fv_size = fixnum(size);
-  TheFvariable(fvar)->fv_type = STACK_(0+1);
-  if ((uintP)Faddress_value(TheFvariable(fvar)->fv_address) & (alignment-1)) {
-    pushSTACK(fvar);
-    pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: foreign variable ~S does not have the required alignment"));
-  }
+  TheFvariable(fvar)->fv_type = *fvd;
+  check_fvar_alignment(fvar,alignment);
   STACK_0 = fvar; /* save */
-  push_foreign_object(fvar,STACK_(2+1));
-  VALUES1(STACK_0/*fvar*/); skipSTACK(4+1);
+  push_foreign_object(fvar,*library);
+  return popSTACK(); /* fvar */
 }
 
-/* (FFI::FOREIGN-LIBRARY-FUNCTION name library offset c-function-type)
- returns a foreign function. */
-LISPFUNN(foreign_library_function,4)
-{
-  STACK_3 = coerce_ss(STACK_3);
-  STACK_2 = check_library(STACK_2);
-  if (!nullp(STACK_1)) STACK_1 = check_sint32(STACK_1);
-  {
-    var object fvd = STACK_0;
-    if (!(simple_vector_p(fvd)
-          && (Svector_length(fvd) == 4)
-          && eq(TheSvector(fvd)->data[0],S(c_function))
-          && simple_vector_p(TheSvector(fvd)->data[2]))) {
-      dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T */
-      pushSTACK(fvd);
-      pushSTACK(TheSubr(subr_self)->name);
-      fehler(error,GETTEXT("~S: illegal foreign function type ~S"));
-    }
-  }
-  pushSTACK(object_address(STACK_2,STACK_3,STACK_1));
-  if (eq(nullobj,STACK_0)) {    /* not found and ignored  */
-    skipSTACK(4+1); VALUES1(NIL); return;
-  }
+/* UP: find and allocate a foreign function in a dynamic library
+ > name     - function C name (string - prechecked)
+ > fvd      - function type (already checked)
+ > properties - function properties
+ > library  - library C name (string - checked here)
+ > version  - object version (NIL or string - checked here)
+ > offset   - address offset in the library or NIL
+ can trigger GC */
+local maygc object foreign_library_function
+(gcv_object_t *name, gcv_object_t *fvd, gcv_object_t *properties,
+ gcv_object_t *library, gcv_object_t *version, gcv_object_t *offset) {
+  push_foreign_library_object(name,library,version,offset);
   var object ffun = allocate_ffunction();
-  var object fvd = STACK_(0+1);
-  TheFfunction(ffun)->ff_name = STACK_(3+1);
+  TheFfunction(ffun)->ff_name = *name;
+  TheFfunction(ffun)->ff_version = *version;
   TheFfunction(ffun)->ff_address = STACK_0;
-  TheFfunction(ffun)->ff_resulttype = TheSvector(fvd)->data[1];
-  TheFfunction(ffun)->ff_argtypes = TheSvector(fvd)->data[2];
-  TheFfunction(ffun)->ff_flags = TheSvector(fvd)->data[3];
+  TheFfunction(ffun)->ff_resulttype = TheSvector(*fvd)->data[1];
+  TheFfunction(ffun)->ff_argtypes = TheSvector(*fvd)->data[2];
+  TheFfunction(ffun)->ff_flags = TheSvector(*fvd)->data[3];
+  TheFfunction(ffun)->ff_properties = *properties;
   STACK_0 = ffun; /* save */
-  push_foreign_object(ffun,STACK_(2+1));
-  VALUES1(STACK_0/*ffun*/); skipSTACK(4+1);
+  push_foreign_object(ffun,*library);
+  return popSTACK(); /* ffun */
 }
 
-#else /* not WIN32_NATIVE HAVE_DLOPEN */
+#else /* not WIN32_NATIVE || HAVE_DLOPEN */
 
 /* Try to make a Foreign-Pointer valid again.
  validate_fpointer(obj); */
-local inline void validate_fpointer (object obj)
+local inline object validate_fpointer (object obj)
 { /* Can't do anything. */
-  check_fpointer(obj,false);
+  return check_fpointer(obj,false);
 }
+
+/* error-message about lack of dlsym */
+nonreturning_function(local,error_no_dlsym,(object name, object library)) {
+  pushSTACK(library); pushSTACK(name);
+  pushSTACK(TheSubr(subr_self)->name);
+  error(error_condition,GETTEXT("~S: cannot find ~S in ~S due to lack of dlsym() on this platform"));
+}
+
+/* stubs signalling errors */
+local maygc object foreign_library_function
+(gcv_object_t* name, gcv_object_t* fvd, gcv_object_t* properties,
+ gcv_object_t* library, gcv_object_t* offset)
+{ error_no_dlsym(*name,*library); }
+local maygc object foreign_library_variable
+(gcv_object_t *name, gcv_object_t* fvd,
+ gcv_object_t *library, gcv_object_t *offset)
+{ error_no_dlsym(*name,*library); }
 
 #endif
 
 /* Allow everybody the creation of a FOREIGN-VARIABLE and FOREIGN-FUNCTION
  object, even without any module.
  This allows, among others, a self-test of the FFI (see testsuite). */
-local uintP ffi_identity (uintP arg) {
-  return arg;
-}
+local uintP ffi_identity (uintP arg) { return arg; }
 global void* ffi_user_pointer = NULL;
 
 /* Initialize the FFI. */
@@ -4377,6 +4614,9 @@ global maygc void init_ffi (void) {
   /* Allocate a fresh zero foreign pointer: */
   O(fp_zero) = allocate_fpointer((void*)0);
   ffi_user_pointer = NULL;
+  register_foreign_inttype("size_t",sizeof(size_t),false);
+  register_foreign_inttype("ssize_t",sizeof(ssize_t),true);
+  register_foreign_inttype("ffi_uintp",sizeof(uintP),false);
   register_foreign_variable(&ffi_user_pointer,"ffi_user_pointer",
                             0,sizeof(ffi_user_pointer));
   register_foreign_function((void*)&ffi_identity,"ffi_identity",
@@ -4389,9 +4629,9 @@ global void exit_ffi (void) {
   /* Close all foreign libraries. */
   var object alist = O(foreign_libraries);
   while (consp(alist)) {
-    var object acons = Car(alist);
-    var object obj = Car(Cdr(acons));
-    if (stringp(Car(acons)) && fp_validp(TheFpointer(obj)))
+    var object lib_spec = Car(alist);
+    var object obj = Car(Cdr(lib_spec));
+    if (stringp(Car(lib_spec)) && fp_validp(TheFpointer(obj)))
       close_library(obj);
     alist = Cdr(alist);
   }
@@ -4399,5 +4639,31 @@ global void exit_ffi (void) {
  #endif
 }
 
+#if defined(HAVE_DLADDR)
+LISPFUNN(foreign_pointer_info,1) {
+  object arg = foreign_address(popSTACK(),true);
+  void *addr = Fpointer_value(arg);
+  Dl_info dli;
+  int status;
+  begin_system_call(); status = dladdr(addr,&dli); end_system_call();
+  if (status == 0) {            /* failed */
+   #if defined(HAVE_DLERROR)
+    pushSTACK(dlerror_string());
+   #endif
+    pushSTACK(arg); pushSTACK(TheSubr(subr_self)->name);
+   #if defined(HAVE_DLERROR)
+    error(error_condition,GETTEXT("~S(~S): dladdr() failed: ~S"));
+   #else
+    error(error_condition,GETTEXT("~S(~S): dladdr() failed"));
+   #endif
+  } else {
+    pushSTACK(safe_to_string(dli.dli_fname));
+    pushSTACK(allocate_fpointer(dli.dli_fbase));
+    pushSTACK(safe_to_string(dli.dli_sname));
+    pushSTACK(allocate_fpointer(dli.dli_saddr));
+    STACK_to_mv(4);
+  }
+}
 #endif
 
+#endif

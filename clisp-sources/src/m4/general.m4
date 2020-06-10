@@ -1,4 +1,4 @@
-dnl Copyright (C) 1993-2005 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -7,66 +7,42 @@ dnl the same distribution terms as the rest of that program.
 
 dnl From Bruno Haible, Marcus Daniels, Sam Steingold.
 
-AC_PREREQ(2.13)
+AC_PREREQ(2.61)
 
 dnl without AC_MSG_...:   with AC_MSG_... and caching:
-dnl   AC_TRY_CPP          CL_CPP_CHECK
-dnl   AC_TRY_COMPILE      CL_COMPILE_CHECK
-dnl   AC_TRY_LINK         CL_LINK_CHECK
-dnl   AC_TRY_RUN          CL_RUN_CHECK - would require cross-compiling support
+dnl   AC_COMPILE_IFELSE      CL_COMPILE_CHECK
+dnl   AC_LINK_IFELSE         CL_LINK_CHECK
 dnl Usage:
-dnl AC_TRY_CPP(INCLUDES,
-dnl            ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND])
-dnl CL_CPP_CHECK(ECHO-TEXT, CACHE-ID,
-dnl              INCLUDES,
-dnl              ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND])
-dnl AC_TRY_xxx(INCLUDES, FUNCTION-BODY,
-dnl            ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND])
-dnl CL_xxx_CHECK(ECHO-TEXT, CACHE-ID,
-dnl              INCLUDES, FUNCTION-BODY,
+dnl AC_xxx_IFELSE(PROGRAM, ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND])
+dnl CL_xxx_CHECK(ECHO-TEXT, CACHE-ID, PROGRAM,
 dnl              ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND])
 
-AC_DEFUN([CL_CPP_CHECK],
-[AC_MSG_CHECKING(for $1)
-AC_CACHE_VAL($2,[
-AC_TRY_CPP([$3], $2=yes, $2=no)
-])
-AC_MSG_RESULT([$]$2)
-if test [$]$2 = yes; then
-  ifelse([$4], , :, [$4])
-ifelse([$5], , , [else
-  $5
-])dnl
-fi
-])
-
-AC_DEFUN([CL_COMPILE_CHECK],
-[AC_MSG_CHECKING(for $1)
-AC_CACHE_VAL($2,[
-AC_TRY_COMPILE([$3],[$4], $2=yes, $2=no)
-])
-AC_MSG_RESULT([$]$2)
-if test [$]$2 = yes; then
-  ifelse([$5], , :, [$5])
-ifelse([$6], , , [else
-  $6
-])dnl
-fi
+dnl the next macro avoids aclocal warnings about wrong macro order
+dnl when making aclocal.m4, see Makefile.devel.
+dnl note that this macro cannot call AC_CONFIG_AUX_DIR directly because
+dnl the required macros are evaluated BEFORE the macro itself
+dnl and some of them require AC_CONFIG_AUX_DIR.
+dnl <http://article.gmane.org/gmane.comp.lib.gnulib.bugs/16312>
+AC_DEFUN([CL_MODULE_COMMON_CHECKS],[dnl
+AC_REQUIRE([CL_CLISP],[CL_CLISP($1)])dnl
+AC_REQUIRE([AC_CONFIG_AUX_DIR],
+[AC_CONFIG_AUX_DIR([$cl_cv_clisp_libdir/build-aux])])dnl
+AC_REQUIRE([AC_PROG_CC])dnl
+AC_REQUIRE([AC_PROG_CPP])dnl
+AC_REQUIRE([CL_PROG_LN_S])dnl
+AC_REQUIRE([AC_GNU_SOURCE])dnl
+AC_REQUIRE([AC_USE_SYSTEM_EXTENSIONS])dnl
+AC_CHECK_HEADERS(time.h sys/time.h)dnl
 ])
 
-AC_DEFUN([CL_LINK_CHECK],
-[AC_MSG_CHECKING(for $1)
-AC_CACHE_VAL($2,[
-AC_TRY_LINK([$3],[$4], $2=yes, $2=no)
+AC_DEFUN([CL_CHECK],[dnl
+  AC_CACHE_CHECK([for $2],[$3],
+    [$1([AC_LANG_PROGRAM([$4],[$5])],[$3=yes],[$3=no])])
+  AS_IF([test $$3 = yes], [$6], [$7])
 ])
-AC_MSG_RESULT([$]$2)
-if test [$]$2 = yes; then
-  ifelse([$5], , :, [$5])
-ifelse([$6], , , [else
-  $6
-])dnl
-fi
-])
+
+AC_DEFUN([CL_COMPILE_CHECK], [CL_CHECK([AC_COMPILE_IFELSE],$@)])
+AC_DEFUN([CL_LINK_CHECK], [CL_CHECK([AC_LINK_IFELSE],$@)])
 
 dnl Expands to the "extern ..." prefix used for system declarations.
 dnl AC_LANG_EXTERN()
@@ -79,44 +55,20 @@ AC_DEFUN([AC_LANG_EXTERN],
 
 AC_DEFUN([CL_CC_WORKS],
 [AC_CACHE_CHECK(whether CC works at all, cl_cv_prog_cc_works, [
-AC_LANG_SAVE()
-AC_LANG_C()
-AC_TRY_RUN([int main() { exit(0); }],
-cl_cv_prog_cc_works=yes, cl_cv_prog_cc_works=no,
-AC_TRY_LINK([], [], cl_cv_prog_cc_works=yes, cl_cv_prog_cc_works=no))
-AC_LANG_RESTORE()
+AC_LANG_PUSH(C)
+AC_RUN_IFELSE(AC_LANG_PROGRAM([],[]),
+[cl_cv_prog_cc_works=yes], [cl_cv_prog_cc_works=no],
+AC_LINK_IFELSE(AC_LANG_PROGRAM([],[]),
+[cl_cv_prog_cc_works=yes], [cl_cv_prog_cc_works=no]))
+AC_LANG_POP(C)
 ])
-case "$cl_cv_prog_cc_works" in
-  *no) echo "Installation or configuration problem: C compiler cannot create executables."; exit 1;;
-  *yes) ;;
-esac
-])
-
-AC_DEFUN([CL_CONFIG_SUBDIRS],
-[dnl No AC_CONFIG_AUX_DIR_DEFAULT, so we don't need install.sh.
-AC_PROVIDE([AC_CONFIG_AUX_DIR_DEFAULT])
-AC_CONFIG_SUBDIRS([$1])dnl
-])
-
-AC_DEFUN([CL_CANONICAL_HOST],
-[AC_REQUIRE([AC_PROG_CC]) dnl Actually: AC_REQUIRE([CL_CC_WORKS])
-dnl Set ac_aux_dir before the cache check, because AM_PROG_LIBTOOL needs it.
-ac_aux_dir=${srcdir}/$1
-dnl A substitute for AC_CONFIG_AUX_DIR_DEFAULT, so we don't need install.sh.
-ac_config_guess="$SHELL $ac_aux_dir/config.guess"
-ac_config_sub="$SHELL $ac_aux_dir/config.sub"
-dnl We have defined $ac_aux_dir.
-AC_PROVIDE([AC_CONFIG_AUX_DIR_DEFAULT])dnl
-dnl In autoconf-2.52, a single AC_CANONICAL_HOST has the effect of inserting
-dnl the code of AC_CANONICAL_BUILD *before* CL_CANONICAL_HOST, i.e. before
-dnl ac_aux_dir has been set. To work around this, we list AC_CANONICAL_BUILD
-dnl explicitly.
-AC_CANONICAL_BUILD
-AC_CANONICAL_HOST
+if test "$cl_cv_prog_cc_works" = no; then
+AC_MSG_FAILURE([Installation or configuration problem: C compiler cannot create executables.])
+fi
 ])
 
 AC_DEFUN([CL_CANONICAL_HOST_CPU],
-[AC_REQUIRE([CL_CANONICAL_HOST])AC_REQUIRE([AC_PROG_CC])
+[AC_REQUIRE([AC_CANONICAL_HOST])AC_REQUIRE([AC_PROG_CC])
 case "$host_cpu" in
 changequote(,)dnl
   i[4567]86 )
@@ -128,8 +80,8 @@ changequote(,)dnl
   hppa1.0 | hppa1.1 | hppa2.0* | hppa64 )
     host_cpu_instructionset=hppa
     ;;
-  powerpc )
-    host_cpu_instructionset=rs6000
+  rs6000 )
+    host_cpu_instructionset=powerpc
     ;;
   c1 | c2 | c32 | c34 | c38 | c4 )
     host_cpu_instructionset=convex
@@ -138,7 +90,7 @@ changequote(,)dnl
     host_cpu_instructionset=arm
     ;;
 changequote([,])dnl
-  mips )
+  mips* )
     AC_CACHE_CHECK([for 64-bit MIPS], cl_cv_host_mips64, [
 AC_EGREP_CPP(yes,
 [#if defined(_MIPS_SZLONG)
@@ -151,6 +103,23 @@ AC_EGREP_CPP(yes,
 ])
 if test $cl_cv_host_mips64 = yes; then
   host_cpu_instructionset=mips64
+else
+  host_cpu_instructionset=mips
+fi
+    ;;
+dnl On powerpc64 systems, the C compiler may still be generating 32-bit code.
+  powerpc64 )
+    AC_CACHE_CHECK([for 64-bit PowerPC], cl_cv_host_powerpc64, [
+AC_EGREP_CPP(yes,
+[#if defined(__powerpc64__) || defined(_ARCH_PPC64)
+  yes
+#endif
+], cl_cv_host_powerpc64=yes, cl_cv_host_powerpc64=no)
+])
+if test $cl_cv_host_powerpc64 = yes; then
+  host_cpu_instructionset=powerpc64
+else
+  host_cpu_instructionset=powerpc
 fi
     ;;
 dnl UltraSPARCs running Linux have `uname -m` = "sparc64", but the C compiler
@@ -169,6 +138,21 @@ else
   host_cpu_instructionset=sparc
 fi
     ;;
+dnl On x86_64 systems, the C compiler may still be generating 32-bit code.
+  x86_64 )
+    AC_CACHE_CHECK([for 64-bit x86_64], cl_cv_host_x86_64, [
+AC_EGREP_CPP(yes,
+[#if defined(__LP64__) || defined(__x86_64__) || defined(__amd64__)
+  yes
+#endif
+], cl_cv_host_x86_64=yes, cl_cv_host_x86_64=no)
+])
+if test $cl_cv_host_x86_64 = yes; then
+  host_cpu_instructionset=x86_64
+else
+  host_cpu_instructionset=i386
+fi
+    ;;
   *)
     host_cpu_instructionset=$host_cpu
     ;;
@@ -177,87 +161,6 @@ dnl was AC_DEFINE_UNQUOTED(__${host_cpu}__) but KAI C++ 3.2d doesn't like this
 cat >> confdefs.h <<EOF
 #ifndef __${host_cpu_instructionset}__
 #define __${host_cpu_instructionset}__ 1
-#endif
-EOF
-])
-
-AC_DEFUN([CL_CANONICAL_HOST_CPU_FOR_FFCALL],
-[AC_REQUIRE([CL_CANONICAL_HOST])AC_REQUIRE([AC_PROG_CC])
-case "$host_cpu" in
-changequote(,)dnl
-  i[4567]86 )
-    host_cpu_abi=i386
-    ;;
-  alphaev[4-8] | alphaev56 | alphapca5[67] | alphaev6[78] )
-    host_cpu_abi=alpha
-    ;;
-  hppa1.0 | hppa1.1 | hppa2.0* | hppa64 )
-    host_cpu_abi=hppa
-    ;;
-  powerpc )
-    host_cpu_abi=rs6000
-    ;;
-  c1 | c2 | c32 | c34 | c38 | c4 )
-    host_cpu_abi=convex
-    ;;
-  arm* )
-    host_cpu_abi=arm
-    ;;
-changequote([,])dnl
-  mips )
-    AC_CACHE_CHECK([for 64-bit MIPS], cl_cv_host_mips64, [
-AC_EGREP_CPP(yes,
-[#if defined(_MIPS_SZLONG)
-#if (_MIPS_SZLONG == 64)
-/* We should also check for (_MIPS_SZPTR == 64), but gcc keeps this at 32. */
-  yes
-#endif
-#endif
-], cl_cv_host_mips64=yes, cl_cv_host_mips64=no)
-])
-if test $cl_cv_host_mips64 = yes; then
-  host_cpu_abi=mips64
-else
-  AC_CACHE_CHECK([for MIPS with n32 ABI], cl_cv_host_mipsn32, [
-dnl Strictly speaking, the MIPS ABI (-32 or -n32) is independent from the CPU
-dnl identification (-mips[12] or -mips[34]). But -n32 is commonly used together
-dnl with -mips3, and it's easier to test the CPU identification.
-AC_EGREP_CPP(yes,
-[#if __mips >= 3
-  yes
-#endif
-], cl_cv_host_mipsn32=yes, cl_cv_host_mipsn32=no)
-])
-if test $cl_cv_host_mipsn32 = yes; then
-  host_cpu_abi=mipsn32
-fi
-fi
-    ;;
-dnl UltraSPARCs running Linux have `uname -m` = "sparc64", but the C compiler
-dnl still generates 32-bit code.
-  sparc | sparc64 )
-    AC_CACHE_CHECK([for 64-bit SPARC], cl_cv_host_sparc64, [
-AC_EGREP_CPP(yes,
-[#if defined(__sparcv9) || defined(__arch64__)
-  yes
-#endif
-], cl_cv_host_sparc64=yes, cl_cv_host_sparc64=no)
-])
-if test $cl_cv_host_sparc64 = yes; then
-  host_cpu_abi=sparc64
-else
-  host_cpu_abi=sparc
-fi
-    ;;
-  *)
-    host_cpu_abi=$host_cpu
-    ;;
-esac
-AC_SUBST(host_cpu_abi)
-dnl was AC_DEFINE_UNQUOTED(__${host_cpu}__) but KAI C++ 3.2d doesn't like this
-cat >> confdefs.h <<EOF
-#ifndef __${host_cpu_abi}__
-#define __${host_cpu_abi}__ 1
 #endif
 EOF
 ])

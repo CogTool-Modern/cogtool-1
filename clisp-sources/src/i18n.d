@@ -8,17 +8,17 @@
 
 #include <locale.h>
 
-# =========== Old-style internationalization, for CLISP itself only ===========
+/* ======== Old-style internationalization, for CLISP itself only ======== */
 
-# (SYS::CURRENT-LANGUAGE) returns the current language.
+/* (SYS::CURRENT-LANGUAGE) returns the current language. */
 LISPFUNNR(current_language,0) {
   VALUES1(O(current_language));
 }
 
-# (SYS::SET-CURRENT-LANGUAGE LANG) ==
-# (SETF (SYS::CURRENT-LANGUAGE) LANG) ==
-# (SETQ *CURRENT-LANGUAGE* LANG)
-# LANG is either LANGUAGE or (LANGUAGE . LOCALE-DIRECTORY)
+/* (SYS::SET-CURRENT-LANGUAGE LANG) ==
+ (SETF (SYS::CURRENT-LANGUAGE) LANG) ==
+ (SETQ *CURRENT-LANGUAGE* LANG)
+ LANG is either LANGUAGE or (LANGUAGE . LOCALE-DIRECTORY) */
 LISPFUNN(set_current_language,1) {
  #ifndef LANGUAGE_STATIC
   if (consp(STACK_0)) {
@@ -38,7 +38,7 @@ LISPFUNN(set_current_language,1) {
   if (!eq(STACK_0,O(current_language))) {
     pushSTACK(STACK_0);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: cannot set language to ~S"));
+    error(error_condition,GETTEXT("~S: cannot set language to ~S"));
   }
  #endif
   VALUES1(O(current_language)); skipSTACK(1);

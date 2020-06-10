@@ -2,7 +2,7 @@
  * Setting up a connection to an X server, and other socket functions
  * Bruno Haible 19.6.1994, 27.6.1997, 9.3.1999 ... 2003
  * Marcus Daniels 28.9.1995, 9.9.1997
- * Sam Steingold 1998-2005
+ * Sam Steingold 1998-2009
  * German comments translated into English: Stefan Kain 2002-09-11
  */
 
@@ -52,21 +52,11 @@
 
 #include <errno.h>
 
-#include <string.h>  /* declares strcmp(), strlen(), strcpy() */
+#include <string.h> /* declares strcmp(), strlen(), strcpy(), memset() */
 
-/* ============ hostnames and IP addresses only (no sockets) ============ */
+/* ============ hostnames and IP addresses only (no sockets) ============
 
-#ifndef WIN32
-  #ifdef HAVE_GETHOSTNAME
-    /* extern_C int gethostname (char* name, size_t namelen); */
-  #endif
-  #ifdef HAVE_SYS_UTSNAME_H
-    #include <sys/utsname.h>
-    extern_C int uname (struct utsname * buf);
-  #endif
-#endif
-
-/* Fetches the machine's host name.
+ Fetches the machine's host name.
  get_hostname(host =);
  The name is allocated on the stack, with dynamic extent.
  < const char* host: The host name.
@@ -76,6 +66,7 @@
  But this seems not worth the trouble to think about it.)
  sds: never: you will always get localhost/127.0.0.1 - what's the point? */
 #if defined(HAVE_GETHOSTNAME)
+/* present on all supported unix systems and on woe32 */
   #define get_hostname(host_assignment)                                 \
     do {  var char hostname[MAXHOSTNAMELEN+1];                          \
       begin_system_call();                                              \
@@ -84,16 +75,8 @@
       hostname[MAXHOSTNAMELEN] = '\0';                                  \
       host_assignment &hostname[0];                                     \
     } while(0)
-#elif defined(HAVE_SYS_UTSNAME_H)
-  #define get_hostname(host_assignment)         \
-    do { var struct utsname utsname;            \
-      begin_system_call();                      \
-      if ( uname(&utsname) <0) { OS_error(); }  \
-      end_system_call();                        \
-      host_assignment utsname.nodename;         \
-    } while(0)
 #else
-  #define get_hostname(host_assignment)    ??
+  #error get_hostname is not defined
 #endif
 
 #ifndef WIN32
@@ -121,6 +104,29 @@
 #elif defined(HAVE_IPV6)
   #define in6_addr in_addr6
 #endif
+
+/* "Older BSDs" (specifically, Mac OS X 10.4.[34]) require that
+   sockaddr is filled with 0 before use (i.e., unused fields must be 0)
+   and this requirement _IS_ codified in
+   + the 1st ed of Stevens "UNIX Network Programming"
+   + "Networking and the BSD Sockets API"
+     http://www.macdevcenter.com/pub/a/mac/2002/12/26/cocoa.html?page=3
+   + tutorial "Socket programming"
+     http://micmacfr.homeunix.org/progsysdet/progsys12.shtml
+   + http://lists.apple.com/archives/Unix-porting/2006/Feb/msg00053.html
+     claims that "RFC 793, page 31, figure 8" means that
+     the "unused fields" are not really unused
+     see http://rfc.net/rfc793.html (figure 8 is actually on page 32)
+   but _NOT_ in
+   - the 3rd ed of Stevens "UNIX Network Programming"
+   - the 2nd ed of Stevens "Advanced Programming in the UNIX Environment"
+   - the 2nd ed of Rochkind "Advanced UNIX Programming"
+   - the Open Group Base Specifications Issue 6 IEEE Std 1003.1, 2004 Edition
+     http://www.opengroup.org/onlinepubs/009695399/
+   It is _NOT_ necessary on Linux, Cygwin, Win32, Solaris, NetBSD, FreeBSD &c.
+   It might be a good idea to add an autoconf test for this ...
+   see bug 1399376 http://sourceforge.net/tracker/index.php?func=detail&aid=1399376&group_id=1355&atid=101355 */
+#define FILL0(s)  memset((void*)&s,0,sizeof(s))
 
 /* Converts an AF_INET address to a printable, presentable format.
  ipv4_ntop(buffer,addr);
@@ -174,7 +180,7 @@
  < lisp string representing the address in a human-readable format
  for syscalls & rawsock modules
  can trigger GC */
-global maygc object addr_to_string (short type, char *addr) {
+modexp maygc object addr_to_string (short type, char *addr) {
   var char buffer[MAXHOSTNAMELEN];
  #ifdef HAVE_IPV6
   if (type == AF_INET6)
@@ -294,7 +300,7 @@ global int nonintr_connect (SOCKET fd, struct sockaddr * name, int namelen) {
 
 #if defined(TCPCONN)
 
-#ifndef WIN32
+#if !defined(WIN32) && !defined(__CYGWIN__)
   extern_C RET_INET_ADDR_TYPE inet_addr (INET_ADDR_CONST char* host);
 #endif
 
@@ -355,7 +361,7 @@ local int string_to_addr1 (const void* addr, int addrlen, int family, void* ret)
  < lisp string for FQDN or integer for IPv[46] numerics
  for syscalls & rawsock modules
  can trigger GC */
-global maygc object string_to_addr (const char* name) {
+modexp maygc object string_to_addr (const char* name) {
   object ret;
   begin_system_call();
   with_host(name,&string_to_addr1,&ret);
@@ -380,7 +386,7 @@ local int resolve_host1 (const void* addr, int addrlen, int family, void* ret) {
         bit vector: raw IPv4[46] address (gethostbyaddr)
  < static hostent descriptor from LIBC
  for syscalls & rawsock modules */
-global struct hostent* resolve_host (object arg) {
+modexp struct hostent* resolve_host (object arg) {
   var struct hostent* he;
   if (eq(arg,S(Kdefault))) {
     var char* host;
@@ -396,9 +402,10 @@ global struct hostent* resolve_host (object arg) {
       end_system_call();
     });
   } else if (uint32_p(arg)) {
-    var uint32 ip = I_to_uint32(arg);
+    var struct in_addr addr;
+    UI_to_LEbytes(arg,8*sizeof(struct in_addr),(uintB*)&addr);
     begin_system_call();
-    he = gethostbyaddr((char*)&ip,sizeof(uint32),AF_INET);
+    he = gethostbyaddr((char*)&addr,sizeof(struct in_addr),AF_INET);
     end_system_call();
   } else if (vectorp(arg)) {
     /* bit vector: treat as raw IP address data */
@@ -446,7 +453,7 @@ global struct hostent* resolve_host (object arg) {
      #endif
       pushSTACK(fixnum(sizeof(struct in_addr)));
       pushSTACK(arg); pushSTACK(TheSubr(subr_self)->name);
-      fehler(type_error,
+      error(type_error,
             #ifdef HAVE_IPV6
              GETTEXT("~S: IP address ~S must have length ~S or ~S")
             #else
@@ -467,7 +474,7 @@ global struct hostent* resolve_host (object arg) {
     end_system_call();
   }
  #endif
-  else fehler_string_integer(arg);
+  else error_string_integer(arg);
   return he;
 }
 
@@ -482,6 +489,7 @@ local SOCKET with_host_port (const char* host, unsigned short port,
  #ifdef HAVE_IPV6
   {
     var struct sockaddr_in6 inaddr;
+    FILL0(inaddr);
     if (inet_pton(AF_INET6,host,&inaddr.sin6_addr) > 0) {
       inaddr.sin6_family = AF_INET6;
       inaddr.sin6_port = htons(port);
@@ -492,6 +500,7 @@ local SOCKET with_host_port (const char* host, unsigned short port,
  #endif
   {
     var struct sockaddr_in inaddr;
+    FILL0(inaddr);
     if (inet_pton(AF_INET,host,&inaddr.sin_addr) > 0) {
       inaddr.sin_family = AF_INET;
       inaddr.sin_port = htons(port);
@@ -506,6 +515,7 @@ local SOCKET with_host_port (const char* host, unsigned short port,
     var uint32 hostinetaddr = inet_addr(host) INET_ADDR_SUFFIX ;
     if (!(hostinetaddr == ((uint32) -1))) {
       var struct sockaddr_in inaddr;
+      FILL0(inaddr);
       inaddr.sin_family = AF_INET;
       inaddr.sin_addr.s_addr = hostinetaddr;
       inaddr.sin_port = htons(port);
@@ -524,6 +534,7 @@ local SOCKET with_host_port (const char* host, unsigned short port,
     if (host_ptr->h_addrtype == AF_INET6) {
       /* Set up the socket data. */
       var struct sockaddr_in6 inaddr;
+      FILL0(inaddr);
       inaddr.sin6_family = AF_INET6;
       inaddr.sin6_addr = *(struct in6_addr *)host_ptr->h_addr;
       inaddr.sin6_port = htons(port);
@@ -534,6 +545,7 @@ local SOCKET with_host_port (const char* host, unsigned short port,
     if (host_ptr->h_addrtype == AF_INET) {
       /* Set up the socket data. */
       var struct sockaddr_in inaddr;
+      FILL0(inaddr);
       inaddr.sin_family = AF_INET;
       inaddr.sin_addr = *(struct in_addr *)host_ptr->h_addr;
       inaddr.sin_port = htons(port);
@@ -653,10 +665,12 @@ global SOCKET connect_to_x_server (const char* host, int display)
     var struct sockaddr_un unaddr;          /* UNIX socket data block */
     var struct sockaddr * addr;             /* generic socket pointer */
     var int addrlen;                        /* length of addr */
+    FILL0(unaddr);
    #ifdef hpux /* this is disgusting */
     var struct sockaddr_un ounaddr;         /* UNIX socket data block */
     var struct sockaddr * oaddr;            /* generic socket pointer */
     var int oaddrlen;                       /* length of addr */
+    FILL0(unaddr);
    #endif
 
     unaddr.sun_family = AF_UNIX;
@@ -751,7 +765,8 @@ typedef union {
 local host_data_t * socket_getlocalname_aux (SOCKET socket_handle,
                                              host_data_t * hd) {
   var sockaddr_max_t addr;
-  var SOCKLEN_T addrlen = sizeof(sockaddr_max_t);
+  var CLISP_SOCKLEN_T addrlen = sizeof(sockaddr_max_t);
+  FILL0(addr);
   if (getsockname(socket_handle,(struct sockaddr *)&addr,&addrlen) < 0)
     return NULL;
   /* Fill in hd->hostname and hd->port. */
@@ -774,9 +789,9 @@ local host_data_t * socket_getlocalname_aux (SOCKET socket_handle,
   return hd;
 }
 
-/* socket_getlocalname(socket_handle,hd)
+/* socket_getlocalname(socket_handle,hd, truename_p)
  Return the IP name of the localhost for the given socket.
- Fills all of *hd.
+ Fills all of *hd, may even fetch truename.
  To be used inside begin/end_system_call() only. */
 global host_data_t * socket_getlocalname (SOCKET socket_handle,
                                           host_data_t * hd, bool resolve_p) {
@@ -793,15 +808,16 @@ global host_data_t * socket_getlocalname (SOCKET socket_handle,
   return hd;
 }
 
-/* socket_getpeername(socket_handle,hd)
+/* socket_getpeername(socket_handle,hd,truename_p)
  Returns the name of the host to which IP socket fd is connected.
- Fills all of *hd.
+ Fills all of *hd, may even fetch truename.
  To be used inside begin/end_system_call() only. */
 global host_data_t * socket_getpeername (SOCKET socket_handle,
                                          host_data_t * hd, bool resolve_p) {
   var sockaddr_max_t addr;
-  var SOCKLEN_T addrlen = sizeof(sockaddr_max_t);
+  var CLISP_SOCKLEN_T addrlen = sizeof(sockaddr_max_t);
   var struct hostent* hp = NULL;
+  FILL0(addr);
   /* Get host's IP address. */
   if (getpeername(socket_handle,(struct sockaddr *)&addr,&addrlen) < 0)
     return NULL;
@@ -896,7 +912,8 @@ global SOCKET create_server_socket_by_socket (host_data_t *hd, SOCKET sock,
                                               unsigned int port, int backlog) {
   var SOCKET fd;
   var sockaddr_max_t addr;
-  var SOCKLEN_T addrlen = sizeof(sockaddr_max_t);
+  var CLISP_SOCKLEN_T addrlen = sizeof(sockaddr_max_t);
+  FILL0(addr);
   if (getsockname(sock,(struct sockaddr *)&addr,&addrlen) < 0)
     return INVALID_SOCKET;
   switch (((struct sockaddr *)&addr)->sa_family) {
@@ -931,7 +948,8 @@ global SOCKET accept_connection (SOCKET socket_handle) {
   }
  #endif
   var sockaddr_max_t addr;
-  var SOCKLEN_T addrlen = sizeof(sockaddr_max_t);
+  var CLISP_SOCKLEN_T addrlen = sizeof(sockaddr_max_t);
+  FILL0(addr);
   return accept(socket_handle,(struct sockaddr *)&addr,&addrlen);
   /* We can ignore the contents of addr, because we can retrieve it again
      through socket_getpeername() later. */
@@ -973,6 +991,17 @@ local SOCKET connect_via_ip (struct sockaddr * addr, int addrlen,
           if (sock_errno_is(EINTR)) goto restart_select;
           saving_sock_errno(CLOSESOCKET(fd)); return INVALID_SOCKET;
         }
+       #if defined(SOL_SOCKET) && defined(SO_ERROR) && defined(HAVE_GETSOCKOPT)
+        var CLISP_SOCKLEN_T len = sizeof(ret);
+        if (getsockopt(fd,SOL_SOCKET,SO_ERROR,&ret,&len) < 0) {
+          CLOSESOCKET(fd);
+          return INVALID_SOCKET;
+        }
+        if (ret) {
+          CLOSESOCKET(fd); sock_set_errno(ret);
+          return INVALID_SOCKET;
+        }
+       #endif
       }
      #endif
       if (ret == 0) {

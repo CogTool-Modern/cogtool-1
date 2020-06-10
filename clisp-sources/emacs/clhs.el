@@ -11,7 +11,7 @@
 ;;; This is accomplished by not hard-wiring the symbol->file table
 ;;; but reading the Data/<map> file instead
 
-;;; Copyright (C) 2002 Sam Steingold <sds@gnu.org>
+;;; Copyright (C) 2002-2008 Sam Steingold <sds@gnu.org>
 ;;; Keywords: lisp, common lisp, emacs, ANSI CL, hyperspec
 ;;; released under the GNU GPL <http://www.gnu.org/copyleft/gpl.html>
 ;;; as a part of GNU CLISP <http://clisp.cons.org>, <http://www.clisp.org>
@@ -33,7 +33,10 @@
 (require 'thingatpt)
 (require 'url)
 
-(defcustom common-lisp-hyperspec-root "http://www.lisp.org/HyperSpec/"
+(defcustom common-lisp-hyperspec-root
+  "http://www.lispworks.com/documentation/HyperSpec/"
+  ;; "http://www.cs.cmu.edu/afs/cs/project/ai-repository/ai/html/hyperspec/HyperSpec/"
+  ;; "http://www.ai.mit.edu/projects/iiip/doc/CommonLISP/HyperSpec/"
   "*The root of the Common Lisp HyperSpec URL.
 If you copy the HyperSpec to your local system, set this variable to
 something like \"file:/usr/local/doc/HyperSpec/\"."
@@ -99,8 +102,7 @@ something like \"file:/usr/local/doc/HyperSpec/\"."
 
 (defun hash-table-complete (string table how)
   "This makes it possible to use hash-tables with `completing-read'.
-Actually, `completing-read' should accept hash-tables natively,
-but it does not - go ahead and report this as a bug."
+Actually, `completing-read' in Emacs 22 accepts hash-tables natively."
   (let ((res nil) (st (upcase string)) (len (length string)))
     (maphash (lambda (key val)
                (when (and (<= len (length key))
@@ -119,7 +121,8 @@ but it does not - go ahead and report this as a bug."
 (defun common-lisp-hyperspec (symbol-name)
   "Browse the Common Lisp HyperSpec documentation for SYMBOL-NAME.
 Finds the HyperSpec at `common-lisp-hyperspec-root'."
-  (interactive (list (let ((sym (thing-at-point 'symbol)))
+  (interactive (list (let ((sym (thing-at-point 'symbol))
+                           (completion-ignore-case t))
                        (completing-read
                         "Look-up symbol in the Common Lisp HyperSpec: "
                         #'hash-table-complete (clhs-symbols)

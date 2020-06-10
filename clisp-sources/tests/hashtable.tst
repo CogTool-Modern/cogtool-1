@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; Test :warn-if-needs-rehash-after-gc.
 
 (block nil
@@ -67,7 +67,7 @@ T
         (gethash x ht)))
 (T 12)
 
-(let ((ht (make-hash-table :test 'ext:fasthash-eq)))
+(let ((ht (make-hash-table :test 'ext:fasthash-eq)) x)
   (defstruct ht-test-struct a b c)
   (setq x (make-ht-test-struct :a 1 :b 2 :c ht))
   (setf (gethash ht ht) ht
@@ -88,5 +88,26 @@ T
         (gethash x ht)))
 (T 12)
 
+;; circular keys (ht cannot be inside the key, see
+;; http://www.lisp.org/HyperSpec/Body/sec_18-1-2.html)
+(let ((ht (make-hash-table :test 'equal)) (l '#1=(1 2 . #1#)))
+  (setf (gethash l ht) 42)
+  (gethash l ht))
+42
+
+(let ((ht (make-hash-table :test 'equalp)) (v #1=#(1 2 #1#)))
+  (setf (gethash v ht) 42)
+  (gethash v ht))
+42
+
+(let* ((ht (make-hash-table :test 'equalp)) s)
+  (defstruct ht-test-struct a b c)
+  (setf s (make-ht-test-struct :a 1 :b 2 :c 3)
+        (ht-test-struct-b s) s
+        (gethash s ht) 42)
+  (gethash s ht))
+42
+
 ;; clean-up
-(setf (find-class 'ht-test-struct) nil) nil
+(progn (symbol-cleanup 'ht-test-struct))
+T

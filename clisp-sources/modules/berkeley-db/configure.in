@@ -1,5 +1,5 @@
 dnl AUTOCONF configuration for Berkeley-DB
-dnl Copyright (C) 2003-2005  Sam Steingold <sds@gnu.org>
+dnl Copyright (C) 2003-2010 Sam Steingold <sds@gnu.org>
 dnl GNU GPL2
 
 AC_PREREQ(2.57)
@@ -7,25 +7,22 @@ AC_INIT(Berkeley-DB, 1.0, clisp-list)
 AC_CONFIG_SRCDIR(dbi.lisp)
 AC_CONFIG_HEADERS(config.h)
 
-AC_MSG_NOTICE([ * Berkeley-DB (Tools)])
-AC_PROG_CC
-AC_PROG_CPP
+RSE_BOLD
+BOLD_MSG([Berkeley-DB (Common)])
+CL_MODULE_COMMON_CHECKS()
 
 dnl Search for libdb and define LIBDB, LTLIBDB and INCDB.
-AC_CONFIG_AUX_DIR(../../src/build-aux)
 AC_LIB_LINKFLAGS([db])
 
-AC_MSG_NOTICE([ * Berkeley-DB (Headers)])
-AC_HEADER_STDC
-AC_HEADER_TIME
+BOLD_MSG([Berkeley-DB (Headers)])
 AC_CHECK_HEADERS(sys/time.h time.h)
 AC_CHECK_HEADERS(db.h)
 if test "$ac_cv_header_db_h" = "no"; then
   AC_MSG_ERROR([cannot find Berkeley-DB headers])
 fi
 
-AC_MSG_NOTICE([ * Berkeley-DB (Functions)])
-AC_LIB_APPENDTOVAR([LIBS], [$LTLIBDB])
+BOLD_MSG([Berkeley-DB (Functions)])
+AC_LIB_APPENDTOVAR([LIBS], [$LIBDB])
 AC_SEARCH_LIBS(db_env_create, db)
 if test "$ac_cv_search_db_env_create" = "no"; then
   AC_MSG_ERROR([cannot find Berkeley-DB library])
@@ -80,9 +77,20 @@ DB_LOCK_STAT.st_nnowaits, DB_LOCK_STAT.st_lock_nowait],,,[#include <db.h>])
 dnl http://www.sleepycat.com/docs/ref/upgrade.4.4/mutex.html
 AC_CHECK_MEMBERS([DB_ENV.mutex_set_tas_spins, DB_ENV.mutex_get_tas_spins,
 DB_ENV.mutex_set_align, DB_ENV.mutex_get_align],,,[#include <db.h>])
+dnl http://www.oracle.com/technology/products/berkeley-db/db/update/4.4.20/if.4.4.20.html
+dnl *DIRTY* -> DB_READ_UNCOMMITTED; DEGREE_2 -> DB_READ_COMMITTED
+AC_CHECK_DECLS([DB_LOCK_READ_UNCOMMITTED],,,[#include <db.h>])
 
-AC_MSG_NOTICE([ * Berkeley-DB (Output)])
+dnl http://www.oracle.com/technology/documentation/berkeley-db/db/ref/upgrade.4.7/log.html
+dnl http://www.oracle.com/technology/documentation/berkeley-db/db/ref/upgrade.4.7/interdir.html
+AC_CHECK_MEMBERS([DB_ENV.log_set_config, DB_ENV.get_intermediate_dir_mode],
+,,[#include <db.h>])
+
+dnl undocumented - upgrade to 4.8
+AC_CHECK_MEMBERS([DB_TXN_ACTIVE.gid, DB_TXN_ACTIVE.status],,,[#include <db.h>])
+
+BOLD_MSG([Berkeley-DB (Output)])
 AC_CONFIG_FILES(Makefile link.sh)
 AC_OUTPUT
 
-AC_MSG_NOTICE([ * Berkeley-DB (Done)])
+BOLD_MSG([Berkeley-DB (Done)])

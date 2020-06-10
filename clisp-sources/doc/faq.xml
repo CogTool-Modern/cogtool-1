@@ -5,20 +5,20 @@
 
 <abstract id="faq-abstract">
 <para>This is a list of frequently asked questions about &clisp; on the
-<ulink url="http://sourceforge.net/mail/?group_id=1355">CLISP mailing
- lists</ulink>
+<link linkend="faq-mailing-lists">CLISP mailing lists</link>
 and the USENET newsgroup
 <ulink url="http://groups.google.com/groups?as_ugroup=comp.lang.lisp"
        >comp.lang.lisp</ulink>.
 <emphasis>All</emphasis> the legitimate technical question are addressed
 in the &clisp; documentation (<olink targetdoc="impnotes"/>,
-<olink targetdoc="man"/>), and for such questions this
-list provides a link into the docs.
-The frequently asked <link linkend="faq-meta">political</link> questions are
-answered here in <emphasis>full</emphasis> detail (meaning that no
+<olink targetdoc="man"/>, <olink targetdoc="clink"/>), and for such
+questions this list provides a link into the docs.
+The frequently asked <link linkend="faq-meta">political</link> questions
+are answered here in <emphasis>full</emphasis> detail (meaning that no
 further explanations of the issues could be provided).</para>
 
-<para>Please submit more questions (and answers!) to &clisp-list;.</para>
+<para>Please submit more questions (and answers!)
+ to <ulink url="ml">clisp-list</ulink>.</para>
 </abstract>
 
 <qandaset id="faq-set"><title>FAQ</title>
@@ -27,14 +27,31 @@ further explanations of the issues could be provided).</para>
 
 <qandadiv id="faq-meta-misc"><title>Miscellaneous</title>
 
+<qandaentry id="faq-fine"><question id="faq-fine-q"><simpara>What is
+   <quote>FAQ fine</quote>?</simpara></question>
+ <answer><para>We levy a fine of 10 zorkmids for
+   <link linkend="faq-help">asking a question</link> that is answered
+   with a link to this <link linkend="faq">FAQ</link> document.
+   We further levy a fine of 1 zorkmid for asking a question that is answered
+   with a link to the &clisp; <link linkend="impnotes-top">manual</link>.
+   The fines are payable to the person who answered the questions.
+   The definition of a <quote>zorkmid</quote> is left to the sole
+   discretion of the <emphasis>payer</emphasis>.</para>
+  <para>This should &not-e; discourage you from asking questions, but
+   rather <emphasis role="strong">encourage</emphasis> you to
+   <emphasis role="strong">read</emphasis> the manual and
+   <emphasis role="strong">answer</emphasis> questions from other users.</para>
+</answer></qandaentry>
+
+
 <qandaentry id="faq-doc"><question id="faq-doc-q"><simpara>The official &clisp;
    documentation sucks - is anything better available?</simpara></question>
  <answer><para>As with all generic complaints, the answer to this one is
    <ulink url="http://www.cygwin.com/acronyms/#PTC"><acronym>PTC<alt>Patches
       Thoughtfully Considered</alt></acronym></ulink>.</para>
   <para>Additionally, the nightly builds of the &clisp; implementation
-   notes documenting the current CVS head are available at
-   <ulink url="http://www.podval.org/~sds/clisp/impnotes/"/>.
+   notes documenting the current &cvs; <literal>HEAD</literal> are
+   available at <ulink url="http://clisp.podval.org/impnotes/"/>.
    It contains both the documentation for the new features and the
    general improvements in the documentation.</para>
 </answer></qandaentry>
@@ -43,30 +60,29 @@ further explanations of the issues could be provided).</para>
    - why &gnu; &gpl;?</simpara></question>
 <answer><para><ulink role="clisp-cvs" url="doc/Why-CLISP-is-under-GPL">Because
    &clisp; uses &readline;</ulink>.</para>
-<para>Note that this does not necessarily prevent you from distributing
+<para>Note that this does &not-e; necessarily prevent you from distributing
  your proprietary products based on &clisp;. See <emphasis>Note</emphasis>
- in <filename role="clisp-cvs">COPYRIGHT</filename>.
-</para></answer></qandaentry>
+ in <filename role="clisp-cvs">COPYRIGHT</filename> and
+ <xref linkend="faq-licensing"/>.</para></answer></qandaentry>
 
 <qandaentry id="faq-ansi"><question id="faq-ansi-q"><simpara>What about
    &ansi-cl; compliance?</simpara></question>
-<answer><para>&clisp;
-  <ulink url="&clhs;/Body/glo_p.html#purports_to_conform"><emphasis>purports
-    to conform</emphasis></ulink> to the &ansi-cl; specification,
-  so all deviations in <screen>&sh-prompt; clisp &ansi-opt;</screen>
-  from the &ansi-cl; standard are bugs and are not (yet) fixed only due
+<answer><para>&clisp; <ulink url="clhs/glo"><emphasis>purports to
+    conform</emphasis></ulink> to the &ansi-cl; specification, so all
+  deviations in <screen>&sh-prompt; clisp &opt-ansi;</screen>
+  from the &ansi-cl; are bugs and are not (yet) fixed only due
   to lack of resources.</para>
 
  <para>On the other hand, some decisions made by the ANSI X3J13 committee
   were not as justified from the <emphasis>technical</emphasis> point of
   view as were most of them, and some of those questionable decisions
-  were made <emphasis>after</emphasis> the alternative behavior has
-  already been implemented in &clisp;.  The &clisp; developers took
-  pains to modify &clisp; to unconditionally comply with the &ansi-cl;
-  specification in all cases <link linkend="ansi">except for a handful
-  of situations where they believed that the committee had made a
-  mistake</link>, in which cases the committee behavior
-  is <emphasis>still</emphasis> optionally available.</para>
+  were made &after-e; the alternative behavior has already been implemented
+  in &clisp;.  The &clisp; developers took pains to modify &clisp; to
+  unconditionally comply with the &ansi-cl; specification in all cases
+  <link linkend="ansi">except for a handful of situations where they
+  believed that the committee had made a mistake</link>, in which cases
+  the committee behavior is <emphasis>still</emphasis> optionally
+  available.</para>
 
  <para>&clisp; does not start in the ansi mode by default for
   historical reasons and this is not about to change.
@@ -77,29 +93,30 @@ further explanations of the issues could be provided).</para>
 
 <qandaentry id="faq-help"><question id="faq-help-q"><simpara>How do I
    ask for help?</simpara></question>
-<answer><para>Politely - please refer to &netiquette;.</para>
+<answer><label>&clisp;</label><para>Type &help; and hit &enter;.</para></answer>
+<answer><label>Human</label>
+ <para>Politely - please refer to &netiquette;.</para>
  <para>If you have a question about &clisp;, you have the following options
-  (listed in the order of decreasing audience size):
-  <variablelist>
+  (listed in the order of decreasing audience size):<variablelist>
    <varlistentry><term>USENET group <ulink url="http://groups.google.com/groups?as_ugroup=comp.lang.lisp">comp.lang.lisp</ulink></term>
     <listitem><simpara>This is the right place to ask all general Lisp
-      questions, such as <ulink url="&clhs;/Body/acc_charcm_schar.html">"how
+      questions, such as <ulink role="clhs" url="acc_charcm_schar">"how
        do I access a character in a string?"</ulink></simpara>
    </listitem></varlistentry>
-   <varlistentry><term>&clisp; User Mailing List &clisp-list;</term>
+   <varlistentry><term>&clisp; User Mailing
+     List <ulink url="ml">clisp-list</ulink></term>
     <term>AKA <ulink url="http://news.gmane.org/gmane.lisp.clisp.general"/>
     </term><listitem><simpara>This is the right place to ask user-level
-      &clisp;-specific questions, such as
-      <link linkend="image">"how do I save my &clisp; image?"</link>
-   </simpara></listitem></varlistentry>
-   <varlistentry><term>&clisp; Developer Mailing List &clisp-devel;</term>
+      &clisp;-specific questions, such as <quote>"how do I save my &clisp;
+      &mem-image;?"</quote>.</simpara>
+      <simpara>See also <xref linkend="faq-bugs"/>.</simpara>
+   </listitem></varlistentry>
+   <varlistentry><term>&clisp; Developer Mailing
+     List <ulink url="ml">clisp-devel</ulink></term>
     <term>AKA <ulink url="http://news.gmane.org/gmane.lisp.clisp.devel"/></term>
-    <listitem><simpara>This is the right place to discuss &clisp;
-      internals, submit patches, offer help.  You must be subscribed to post.
-      If you read this list on <ulink url="http://gmane.org">Gmane</ulink>
-      and do not want to receive it also by e-mail, you can subscribe to
-      it using the aforementioned web interface and then disable mail
-      delivery.</simpara></listitem></varlistentry>
+    <listitem><simpara>This is the right place to discuss &clisp; internals,
+      problems with the current development sources, submit patches,
+      offer help.</simpara></listitem></varlistentry>
    <varlistentry><term><ulink url="http://sourceforge.net/project/memberlist.php?group_id=1355">Individual &clisp; developers</ulink></term>
     <listitem><simpara>This is <emphasis>never</emphasis> the right thing to
       do, unless you want to <emphasis>hire</emphasis> this developer to do
@@ -109,27 +126,46 @@ further explanations of the issues could be provided).</para>
       and some other user may be able to help you in the meantine;
       as well as for the benefit of the other &clisp; users,
       since the mailing lists are publicly archived (you are encouraged
-      to <ulink url="http://clisp.cons.org">search</ulink> them before asking).
-      Please do &not-e; copy your messages to the
-      individual developers.</simpara></listitem></varlistentry>
-</variablelist></para></answer></qandaentry>
+      to <ulink url="http://clisp.cons.org/#search">search</ulink> them
+      before asking).</simpara>
+     <simpara>Please do &not-e; copy your messages to the individual
+      developers.</simpara></listitem></varlistentry>
+</variablelist></para>
+<note><title>Mailing lists are member-only</title>
+ <simpara>To avoid spam, we require that you subscribe before you can
+  post to a mailing list.
+  Alternatively, you can post to the &clisp;
+  <ulink url="http://sourceforge.net/forum/forum.php?forum_id=3816">web
+   forum</ulink> and your message will be forwarded to
+  the <ulink url="ml">clisp-list</ulink> mailing list.
+  If you read a list on <ulink url="http://gmane.org">Gmane</ulink>
+  and do not want to receive it also by e-mail, you can subscribe to
+  it using the aforementioned web interface and then disable mail
+  delivery.</simpara></note></answer></qandaentry>
+
 
 <qandaentry id="faq-mailing-lists"><question id="faq-mailing-lists-q">
   <simpara>Which mailing lists should I subscribe to?</simpara></question>
-<answer><para>Cross-posting in the &clisp; mailing lists is very
-  actively discouraged and is virtually non-existent, thus you can
-  subscribe to all mailing lists that are relevant to you without getting
-  duplicate messages:<variablelist>
- <varlistentry><term>&clisp-announce;</term>
-  <listitem><simpara>extremely low-level moderated list, you should
-    definitely subscribe to this list if you have any interest in &clisp;
-    whatsoever</simpara></listitem></varlistentry>
- <varlistentry><term>&clisp-list;</term>
-  <listitem><simpara>subscribe to this list of you use &clisp; and want
-    to ask (and answer!) questions</simpara></listitem></varlistentry>
- <varlistentry><term>&clisp-devel;</term>
-  <listitem><simpara>subscribe to this list if you want to help with &clisp;
-    developments; CVS commit notes go here (as a daily digest).</simpara>
+<answer><para>Cross-posting in the &clisp;
+  <ulink url="http://sourceforge.net/mail/?group_id=1355">mailing lists</ulink>
+  is very actively discouraged and is virtually non-existent,
+  thus you can subscribe to all mailing lists that are relevant to you
+  without getting duplicate messages:<variablelist>
+ <varlistentry><term><ulink url="ml">clisp-announce</ulink></term>
+  <listitem><simpara>Extremely low-level moderated list, you should
+    definitely subscribe to this list if you have any interest in &cl;
+    or &clisp; whatsoever.</simpara></listitem></varlistentry>
+ <varlistentry><term><ulink url="ml">clisp-list</ulink></term>
+  <listitem><simpara>Subscribe to this list of you use &clisp; and want
+    to ask (and answer!) questions. If you subscribe to this list, you
+    probably want to subscribe to <ulink url="ml">clisp-announce</ulink> too.
+ </simpara></listitem></varlistentry>
+ <varlistentry><term><ulink url="ml">clisp-devel</ulink></term>
+  <listitem><simpara>Subscribe to this list if you want to influence
+    &clisp; developments; &cvs; commit notes go here (as a daily digest).
+    If you subscribe to this list, you probably want to subscribe
+    to <ulink url="ml">clisp-list</ulink>
+    &and-e; <ulink url="ml">clisp-announce</ulink> too.</simpara>
 </listitem></varlistentry></variablelist></para></answer></qandaentry>
 
 
@@ -141,17 +177,18 @@ further explanations of the issues could be provided).</para>
   can safely <emphasis role="strong">assume that it went
    to <filename>/dev/null</filename></emphasis>
   and try again, noting the following:<variablelist>
- <varlistentry><term>&clisp-announce;</term>
+ <varlistentry><term><ulink url="ml">clisp-announce</ulink></term>
   <listitem><simpara>do not mail here without a prior discussion
-    on &clisp-devel;</simpara></listitem></varlistentry>
- <varlistentry><term>&clisp-devel;</term>
-  <listitem><simpara>subscriber-only, you <emphasis>must</emphasis> post
+    on <ulink url="ml">clisp-devel</ulink>
+    or <ulink url="ml">clisp-list</ulink></simpara></listitem></varlistentry>
+ <varlistentry><term><ulink url="ml">clisp-devel</ulink></term>
+  <listitem><simpara>subscriber-only, you &must-e; post
     from a <emphasis role="strong">subscribed address</emphasis>,
     no exceptions (see <link linkend="faq-help">above</link>)
  </simpara></listitem></varlistentry>
- <varlistentry><term>&clisp-list;</term>
-  <listitem><para>the only open list, so it is filtered especially
-    aggressively:<itemizedlist>
+ <varlistentry><term><ulink url="ml">clisp-list</ulink></term>
+  <listitem><para>used to be the only open list (it is closed now), so
+    it is filtered especially aggressively:<itemizedlist>
      <listitem><simpara>no &mime; mail (no &html; formatting, no
        attachments - send the URL instead)</simpara></listitem>
      <listitem><simpara>the list address must be in <literal>CC</literal>
@@ -178,34 +215,123 @@ further explanations of the issues could be provided).</para>
    do I help?</simpara></question>
 <answer><para>Please read <xref linkend="extend"/> and submit your patch,
   together with a <filename role="clisp-cvs">src/ChangeLog</filename>
-  entry (see other entries there for inspiration), to &clisp-devel;.</para>
+  entry (see other entries there for inspiration),
+  to <ulink url="ml">clisp-devel</ulink>.</para>
  <para>See <filename role="clisp-cvs">src/CodingStyle</filename> for the
   style one should follow.</para>
  <para>If your patch is more than just a few lines, it is
   <emphasis>much</emphasis> preferred that you make your patch available
   on the web and send the link to the list.</para>
- <para>The patch must be against the
-  <ulink url="http://www.cvshome.org">CVS</ulink> head
+ <para>The patch must be against the &cvs; head
   (reasonably recent).</para></answer></qandaentry>
 
 
 <qandaentry id="faq-debug"><question id="faq-debug-q"><simpara>How do I
    debug &clisp;?</simpara></question>
-<answer><para>When debugging the core:<screen>
-&sh-prompt; ./configure --with-debug --build build-g
-&sh-prompt; cd build-g
-&sh-prompt; gdb lisp.run            ;; or lisp.exe on windows and cygwin
-<prompt>(gdb)</prompt> base
-<prompt>(gdb)</prompt> run
-</screen></para>
+<answer><formalpara id="with-debug"><title>Configuring for debugging</title>
+<para>Passing &with-debug; to the top-level &configure; script does not
+ just replace <option>-O</option> with <option>-g</option>
+ in the &gcc; invocation, it also disables some optimizations
+ (registers, assembly, generational &gc;or) and enables
+ some <function role="unix">printf</function> calls (mostly before error
+ messages caused by system calls).
+ This means that some bugs might be exhibited by the normal build but
+ &not-e; by the &with-debug; one (and vice versa).
+ If that is the case, please &configure; normally but edit the
+ <filename>Makefile</filename> and replace the &gcc; optimization
+ options (<option>-O</option> et al) with <option>-g</option> before
+ running <command role="unix">make</command>.</para></formalpara>
 
-<para>When debugging module <literal>foo</literal>:<screen>
-&sh-prompt; ./configure --with-debug --with-module=foo --build build-g
+<formalpara id="faq-debug-core"><title>Debugging the core</title>
+<para><screen>
+&sh-prompt; ./configure &with-debug; --cbc build-g
 &sh-prompt; cd build-g
-&sh-prompt; gdb full/lisp.run       ;; or lisp.exe on windows and cygwin
-<prompt>(gdb)</prompt> full
+&sh-prompt; gdb lisp.run <lineannotation>;; or lisp.exe on &win32; and &cygwin;</lineannotation>
+<prompt>(gdb)</prompt> boot
 <prompt>(gdb)</prompt> run
-</screen></para></answer></qandaentry>
+</screen></para></formalpara>
+
+<formalpara id="faq-debug-module"><title>Debugging
+  module <literal>foo</literal></title><para><screen>
+&sh-prompt; ./configure &with-debug; --with-module=foo --cbc build-g
+&sh-prompt; cd build-g
+&sh-prompt; gdb full/lisp.run <lineannotation>;; or lisp.exe on &win32; and &cygwin;</lineannotation>
+<prompt>(gdb)</prompt> full
+<prompt>(gdb)</prompt> run</screen>
+When debugging a &base; module, use <command>base</command>
+ instead of <command>full</command> and <command>boot</command> above.
+</para></formalpara>
+
+<formalpara id="faq-debug-gengc">
+ <title>The impact of generational &gc;or</title>
+<para>If your &clisp; was built with generational &gc;or, you will see
+ plenty of spurious segfaults (that's how the generational &gc;or
+ works).  At the end of <filename role="clisp-cvs">src/.gdbinit</filename>
+ you will find the following suggested &gdb; commands:
+<programlisting language="gdb">handle SIGSEGV noprint nostop
+break sigsegv_handler_failed</programlisting>
+which will stop execution on a <emphasis>dangerous</emphasis> segfault.
+You can find out whether this is needed by examining the output of the
+following command:
+<screen>&sh-prompt; clisp --version | grep GENERATIONAL_GC</screen>
+</para></formalpara>
+
+<formalpara id="faq-debug-gdbinit"><title>Useful commands</title>
+<para>You are encouraged to make use of commands defined in
+ <filename role="clisp-cvs">src/.gdbinit</filename>,
+ such as<simplelist columns="3">
+  <member><command>boot</command></member>
+  <member><command>base</command></member>
+  <member><command>full</command></member>
+  <member><command>run_test</command></member>
+  <member><command>run_mod_test</command></member>
+  <member><command>run_all_tests</command></member>
+  <member><command>run_ansi_tests</command></member>
+  <member><command>run_ansi_tests_compiled</command></member>
+  <member><command>xout</command></member>
+  <member><command>zout</command></member>
+  <member><command>zbacktrace</command></member>
+ </simplelist>and others; <command>help &command-r;</command> in &gdb;
+  will tell you what &command-r; does.</para></formalpara>
+
+<formalpara id="faq-debug-macros"><title>Macros</title>
+ <para>&clisp; makes heavy use of &cpp; macros
+  (e.g., <function>pushSTACK</function>), which can complicate debugging
+  in &gdb;.  The macros are defined
+  in <filename role="clisp-cvs">src/lispbibl.d</filename>, but the maze
+  of conditionals may be hard to navigate. If you are using &gcc;, you
+  can do <command role="unix">make lispbibl.h</command> and then
+  examine the definitions in the generated <filename>lispbibl.h</filename>.
+  See also bottom of <filename role="clisp-cvs">src/spvw_debug.d</filename>.
+</para></formalpara>
+
+<formalpara id="faq-debug-binary-search"><title>Binary Search in Time</title>
+<para>When you encounter an <emphasis>regression error</emphasis> (i.e.,
+something worked in a previous version of &clisp;, but does not work in
+the current version) which we cannot reproduce, we will often ask you to
+figure out which specific &cvs; commit introduced it.
+The way to figure that out is to use the <emphasis>binary search in
+time</emphasis>, specifically:<orderedlist>
+<listitem><simpara>Write a script <command>test-clisp</command>, which tests
+for the bug given a path to the &clisp; executable.</simpara></listitem>
+<listitem><simpara>Select dates <replaceable>good-date</replaceable> and
+<replaceable>bad-date</replaceable> such that the bug is present at
+<replaceable>bad-date</replaceable> (e.g., set it to the current date) and
+&not-e; present at <replaceable>good-date</replaceable>.</simpara></listitem>
+<listitem><para>Let date &m-r; be the midpoint between
+<replaceable>good-date</replaceable> and <replaceable>bad-date</replaceable>.
+ Do:<screen>&sh-prompt; cvs co -D &m-r; clisp
+&sh-prompt; cd clisp; ./configure --cbc build; cd ..;
+&sh-prompt; if test-clisp ./clisp/build/clisp; then rm -rf good; mv clisp good; else rm -rf bad; mv clisp bad; fi</screen>
+Is the <command>test-clisp</command> command succeeded, then set
+<replaceable>good-date</replaceable> to &m-r;, otherwise set
+<replaceable>bad-date</replaceable> to &m-r;.</para></listitem>
+<listitem><para>Repeat the previous listitem until there is only one &cvs;
+commit between <replaceable>bad-date</replaceable> and
+<replaceable>good-date</replaceable>.</para></listitem></orderedlist>
+See output of <command>&cvs; log</command> for the acceptable date
+format for <command>&cvs; co -D</command>.</para></formalpara>
+</answer></qandaentry>
 </qandadiv>
 
 <qandadiv id="faq-menorah"><title>Logo</title>
@@ -236,7 +362,8 @@ further explanations of the issues could be provided).</para>
 <answer><para>The &clisp; developers, both the original creators and the
   current maintainers, do not subscribe to the mainstream view that
   blames the Jews for everything from high oil prices and Islamic
-  extremism to El Ni&ntilde;o and Sun spots.</para>
+  extremism to El Ni&ntilde;o and global warming (or cooling, whatever
+  the looming disaster du jour is).</para>
  <para>Moreover, today, when Jews are being pushed out of the American
   and European academic institutions with various obscene
   <ulink url="http://how_to_help_israel.tripod.com/Petition.htm">boycott</ulink>
@@ -259,14 +386,19 @@ further explanations of the issues could be provided).</para>
 
 <qandaentry id="faq-menorah-other"><question id="faq-menorah-other-q">
   <simpara>Aren't there other political issues of concern?</simpara></question>
-<answer><para>Yes, there are!  For example, in 1989 the communist
-  government of the People's Republic of China murdered some 3000+
+<answer><para>Yes, there are!  For example, in 1989 the
+  <ulink url="http://sds.podval.org/commies.html">communist</ulink>
+  government of the <ulink url="http://www.chinasupport.net/">People's
+   Republic of China</ulink> murdered some 3000+
   student human rights protesters at the Tienanmen square in Beijing,
   and people appear to have already forgotten this crime.
   A note to that effect was kept in the file
   <filename role="clisp-cvs">src/timezone.lisp</filename>
   until 2002, when it was decided that is was not visible enough there
-  and moved it here.</para></answer></qandaentry>
+  and it was moved here.</para>
+ <para>We also oppose <ulink url="http://swpat.ffii.org/">software
+   patents</ulink> and support other liberal (i.e., pro-liberty) causes.</para>
+</answer></qandaentry>
 
 <qandaentry id="faq-menorah-users"><question id="faq-menorah-users-q">
   <simpara>Aren't you afraid of losing some users who are offended by
@@ -284,7 +416,7 @@ further explanations of the issues could be provided).</para>
   and the authors are proud to display it.
   If you are unlucky enough to have lost the freedom to express your
   opinion, due to the constraints of a government, society, religion,
-  or expectations of "professional relationships",
+  or expectations of <quote>professional relationships</quote>,
   the Free World condoles with you.
   The authors of &clisp; are not operating under such constraints.
   If you are unhappy about their artistic preferences, political views or
@@ -302,29 +434,30 @@ further explanations of the issues could be provided).</para>
 
 <qandadiv id="faq-run"><title>Running &clisp;</title>
 
-<qandaentry id="faq-defun"><question id="faq-defun-q"><simpara>Where is
-   &defun;?</simpara></question>
-<answer><para>Pass &opt-M; to the runtime (&lisp-run;
+<qandaentry id="faq-defun"><question id="faq-defun-q">
+  <simpara>Why are floats printed in binary?</simpara>
+  <simpara>Where is &defun;?</simpara></question>
+<answer><para>Pass &opt-M; to the &rt; (&lisp-run;
   or <filename>lisp.exe</filename>).
-  Use the driver <filename>clisp</filename> (or
-  <filename>clisp.exe</filename>) instead of invoking the runtime
+  Or, better yet, use the driver <filename>clisp</filename> (or
+  <filename>clisp.exe</filename>) instead of invoking the &rt;
   directly.</para></answer></qandaentry>
 
 <qandaentry id="faq-ide">
 <question id="faq-ide-q"><simpara>Where is the <acronym>IDE<alt>Integrated
     Development Environment</alt></acronym>?</simpara></question>
-<answer><formalpara><title>&emacs;-based</title><para><itemizedlist>
-    <listitem><simpara><ulink url="http://www.gnu.org/software/emacs/manual/emacs.html#External%20Lisp"><function>inferior-lisp</function></ulink></simpara></listitem>
-    <listitem><simpara>&slime;</simpara></listitem>
-    <listitem><simpara>&ilisp;</simpara></listitem>
-    <listitem><simpara><ulink url="http://cl-cookbook.sourceforge.net/windows.html">The Common Lisp Cookbook</ulink></simpara></listitem>
- </itemizedlist></para></formalpara>
- <formalpara><title>non-&emacs;-based</title><para><itemizedlist>
-    <listitem><simpara><ulink url="google">VisualCLisp</ulink></simpara></listitem>
-    <listitem><simpara><ulink url="http://jabberwocky.sourceforge.net/">Jabberwocky</ulink></simpara></listitem>
-    <listitem><simpara><ulink url="http://gclisp.sourceforge.net/">GClisp</ulink></simpara></listitem>
-    <listitem><simpara>&phemlock;</simpara></listitem>
-</itemizedlist></para></formalpara></answer></qandaentry>
+<answer><label>&emacs;-based</label><itemizedlist>
+  <listitem><simpara><ulink url="http://www.gnu.org/software/emacs/manual/html_node/emacs/External-Lisp.html"><function>run-lisp</function></ulink></simpara></listitem>
+  <listitem><simpara>&slime;</simpara></listitem>
+  <listitem><simpara>&ilisp;</simpara></listitem>
+  <listitem><simpara><ulink url="http://cl-cookbook.sourceforge.net/windows.html">The Common Lisp Cookbook</ulink></simpara></listitem>
+</itemizedlist></answer>
+<answer><label>non-&emacs;-based</label><itemizedlist>
+  <listitem><simpara><ulink url="google">VisualCLisp</ulink></simpara></listitem>
+  <listitem><simpara><ulink url="http://jabberwocky.sourceforge.net/">Jabberwocky</ulink></simpara></listitem>
+  <listitem><simpara><ulink url="http://gclisp.sourceforge.net/">GClisp</ulink></simpara></listitem>
+  <listitem><simpara>&phemlock;</simpara></listitem>
+</itemizedlist></answer></qandaentry>
 
 
 <qandaentry id="faq-opt"><question id="faq-opt-q"><simpara>What are the
@@ -339,38 +472,32 @@ further explanations of the issues could be provided).</para>
 
 <qandaentry id="faq-ext"><question id="faq-ext-q"><simpara>What &clisp;
    extensions are available?</simpara></question>
-<answer><variablelist>
-  <varlistentry><term>Distributed with &clisp;</term>
-   <listitem><simpara>Quite a few modules are
-     <link linkend="included-modules">included</link> with &clisp;,
-     pass <option>--with-module=...</option> to <filename>configure</filename>
-     to build them and use the &full; &linkset;.
-  </simpara></listitem></varlistentry>
-  <varlistentry><term>3rd party</term>
-   <listitem><simpara>See the <emphasis>incomplete</emphasis> list of
-     <ulink url="http://clisp.cons.org/resources.html#software">"Common
-      Lisp software running in &clisp;"</ulink>.
-  </simpara></listitem></varlistentry>
-  <varlistentry><term><acronym>DIY<alt>Do It Yourself</alt></acronym></term>
-   <listitem><simpara>See <xref linkend="modules"/> and <xref linkend="dffi"/>
-     for information on how to interface with external &c-lang; libraries.
-  </simpara></listitem></varlistentry>
-  <varlistentry><term>&http; (really Frequently Asked!)</term>
-   <listitem><itemizedlist>
-     <listitem><simpara>&clisp; comes with
-       <filename role="clisp-cvs">src/inspect.lisp</filename>
-       which implements a rudimentary &http; server</simpara></listitem>
-     <listitem><simpara><ulink url="http://clocc.sourceforge.net/clocc/src/donc/http.lisp">CLOCC/src/donc/</ulink> has an &http; server</simpara></listitem>
-     <listitem><simpara><ulink url="http://clocc.sourceforge.net/clocc/src/cllib/url.lisp">CLOCC/src/cllib/</ulink> handles URLs</simpara></listitem>
-     <listitem><simpara><ulink url="http://www.fractalconcept.com/asp/mod_lisp">mod_lisp</ulink>
-       hooks lisp into &apache;</simpara></listitem>
-     <listitem><simpara><ulink url="http://alvin.jpl.nasa.gov/gat/ftp/http.lsp"
-       >Object-Oriented HTTP server for &clisp;</ulink></simpara></listitem>
-    </itemizedlist>
-    <para>Both <ulink url="http://allegroserve.sourceforge.net/">AllegroServe</ulink>
-     and <ulink url="http://www.ai.mit.edu/projects/iiip/doc/cl-http/">CL-HTTP</ulink>
-     require multithreading and do not work with &clisp; yet.
-</para></listitem></varlistentry></variablelist></answer></qandaentry>
+<answer><label>bundled</label><simpara>Quite a few modules are
+  <link linkend="included-modules">included</link> with &clisp;,
+  pass <option>--with-module=...</option> to &configure;
+  to build them and see <xref linkend="faq-modules"/>.</simpara></answer>
+<answer><label>3rd party</label>
+ <simpara>See the <emphasis>incomplete</emphasis> list of
+  <ulink url="http://clisp.cons.org/resources.html#software"><quote>Common
+    Lisp software running in &clisp;</quote></ulink>.</simpara></answer>
+<answer><label><acronym>DIY<alt>Do It Yourself</alt></acronym></label>
+ <simpara>See <xref linkend="modules"/> and <xref linkend="dffi"/>
+  for information on how to interface with external &c-lang; libraries.
+</simpara></answer>
+<answer><label>&http;</label><itemizedlist><title>Very Frequently Asked!</title>
+  <listitem><simpara>&clisp; comes with
+    <filename role="clisp-cvs">src/inspect.lisp</filename>
+    which implements a rudimentary &http; server</simpara></listitem>
+  <listitem><simpara><ulink url="http://clocc.sourceforge.net/clocc/src/donc/http.lisp">CLOCC/src/donc/</ulink> has an &http; server</simpara></listitem>
+  <listitem><simpara><ulink url="http://clocc.sourceforge.net/clocc/src/cllib/url.lisp">CLOCC/src/cllib/</ulink> handles URLs</simpara></listitem>
+  <listitem><simpara><ulink url="http://www.cliki.net/mod_lisp">mod_lisp</ulink>
+    hooks lisp into &apache;</simpara></listitem>
+  <listitem><simpara><ulink url="http://www.cliki.net/HTTP%20dot%20LSP">Object-Oriented HTTP server for &clisp;</ulink></simpara></listitem>
+ </itemizedlist>
+ <para>Both <ulink url="http://allegroserve.sourceforge.net/">AllegroServe</ulink>
+  and <ulink url="http://www.cl-http.org:8001/cl-http/">CL-HTTP</ulink>
+  require <link linkend="mt">multithreading</link> and do not work
+  with &clisp; yet.</para></answer></qandaentry>
 
 
 <qandaentry id="faq-rc"><question id="faq-rc-q"><simpara>Where is the
@@ -385,15 +512,40 @@ further explanations of the issues could be provided).</para>
    are the modules with which I built &clisp;?</simpara></question>
 <answer><para>In the &full; &linkset;. Run &clisp; like this:
   <screen>&sh-prompt; clisp &opt-K; full</screen></para>
-
-<para>The reasons for &base; being the default are explained
- <ulink url="http://article.gmane.org/gmane.lisp.clisp.general:8691">here</ulink>.</para></answer></qandaentry>
+ <para>Unless your &clisp; was configured with option &without-dynmod;, you
+  should instead use <code>(&require-my; &name-r;)</code> where &name-r; is
+  a &string-t;, e.g., <quote>&rawsock-mod;</quote>, or <quote>clx</quote>
+  (for either &new-clx; or &mit-clx;, whichever is installed),
+  or <quote>linux</quote> (for &glibc-mod;) etc.
+  This is more reliable because the &full; &linkset; may include many modules
+  which you do not need and, in fact, &cannot-e; use because they require
+  external libraries not installed on your system.</para>
+ <para>Making &base; the default &linkset; has some advantages:<variablelist>
+   <varlistentry><term>Shared Library Hell</term>
+    <listitem><simpara>Avoid problems when a module requires a shared
+      library, and that shared library is not present (or is present but
+      with wrong version) on your system.</simpara></listitem></varlistentry>
+   <varlistentry><term>Smaller Images Are Faster</term>
+    <listitem><simpara>Adding things to the heap increases working
+      set size causing a slowdown, which is especially important for
+      small to medium applications.</simpara></listitem> </varlistentry>
+   <varlistentry><term>Uniform User Experience</term>
+    <listitem><simpara>Composition of the &full; &linkset; is up to the
+      packager, while &base; is the same on all platforms.
+ </simpara></listitem></varlistentry></variablelist></para>
+ <para>See <ulink url="ml">clisp-list</ulink> for more information
+  (<ulink role="sfmail" url="200407212204.44395.bruno%40clisp.org"/>/<ulink role="gmane" url="general/8691"/>).</para>
+</answer></qandaentry>
 
 
 <qandaentry id="faq-gui"><question id="faq-gui-q"><simpara>How do I create
    a <acronym>GUI<alt>Graphical User Interface</alt></acronym>
    for my &clisp; program?</simpara></question>
- <answer><para>There are many options,
+ <answer><para>Use module &gtk2-mod;: create <filename>ui.glade</filename>
+   with &glade;, then do<screen>
+&sh-prompt; ./configure --with-module=gtk2 --cbc build-gtk
+&sh-prompt; ./build-gtk/clisp -K full -x '(gtk:run-glade-file "ui.glade")'</screen></para>
+  <para>There are many other options,
   see <ulink url="http://clisp.cons.org/resources.html#software">"Common
     Lisp software running in &clisp;"</ulink>.</para></answer></qandaentry>
 </qandadiv>
@@ -406,9 +558,10 @@ further explanations of the issues could be provided).</para>
 <answer><para>Use &savemem;, see also <xref linkend="quickstart"/>.
 </para></answer></qandaentry>
 
+
 <qandaentry id="faq-licensing"><question id="faq-licensing-q"><simpara>When
- I deliver my application with &clisp; does it have to be covered by
-   &gnu; &gpl;?</simpara></question>
+   I deliver my application with &clisp;, does it have to be covered by
+   the &gnu; &gpl;?</simpara></question>
 <answer><para>Not necessarily.</para>
 
 <para>&clisp; is <ulink url="http://www.gnu.org/philosophy/free-sw.html">Free
@@ -457,6 +610,33 @@ further explanations of the issues could be provided).</para>
 
 <qandadiv id="faq-trouble"><title>Troubles</title>
 
+<qandaentry id="faq-bin-distrib"><question id="faq-bin-distrib-q"><para>Where
+   is the binary distribution for my platform?</para></question>
+<answer><para>The &clisp; maintainers do not offer &clisp; binary
+  distributions, we believe that software packagers specializing on a
+  particular platform are in a better position to provide quality binaries.
+  Indeed, the section <quote>Get CLISP</quote> on the &clisp;'s home
+  page points to &clisp; packages for all major &linux; and &bsd;
+  variants.</para>
+ <para>The only exception is &win32; for which there is no centralized
+  packager: <emphasis>usually</emphasis>, after each &clisp; release,
+  a &clisp; user <emphasis>volunteers</emphasis> to build a &win32;
+  binary package, which we then distribute at
+  <ulink url="http://sourceforge.net/project/showfiles.php?group_id=1355"/>.
+</para></answer></qandaentry>
+
+
+<qandaentry id="faq-bin-distrib-prev"><question id="faq-bin-distrib-prev-q">
+  <para>But a previous release <emphasis>had</emphasis> a binary
+   distribution for my platform, why does not the current one?</para></question>
+<answer><para>It was probably contributed by a user who did not (yet?)
+  contribute a binary distribution for the current release. You can
+  find out who contributed a specific binary distribution by looking at
+  the release notes in the &sf;
+  <ulink url="http://sourceforge.net/project/showfiles.php?group_id=1355"
+         >Files</ulink> section.</para></answer></qandaentry>
+
+
 <qandaentry id="faq-build"><question id="faq-build-q"><para>Why does not
    &clisp; build on my platform?</para></question>
 <answer><para>Please see file
@@ -465,10 +645,24 @@ further explanations of the issues could be provided).</para>
   as well as instructions on porting &clisp; to new platforms.</para>
 </answer></qandaentry>
 
+
+<qandaentry id="faq-with-prefix"><question id="faq-with-prefix-q"><para>
+   Why is the <option>--with-libsigsegv-prefix</option> option ignored
+   by the &configure; script on my 64-bit machine?</para></question>
+<answer><para>See a note on <quote>bi-arch systems</quote> in section 2 of
+ <filename role="clisp-cvs">unix/INSTALL</filename> in your source distribution
+  (for the impatient: pass <option>--libdir=='${exec_prefix}/lib64'</option>
+    to the &libsigsegv; &configure;).</para>
+ <para>See these threads which discuss the situation in depth:<simplelist>
+   <member><ulink url="http://thread.gmane.org/gmane.comp.lib.gnulib.bugs/14565"/></member>
+   <member><ulink url="http://thread.gmane.org/gmane.comp.sysutils.autoconf.general/10827"/></member>
+</simplelist></para></answer></qandaentry>
+
+
 <qandaentry id="faq-enc-err">
  <blockinfo><title>What do charset errors mean?</title></blockinfo>
- <question id="faq-enc-err-q"><para>What do
-   these messages mean: <quote><computeroutput>invalid byte #x94 in
+ <question id="faq-enc-err-q"><para>What do these error messages
+    mean: <quote><computeroutput>invalid byte #x94 in
     CHARSET:ASCII conversion</computeroutput></quote> and
    <quote><computeroutput>character #\u00B3 cannot be represented in the
     character set CHARSET:ASCII</computeroutput></quote>?</para></question>
@@ -479,25 +673,22 @@ further explanations of the issues could be provided).</para>
   <olink targetdoc="man" targetptr="opt-enc"/>.</para>
 
 <para>This may also be caused by filesystem access.
- If your &path-enc; is set incorrectly, many filesystem accesses (like
- &load;, &directory; etc) will raise this error.
- Note that &load; will traverse the directories mentioned in &load-paths;
- - this applies to the <link linkend="faq-rc">init (RC) file</link> too.
+ If you have files with names incompatible with your &path-enc;,
+ filesystem access (e.g., &directory;) will &signal; this &error-t;.
  You will need to set &path-enc; or pass &opt-E; to &clisp;.
- Using a <quote>1:1</quote> encoding, such as
- <link linkend="charset-ISO-8859-1"><constant>ISO-8859-1</constant></link>,
+ Using a &enc1-1;, such as &iso-8859-1;,
  should help you avoid this error.</para>
 
-<para>Note that this error may be signaled by the Print part of the
- &repl; and &not-e; by the function you call.
+<para>Note that this error may be signaled by the <quote>Print</quote>
+ part of the &repl; and &not-e; by the function you call.
  E.g., if file <filename>"foo"</filename> contains non-&ascii; characters,
  you will see such an error when you type<programlisting language="lisp">
-(with-open-file (s "foo" :direction :input :external-format charset:iso-8859-1)
-  (read-line s))
+(&with-open-file; (s "foo" :direction :input &extfmt; &iso-8859-1;)
+  (&read-line; s))
 </programlisting> If instead you type <programlisting language="lisp">
-(with-open-file (s "foo" :direction :input :external-format charset:iso-8859-1)
-  (setq l (read-line s))
-  nil)
+(&with-open-file; (s "foo" :direction :input &extfmt; &iso-8859-1;)
+  (&setq; l (&read-line; s))
+  &nil;)
 </programlisting> &clisp; will just print &nil; and signal the error
  when you type <literal>l</literal>.</para></answer></qandaentry>
 
@@ -525,11 +716,11 @@ further explanations of the issues could be provided).</para>
    avoid stack overflow?</simpara></question>
 <answer><para>&clisp; has <link linkend="vm"><emphasis>two</emphasis>
    stacks</link>, the <quote>program stack</quote> and the <quote>lisp
-   stack</quote>, and both may occasionally overflow.</para>
- <itemizedlist><title>Avoiding stack overflow: Generic</title>
-  <listitem><simpara>You will always get a stack
-    overflow when you try to print a circular object (list or
-    structure) and &print-circle-var; is &nil;.
+   stack</quote>, and both may occasionally overflow.</para></answer>
+<answer><label>Generic</label><itemizedlist>
+  <listitem><simpara>You will always get a stack overflow when you try
+    to print a <ulink url="clhs/glo">circular</ulink> object (&list-t;,
+    &structure-object-t;, &vector-t; etc) and &print-circle-var; is &nil;.
     Just set &print-circle-var; to &t;.</simpara></listitem>
   <listitem><simpara>You will always get a stack overflow on infinite
     recursion.</simpara></listitem>
@@ -540,18 +731,28 @@ further explanations of the issues could be provided).</para>
   <listitem><simpara>Compiled code uses less stack (and memory) and is
     faster.</simpara></listitem>
   <listitem><simpara>If you really do need more Lisp stack, you can
-    increase it by telling &clisp; to
-    <olink targetdoc="man" targetptr="opt-memsize">pre-allocate more
-     memory</olink>.</simpara></listitem>
+    increase it by telling &clisp; to pre-allocate more memory using
+    &opt-m; or &make-thread;.</simpara></listitem>
   <listitem><simpara>If you get a segmentation fault after (or instead
     of) a <quote>program stack overflow</quote> message, please make
     sure that you had &libsigsegv; installed when you configured and
-    built &clisp;.</simpara></listitem></itemizedlist>
+    built &clisp;.</simpara></listitem></itemizedlist></answer>
 
-<variablelist><title>Avoiding stack overflow: Platform-specific</title>
+<answer><label>Specific</label><variablelist>
  <varlistentry><term>&win32-only;</term>
-  <listitem><simpara><ulink url="http://sourceforge.net/mailarchive/message.php?msg_id=1785942">modify SYSTEM.INI or change PIF that you use to invoke &clisp;</ulink> or
-    <ulink url="http://sourceforge.net/mailarchive/message.php?msg_id=1662294">set program stack using editbin</ulink> (answered on &clisp-list;)</simpara></listitem></varlistentry>
+  <listitem><para>You have several option, use whichever is applicable
+    to your situation:<itemizedlist><listitem><simpara>modify the
+       global <filename>SYSTEM.INI</filename></simpara></listitem>
+     <listitem><simpara>modify the <filename>PIF</filename>
+       that you use to invoke &clisp;
+       (<ulink role="sfmail" url="3D2600BB.1CDBE9D0%40freenet.de"/>/<ulink role="gmane" url="general/4656"/>)</simpara></listitem>
+     <listitem><simpara>or set the program stack (of the run
+       times <command>base/lisp.exe</command> or
+       <command>full/lisp.exe</command>, &not-e; the driver
+       <command>clisp.exe</command>) using <command>editbin</command>
+       (<ulink role="sfmail" url="sa0ptz4o4e3.fsf%40glip.premonitia.com"/>/<ulink role="gmane" url="general/5523"/>); you can find the
+       current stack size using <command>dumpbin</command>.
+ </simpara></listitem></itemizedlist></para></listitem></varlistentry>
  <varlistentry><term>&unix-only;</term>
   <listitem><simpara>Increase program stack with <command>ulimit
      -s</command> (or <command>limit stacksize</command> if you are using
@@ -567,9 +768,9 @@ further explanations of the issues could be provided).</para>
   (nconc var '(1 2 3)))</programlisting>
 and will not work as one would naively expect.
 (on the first invocation, it will return
-<literal role="data">(a b c 1 2 3)</literal>,
-the second invocation will produce a circular list, the third will hang
-trying to &nconc; a circular list).</para>
+<returnvalue>(a b c 1 2 3)</returnvalue>,
+the second invocation will produce a <ulink url="clhs/glo">circular
+ list</ulink>, the third will hang trying to &nconc; a circular list).</para>
 
 <para>Instead you must do
 <programlisting language="lisp">(let ((var (copy-list '(a b c))))
@@ -579,47 +780,35 @@ trying to &nconc; a circular list).</para>
  functions.  See <xref linkend="bytecode"/> for the explanation of the
  &disassemble; output.</para>
 
-<para>See <ulink url="http://www.lisp.org/table/style.htm">Lisp Programming
+<para>See <ulink url="http://norvig.com/luv-slides.ps">Lisp Programming
   Style</ulink> for more useful information.</para>
 </answer></qandaentry>
 
 
-<qandaentry id="faq-autoconf"><question id="faq-autoconf-q"><simpara>Why
-   is autoconf invoked during build?</simpara></question>
-<answer><para>When building from the CVS HEAD development sources, you
-  will sometimes get errors when <command role="unix">make</command>
-  tries to regenerate a <filename>configure</filename> script for you.
- <emphasis role="strong">This is never necessary!</emphasis>
- (and will not happen in an officially released source distribution).
- Please just <command role="unix">touch</command> the target, e.g.:
- <screen>&sh-prompt; touch src/configure</screen>
- and re-run <command role="unix">make</command>.</para>
-<para>You can also pass <option>--disable-maintainer-mode</option>
- to top-level <filename>configure</filename> script (this is the default
- when you are &not-e; working from the CVS).</para>
-</answer></qandaentry>
-
-
 <qandaentry id="faq-fp">
- <blockinfo><title>Is floating point arithmetics broken?</title></blockinfo>
- <question id="faq-fp-q"><para>Why don't floating
-   point arithmetics return what I want?<programlisting language="lisp">
+ <blockinfo><title>Is floating point arithmetic broken?</title></blockinfo>
+ <question id="faq-fp-q"><para>Why don't floating point arithmetic
+   return what I want?</para><programlisting language="lisp">
 (- 1.1 0.9)
 <computeroutput>0.20000005</computeroutput>
-</programlisting></para></question>
-<answer><para>This not a bug, at least not a bug in &clisp;.
- You may argue that this is a bug in &ieee-bfp;,
- but first make sure that you do know
- <ulink url="http://docs.sun.com/source/806-3568/ncg_goldberg.html">What
- Every Computer Scientist Should Know About Floating-Point Arithmetic</ulink>.
- </para>
-<para>See also <ulink url="http://sourceforge.net/mailarchive/message.php?msg_id=12445006">this message</ulink> in &clisp-list;.</para>
+</programlisting></question>
+<answer><label>inexact</label><para>Floating point arithmetic is
+  inherently <emphasis>inexact</emphasis>, so this &not-e; a bug,
+  at least not a bug in &clisp;.
+  You may argue that this is a bug in &ieee-bfp;,
+  but, before you do, please make sure that you do know
+  <ulink url="http://docs.sun.com/source/806-3568/ncg_goldberg.html">What
+   Every Computer Scientist Should Know About Floating-Point Arithmetic</ulink>
+  (or are at least familiar with the
+  <ulink url="http://floating-point-gui.de/">light version</ulink> thereof).
+ </para><para>See also <ulink url="ml">clisp-list</ulink>
+  (<ulink role="sfmail" url="17121.26476.75643.47774%40thalassa.informatimago.com"/>/<ulink role="gmane" url="general/9850"/>).</para></answer>
 
-<formalpara><title>PS</title><para>If you want <emphasis>exact</emphasis>
+<answer><label>exact</label><para>If you want <emphasis>exact</emphasis>
  calculations, use &rational-t;s:<programlisting language="lisp">
 (- 11/10 9/10)
-<computeroutput>1/5</computeroutput>
-</programlisting></para></formalpara></answer></qandaentry>
+<computeroutput>1/5</computeroutput></programlisting>
+</para></answer></qandaentry>
 
 
 <qandaentry id="faq-random">
@@ -631,19 +820,91 @@ trying to &nconc; a circular list).</para>
   See <xref linkend="random-state"/>.</para></answer></qandaentry>
 
 
+<qandaentry id="faq-pp-newline">
+ <question id="faq-pp-newline-q"><para>Why is an extra line break
+   inserted by the pretty printer?</para></question>
+<answer><para>See <xref linkend="ppr-first-newline"/>.</para>
+ <para>For example, here you are pretty-printing two objects: a
+  one-liner <keysym>#\Q</keysym> and a two-liner &cr-c;+&lf-c;,
+  and a line break is inserted between them so that they are printed on
+  separate lines: <programlisting language="lisp">
+(defparameter crlf (coerce '(#\Return #\Linefeed) 'string))
+<computeroutput>CRLF</computeroutput>
+(map 'list #'char-code (format nil "Q~a" crlf))
+<computeroutput>(81 10 13 10)</computeroutput><lineannotation>not (81 13 10) !</lineannotation>
+</programlisting></para>
+ <para>When you want &cr-c;+&lf-c;-terminated lines, use &extfmt; &dos-k;
+  argument when opening your &stream-t;s.</para>
+</answer></qandaentry>
+
+
 <qandaentry id="faq-warning">
  <question id="faq-warning-q"><para>How do I disable this annoying
    warning?</para></question>
 <answer><para>&clisp; often issues &warning-t;s when it encounters
   suspicious behavior.  It is best to fix your code rather than to
   suppress them.  To figure out where the warning is coming from, do
-<programlisting language="lisp">
- (&setq; &break-on-signals-var; '&warning-t;)
-</programlisting> and examine the stack (see <xref linkend="debugger"/>)
-to see where the warning is coming from.</para>
+  <code>(&setq; &break-on-signals-var; '&warning-t;)</code> and examine
+  the stack in the &debugger; to see where the warning is coming from.</para>
  <para>If everything else fails, read the
  <link linkend="impnotes-top">manual</link>.</para></answer>
 </qandaentry>
+
+
+<qandaentry id="faq-scope"><question id="faq-scope-q">
+  <para>Why does &defvar; affect previously defined lexical closures?</para>
+  <programlisting language="lisp">
+(defun adder (val) (lambda (x) (+ x val)))
+<computeroutput>ADDER</computeroutput>
+(setq add-10 (adder 10))
+<computeroutput>ADD-10</computeroutput>
+(funcall add-10 32)
+<computeroutput>42</computeroutput><lineannotation>as expected</lineannotation>
+(defvar val 12)
+<computeroutput>VAL</computeroutput>
+(funcall add-10 0)
+<computeroutput>12</computeroutput><lineannotation>why not 10?!</lineannotation>
+</programlisting></question>
+<answer><label>Explanation</label>
+ <para>The above code does not conform to &ansi-cl;, therefore &clisp;
+  can produce arbitrary results.
+  See <xref linkend="semantic-constraints"/>.</para></answer>
+<answer><label>Remedy</label>
+ <para>Always follow the naming convention for global special variables
+  defined by &defvar; and &defparameter; (e.g., <varname>*FOO*</varname>)
+  and &defconstant; (e.g., <varname>+BAR+</varname>).</para></answer>
+<answer><label>More</label>
+ <simplelist><member><ulink role="sfmail" url="470A4B2A.30306%40gnu.org"/>/<ulink role="gmane" url="general/11945"/></member>
+  <member><ulink role="sfmail" url="200710090043.01871.bruno%40clisp.org"/>/<ulink role="gmane" url="general/11949"/></member>
+</simplelist></answer>
+</qandaentry>
+
+
+<qandaentry id="faq-bad-error"><question id="faq-bad-error-q">
+  <simpara>The error message is not helpful!</simpara></question>
+<answer><para>Sometimes an error message contains a compound object
+  whose content you want to examine. Often this object will be available
+  for &inspect-my;ion via the <command>Inspect</command> command (see
+  <xref linkend="debugger-deb-step-1"/>). E.g., <screen>
+*** - READ: input stream #&lt;INPUT STRING-INPUT-STREAM&gt; ends within an object
+The following restarts are available:
+ABORT          :R1      ABORT
+<prompt>Break 4 [1]&gt;</prompt> <userinput>:i</userinput>
+#&lt;SYSTEM::SIMPLE-END-OF-FILE #x000333CB82F8&gt;:  standard object
+ type: SYSTEM::SIMPLE-END-OF-FILE
+0 [$STREAM]:  #&lt;INPUT STRING-INPUT-STREAM&gt;
+1 [$FORMAT-CONTROL]:
+"~S: input stream ~S ends within an object
+"
+2 [$FORMAT-ARGUMENTS]:  (READ #&lt;INPUT STRING-INPUT-STREAM&gt;)
+<prompt>INSPECT-- type :h for help; :q to return to the REPL ---&gt;</prompt> <userinput>0</userinput>
+#&lt;INPUT STRING-INPUT-STREAM&gt;:  atom
+ type: STRING-STREAM
+ class: #1=#&lt;BUILT-IN-CLASS STRING-STREAM&gt;
+<prompt>INSPECT-- type :h for help; :q to return to the REPL ---&gt;</prompt> <userinput>:d</userinput>
+
+#&lt;INPUT STRING-INPUT-STREAM&gt; is an input-stream. It reads from "(foo" from 0 to 4 at 4.
+</screen></para></answer></qandaentry>
 
 
 <qandaentry id="faq-other-problem"><question id="faq-other-problem-q">
@@ -656,7 +917,7 @@ to see where the warning is coming from.</para>
  you should search the &clisp; implementation notes for "DIRECTORY".</para>
 <para>Alternatively, since the implementation notes are organized in
  parallel to the &ansi-cl;, and &directory; belongs to the
- <ulink url="&clhs;/Body/chap-20.html">Chapter 20</ulink> in &ansi-cl;,
+ <ulink role="clhs" url="chap-20">Chapter 20</ulink> in &ansi-cl;,
  you can just go to <xref linkend="files"/> in impnotes and look
  for "DIRECTORY" <link linkend="directory">there</link>.
 </para></answer></qandaentry>

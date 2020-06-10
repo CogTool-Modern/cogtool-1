@@ -1,39 +1,49 @@
 # Makefile for CLISP module set netica
 # <http://norsys.com/netica_c_api.htm>
 
+srcdir = .
 CC = gcc
 CPPFLAGS =
 CFLAGS = -Wall -O2
-INCLUDES = ..
-NETICA = /usr/local/netica
+NETICA = $(NETICA_C_API)/src
 CLISP = clisp -q -norc
+CLISP_LINKKIT = $$($(CLISP) -b)/linkkit
 
 LN = ln
+LN_S = ln -s
 
 MAKE = make
 
 SHELL = /bin/sh
 
-DISTRIBFILES = netica.o link.sh Makefile netica.lisp wrap.lisp
+GENERATED = netica.o netica.fas wrap.fas link.sh
+DISTRIBFILES = Makefile $(GENERATED) \
+	$(srcdir)/netica.lisp $(srcdir)/wrap.lisp $(srcdir)/README
 distribdir =
 
-all : netica.o wrap.fas
+# default target: make the module
+clisp-module : $(GENERATED)
 
-netica.c netica.fas : netica.lisp
-	$(CLISP) -c netica.lisp
+netica.c netica.fas : $(srcdir)/netica.lisp
+	$(CLISP) -c $(srcdir)/netica.lisp -o ./
 
-netica.o : netica.c $(INCLUDES)/clisp.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -I$(INCLUDES) -I$(NETICA) -c netica.c
+netica.o : netica.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I$(CLISP_LINKKIT) -I$(NETICA) -c netica.c
 
-%.fas: %.lisp
-	$(CLISP) -c $<
+wrap.fas: $(srcdir)/wrap.lisp
+	$(CLISP) -c $< -o ./
 
-# Make a module
-clisp-module : all
+link.sh : $(srcdir)/link.sh
+	$(LN_S) $(srcdir)/link.sh .
 
 # Make a module distribution into $(distribdir)
 clisp-module-distrib : clisp-module force
 	$(LN) $(DISTRIBFILES) $(distribdir)
+
+clean : force
+	rm -f core *.o *.a *.fas *.lib
+
+distclean : clean
 
 force :
 

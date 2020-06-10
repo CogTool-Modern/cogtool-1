@@ -3,35 +3,32 @@
   href="http://docbook.sf.net/release/xsl/current/manpages/docbook.xsl"?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V@DTDVER@//EN"
           "@DTD@" [
+  <!-- http://article.gmane.org/gmane.text.docbook.misc:5091
+       allow alt in acronym -->
+  <!ENTITY % local.word.char.mix "|alt">
   <!ENTITY % cl-entities SYSTEM "cl-ent.xml">
   %cl-entities;
   <!ENTITY % imp-entities SYSTEM "impent.xml">
   %imp-entities;
   <!ENTITY % unix-entities SYSTEM "unix-ent.xml">
   %unix-entities;
-  <!ENTITY dom "<replaceable>domain</replaceable>">
   <!ENTITY ld "<replaceable>locale-dir</replaceable>">
   <!ENTITY lf "<replaceable>lisp-file</replaceable>">
   <!ENTITY lld "<replaceable>lisp-lib-dir</replaceable>">
-  <!ENTITY rt "<link linkend='runtime'>runtime</link>">
   <!ENTITY exprs "<replaceable>expressions</replaceable>">
   <!ENTITY opt-c "<option><link linkend='opt-compile'>-c</link></option>">
-  <!ENTITY opt-x "<option><link linkend='opt-exec-expr'>-x</link></option>">
+  <!ENTITY opt-lf '<option><link linkend="opt-exec-file">&lf;</link></option>'>
 ]>
 
 <refentry id="clisp">
 
- <refentryinfo>
+<refentryinfo>
  <title>&clisp; version @VERSION@</title>
  <subtitle>Platform: @PLATFORM@</subtitle>
  <date>Last modified: @TODAY@</date>
  <productnumber>@VERSION@</productnumber>
  <productname>CLISP</productname>
- &bruno; &sds;
- <authorblurb><para>Bugs in both this manual page and &clisp; itself
-   should be reported to the mailing list &clisp-list;.</para></authorblurb>
- <copyright><year>1992-2006</year><holder>Bruno Haible</holder></copyright>
- <copyright><year>1998-2006</year><holder>Sam Steingold</holder></copyright>
+ &clisp-authors; &clisp-doc-copyright; &clisp-abstract;
 </refentryinfo>
 
 <refmeta>
@@ -41,33 +38,28 @@
 <refmiscinfo class="manual">Platform: @PLATFORM@</refmiscinfo>
 </refmeta>
 
-<refnamediv>
+<refnamediv id="summary">
 <refname>clisp</refname>
-<refpurpose>ANSI Common Lisp compiler, interpreter and debugger.</refpurpose>
+<refpurpose>&the-ansi; &cl; compiler, interpreter and debugger.</refpurpose>
 </refnamediv>
 
-<refsynopsisdiv><cmdsynopsis>&clisp-cmd;
+<refsynopsisdiv id="synopsis"><cmdsynopsis>&clisp-cmd;
 <group><arg><option><link linkend="opt-help">-h</link></option></arg>
  <arg><option><link linkend="opt-help">--help</link></option></arg></group>
 <arg><option><link linkend="opt-version">--version</link></option></arg>
 <arg><option><link linkend="opt-license">--license</link></option></arg>
+<arg><option><link linkend="opt-help-image">-help-image</link></option></arg>
 <arg><option><link linkend="opt-libdir">-B &lld;</link></option></arg>
-<!-- #ifdef UNIX -->
+<arg><option><link linkend="opt-printlibdir">-b</link></option></arg>
 <arg><option><link linkend="opt-link-set">-K
    <replaceable>linking-set</replaceable></link></option></arg>
-<!-- #endif -->
 <arg><option><link linkend="opt-memfile">-M
    <replaceable>mem-file</replaceable></link></option></arg>
-<arg><option><link linkend="opt-memsize">-m
-   <replaceable>mem-size</replaceable></link></option></arg>
-<!-- #ifdef MULTIMAP_MEMORY_VIA_FILE -->
-<arg><option><link linkend="opt-tempdir">-t
-   <replaceable>temp-dir</replaceable></link></option></arg>
-<!-- #endif -->
+<arg><option><link linkend="opt-memsize">-m &mems-r;</link></option></arg>
 <arg><option><link linkend="opt-lang">-L &lang-r;</link></option></arg>
 <arg><option><link linkend="opt-locale">-N &ld;</link></option></arg>
-<arg><option><link linkend="opt-enc">-E&dom; &encoding-r;</link></option></arg>
-<group><arg><option><link linkend="opt-verbose">-q</link></option></arg>
+<arg><option><link linkend="opt-enc">-E&dom-r; &encoding-r;</link></option></arg>
+<group><arg>&opt-q;</arg>
  <arg><option><link linkend="opt-verbose">--quiet</link></option></arg>
  <arg><option><link linkend="opt-verbose">--silent</link></option></arg>
  <arg>&opt-v;</arg>
@@ -77,12 +69,14 @@
 <arg><option><link linkend="opt-repl">-repl</link></option></arg>
 <arg><option><link linkend="opt-wait">-w</link></option></arg>
 <arg><option><link linkend="opt-ilisp">-I</link></option></arg>
-<group><arg><option><link linkend="opt-ansi">-ansi</link></option></arg>
- <arg><option><link linkend="opt-traditional" >-traditional</link></option></arg></group>
-<arg><option><link linkend="opt-modern">-modern</link></option></arg>
+<arg>&opt-norl;</arg>
+<group><arg>&opt-ansi;</arg><arg>&opt-traditional;</arg></group>
+<arg>&opt-modern;</arg>
 <arg><option><link linkend="opt-pack">-p &pack-r;</link></option></arg>
 <arg>&opt-C;</arg>
-<arg><option><link linkend="opt-norc">-norc</link></option></arg>
+<arg>&opt-norc;</arg>
+<arg rep="repeat"><option><link linkend="opt-load-paths">-lp
+   &dir-r;</link></option></arg>
 <arg rep="repeat"><option><link linkend="opt-init">-i
    <replaceable>init-file</replaceable></link></option></arg>
 <arg rep="repeat"><option><link linkend="opt-compile">-c</link></option>
@@ -91,22 +85,31 @@
    <replaceable>output-file</replaceable></option></arg></arg>
 <arg rep="repeat"><option><link linkend="opt-exec-expr">-x
    &exprs;</link></option></arg>
-<arg><option><link linkend="opt-exec-file">&lf;</link></option>
- <arg rep="repeat"><option><link linkend="opt-exec-file"
-                                 >&arg-r;</link></option></arg></arg>
+<arg>&opt-lf; <arg rep="repeat"><option>&arg-r;</option></arg></arg>
 </cmdsynopsis>
 </refsynopsisdiv>
 
 <refsection id="description"><title>Description</title>
 
-<para>Invokes the &cl; interpreter and compiler.
-When called without arguments, executes the &repl;,
-in which expressions are in turn &read; from the standard input,
-&eval;uated by the lisp interpreter,
-and their results are &print;ed to the standard output.
-Invoked with &opt-c;,
-compiles the specified lisp files to a platform-independent
-&bytecode; which can be executed more efficiently.</para>
+<para>Invokes the &cl; interpreter and compiler.</para>
+
+<refsection id="interactive-mode"><title>Interactive Mode</title>
+
+<para>When called without arguments, executes the &repl;,
+in which expressions are in turn <itemizedlist>
+<listitem><simpara>&read; from the standard input,</simpara></listitem>
+<listitem><simpara>&eval;uated by the lisp interpreter,</simpara></listitem>
+<listitem><simpara>and their results are &print;ed to the standard output.
+</simpara></listitem></itemizedlist></para>
+</refsection>
+
+<refsection id="batch-mode"><title>Non-Interactive (Batch) Mode</title>
+
+<para>Invoked with &opt-c;, compiles the specified lisp files to a
+platform-independent &bytecode; which can be executed more efficiently.</para>
+<para>Invoked with &opt-x;, executes the specified lisp expressions.</para>
+<para>Invoked with &opt-lf;, runs the specified lisp file.</para>
+</refsection>
 
 </refsection>
 
@@ -128,23 +131,30 @@ compiles the specified lisp files to a platform-independent
  <listitem><simpara>Displays a summary of the licensing information,
    the &gnu; &gpl;.</simpara></listitem></varlistentry>
 
+<varlistentry id="opt-help-image"><term><option>-help-image</option></term>
+ <listitem><simpara>Displays information about the &mem-image; being invoked:
+   whether is it suitable for scripting as well as the &documentation-k;
+   supplied to &savemem;.</simpara></listitem></varlistentry>
+
 <varlistentry id="opt-libdir"><term><option>-B</option> &lld;</term>
  <listitem><simpara>Specifies the installation directory.
    This is the directory containing the linking sets and other data files.
-<!-- #ifdef UNIX -->
    This option is normally not necessary, because the installation directory
    is already built-in into the &clisp-cmd; executable.
-<!-- #endif -->
-   Directory &lld; can be changed dynamically using the
-   &symbol-macro; <varname>*LIB-DIRECTORY*</varname>.
+   Directory &lld; can be changed dynamically using the &symbol-macro; &libdir;.
 </simpara></listitem></varlistentry>
 
-<!-- #ifdef UNIX -->
+<varlistentry id="opt-printlibdir"><term><option>-b</option></term>
+ <listitem><simpara>Print the installation directory and exit immediately.
+   The namestring of &libdir; is printed without any quotes.
+   This is mostly useful in module Makefiles, see,
+   e.g., <filename role="clisp-cvs">modules/syscalls/Makefile.in</filename>.
+</simpara></listitem></varlistentry>
+
 <varlistentry id="opt-link-set"><term><option>-K</option>
   <replaceable>linking-set</replaceable></term>
  <listitem><para>Specifies the &linkset; to be run.
-   This is a directory (relative to the
-   <link linkend="opt-libdir">&lld;</link>)
+   This is a directory (relative to the <link linkend="opt-libdir">&lld;</link>)
    containing at least a main executable (&rt;) and an initial &mem-image;.
    Possible values are
    <variablelist>&varlist-table;<varlistentry><term>&base;</term>
@@ -154,8 +164,8 @@ compiles the specified lisp files to a platform-independent
        installation was built, see
        <olink targetdoc="impnotes" targetptr="modules"/>.
    </simpara></listitem></varlistentry></variablelist>
-   The default is &base;.</para></listitem></varlistentry>
-<!-- #endif -->
+   The <olink targetdoc="impnotes" targetptr="faq-modules">default</olink>
+   is &base;.</para></listitem></varlistentry>
 
 <varlistentry id="opt-memfile"><term><option>-M</option>
   <replaceable>mem-file</replaceable></term>
@@ -166,25 +176,34 @@ compiles the specified lisp files to a platform-independent
 <!-- #endif -->
 </simpara></listitem></varlistentry>
 
-<varlistentry id="opt-memsize"><term><option>-m</option>
-    <replaceable>mem-size</replaceable></term>
+<varlistentry id="opt-memsize"><term><option>-m</option> &mems-r;</term>
  <listitem><para>Sets the amount of memory &clisp;
    tries to grab on startup. The amount may be given as
    <variablelist>
-    <varlistentry><term><replaceable>nnnnnnn</replaceable></term>
+    <varlistentry><term>&n-r;</term><term>&n-r;<command>B</command></term>
      <listitem><simpara>measured in bytes
     </simpara></listitem></varlistentry>
+    <varlistentry><term>&n-r;</term><term>&n-r;<command>W</command></term>
+     <listitem><simpara>measured in machine words (4&times;&n-r; on
+       32-bit platforms, 8&times;&n-r; on 64-bit platforms)
+    </simpara></listitem></varlistentry>
     <varlistentry>
-     <term><replaceable>nnnn</replaceable><command>K</command></term>
-     <term><replaceable>nnnn</replaceable><command>KB</command></term>
+     <term>&n-r;<command>K</command></term>
+     <term>&n-r;<command>KB</command></term>
      <listitem><simpara>measured in kilobytes
+    </simpara></listitem></varlistentry>
+     <varlistentry><term>&n-r;<command>KW</command></term>
+     <listitem><simpara>measured in kilowords
     </simpara></listitem></varlistentry>
     <varlistentry>
      <term>&n-r;<command>M</command></term>
      <term>&n-r;<command>MB</command></term>
      <listitem><simpara>measured in megabytes
+   </simpara></listitem></varlistentry>
+    <varlistentry><term>&n-r;<command>MW</command></term>
+     <listitem><simpara>measured in megawords
    </simpara></listitem></varlistentry></variablelist>
-   The default is 2 megabytes.
+   The default is 3 megabytes.
 <!-- #if (oint_addr_len+addr_shift==24) -->
    The argument is constrained between 100 KB and 16 MB.
 <!-- #elif (oint_addr_len+addr_shift==26) -->
@@ -197,29 +216,18 @@ compiles the specified lisp files to a platform-independent
    </para><simpara>This version of &clisp;
 <!-- #if defined(SPVW_MIXED) && defined(SPVW_BLOCKS) -->
 <!-- #ifdef GENERATIONAL_GC -->
-   is not likely to actually use the entire
-   <replaceable>mem-size</replaceable> since garbage collection will
+   is not likely to actually use the entire &mems-r; since &gc;ion will
    periodically reduce the amount of used memory.
    It is therefore common to specify 10 MB even if only 2 MB are going
    to be used.
 <!-- #else -->
-   eventually uses the entire <replaceable>mem-size</replaceable>.
+   eventually uses the entire &mems-r;.
 <!-- #endif -->
 <!-- #else -->
-   allocates memory dynamically.
-   <replaceable>mem-size</replaceable> is essentially ignored
+   allocates memory dynamically. &mems-r; is essentially ignored
    (except that it determines the Lisp &STACK; size).
 <!-- #endif -->
 </simpara></listitem></varlistentry>
-
-<!-- #ifdef MULTIMAP_MEMORY_VIA_FILE -->
-<varlistentry id="opt-tempdir"><term><option>-t</option>
-  <replaceable>temp-dir</replaceable></term>
- <listitem><simpara>Specifies the directory where the temporary core
-   file is to be held.  This option takes precedence over the
-   &env-var; <envar>TMPDIR</envar>.
-</simpara></listitem></varlistentry>
-<!-- #endif -->
 
 <varlistentry id="opt-lang"><term><option>-L</option> &lang-r;</term>
  <listitem><para>Specifies the
@@ -236,8 +244,7 @@ compiles the specified lisp files to a platform-independent
     <member><command>dutch</command></member>
     <member><command>russian</command></member>
     <member><command>danish</command></member></simplelist>.
-   Other languages may be specified through the &env-var;
-   <envar>LANG</envar>,
+   Other languages may be specified through the &env-var; <envar>LANG</envar>,
    provided the corresponding message catalog is installed.
 <!-- #endif -->
    The language may be changed dynamically using the &symbol-macro;
@@ -251,11 +258,11 @@ compiles the specified lisp files to a platform-independent
   &curr-lang;.</simpara></listitem></varlistentry>
 
 <varlistentry id="opt-enc">
- <term><option>-E</option>&dom; &encoding-r;</term>
+ <term><option>-E&dom-r; &encoding-r;</option></term>
  <listitem><para>Specifies the encoding used for the given domain,
    overriding the default which depends on the &env-var;s
    <envar>LC_ALL</envar>, <envar>LC_CTYPE</envar>, <envar>LANG</envar>.
-   &dom; can be
+   &dom-r; can be
    <variablelist>&varlist-table;
     <varlistentry><term><constant>file</constant></term>
      <listitem><simpara>affecting &def-file-enc;
@@ -275,10 +282,9 @@ compiles the specified lisp files to a platform-independent
     <varlistentry><term><replaceable>blank</replaceable></term>
      <listitem><simpara>affecting all of the above.
    </simpara></listitem></varlistentry></variablelist></para>
-   <warning><para>Note that the values of these &symbol-macro;s that
-     have been saved in a &mem-image; are ignored: these &symbol-macro;s
-     are reset based on the OS environment <emphasis>after</emphasis>
-     the &mem-image; is loaded.
+   <warning><para>Note that the values of these &symbol-macro;s that have
+     been saved in a &mem-image; are ignored: these &symbol-macro;s are
+     reset based on the OS environment &after-e; the &mem-image; is loaded.
      You have to use the &RC-file;, &init-hooks; or &init-function; to
      set them on startup, but it is best to set the aforementioned
      &env-var;s appropriately for consistency with other programs.
@@ -295,7 +301,8 @@ compiles the specified lisp files to a platform-independent
    &load-verbose-var; and &compile-verbose-var; to &t;, and
    &load-print-var; and &compile-print-var; to &nil;, as per &ansi-cl;.
    The first &opt-q; removes the banner and the good-bye message, the
-   second sets variables &load-verbose-var; and &compile-verbose-var; to &nil;.
+   second sets variables &load-verbose-var;, &compile-verbose-var; and
+   &savemem-verbose; to &nil;.
    The first &opt-v; sets variables &err-pr-bt;, &load-print-var; and
    &compile-print-var; to &t;, the second sets &load-echo; to &t;.
    These settings affect the output produced by &opt-i; and &opt-c; options.
@@ -306,8 +313,7 @@ compiles the specified lisp files to a platform-independent
 
 <varlistentry id="opt-on-error">
  <term><option>-on-error</option> <replaceable>action</replaceable></term>
- <listitem><para>Override (or force) the batch mode imposed by
-   &opt-c;, &opt-x;, and <link linkend="opt-exec-file">&lf;</link>,
+ <listitem><para>Establish global error handlers,
    depending on <replaceable>action</replaceable>:<variablelist>
     <varlistentry><term>appease</term>
      <listitem><simpara>&cont-err;s are turned into &warning-t;s (with
@@ -315,21 +321,22 @@ compiles the specified lisp files to a platform-independent
     </simpara></listitem></varlistentry>
     <varlistentry><term>debug</term>
      <listitem><simpara>&error-t;s &invoke-debugger; (the normal &repl;
-       behavior)</simpara></listitem></varlistentry>
+       behavior), disables &batch-mode; imposed by &opt-c;, &opt-x;,
+       and &opt-lf;,</simpara></listitem></varlistentry>
     <varlistentry><term>abort</term>
      <listitem><simpara>&cont-err;s are appeased, other &error-t;s
        are &abort;ed with &abort-on-error;</simpara></listitem></varlistentry>
     <varlistentry><term>exit</term>
      <listitem><simpara>&cont-err;s are appeased, other &error-t;s terminate
-       &clisp; with &exit-on-error;</simpara></listitem></varlistentry>
-   </variablelist>
+       &clisp; with &exit-on-error; (the normal &batch-mode; behavior).
+     </simpara></listitem></varlistentry></variablelist>
    See also &set-global-handler;.</para></listitem></varlistentry>
 
 <varlistentry id="opt-repl"><term><option>-repl</option></term>
  <listitem><simpara>Start an interactive &repl; after processing the
-   &opt-c;, &opt-x;, and <link linkend="opt-exec-file">&lf;</link>
-   options and on any &error-t; &signal;ed during that processing.
-</simpara></listitem></varlistentry>
+   &opt-c;, &opt-x;, and &opt-lf; options and on any &error-t; &signal;ed
+   during that processing.</simpara>
+<simpara>Disables &batch-mode;.</simpara></listitem></varlistentry>
 
 <varlistentry id="opt-wait"><term><option>-w</option></term>
  <listitem><simpara>Wait for a keypress after program termination.
@@ -349,23 +356,31 @@ compiles the specified lisp files to a platform-independent
 <!-- #endif -->
 </itemizedlist></para></listitem></varlistentry>
 
+<varlistentry id="opt-norl"><term><option>-disable-readline</option></term>
+ <listitem><simpara>Do not use &readline; even when it has been linked against.
+   This can be used if one wants to paste non-&ascii; characters, or
+   when &readline; misbehaves due to installation (different versions on
+   the build and install machines) or setup (bad <envar>TERM</envar>
+   &env-var; value) issues.</simpara></listitem></varlistentry>
+
 <varlistentry id="opt-ansi"><term><option>-ansi</option></term>
- <listitem><simpara>Comply with the &ansi-cl; specification
-   even where &clisp; has been traditionally different.
-   It sets the &symbol-macro; &ansi; to &t;.
-</simpara></listitem></varlistentry>
+ <listitem><simpara>Comply with the &ansi-cl; specification even where
+   &clisp; has been traditionally different by setting the
+   &symbol-macro; &ansi; to &t;.</simpara></listitem></varlistentry>
 
 <varlistentry id="opt-traditional"><term><option>-traditional</option></term>
  <listitem><simpara>Traditional: reverses the residual effects of
-   &ansi-opt; in the saved &mem-image;.</simpara></listitem></varlistentry>
+   &opt-ansi; in the saved &mem-image;.</simpara></listitem></varlistentry>
 
 <varlistentry id="opt-modern"><term><option>-modern</option></term>
  <listitem><simpara>Provides a modern view of symbols: at startup the
   &package-var; variable will be set to the &cs-clu; package, and the
-  &print-base-var; will be set to <constant>:DOWNCASE</constant>.
+  &print-case-var; will be set to <constant>:DOWNCASE</constant>.
   This has the effect that symbol lookup is case-sensitive (except for
   keywords and old-style packages) and that keywords and uninterned symbols
-  are printed with lower-case preferrence.</simpara></listitem></varlistentry>
+  are printed with lower-case preferrence.
+   See <olink targetdoc="impnotes" targetptr="package-case"/>.
+</simpara></listitem></varlistentry>
 
 <varlistentry id="opt-pack"><term><option>-p</option> &pack-r;</term>
  <listitem><simpara>At startup the value of the variable &package-var;
@@ -385,12 +400,21 @@ compiles the specified lisp files to a platform-independent
  <listitem><simpara>Normally &clisp; loads the user
    <ulink url="http://www.faqs.org/docs/artu/ch10s03.html"><quote>run
      control</quote> (RC)</ulink> file on startup (this happens
-   <emphasis>after</emphasis> the &opt-C; option is processed).
+   &after-e; the &opt-C; option is processed).
    The file loaded is <filename>.clisprc.lisp</filename>
    or <filename>.clisprc.fas</filename>
    in the home directory &user-homedir-pathname;, whichever is newer.
    This option, &opt-norc;, prevents loading of the &RC-file;.
 </simpara></listitem></varlistentry>
+
+<varlistentry id="opt-load-paths"><term><option>-lp</option> &dir-r;</term>
+ <listitem><simpara>Specifies directories to be added to &load-paths;
+   at startup.  This is done &after-e; loading the &RC-file; (so that
+   it does not override the command-line option) but &before-e; loading
+   the init-files specified by the <option>-i</option> options (so that
+   the init-files will be searched for in the specified directories).
+   Several <option>-lp</option> options can be given; all the specified
+   directories will be added.</simpara></listitem></varlistentry>
 
 <varlistentry id="opt-init"><term><option>-i</option>
   <replaceable>init-file</replaceable></term>
@@ -400,10 +424,10 @@ compiles the specified lisp files to a platform-independent
    files will be loaded in order.</simpara></listitem></varlistentry>
 
 <varlistentry id="opt-compile"><term><option>-c</option> &lf;</term>
- <listitem><simpara>Compiles the specified &lf;s to bytecode
+ <listitem><simpara>Compiles the specified &lf;s to &bytecode;
    (<filename>*.fas</filename>).  The compiled files can then be
-   &load;ed instead of the sources to gain efficiency.
-</simpara></listitem></varlistentry>
+   &load;ed instead of the sources to gain efficiency.</simpara>
+<simpara>Imposes &batch-mode;.</simpara></listitem></varlistentry>
 
 <varlistentry id="opt-out"><term><option>-o</option>
   <replaceable>outputfile</replaceable></term>
@@ -412,7 +436,7 @@ compiles the specified lisp files to a platform-independent
 </simpara></listitem></varlistentry>
 
 <varlistentry id="opt-list"><term><option>-l</option></term>
- <listitem><simpara>Produce a bytecode &disassemble; listing
+ <listitem><simpara>Produce a &bytecode; &disassemble; listing
    (<filename>*.lis</filename>) of the files being compiled.
    Useful only for debugging.
    See <olink targetdoc="impnotes" targetptr="compilefile"/> for details.
@@ -424,11 +448,12 @@ compiles the specified lisp files to a platform-independent
    The values of the expressions will be output to &standard-output-var;.
    Due to the argument processing done by the shell, the &exprs; must be
    enclosed in double quotes, and double quotes and backslashes must be
-   escaped with backslashes.</simpara></listitem></varlistentry>
+   escaped with backslashes.</simpara>
+<simpara>Imposes &batch-mode;.</simpara></listitem></varlistentry>
 
 <varlistentry id="opt-exec-file"><term>&lf; [ &arg-r; ... ]</term>
  <listitem><simpara>Loads and executes a &lf;, as described in
-   <olink targetdoc="impnotes" targetptr="script-exec"/>.
+   <olink targetdoc="impnotes" targetptr="quickstart-unix"/>.
    There will be no &repl;.
    Before &lf; is loaded, the variable &args; will be bound to a list of
    strings, representing the &arg-r;s.
@@ -437,38 +462,47 @@ compiles the specified lisp files to a platform-independent
    thus permitting &clisp; to be used as a script interpreter.
 <!-- #endif -->
    If &lf; is <command>-</command>,
-   the &standard-input-var; is used instead of a file.
-   If &lf; is the empty string <command>""</command>
-   or <command>"--"</command>, the normal &repl; is
-   entered, and the rest of the arguments is still available in &args;,
-   for parsing by the &init-function; of the current &mem-image;.
-   This option must be the last one.
-   No &RC-file; will be executed.
-</simpara></listitem></varlistentry>
+   the &standard-input-var; is used instead of a file.</simpara>
+<simpara>This option is <emphasis>disabled</emphasis> if the &mem-image;
+ was created by &savemem; with &nil; <constant>:SCRIPT</constant>
+ argument.  In that case the &list-t; &args; starts with &lf;.</simpara>
+<simpara>This option must be the last one.</simpara>
+<simpara>No &RC-file; will be executed.</simpara>
+<simpara>Imposes &batch-mode;.</simpara>
+</listitem></varlistentry>
 
 </variablelist>
+
+<para>As usual, <option>--</option> stops option processing and places
+ all remaining command line arguments into &args;.</para>
 
 </refsection>
 
 <refsection id="reference"><title>Language Reference</title>
 
-<para id="ansi-cl">The language implemented is &ansi-cl;.
+<para>The language implemented is &the-ansi; &cl;.
  The implementation mostly conforms to the <olink targetdoc="impnotes"
- targetptr="ref-ansi">ANSI Common Lisp standard</olink>.</para>
+ targetptr="ref-ansi">ANSI Common Lisp standard</olink>,
+ see <olink targetdoc="impnotes" targetptr="ansi"/>.</para>
+
+<bibliolist>&ansi-cl-bib;</bibliolist>
 
 </refsection>
 
-<refsection id="usage"><title>Usage</title>
+<refsection id="clue"><title>Command Line User Environment</title>
 
 <variablelist>
-<varlistentry><term>help</term>
+<varlistentry><term>&help;</term>
  <listitem><simpara>get context-sensitive on-line help, see
    <olink targetdoc="impnotes" targetptr="environment"/>.
 </simpara></listitem></varlistentry>
 
-<varlistentry><term>(&apropos; &name-r;)</term>
- <listitem><simpara><olink targetdoc="impnotes" targetptr="apropos">list
-    the symbols</olink> matching to &name-r;.
+<varlistentry><term>(&apropos-my; &name-r;)</term>
+ <listitem><simpara>list the &symbol-t;s matching &name-r;.
+</simpara></listitem></varlistentry>
+
+<varlistentry><term>(&describe-my; &symbol-r;)</term>
+ <listitem><simpara>describe the &symbol-r;.
 </simpara></listitem></varlistentry>
 
 <varlistentry><term>(exit)</term><term>(quit)</term><term>(bye)</term>
@@ -499,16 +533,12 @@ compiles the specified lisp files to a platform-independent
      limited to the symbols that name functions.</simpara></listitem>
    <listitem><simpara>If you are in the "filename position" (inside a
      string after &sharp-P;), the completion is done across file names,
-     <ulink url="http://www.gnu.org/software/bash/">bash</ulink>-style.
-   </simpara></listitem>
+     &bash;-style.</simpara></listitem>
    <listitem><simpara>If you have not typed anything yet, you will get
-     a help message, as if by the
-     <olink targetdoc="impnotes" targetptr="debugger-main-deb-step"
-            ><command>Help</command></olink>
-     command.</simpara></listitem>
+     a help message, as if by the &help; command.</simpara></listitem>
    <listitem><simpara>If you have not started typing the next symbol
      (i.e., you are at a whitespace), the current function or macro is
-     &describe;d.</simpara></listitem>
+     &describe-my;d.</simpara></listitem>
    <listitem><simpara>Otherwise, the symbol you are currently typing is
      completed.</simpara></listitem></itemizedlist>
 </para></listitem></varlistentry>
@@ -516,19 +546,50 @@ compiles the specified lisp files to a platform-independent
 </variablelist>
 </refsection>
 
+<refsection id="using"><title>Using and Extending &clisp;</title>
+
+<epigraph><attribution><ulink url="http://www.franz.com/~jkf/">John
+  Foderaro</ulink></attribution>
+ <para>&cl; is a <emphasis>programmable</emphasis>
+  programming language.</para></epigraph>
+
+<para>When &clisp; is invoked, the &rt; loads
+ the <link linkend="init-mem">initial memory image</link> and outputs
+ the <olink targetdoc="impnotes" targetptr="prompt">prompt</olink>;
+ at which one can start typing &defvar;s, &defun;s and &defmacro;s.</para>
+
+<para>To avoid having to re-enter the same definitions by hand in every
+ session, one can create a lisp file with all the variables, functions,
+ macros, etc.; (optionally) compile it with &compile-file;; and &load;
+ it either by hand or from the &RC-file;; or save a &mem-image; to
+ avoid the &load; overhead.</para>
+
+<para>However, sometimes one needs to use some functionality implemented in
+ another language, e.g., call a &c-lang; library function.
+ For that one uses the <olink targetdoc="impnotes" targetptr="dffi">Foreign
+  Function Interface</olink> and/or
+ the <olink targetdoc="impnotes" targetptr="modules">External
+  Modules</olink> facility.
+ Finally, the truly adventurous ones might delve
+ into <olink targetdoc="impnotes" targetptr="extend">Extending the
+  Core</olink>.</para>
+
+</refsection>
+
 <refsection id="files"><title>Files</title>
 
 <variablelist>
-<!-- #ifdef UNIX -->
-<varlistentry><term>&clisp-cmd;</term>
- <listitem><simpara>startup driver (a script or an executable)
-</simpara></listitem></varlistentry>
+<varlistentry id="driver">
+<!-- #if defined(UNIX) && !defined(UNIX_CYGWIN32) -->
+<term>&clisp-cmd;</term>
 <!-- #endif -->
-<!-- #if defined(WIN32_NATIVE) -->
-<varlistentry><term><command>clisp.exe</command></term>
- <listitem><simpara>startup driver (executable)
-</simpara></listitem></varlistentry>
+<!-- #if defined(WIN32_NATIVE) || defined(UNIX_CYGWIN32) -->
+<term><command>clisp.exe</command></term>
 <!-- #endif -->
+<listitem><simpara>startup driver (an executable or, rarely, a shell script)
+  which remembers the location of the &rt;
+  and starts it with the appropriate arguments
+</simpara></listitem></varlistentry>
 
 <varlistentry id="runtime">
 <!-- #if defined(UNIX) && !defined(UNIX_CYGWIN32) -->
@@ -537,11 +598,12 @@ compiles the specified lisp files to a platform-independent
 <!-- #if defined(WIN32_NATIVE) || defined(UNIX_CYGWIN32) -->
 <term><filename>lisp.exe</filename></term>
 <!-- #endif -->
-<listitem><simpara>main executable (runtime)
-</simpara></listitem></varlistentry>
+<listitem><simpara>main executable (runtime) - the part of &clisp;
+  implemented in &c-lang;.</simpara></listitem></varlistentry>
 
-<varlistentry><term><filename>lispinit.mem</filename></term>
-<listitem><simpara>initial &mem-image;</simpara></listitem></varlistentry>
+<varlistentry id="init-mem"><term><filename>lispinit.mem</filename></term>
+<listitem><simpara>initial &mem-image; (the part of &clisp; implemented
+  in lisp)</simpara></listitem></varlistentry>
 
 <varlistentry id="config-lisp"><term><filename>config.lisp</filename></term>
 <listitem><simpara>site-dependent configuration (should have been
@@ -583,7 +645,7 @@ compiles the specified lisp files to a platform-independent
    option which can be used to override this &env-var;.
 </simpara></listitem></varlistentry>
 
-<!-- #ifdef UNICODE -->
+<!-- #ifdef ENABLE_UNICODE -->
 <varlistentry><term><envar>LC_CTYPE</envar></term>
  <listitem><simpara>specifies the locale which determines the character
    set in use.  The value can be of the form
@@ -605,7 +667,7 @@ compiles the specified lisp files to a platform-independent
    uses to communicate with the user, unless it is already specified
    through the &env-var; <envar>CLISP_LANGUAGE</envar> or the
    &opt-L; option.
-<!-- #ifdef UNICODE -->
+<!-- #ifdef ENABLE_UNICODE -->
    It also specifies the locale determining the character set in use, unless
    already specified through the &env-var; <envar>LC_CTYPE</envar>.
 <!-- #endif -->
@@ -615,7 +677,7 @@ compiles the specified lisp files to a platform-independent
 
 <!-- #ifdef UNIX -->
 <varlistentry><term><envar>HOME</envar></term><term><envar>USER</envar></term>
- <listitem><simpara>are used for determining the value of the function
+ <listitem><simpara>used for determining the value of the function
    &user-homedir-pathname;.</simpara></listitem></varlistentry>
 <!-- #endif -->
 
@@ -633,12 +695,6 @@ compiles the specified lisp files to a platform-independent
 <varlistentry><term><envar>TERM</envar></term>
  <listitem><simpara>determines the screen size recognized by the pretty
    printer.</simpara></listitem></varlistentry>
-<!-- #endif -->
-
-<!-- #ifdef MULTIMAP_MEMORY_VIA_FILE -->
-<varlistentry><term><envar>TMPDIR</envar></term>
- <listitem><simpara>specifies the directory where the temporary core
-   file is to be held.</simpara></listitem></varlistentry>
 <!-- #endif -->
 
 <varlistentry><term><envar>ORGANIZATION</envar></term>
@@ -664,30 +720,39 @@ compiles the specified lisp files to a platform-independent
 </refsection>
 <!-- #endif -->
 
+<refsection id="input-output"><title>Input and Outut</title>
+
+<para>See <olink targetdoc="impnotes" targetptr="stream-stdio-init"/>.</para>
+
+</refsection>
+
 <refsection id="see-also"><title>See also</title>
 
-<para><olink targetdoc="impnotes" targetptr="impnotes-top"/>,
-&cmucl; - <command>cmucl</command>(1),
-&emacs; - <command>emacs</command>(1),
-&xemacs; - <command>xemacs</command>(1).</para>
+<para><simplelist>
+  <member><olink targetdoc="impnotes"/></member>
+  <member><olink targetdoc="clink"/></member>
+  <member>&cmucl; - <command>cmucl</command>(1)</member>
+  <member>&emacs; - <command>emacs</command>(1)</member>
+  <member>&xemacs; - <command>xemacs</command>(1)</member></simplelist></para>
 
 </refsection>
 
 <refsection id="bugs"><title>Bugs</title>
 
-<para>When you encounter a bug in &clisp;, please report it to the &clisp;
+<para>When you encounter a bug in &clisp; or in its documentation (this
+ manual page or <olink targetdoc="impnotes" targetptr="impnotes-top"/>),
+ please report it to the &clisp;
  <ulink url="http://sourceforge.net/tracker/?func=add&amp;group_id=1355&amp;atid=101355">SourceForge bug tracker</ulink>.</para>
 
 <para><emphasis>Before</emphasis> submitting a bug report, please take
- the following basic steps to make the report more useful:
-<orderedlist>
+ the following basic steps to make the report more useful:<orderedlist>
  <listitem><simpara>Please do a clean build (remove your build directory
-   and build &clisp; with <command>./configure --build build</command>
+   and build &clisp; with <command>./configure --cbc build</command>
    or at least do a <command role="unix">make distclean</command>
    before <command role="unix">make</command>).</simpara></listitem>
  <listitem><simpara>If you are reporting a <quote>hard crash</quote>
    (segmentation fault, bus error, core dump etc), please do
-   <command>./configure --with-debug --build build-g ; cd build-g; gdb
+   <command>./configure &with-debug; --cbc build-g ; cd build-g; gdb
     lisp.run</command>, then load the appropriate &linkset; by either
    &base; or &full; &gdb; command, and report the backtrace (see also
    <olink targetdoc="impnotes" targetptr="faq-debug"/>).</simpara></listitem>
@@ -697,15 +762,14 @@ compiles the specified lisp files to a platform-independent
    try compiling the sources and report the problem if it persists.
 </simpara></listitem></orderedlist></para>
 
-<para>When submitting a bug report, please specify the
-following information:
-<orderedlist>
+<para>When submitting a bug report, please specify the following
+ information:<orderedlist>
  <listitem><simpara>What is your platform (<command role="unix">uname
     -a</command> on a &unix; system)?  Compiler version?
    &glibc; version (on &gnu;/&linux;)?</simpara></listitem>
  <listitem><simpara>Where did you get the sources or binaries?  When?
-   (Absolute dates - like <quote>2006-01-17</quote> - are preferred over
-   the relative ones - like <quote>2 days ago</quote>).</simpara></listitem>
+   (Absolute dates, e.g., <quote>2006-01-17</quote>, are preferred over
+   the relative ones, e.g., <quote>2 days ago</quote>).</simpara></listitem>
  <listitem><simpara>How did you build &clisp;?
    (What command, options &amp;c.)</simpara></listitem>
  <listitem><simpara>What is the output of
@@ -715,43 +779,15 @@ following information:
    all the error messages, as well as detailed instructions on how to
    reproduce them.</simpara></listitem></orderedlist></para>
 
-<para>Known bugs, some of which may be platform-dependent, include:
-<itemizedlist>
-<!-- #ifdef SPVW_MIXED_BLOCKS -->
-<listitem><simpara>The memory management scheme is not very flexible.
-</simpara></listitem>
-<!-- #endif -->
-<!-- #ifdef UNIX_COHERENT -->
-<listitem><simpara>&kbd-in; does not
-  recognize <keycombo>&ctrl;<keysym>S</keysym></keycombo>
-  and <keycombo>&ctrl;<keysym>Q</keysym></keycombo>.</simpara></listitem>
-<!-- #endif -->
-<listitem><simpara>No on-line documentation beyond &apropos;
-  and &describe; is available.</simpara></listitem>
-</itemizedlist></para>
 </refsection>
 
 <refsection id="projects"><title>Projects</title>
 
 <itemizedlist>
- <listitem><simpara>Write on-line documentation.</simpara></listitem>
  <listitem><simpara>Enhance the compiler so that it can inline local
    functions.</simpara></listitem>
- <listitem><simpara>Specify a portable set of window and graphics
-   operations.</simpara></listitem>
- <listitem><simpara>Add Multi-Threading capabilities, via OS
-   threads.</simpara></listitem>
+ <listitem><simpara>Embed &clisp; in &vim;.</simpara></listitem>
 </itemizedlist>
-</refsection>
-
-<refsection id="authors"><title>CLISP Authors</title>
-
-<para>&clisp; project was started in late 1980-ies by &bruno; and
- &stoll;, both in Germany.</para>
-
-<para>See <filename role="clisp-cvs">COPYRIGHT</filename>
- for the list of other contributors and the license.</para>
-
 </refsection>
 
 </refentry>

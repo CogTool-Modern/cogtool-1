@@ -1,5 +1,5 @@
 ;; netica demo
-(defpackage "NETICA-DEMO" (:use "CL" "EXT" "FFI" "NETICA"))
+(defpackage "NETICA-DEMO" (:use "CL" "EXT" "NETICA"))
 (in-package "NETICA-DEMO")
 
 (defvar *x-step* 100)
@@ -49,29 +49,35 @@
                            (#("false") . #(0.05f0 0.95f0)))
                     :states '("abnormal" "normal")))
 
-(format t "~&Compiling net...~%")
+(format t "~& === Compiling net...~%")
 (netica:CompileNet_bn *net*)
 (netica:check-errors)
 
-(format t "~&Original probabilities:~%")
+(format t "~& === Original probabilities:~%")
 (netica:get-beliefs *tuberculosis* :verbose t)
 
 (netica:enter-finding *net* "XRay" "abnormal")
-(format t "~&Given an abnormal X-ray:~%")
+(format t "~& === Given an abnormal X-ray:~%")
 (netica:get-beliefs *tuberculosis* :verbose t)
 
 (netica:enter-finding *net* "VisitAsia" "visit")
-(format t "~&Given an abnormal X-ray and a visit to Asia:~%")
+(format t "~& === Given an abnormal X-ray and a visit to Asia:~%")
 (netica:get-beliefs *tuberculosis* :verbose t)
 
 (netica:enter-finding *net* "Cancer" "present")
-(format t "~&Given abnormal X-ray, Asia visit, and lung cancer:~%")
+(format t "~& === Given abnormal X-ray, Asia visit, and lung cancer:~%")
 (netica:get-beliefs *tuberculosis* :verbose t)
 
-(netica:save-net *net* :file "asia")
-
+(format t "~& === *net*~%")
 (netica:net-info *net*)
+
+(netica:save-net *net* :file "asia")
+(defparameter *new* (netica:read-net "asia"))
+(format t "~& === *new*~%")
+(netica:net-info *new*)
 
 ;; termination
 (netica:DeleteNet_bn *net*)
+(netica:DeleteNet_bn *new*)
 (netica:close-netica)
+(delete-file "asia.dne")

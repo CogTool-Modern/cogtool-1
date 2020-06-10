@@ -1,15 +1,18 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; some tests for PCRE
-;; clisp -K full -E 1:1 -q -norc -i ../tests/tests -x '(run-test "pcre/test")'
+;; clisp -E 1:1 -q -norc -i ../tests/tests -x '(run-test "pcre/test")'
 
+(list (require "pcre")) (#-PCRE T #+PCRE NIL)
 (listp (show (multiple-value-list (ext:module-info "pcre" t)) :pretty t)) T
 
-(multiple-value-bind (ve ma mi) (pcre:pcre-version)
-  (format t "~&Version: ~S (~D.~D)~%Options:~{~%  ~25@A  ~S~}~%" ve ma mi
-          (and (fboundp 'pcre:pcre-config) (pcre:pcre-config))))
-NIL
+(defparameter *major-version*
+  (multiple-value-bind (ve ma mi da) (pcre:pcre-version)
+    (format t "~&Version: ~S (~D.~D ~S)~%Options:~{~%  ~25@A  ~S~}~%"
+            ve ma mi da (and (fboundp 'pcre:pcre-config) (pcre:pcre-config)))
+    ma))
+*major-version*
 
-(if (<= 4 (nth-value 1 (pcre:pcre-version)))
+(if (<= 4 *major-version*)
     (let* ((d (pcre:pcre-compile "(?P<date> (?P<year>(\\d\\d)?\\d\\d) - (?P<month>\\d\\d) - (?P<day>\\d\\d) )" :extended t :study t))
            (s "today is 2003-12-15!")
            (v (pcre:pcre-exec d s)))
@@ -33,7 +36,7 @@ NIL
 
 (let* ((p (pcre:pcre-compile "(a|(z))(bc)"))
        (r (pcre:pcre-exec p "abc")))
-  (format t "~&~S~%" (pcre:pattern-info p))
+  (show (pcre:pattern-info p) :pretty t)
   (list r (pcre:match-strings r "abc")
         (pcre:pattern-info p :options)))
 (#(#S(PCRE::MATCH :START 0 :END 3) #S(PCRE::MATCH :START 0 :END 1) NIL
@@ -44,6 +47,24 @@ NIL
 (let ((cp (pcre:pcre-compile "a(a)*b" :extended t)))
   (pcre:pcre-exec cp "ab"))
 #(#S(PCRE:MATCH :START 0 :END 2))
+
+;; http://pcre.org/pcre.txt
+(let ((cp (pcre:pcre-compile "<.*>" :extended t)))
+  (pcre:pcre-exec
+   cp "This is <something> <something else> <something further> no more"))
+#(#S(PCRE:MATCH :START 8 :END 56))
+
+(let ((cp (pcre:pcre-compile "<.*>" :extended t))
+      (su "This is <something> <something else> <something further> no more"))
+  (if (<= 6 *major-version*)
+      (pcre:pcre-exec cp su :dfa t :work-space 100)
+      ;; pre-6 versions do not support :DFA
+      (vector (pcre:pcre-exec cp su)
+              #S(PCRE:MATCH :START 8 :END 36)
+              #S(PCRE:MATCH :START 8 :END 19))))
+#(#S(PCRE:MATCH :START 8 :END 56)
+  #S(PCRE:MATCH :START 8 :END 36)
+  #S(PCRE:MATCH :START 8 :END 19))
 
 (let ((cp (pcre:pcre-compile "a(a)*(b)" :extended t)))
   (pcre:pcre-exec cp "ab"))
@@ -508,3 +529,7 @@ yz")
 ;; kmp it is legal for a* to match nothing
 (re-test "(a*)+" "aaaa") ("aaaa" #-:regex-left "" #+:regex-left "aaaa")
 (re-test "(a+)*" "aaaa") ("aaaa" "aaaa")
+
+(progn (makunbound '*major-version*)
+       (unintern '*major-version*))
+T

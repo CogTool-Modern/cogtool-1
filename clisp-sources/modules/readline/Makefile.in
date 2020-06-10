@@ -1,38 +1,37 @@
 # Makefile for CLISP module set readline
 
+srcdir = @srcdir@
 CC = @CC@
 CPPFLAGS = @CPPFLAGS@
 CFLAGS = @CFLAGS@
-INCLUDES= ..
+CLISP = @CLISP@ -norc -q
+CLISP_LINKKIT = @CLISP_LINKKIT@
 
-CLISP = clisp -q -norc
-
-LN = ln
+LN = @LN@
 
 MAKE = make
 
 SHELL = /bin/sh
 
-DISTRIBFILES = readline.o link.sh Makefile readline.lisp
+GENERATED = readline.o readline.fas
+DISTRIBFILES = link.sh Makefile $(GENERATED) $(srcdir)/readline.lisp
 distribdir =
 
-all : readline.o readline.fas
+# default target: make the module
+clisp-module : $(GENERATED)
 
-readline.c readline.fas : readline.lisp
-	$(CLISP) -c readline.lisp
+readline.c readline.fas : $(srcdir)/readline.lisp
+	$(CLISP) -c $(srcdir)/readline.lisp -o ./
 
-readline.o : readline.c $(INCLUDES)/clisp.h config.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -I$(INCLUDES) -c readline.c
-
-# Make a module
-clisp-module : all
+readline.o : readline.c config.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I$(CLISP_LINKKIT) -c readline.c
 
 # Make a module distribution into $(distribdir)
 clisp-module-distrib : clisp-module force
 	$(LN) $(DISTRIBFILES) $(distribdir)
 
 clean : force
-	rm -f core *.o *.a
+	rm -f core *.o *.a *.fas *.lib
 
 distclean : clean
 

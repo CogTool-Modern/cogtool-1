@@ -1,8 +1,12 @@
-;; -*- lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; (ext:cd "../tests/") (load "tests") (run-test "ffi")
 ;; ./clisp -E utf-8 -norc -i tests/tests -x '(run-test "tests/ffi")'
 
-(progn (defpackage "FTEST" (:use "FFI" "COMMON-LISP")) (in-package "FTEST") T)
+;; This file must stay encoded with UTF-8 for the tests to succeed!
+#+unicode (ext:encoding-charset *default-file-encoding*)
+#+unicode charset:utf-8
+
+(use-package "FFI")
 T
 
 (multiple-value-list (sizeof 'uint8))
@@ -17,6 +21,82 @@ T
 (foreign-address-unsigned (unsigned-foreign-address 3))
 3
 
+(handler-case
+    (progn
+      (def-call-out strerror (:arguments (errnum int))
+        (:language :stdc) (:library :default)
+        (:return-type c-string :none))
+      (loop :for i :from 0 :to 100 :do (show (strerror i)))
+      (def-c-var errno (:type ffi:int) (:library :default))
+      (defun os-error (where)
+        (error "~S failed: errno=~D: ~S" where errno (strerror errno))))
+  (error (c)
+    (princ-error c)
+    (defun os-error (where) (error "~S failed" where))))
+OS-ERROR
+
+(def-call-out gethostname1 (:name "gethostname")
+  (:arguments (name (c-ptr (c-array-max character 256)) :out :alloca) (len int))
+  (:return-type int) (:language :stdc) (:library :default))
+GETHOSTNAME1
+
+(defun myhostname1 ()
+  (multiple-value-bind (success name) (gethostname1 256)
+    (if (zerop success) name
+        (os-error 'myhostname1))))
+MYHOSTNAME1
+
+(def-call-out gethostname2 (:name "gethostname")
+  (:arguments (name (c-ptr (c-array-max char 256)) :out :alloca) (len int))
+  (:return-type int) (:language :stdc) (:library :default))
+GETHOSTNAME2
+
+(defun myhostname2 ()
+  (multiple-value-bind (success name) (gethostname2 256)
+    (if (zerop success) name
+        (os-error 'myhostname2))))
+MYHOSTNAME2
+
+(def-call-out gethostname3 (:name "gethostname")
+  (:arguments (name c-pointer) (len int))
+  (:return-type int) (:language :stdc) (:library :default))
+GETHOSTNAME3
+
+(defun myhostname3 ()
+  (with-foreign-object (name '(c-array-max character 256))
+    (let ((success (gethostname3 name 256)))
+      (if (zerop success) (foreign-value name)
+          (os-error 'myhostname3)))))
+MYHOSTNAME3
+
+(defun myhostname4 ()
+  (with-foreign-object (name '(c-array-max char 256))
+    (let ((success (gethostname3 name 256)))
+      (if (zerop success) (foreign-value name)
+          (os-error 'myhostname4)))))
+MYHOSTNAME4
+
+(string= (myhostname1) (myhostname3)) T
+(equalp (myhostname2) (myhostname4)) T
+
+(let ((n1 (show (myhostname1)))
+      (mi (show (machine-instance))))
+  (or (and (>= (length mi) (length n1))
+           (string= n1 mi :end2 (length n1)))
+      ;; n1 /= mi ==> HAVE_GETHOSTBYNAME, see socket.d:MACHINE-INSTANCE
+      (progn
+        (def-call-out gethostbyname (:name "gethostbyname")
+          (:arguments (name c-string))  (:language :stdc) (:library :default)
+          (:return-type (c-ptr (c-struct list (name c-string)))))
+        (setq n1 (first (show (gethostbyname n1))))
+        (string= n1 mi :end2 (length n1)))))
+T
+
+(string= (myhostname1)
+         #+UNICODE (ext:convert-string-from-bytes (myhostname2) charset:utf-8)
+         #-UNICODE (map 'string #'code-char (myhostname2)))
+T
+
 (def-call-out c-self
   (:name "ffi_identity")
   (:documentation "return the pointer argument as is")
@@ -24,8 +104,15 @@ T
   (:return-type c-pointer) (:language :stdc))
 C-SELF
 
-(stringp (documentation 'c-self 'function))
-T
+(sys::get-signature #'c-self) #(1 0 NIL NIL NIL NIL)
+(describe #'c-self) NIL
+(documentation 'c-self 'function)  "return the pointer argument as is"
+(setf (documentation 'c-self 'function) "junk")  "junk"
+(documentation 'c-self 'function)  "junk"
+(setf (documentation 'c-self 'function) nil)  NIL
+(documentation 'c-self 'function)  NIL
+(setf (documentation 'c-self 'function) "return argument")  "return argument"
+(documentation 'c-self 'function)  "return argument"
 
 (typep #'c-self 'function)
 T
@@ -40,6 +127,9 @@ T
 nil
 
 (integerp (foreign-address-unsigned #'c-self))
+T
+
+(eql (foreign-address-unsigned #'c-self) (sys::code-address-of #'c-self))
 T
 
 (functionp (setq parse-c-type-optimizer
@@ -242,22 +332,30 @@ C-SELF
 #+UNICODE T
 
 #+UNICODE
-(typep (setf custom:*foreign-encoding* (ext:make-encoding :charset 'charset:utf-8))
+(typep (setf custom:*foreign-encoding*
+             (ext:make-encoding :charset 'charset:utf-8))
        'ext:encoding)
 #+UNICODE T
 
-(typep (ffi::lookup-foreign-variable "ffi_user_pointer"
-                                     (ffi::parse-c-type 'ffi:c-pointer))
+(typep (ffi::find-foreign-variable "ffi_user_pointer"
+                                   (parse-c-type 'ffi:c-pointer)
+                                   nil nil nil)
        'foreign-variable)
 T
 
-(ffi::lookup-foreign-variable "ffi_user_pointer" (parse-c-type 'uint64))
-ERROR
+(ffi::find-foreign-variable "ffi_user_pointer" (parse-c-type 'uint)
+                            nil nil nil)
+ERROR        ; type specification conflicts with the previous definition
 
-(typep (ffi::lookup-foreign-variable "ffi_user_pointer"
-                                     (parse-c-type '(c-array-ptr sint8)))
+(typep (ffi::find-foreign-variable "ffi_user_pointer"
+                                   (parse-c-type '(c-array-ptr sint8))
+                                   nil nil nil)
        'foreign-variable)
 T
+
+(def-c-var user-pointer (:type c-pointer) (:name "ffi_user_pointer"))
+user-pointer
+(describe (get 'user-pointer 'foreign-variable)) NIL
 
 (progn
   (def-call-out c-self (:name "ffi_identity")
@@ -415,7 +513,7 @@ T
     (:arguments (first uint8))
     (:return-type character) (:language :stdc))
   (c-self #x9E))
-ERROR
+#+unicode ERROR #-unicode #\code158
 
 (progn
   (def-call-out c-self (:name "ffi_identity")
@@ -428,8 +526,8 @@ ERROR
   (def-call-out c-self (:name "ffi_identity")
     (:arguments (first (c-array-ptr uint8)))
     (:return-type (c-ptr (c-array character (3 3)))) (:language :stdc))
-  (c-self #(#xE6 #x97 #xA5  #xE6 #x9C #xAC  #xE8 #xAA #x9E)))
-ERROR
+  (array-dimensions (c-self #(#xE6 #x97 #xA5  #xE6 #x9C #xAC  #xE8 #xAA #x9E))))
+#+unicode ERROR #-unicode (3 3)
 
 (progn
   (def-call-out c-self (:name "ffi_identity")
@@ -443,7 +541,7 @@ ERROR
     (:arguments (first (c-array-ptr uint8)))
     (:return-type (c-ptr character)) (:language :stdc))
   (c-self #(#xE6 #x97 #xA5  #xE6 #x9C #xAC  #xE8 #xAA #x9E)))
-ERROR
+#+unicode ERROR #-unicode #\code230
 
 (progn
   (def-call-out c-self (:name "ffi_identity")
@@ -457,7 +555,7 @@ ERROR
     (:arguments (first (c-array-ptr uint8)))
     (:return-type (c-ptr-null character)) (:language :stdc))
   (c-self #(#xE6 #x97 #xA5  #xE6 #x9C #xAC  #xE8 #xAA #x9E)))
-ERROR
+#+unicode ERROR #-unicode #\code230
 
 ;; Test convert_to_foreign of UTF-8 strings.
 ;; C-STRING, C-ARRAY dim1, C-ARRAY-MAX, C-ARRAY-PTR use UTF-8 encoding,
@@ -484,12 +582,13 @@ ERROR
   (c-self "日本語"))
 #(#xE6 #x97 #xA5  #xE6 #x9C #xAC  #xE8 #xAA #x9E)
 
+#+unicode ; 7 is not enough room without unicode
 (progn
   (def-call-out c-self (:name "ffi_identity")
     (:arguments (first (c-ptr (c-array-max character 7))))
     (:return-type (c-array-ptr uint8)) (:language :stdc))
   (c-self "日本語"))
-#(#xE6 #x97 #xA5  #xE6 #x9C #xAC)
+#+unicode #(#xE6 #x97 #xA5  #xE6 #x9C #xAC)
 
 (progn
   (def-call-out c-self (:name "ffi_identity")
@@ -505,12 +604,14 @@ ERROR
   (c-self #\a))
 #x61
 
+; the #-unicode reader will skip over #\ø which it cannot read
+#+unicode
 (progn
   (def-call-out c-self (:name "ffi_identity")
     (:arguments (first character))
     (:return-type uint8) (:language :stdc))
   (c-self #\ø))
-ERROR
+#+unicode ERROR
 
 (progn
   (def-call-out c-self (:name "ffi_identity")
@@ -519,19 +620,21 @@ ERROR
   (c-self #2A("abc" "def" "ghi")))
 #(#x61 #x62 #x63  #x64 #x65 #x66  #x67 #x68 #x69)
 
+#+unicode
 (progn
   (def-call-out c-self (:name "ffi_identity")
     (:arguments (first (c-ptr (c-array character (3 3)))))
     (:return-type (c-ptr (c-array uint8 9))) (:language :stdc))
   (c-self #2A("日本語" "Tür" "kçe")))
-ERROR
+#+unicode ERROR
 
+#+unicode
 (progn
   (def-call-out c-self (:name "ffi_identity")
     (:arguments (first (c-ptr (c-array character (3 3)))))
     (:return-type (c-ptr (c-array uint8 9))) (:language :stdc))
   (c-self #2A("日" "本" "語")))
-ERROR
+#+unicode ERROR
 
 (progn
   (def-call-out c-self (:name "ffi_identity")
@@ -540,12 +643,13 @@ ERROR
   (c-self #\a))
 #(#x61)
 
+#+unicode
 (progn
   (def-call-out c-self (:name "ffi_identity")
     (:arguments (first (c-ptr character)))
     (:return-type (c-ptr (c-array uint8 1))) (:language :stdc))
   (c-self #\ø))
-ERROR
+#+unicode ERROR
 
 (progn
   (def-call-out c-self (:name "ffi_identity")
@@ -554,12 +658,13 @@ ERROR
   (c-self #\a))
 #(#x61)
 
+#+unicode
 (progn
   (def-call-out c-self (:name "ffi_identity")
     (:arguments (first (c-ptr-null character)))
     (:return-type (c-ptr (c-array uint8 1))) (:language :stdc))
   (c-self #\ø))
-ERROR
+#+unicode ERROR
 
 
 (progn
@@ -591,8 +696,7 @@ T
 (progn
   (defparameter *x* 0)
   (defun callback (x)
-    (the (unsigned-byte 16) x)
-    (setf *x* x)
+    (setf *x* (the (unsigned-byte 16) x))
     (the (unsigned-byte 16) (1+ (* 2 x))))
   *x*)
 0
@@ -646,6 +750,12 @@ FOREIGN-FUNCTION
 (funcall fpcallback -7.5d0)
 ERROR
 
+;; Some platforms might not define HAVE_LONG_LONG_INT (what are they?),
+;; so the int64 tests will fail there.
+;; We might conditionalize such tests on #+word-size=64...
+;; [actually, word-size=64 (== WIDE_HARD) is a _stronger_ condition than
+;; HAVE_LONG_LONG_INT which is required for 64-bit integers to work]
+;; https://sourceforge.net/tracker/index.php?func=detail&aid=2874184&group_id=1355&atid=101355
 (with-c-var (x 'sint64) x)
 0
 
@@ -762,7 +872,7 @@ FOREIGN-VARIABLE
 (with-c-place (x fm) (setf x "xyz"))
 ERROR
 
-(foreign-value (ffi::%cast fm (ffi::parse-c-type
+(foreign-value (ffi::%cast fm (parse-c-type
                                '(c-ptr (c-array-max character 20)))))
 "abc"
 
@@ -818,7 +928,7 @@ FOREIGN-POINTER
 (eq (foreign-pointer fa) fp)
 T
 
-(eq (set-foreign-pointer fa :copy) fp)
+(eq (foreign-pointer (set-foreign-pointer fa :copy)) fp)
 NIL
 
 (eq (foreign-pointer fm) (foreign-pointer fp))
@@ -849,8 +959,30 @@ NIL
       (parse-c-type '(c-function (:language :stdc)))))))
 #.(foreign-address-unsigned #'c-self)
 
+(with-foreign-object (p 'opaque)
+  (equalp (set-foreign-pointer
+           (unsigned-foreign-address
+            (foreign-address-unsigned p))
+           p)
+          (foreign-address p)))
+T
+
+(equalp (set-foreign-pointer
+         (unsigned-foreign-address
+          (foreign-address-unsigned #'c-self))
+         #'c-self)
+        (foreign-address #'c-self))
+T
+
 (progn (setq fm (allocate-deep 'character "abc" :count 5)) (type-of fm))
 FOREIGN-VARIABLE
+
+(equalp (set-foreign-pointer
+         (unsigned-foreign-address
+          (foreign-address-unsigned fm))
+         fm)
+        (foreign-address fm))
+T
 
 (with-c-place (x fm) (identity (typeof x)))
 (C-ARRAY-MAX CHARACTER 5)
@@ -1103,19 +1235,56 @@ FM
            (setq i (1- (ash 1 32)))
            (push v ret)
            (setq v #A((unsigned-byte 8) (4) (1 2 3 4)))
-           ;; I depends on endianness!
-           (assert (or (= i (+ (ash 4 24) (ash 3 16) (ash 2 8) 1))
-                       (= i (+ (ash 1 24) (ash 2 16) (ash 3 8) 4)))))
+           (assert (if sys::*big-endian* ; i depends on endianness!
+                       (= i (+ (ash 1 24) (ash 2 16) (ash 3 8) 4))
+                       (= i (+ (ash 4 24) (ash 3 16) (ash 2 8) 1)))))
          (nreverse ret))
     (c-free m)))
 #-BeOS
 (#A((unsigned-byte 8) (4) (0 0 0 0))
  #A((unsigned-byte 8) (4) (255 255 255 255)))
 
-(integerp (sys::code-address-of #'c-malloc)) T
+#-BeOS (integerp (sys::code-address-of #'c-malloc)) T
+#-BeOS (stringp (nth-value 2 (function-lambda-expression #'c-malloc))) T
+
+(type-of (ffi:open-foreign-library :default))  ffi:foreign-pointer
 
 (listp (macroexpand '(def-c-var foo-var (:type int)))) T
 
 (listp (macroexpand '(def-c-const foo-const))) T
 
-(progn (in-package "USER") (delete-package "FTEST") T) T
+(def-c-type ffi_uintp) FFI_UINTP
+(def-call-out my-uintp (:name "ffi_identity")
+  (:arguments (obj ffi_uintp))
+  (:return-type ffi_uintp) (:language :stdc))
+MY-UINTP
+(my-uintp 123) 123
+
+(def-call-out toupper (:library :default)
+  (:language :stdc) (:arguments (c character)) (:return-type character))
+TOUPPER
+(toupper #\a)
+#\A
+
+(when (ignore-errors (ffi:open-foreign-library "libpcre.so"))
+  (def-call-out pcre-version (:name "pcre_version")
+    ;; actually in libpcre.so, but dlsym() now searches in any open library
+    (:library :default) (:language :stdc) (:arguments) (:return-type c-string))
+  (not (stringp (show (pcre-version)))))
+NIL
+
+(progn
+  (def-call-out strlen (:arguments (s c-string))
+    (:return-type size_t) (:library :default) (:language :stdc))
+  (strlen "foo"))
+3
+
+#+(or) (progn
+;; dll dependencies (requries gsl)
+(ffi:open-foreign-library "libgsl.so" :require '("libgslcblas.so"))
+(ffi:def-call-out gsl_cheb_alloc (:library "libgsl.so") (:language :stdc)
+  (:arguments (n ffi:int)) (:return-type ffi:c-pointer))
+(saveinitmem "foo" :executable t)
+;; in ./foo:
+(gsl_cheb_alloc 10)
+)
