@@ -33,7 +33,5 @@
 	</dict>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.3</string>
-	<key>LSRequiresCarbon</key>
-	<string>1</string>
 </dict>
 </plist>
