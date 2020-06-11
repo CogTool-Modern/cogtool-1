@@ -15,7 +15,6 @@
     <initialHeapSize>32</initialHeapSize>
     <maxHeapSize>512</maxHeapSize>
     <args>-Djava.library.path=&quot;&quot;./lib&quot;&quot; -Dcogtool.version=&quot;&quot;VERSION&quot;&quot; -Dcogtool.revision=&quot;&quot;REVISION&quot;&quot; -Dcogtool.build=&quot;&quot;BUILDTIME&quot;&quot; -Xmx400000000</args>
-    <opt>-D32</opt>
   </jre>
   <splash>
     <file>.\CogTool_Splash.bmp</file>
