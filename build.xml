@@ -8,8 +8,8 @@
 	<property name="version" value="1.3trunk" />
 	<property name="versionclean" value="1_3trunk" />
 
-	<property name="jlevel" value="1.5" />
-        <property name="build.compiler" value="javac${jlevel}" />
+	<property name="jlevel" value="1.8" />
+    <property name="build.compiler" value="javac${jlevel}" />
 
 	<property name="srcroot" value="${basedir}/java" />
 	<property name="macsrcroot" value="${basedir}/mac-support" />
