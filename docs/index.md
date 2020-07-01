@@ -20,8 +20,13 @@ Welcome to this community of UI designers, cognitive modelers, and HCI researche
 
 Bonnie E. John, Principal Investigator
 
+## Latest Downloads
+
 <div class="wp-block-buttons">
-  <div class="wp-block-button">
-    <a class="wp-block-button__link" href="https://github.com/cogtool-modern/cogtool/releases/tag/1.2.2"><button>Download CogTool</button></a>
+  <div class="wp-block-button" style="display:grid;grid-template-columns:1fr 1fr 1fr;">
+  <a class="wp-block-button__link" href="https://github.com/cogtool/cogtool/releases/download/1.2.2/CogTool-1_2_2setup.exe"><button>CogTool installer for Microsoft Windows</button></a>
+<a class="wp-block-button__link" href="https://github.com/cogtool/cogtool/releases/download/1.2.2/CogToolMac-1_2_2.tgz"><button>CogTool.app macOS (Snow Leopard - Mojave)</button></a>
+<a class="wp-block-button__link" href="https://github.com/CogTool-Modern/cogtool/releases/download/1.3-2020-06-10/CogTool.app.zip"><button>CogTool.app macOS (Catalina and newer) (Pre-release)</button></a>
   </div>
 </div>
+<a href="https://github.com/cogtool/cogtool/releases">View all releases</a>
