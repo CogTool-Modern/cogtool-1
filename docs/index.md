@@ -22,6 +22,6 @@ Bonnie E. John, Principal Investigator
 
 <div class="wp-block-buttons">
   <div class="wp-block-button">
-    <a class="wp-block-button__link" href="https://github.com/cogtool-modern/cogtool/releases/tag/1.2.2">Download CogTool</a>
+    <a class="wp-block-button__link" href="https://github.com/cogtool-modern/cogtool/releases/tag/1.2.2"><button>Download CogTool</button></a>
   </div>
 </div>
