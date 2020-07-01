@@ -23,7 +23,6 @@
 	<property name="clisp" value="${basedir}/lisp" />
 	<property name="launch4j.dir" location="${libdir}/build-only/launch4j" />
 	<property name="java.library.path" value="${java.library.path};${swtdir}" />
-	<!-- revision property is set in the call to svnversion -->
 
 	<!-- Classpath: setup once, used everywhere. -->
 	<path id="classpath">
@@ -149,17 +148,6 @@
 		<pathconvert pathsep=":$JAVAROOT/" property="distjarstr" refid="distjars">
 			<mapper type="flatten" />
 		</pathconvert>
-
-		<condition property="svnversion" value="/usr/local/bin/svnversion" else="svnversion">
-			<and>
-				<os family="mac" />
-				<os family="unix" />
-			</and>
-		</condition>
-
-		<exec executable="${svnversion}" vmlauncher="true" resolveexecutable="true" outputproperty="revision">
-			<arg file="${basedir}" />
-		</exec>
 
 		<echo message="${revision}" />
 
