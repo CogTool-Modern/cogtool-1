@@ -23,7 +23,6 @@
 	<property name="clisp" value="${basedir}/lisp" />
 	<property name="launch4j.dir" location="${libdir}/build-only/launch4j" />
 	<property name="java.library.path" value="${java.library.path};${swtdir}" />
-	<!-- revision property is set in the call to svnversion -->
 
 	<!-- Classpath: setup once, used everywhere. -->
 	<path id="classpath">
