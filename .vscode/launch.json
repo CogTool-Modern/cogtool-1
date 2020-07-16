@@ -1,0 +1,56 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Debug (Launch) - Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "Debug (Launch)-CogTool<CogTool-Modern>",
+            "request": "launch",
+            "mainClass": "CogTool",
+            "projectName": "CogTool-Modern"
+        },
+        {
+            "type": "java",
+            "name": "Debug (Launch)-ZipUtil<CogTool-Modern>",
+            "request": "launch",
+            "mainClass": "util.ZipUtil",
+            "projectName": "CogTool-Modern"
+        },
+        {
+            "type": "java",
+            "name": "Debug (Launch)-Launcher<launch4j>",
+            "request": "launch",
+            "mainClass": "net.sf.launch4j.Launcher",
+            "projectName": "launch4j"
+        },
+        {
+            "type": "java",
+            "name": "Debug (Launch)-Main<launch4j>",
+            "request": "launch",
+            "mainClass": "net.sf.launch4j.Main",
+            "projectName": "launch4j"
+        },
+        {
+            "type": "java",
+            "name": "Debug (Launch)-ConsoleApp<launch4j>",
+            "request": "launch",
+            "mainClass": "net.sf.launch4j.example.ConsoleApp",
+            "projectName": "launch4j"
+        },
+        {
+            "type": "java",
+            "name": "Debug (Launch)-SimpleApp<launch4j>",
+            "request": "launch",
+            "mainClass": "net.sf.launch4j.example.SimpleApp",
+            "projectName": "launch4j"
+        }
+    ]
+}
