@@ -228,6 +228,21 @@ public class CommandFile
                 cf.currentProject.performAction(CogToolLID.ImportXML, 
                                                 new ProjectContextSelectionState(cf.currentProject.getModel()));
             }});
+
+        defineExecutor("importBMPR", new CommandExecutor() {
+                @Override
+                protected void execute(String[] args, CommandFile cf) throws Exception {
+                    if (cf.currentProject == null) {
+                        cf.currentProject = ProjectController.newProjectController();
+                    }
+                    cf.currentProject.importFile = new File(args[0]);
+                    cf.currentProject.importFileComputes = (args.length > 1 ?
+                                                              Boolean.parseBoolean(args[1]) :
+                                                              CogToolPref.COMPSCR.getBoolean());
+                                          
+                    cf.currentProject.performAction(CogToolLID.ImportBMPR, 
+                                                    new ProjectContextSelectionState(cf.currentProject.getModel()));
+                }});
         
         defineExecutor("computeAllSkilled", new CommandExecutor() {
             @Override

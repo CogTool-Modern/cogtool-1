@@ -355,6 +355,9 @@ public class CogToolLID extends ListenerIdentifier
     public static final CogToolLID ImportXML =
         new CogToolLID("ImportXML", 114);
 
+    public static final CogToolLID ImportBMPR =
+        new CogToolLID("ImportBMPR", 114);
+
     public static final CogToolLID PrintProject =
         new CogToolLID("PrintProject", 105, COMMITS_CHANGES);
 

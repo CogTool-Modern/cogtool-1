@@ -269,6 +269,11 @@ public class MenuFactory
                                               "Import Project from CogTool XML..."),
                                      CogToolLID.ImportXML);
 
+    public static final SimpleMenuItemDefinition IMPORT_BALSAMIQ =
+        new SimpleMenuItemDefinition(L10N.get("MI.PM.Import",
+                                              "Import Designs from Balsamiq Wireframes…"),
+                                     CogToolLID.ImportBMPR);
+
     public static final MenuItemDefinition IMPORT_OTHER =
         new CascadingMenuItemDefinition(L10N.get("MI.PM.Import",
         "&Import Other"),
@@ -1014,14 +1019,15 @@ public class MenuFactory
         result.add(MenuUtil.SEPARATOR);
         if (research) {
             result.add(IMPORT_XML);
+            result.add(IMPORT_BALSAMIQ);
         }
         result.add(IMPORT_HTML);
         if (research) {
             result.add(IMPORT_DICTIONARY);
             String convDir = CogToolPref.CONVERTER_DIRECTORY.getString();
-            if (convDir != null && !convDir.equals("")) {
+            // if (convDir != null && !convDir.equals("")) {
                 result.add(IMPORT_OTHER);
-            }
+            // }
         }
 
         result.add(MenuUtil.SEPARATOR);

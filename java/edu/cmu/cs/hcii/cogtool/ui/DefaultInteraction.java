@@ -734,6 +734,23 @@ public class DefaultInteraction implements Interaction
         return new File(path, dialog.getFileName());
     }
 
+    public File selectBMPRFile(boolean forInput, String def)
+    {
+        FileDialog dialog =
+            selectFileName(forInput ? SWT.OPEN : SWT.SAVE,
+                           new String[] { "Balsamiq Mockup Project Files (*.bmpr)" },
+                           new String[] { "*.bmpr"},
+                           def);
+
+        if (dialog == null) {
+            return null;
+        }
+
+        File path = new File(dialog.getFilterPath());
+
+        return new File(path, dialog.getFileName());
+    }
+
     public File selectFile(boolean forInput, String def, String[] allowedExtensions)
     {
         FileDialog dialog =

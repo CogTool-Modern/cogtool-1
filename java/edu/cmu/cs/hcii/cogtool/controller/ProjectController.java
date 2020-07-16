@@ -101,9 +101,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -122,6 +124,7 @@ import java.util.regex.Pattern;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.xml.sax.SAXException;
+import balsamiq2cogtool.*;
 
 import edu.cmu.cs.hcii.cogtool.CogTool;
 import edu.cmu.cs.hcii.cogtool.CogToolClipboard;
@@ -986,6 +989,9 @@ public class ProjectController extends DefaultController
 
         ui.setAction(ProjectLID.ImportXML,
                           createImportAction());
+
+        ui.setAction(ProjectLID.ImportBMPR,
+                          createImportBMPRAction());
 
         /*for(CogToolLID lid : ProjectLID.getCollection())
         {
@@ -5750,6 +5756,197 @@ public class ProjectController extends DefaultController
     public File importFile = null;
     public boolean importFileComputes = false;
 
+    protected IListenerAction createImportBMPRAction() 
+    {
+        return new IListenerAction() {
+
+            public Class<?> getParameterClass()
+            {
+                return ProjectSelectionState.class;
+            }
+
+            public boolean performAction(Object prms)
+            {
+                boolean computeScripts = CogToolPref.COMPSCR.getBoolean();
+                if (importFile == null) {
+                    importFile = interaction.selectBMPRFile(true, null);  
+                    
+                } else {
+                    computeScripts = importFileComputes;
+                }
+
+                if (importFile == null) {
+                    return false;
+                }
+
+                BalsamiqToCogTool myConverter = new BalsamiqToCogTool();
+        
+                try {
+                    File outputCogToolXML = myConverter.importBalsamiqProjectFile(importFile);
+                    // Prepare the outputXMl to be imported as XML
+                    importFile = outputCogToolXML;
+                    
+                } 
+                catch (FileNotFoundException ex) {
+                    throw new RcvrXMLParsingException("Could not find the file to import. ", ex);
+                } 
+                catch (SQLException ex) {
+                    String reason = "";
+                    if (ex.getSQLState().equals("08001")) {
+                        reason = "Connection failed.";
+                    }
+
+                    StringWriter sw = new StringWriter();
+                    PrintWriter pw = new PrintWriter(sw);
+                    ex.printStackTrace(pw);
+
+                    throw new RcvrXMLParsingException("Problem querying the Balsamiq Project file, " + importFile.toPath() + ", \n " + sw.toString() + "\n SQL State: " + ex.getSQLState(), ex);
+                }
+
+                return importCogToolXML(prms);
+                
+            }
+
+        };
+
+    }
+
+    protected boolean importCogToolXML(Object prms) {
+        boolean computeScripts = CogToolPref.COMPSCR.getBoolean();
+        if (importFile == null) {
+            importFile = interaction.selectXMLFile(true, null);
+        } else {
+            computeScripts = importFileComputes;
+        }
+
+        if (importFile == null) {
+            return false;
+        }
+
+
+        CompoundUndoableEdit editSeq =
+            new CompoundUndoableEdit(importXMLPresentation,
+                                     ProjectLID.ImportXML);
+
+        Map<Design, Collection<Demonstration>> parsedDesigns = null;
+        Set<AUndertaking> newUndertakings = null;
+        TaskParent parent = project;
+
+        try {
+            if (CogToolPref.HCIPA.getBoolean()) {
+                TaskGroup importGroup =
+                    new TaskGroup(importFile.getName(),
+                                  GroupNature.SUM);
+                parent = importGroup;
+                project.addUndertaking(importGroup);
+                editSeq.addEdit(createNewTaskUndo(project,
+                                                  Project.AT_END,
+                                                  importGroup,
+                                                  ProjectLID.ImportXML,
+                                                  importXMLPresentation));
+            }
+            ImportCogToolXML importer = new ImportCogToolXML();
+            if (! importer.importXML(importFile,
+                                     parent,
+                                     MODELGEN_ALG) ||
+                (importer.getDesigns().size() == 0))
+            {
+                List<String> errors = importer.getObjectFailures();
+                if ((errors != null) && (errors.size() > 0)) {
+                    interaction.reportProblems(importXMLPresentation,
+                                               errors);
+                }
+                else {
+                    interaction.reportProblem(importXMLPresentation,
+                                              xmlParseFailed);
+                }
+                return false;
+            }
+            List<String> warnings = importer.getGenerationWarnings();
+            if (warnings.size() > 0) {
+                interaction.reportWarnings(importXMLPresentation,
+                                           warnings);
+            }
+            parsedDesigns = importer.getDesigns();
+            newUndertakings = importer.getNewUndertakings();
+        }
+        catch (ImportCogToolXML.ImportFailedException ex) {
+            throw new RcvrXMLParsingException("Missing XML component",
+                                              ex);
+        }
+        catch (GraphicsUtil.ImageException ex) {
+            throw new RcvrImageException("Image error during loading XML",
+                                         ex);
+        }
+        catch (IOException ex) {
+            throw new RcvrXMLParsingException("IO error loading XML",
+                                              ex);
+        }
+        catch (SAXException ex) {
+            throw new RcvrXMLParsingException("Error parsing XML: " + importFile.toPath(), ex);
+        }
+        catch (SecurityException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        catch (IllegalArgumentException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        finally {
+            importFile = null;
+            importFileComputes = false;
+        }
+
+        for (AUndertaking u : newUndertakings) {
+            parent.addUndertaking(u);
+            final AUndertaking uu = u;
+            final TaskParent pp = parent;
+            editSeq.addEdit(new AUndoableEdit(ProjectLID.ImportXML) {
+                @Override
+                public void redo()
+                {
+                    super.redo();
+                    pp.addUndertaking(uu);
+                }
+                @Override
+                public void undo()
+                {
+                    super.undo();
+                    pp.removeUndertaking(uu);
+                }
+            });
+        }
+        
+        Iterator<Map.Entry<Design, Collection<Demonstration>>> designDemos =
+            parsedDesigns.entrySet().iterator();
+        while (designDemos.hasNext()) {
+            Map.Entry<Design, Collection<Demonstration>> entry =
+                designDemos.next();
+
+            importDesign(parent,
+                         (DesignSelectionState) prms,
+                         entry.getKey(),
+                         entry.getValue(),
+                         newUndertakings,
+                         editSeq);
+        }
+
+        editSeq.end();
+        undoMgr.addEdit(editSeq);
+        
+        if(computeScripts){
+            //compute predictions for imported project
+            ProjectContextSelectionState seln = new ProjectContextSelectionState(project);
+            seln.addSelectedDesigns(project.getDesigns());
+            ui.selectAllTasks();
+            recomputeScripts(seln);    
+            ui.deselectAllTasks();
+        }
+
+        return true;
+    }
+
     protected IListenerAction createImportAction()
     {
         return new IListenerAction() {
@@ -5759,145 +5956,9 @@ public class ProjectController extends DefaultController
                 return ProjectSelectionState.class;
             }
 
-
-
-
             public boolean performAction(Object prms)
             {
-
-                boolean computeScripts = CogToolPref.COMPSCR.getBoolean();
-                if (importFile == null) {
-                    importFile = interaction.selectXMLFile(true, null);
-                } else {
-                    computeScripts = importFileComputes;
-                }
-
-                if (importFile == null) {
-                    return false;
-                }
-
-
-                CompoundUndoableEdit editSeq =
-                    new CompoundUndoableEdit(importXMLPresentation,
-                                             ProjectLID.ImportXML);
-
-                Map<Design, Collection<Demonstration>> parsedDesigns = null;
-                Set<AUndertaking> newUndertakings = null;
-                TaskParent parent = project;
-
-                try {
-                    if (CogToolPref.HCIPA.getBoolean()) {
-                        TaskGroup importGroup =
-                            new TaskGroup(importFile.getName(),
-                                          GroupNature.SUM);
-                        parent = importGroup;
-                        project.addUndertaking(importGroup);
-                        editSeq.addEdit(createNewTaskUndo(project,
-                                                          Project.AT_END,
-                                                          importGroup,
-                                                          ProjectLID.ImportXML,
-                                                          importXMLPresentation));
-                    }
-                    ImportCogToolXML importer = new ImportCogToolXML();
-                    if (! importer.importXML(importFile,
-                                             parent,
-                                             MODELGEN_ALG) ||
-                        (importer.getDesigns().size() == 0))
-                    {
-                        List<String> errors = importer.getObjectFailures();
-                        if ((errors != null) && (errors.size() > 0)) {
-                            interaction.reportProblems(importXMLPresentation,
-                                                       errors);
-                        }
-                        else {
-                            interaction.reportProblem(importXMLPresentation,
-                                                      xmlParseFailed);
-                        }
-                        return false;
-                    }
-                    List<String> warnings = importer.getGenerationWarnings();
-                    if (warnings.size() > 0) {
-                        interaction.reportWarnings(importXMLPresentation,
-                                                   warnings);
-                    }
-                    parsedDesigns = importer.getDesigns();
-                    newUndertakings = importer.getNewUndertakings();
-                }
-                catch (ImportCogToolXML.ImportFailedException ex) {
-                    throw new RcvrXMLParsingException("Missing XML component",
-                                                      ex);
-                }
-                catch (GraphicsUtil.ImageException ex) {
-                    throw new RcvrImageException("Image error during loading XML",
-                                                 ex);
-                }
-                catch (IOException ex) {
-                    throw new RcvrXMLParsingException("IO error loading XML",
-                                                      ex);
-                }
-                catch (SAXException ex) {
-                    throw new RcvrXMLParsingException("Error parsing XML", ex);
-                }
-                catch (SecurityException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-                catch (IllegalArgumentException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-                finally {
-                    importFile = null;
-                    importFileComputes = false;
-                }
-
-                for (AUndertaking u : newUndertakings) {
-                    parent.addUndertaking(u);
-                    final AUndertaking uu = u;
-                    final TaskParent pp = parent;
-                    editSeq.addEdit(new AUndoableEdit(ProjectLID.ImportXML) {
-                        @Override
-                        public void redo()
-                        {
-                            super.redo();
-                            pp.addUndertaking(uu);
-                        }
-                        @Override
-                        public void undo()
-                        {
-                            super.undo();
-                            pp.removeUndertaking(uu);
-                        }
-                    });
-                }
-                
-                Iterator<Map.Entry<Design, Collection<Demonstration>>> designDemos =
-                    parsedDesigns.entrySet().iterator();
-                while (designDemos.hasNext()) {
-                    Map.Entry<Design, Collection<Demonstration>> entry =
-                        designDemos.next();
-
-                    importDesign(parent,
-                                 (DesignSelectionState) prms,
-                                 entry.getKey(),
-                                 entry.getValue(),
-                                 newUndertakings,
-                                 editSeq);
-                }
-
-                editSeq.end();
-                undoMgr.addEdit(editSeq);
-                
-                if(computeScripts){
-                    //compute predictions for imported project
-                    ProjectContextSelectionState seln = new ProjectContextSelectionState(project);
-                    seln.addSelectedDesigns(project.getDesigns());
-                    ui.selectAllTasks();
-                    recomputeScripts(seln);    
-                    ui.deselectAllTasks();
-                }
-
-                return true;
+                return importCogToolXML(prms);
             }
         };
     }

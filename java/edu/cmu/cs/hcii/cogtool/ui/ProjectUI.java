@@ -1974,6 +1974,9 @@ public class ProjectUI extends DefaultUI
         setEnabled(CogToolLID.ImportXML,
                    ListenerIdentifierMap.ALL,
                    MenuUtil.ENABLED);
+        setEnabled(CogToolLID.ImportBMPR,
+                   ListenerIdentifierMap.ALL,
+                   MenuUtil.ENABLED);
         setEnabled(CogToolLID.ImportWebCrawl,
                    ListenerIdentifierMap.ALL,
                    MenuUtil.ENABLED);
