@@ -611,24 +611,24 @@ the"1-Start" FRAME.
 
 #### 2.7.2 Add Content to All FRAMES 
 
-  Repeat the process described above to add the necessary WIDGETS to
-  all FRAMES of the storyboard, as follows.
- 
-  NOTE \#1. When you have two actions in a row that act on the same
-  WIDGET, like the two Graffiti strokes in the tutorial task, it is
-  important for the two WIDGETS to be absolutely identical. The only
-  way be sure that two WIDGETS are absolutely identical is to create
-  one and then copy it onto all the other FRAMES that need that
-  identical WIDGET. All properties, including the name and type will
-  be copied
- 
-  NOTE \#2. If you accidentally didn't have the correct WIDGET
-  type selected before you create your WIDGET, you must delete the
-  WIDGET, select the correct WIDGET type with the toolbar button
-  on the left, and recreate the WIDGET.
+Repeat the process described above to add the necessary WIDGETS to
+all FRAMES of the storyboard, as follows.
 
-[In FRAME ]{.underline} [Type of WIDGET]{.underline} [Placed
-over]{.underline}
+NOTE \#1. When you have two actions in a row that act on the same
+WIDGET, like the two Graffiti strokes in the tutorial task, it is
+important for the two WIDGETS to be absolutely identical. The only
+way be sure that two WIDGETS are absolutely identical is to create
+one and then copy it onto all the other FRAMES that need that
+identical WIDGET. All properties, including the name and type will
+be copied
+
+NOTE \#2. If you accidentally didn't have the correct WIDGET
+type selected before you create your WIDGET, you must delete the
+WIDGET, select the correct WIDGET type with the toolbar button
+on the left, and recreate the WIDGET.
+
+[In FRAME ] [Placed
+over]
 
 1-Start Button the area labeled "Museums"
 
@@ -644,710 +644,698 @@ over]{.underline}
 
 5-The Met no WIDGETS are needed in this FRAME
 
-![](media/image52.jpg){width="2.8366666666666664in"
-height="2.8566666666666665in"}
+![](/assets/tutorial-1/image055.jpg\)
 
-  Figure 18 Graffiti**_®_** type WIDGET is placed over the image area
-  that represents where a user would mark Graffiti**_®_** gestures for
-  letters.
- 
-  Your design window should look like Figure 19.
- 
-  ![](media/image53.jpg){width="3.526666666666667in"
-  height="3.513333333333333in"}
- 
-  Figure 19. All FRAMES in the DESIGN are populated with background
-  images and
- 
-  WIDGETS sufficient to do the TASK.
+Figure 18 Graffiti**_®_** type WIDGET is placed over the image area
+that represents where a user would mark Graffiti**_®_** gestures for
+letters.
 
- 2.8 Link FRAMES via TRANSITIONS 
+Your design window should look like Figure 19.
+
+![](/assets/tutorial-1/image056.jpg\)
+
+![](/assets/tutorial-1/image057.jpg\)
+
+![](/assets/tutorial-1/image058.jpg\)
+
+![](/assets/tutorial-1/image059.jpg\)
+
+Figure 19. All FRAMES in the DESIGN are populated with background
+images and
+
+WIDGETS sufficient to do the TASK.
+
+2.8 Link FRAMES via TRANSITIONS 
 -------------------------------
 
-  We have now created all of the FRAMES of the storyboard for this
-  DESIGN. However, the
- 
-  DESIGN is only complete when multiple FRAMES are linked
-  together to follow the series of steps in a TASK. The links
-  between FRAMES are called TRANSITIONS and each represents a
-  user action on the interface that causes a new FRAME to appear.
-  For example, when the user taps on the "Museums" WIDGET on the
-  "Start" frame, we want the "Museums List" FRAME to appear.
+We have now created all of the FRAMES of the storyboard for this
+DESIGN. However, the
+
+DESIGN is only complete when multiple FRAMES are linked
+together to follow the series of steps in a TASK. The links
+between FRAMES are called TRANSITIONS and each represents a
+user action on the interface that causes a new FRAME to appear.
+For example, when the user taps on the "Museums" WIDGET on the
+"Start" frame, we want the "Museums List" FRAME to appear.
 
 #### 2.8.1 Create a TRANSITION 
 
-  To create a TRANSITION from the "Museums Button" WIDGET to the
-  "Museums List" FRAME, press the left mouse button on the
-  WIDGET that will cause the TRANSITION to occur, drag the
-  cursor to the destination FRAME so that it highlights (Figure 20),
-  and then release the mouse button. An arrow will connect the
-  WIDGET to an edge of the destination FRAME.
- 
-  If you have trouble clicking on WIDGETS because they are too
-  small, use the "Zoom" commands in the "Modify" menu.
- 
-  ![](media/image57.jpg){width="3.0in" height="1.61in"}
- 
-  Figure 20. Creating a transition by dragging from the "Museums
-  Button" WIDGET in the "1\_Start" FRAME to the "Museums List" FRAME.
-  The destination FRAME highlights by turning gray.
+To create a TRANSITION from the "Museums Button" WIDGET to the
+"Museums List" FRAME, press the left mouse button on the
+WIDGET that will cause the TRANSITION to occur, drag the
+cursor to the destination FRAME so that it highlights (Figure 20),
+and then release the mouse button. An arrow will connect the
+WIDGET to an edge of the destination FRAME.
+
+If you have trouble clicking on WIDGETS because they are too
+small, use the "Zoom" commands in the "Modify" menu.
+
+![](/assets/tutorial-1/image060.jpg\)
+
+Figure 20. Creating a transition by dragging from the "Museums
+Button" WIDGET in the "1\_Start" FRAME to the "Museums List" FRAME.
+The destination FRAME highlights by turning gray.
 
 #### 2.8.2 Edit TRANSITION Properties 
 
-  Like WIDGETS, TRANSITIONS have properties that can be
-  configured in the panel on the right side of the DESIGN window.
-  Each TRANSITION is triggered by a specific user action. For
-  example, a design using a touch-screen can TRANSITIONS triggered
-  by tap or double-tap on a particular button WIDGET. Each type of
-  WIDGET can respond to different types of user actions, and
-  therefore different TRANSITIONS have different properties. When a
-  new TRANSITION, or an existing one, is selected, the Action field
-  will have the available properties.
- 
-  Figure 21 shows the actions available for touch screen (Tap,
-  Double-Tap, and Hover, because some touch-screen can detect fingers
-  hovering above their surface). Figure 22 show the single action
-  available for Graffiti® "Graffiti® Gestures:". A Graffiti® gesture
-  also has a property of being a command (the "Is Command" box must be
-  checked) or not (the "Is Command" box must be empty).
+Like WIDGETS, TRANSITIONS have properties that can be
+configured in the panel on the right side of the DESIGN window.
+Each TRANSITION is triggered by a specific user action. For
+example, a design using a touch-screen can TRANSITIONS triggered
+by tap or double-tap on a particular button WIDGET. Each type of
+WIDGET can respond to different types of user actions, and
+therefore different TRANSITIONS have different properties. When a
+new TRANSITION, or an existing one, is selected, the Action field
+will have the available properties.
 
-![](media/image58.png){width="4.726666666666667in"
-height="1.3966655730533684in"}
+Figure 21 shows the actions available for touch screen (Tap,
+Double-Tap, and Hover, because some touch-screen can detect fingers
+hovering above their surface). Figure 22 show the single action
+available for Graffiti® "Graffiti® Gestures:". A Graffiti® gesture
+also has a property of being a command (the "Is Command" box must be
+checked) or not (the "Is Command" box must be empty).
 
-  Figure 21. The type of transitions available for a touch screen.
+![](/assets/tutorial-1/image061.png\)
 
-![](media/image60.jpg){width="4.793333333333333in"
-height="1.663332239720035in"}
+![](/assets/tutorial-1/image062.png\)
 
-  Figure 22. Graffiti® gestures are either text or commands. Both
-  types are entered into the text box. To indicate a command check the
-  box on the right.
- 
-  Now add TRANSITIONS for each step in the TASK as follows:
+Figure 21. The type of transitions available for a touch screen.
 
-  [From WIDGET in FRAME ]{.underline}   [To FRAME]{.underline} [Action]{.underline}
-  --------------------------------------------- -------------------------------------------------
-  1-Start 2-Museums\_List                       Tap
-  2-Museum\_List 3-m\_List                      Graffiti® gesture "m"
-  3-m\_List 4-me\_List                          Graffiti® gesture "e"
-  4-me\_List 5-The\_Met                         Tap
+![](/assets/tutorial-1/image063.jpg\)
 
-  NOTE \#3. To indicate a command that requires two gestures (e.g.,
-  many commands start with a gesture that looks like a /), please use
-  "/" before the letter of the command. Therefore the gesture command
-  for Cut would be "_x", for Copy would be "_c", for Paste would be
-  "/v", etc. In addition, check the Is-Command check-box to tell CogTool
-  that these gestures constitute a command.
- 
-  NOTE \#4. A "self transition" can also be made. You would use a
-  self-transition if the user's action did not change the look of the
-  interface your are mocking up, or if you want to use one FRAME to
-  demonstrate many actions and you don't care that the look of the
-  interface doesn't change during this part of the demonstration. To
-  make a self-TRANSITION, simply click on the WIDGET that
-  triggers the self-TRANSITION and drag a short distance off that
-  WIDGET but still on the frame, then release the mouse button. An
-  arrow will go from the WIDGET to the edge of FRAME to indicate
-  the self-TRANSITION.
- 
-  When you are finished, your storyboard should look like Figure 23
-  below. You can now close the DESIGN window to return to the
-  PROJECT window.
+Figure 22. Graffiti® gestures are either text or commands. Both
+types are entered into the text box. To indicate a command check the
+box on the right.
 
-![](media/image2.jpg){width="4.63in" height="3.276666666666667in"}
+Now add TRANSITIONS for each step in the TASK as follows:
 
-  Figure 23. TRANSITIONS complete. The TRANSITION in Frame
-  "4-me\_List" is selected.
- 
-  The entire DESIGN is finished at this point and is sufficient to
-  demonstrate the TASK of looking up the MET.
+[From WIDGET in FRAME ]
+--------------------------------------------- -------------------------------------------------
+1-Start 2-Museums\_List                       Tap
+2-Museum\_List 3-m\_List                      Graffiti® gesture "m"
+3-m\_List 4-me\_List                          Graffiti® gesture "e"
+4-me\_List 5-The\_Met                         Tap
+
+NOTE \#3. To indicate a command that requires two gestures (e.g.,
+many commands start with a gesture that looks like a /), please use
+"/" before the letter of the command. Therefore the gesture command
+for Cut would be "_x", for Copy would be "_c", for Paste would be
+"/v", etc. In addition, check the Is-Command check-box to tell CogTool
+that these gestures constitute a command.
+
+NOTE \#4. A "self transition" can also be made. You would use a
+self-transition if the user's action did not change the look of the
+interface your are mocking up, or if you want to use one FRAME to
+demonstrate many actions and you don't care that the look of the
+interface doesn't change during this part of the demonstration. To
+make a self-TRANSITION, simply click on the WIDGET that
+triggers the self-TRANSITION and drag a short distance off that
+WIDGET but still on the frame, then release the mouse button. An
+arrow will go from the WIDGET to the edge of FRAME to indicate
+the self-TRANSITION.
+
+When you are finished, your storyboard should look like Figure 23
+below. You can now close the DESIGN window to return to the
+PROJECT window.
+
+![](/assets/tutorial-1/image002.jpg\)
+
+Figure 23. TRANSITIONS complete. The TRANSITION in Frame "4-me\_List" is selected.
+
+The entire DESIGN is finished at this point and is sufficient to demonstrate the TASK of looking up the MET.
 
 3 Demonstrate a TASK and Produce a Prediction 
 =============================================
 
-  CogTool needs three ingredients for each prediction: an interface
-  DESIGN, a TASK, and a
- 
-  SCRIPT of actions. In Section 2 we named the task "Lookup the MET"
-  and created the New York Guide DESIGN using FRAMES,
-  WIDGETS, and TRANSITIONS. This section shows how to
-  demonstrate a TASK to create a SCRIPT of actions.
+CogTool needs three ingredients for each prediction: an interface
+DESIGN, a TASK, and a
 
- 3.1 Open a SCRIPT 
+SCRIPT of actions. In Section 2 we named the task "Lookup the MET"
+and created the New York Guide DESIGN using FRAMES,
+WIDGETS, and TRANSITIONS. This section shows how to
+demonstrate a TASK to create a SCRIPT of actions.
+
+3.1 Open a SCRIPT 
 -----------------
 
-  A SCRIPT is opened by double-clicking on the cell at the
-  intersection of a TASK and a DESIGN. You may also open the
-  contextual menu for a script by clicking the right mouse button in the
-  cell. (On a Mac, click while holding the CTRL key.) Then, choose the
-  "Edit SCRIPT" command from the contextual menu (Figure 24).
- 
-  ![](media/image64.jpg){width="3.2216666666666667in"
-  height="1.6760520559930008in"}
- 
-  Figure 24. Edit the SCRIPT by using the contextual menu.
+A SCRIPT is opened by double-clicking on the cell at the
+intersection of a TASK and a DESIGN. You may also open the
+contextual menu for a script by clicking the right mouse button in the
+cell. (On a Mac, click while holding the CTRL key.) Then, choose the
+"Edit SCRIPT" command from the contextual menu (Figure 24).
 
- 3.2 Choose a Start FRAME 
+![](/assets/tutorial-1/image064.jpg\)
+
+Figure 24. Edit the SCRIPT by using the contextual menu.
+
+3.2 Choose a Start FRAME 
 ------------------------
 
-  Since a SCRIPT may begin at any FRAME in the DESIGN, you
-  must select the start FRAME separately for each SCRIPT. To
-  select the start FRAME, double-click on a FRAME (Figure 25) or
-  its name in the list at the left. You may also click the desired
-  FRAME to select it, and then press the "Start Demonstrating Task"
-  button or the Enter key. In this tutorial, we called the first
-  FRAME in this the Look-up-the-Met task the "1-Start" FRAME.
-  Double-click on the "1Start" FRAME to begin. The FRAME-chooser
-  window will be replaced by the main SCRIPT editor window.
- 
-  ![](media/image72.jpg){width="3.3366666666666664in" height="2.36in"}
- 
-  Figure 25. The initial SCRIPT window with the "1-Start" FRAME
-  selected.
+Since a SCRIPT may begin at any FRAME in the DESIGN, you
+must select the start FRAME separately for each SCRIPT. To
+select the start FRAME, double-click on a FRAME (Figure 25) or
+its name in the list at the left. You may also click the desired
+FRAME to select it, and then press the "Start Demonstrating Task"
+button or the Enter key. In this tutorial, we called the first
+FRAME in this the Look-up-the-Met task the "1-Start" FRAME.
+Double-click on the "1Start" FRAME to begin. The FRAME-chooser
+window will be replaced by the main SCRIPT editor window.
 
- 3.3 Demonstrate Actions 
+![](/assets/tutorial-1/image072.jpg\)
+
+Figure 25. The initial SCRIPT window with the "1-Start" FRAME
+selected.
+
+3.3 Demonstrate Actions 
 -----------------------
 
-  In the SCRIPT editor window, you will interact with the DESIGN
-  to record a sequence of SCRIPT STEPS in a SCRIPT. The
-  beginning FRAME appears in the left pane, and the current list of
-  STEPS in the SCRIPT appears in the right pane. A set of
-  buttons for manipulating the SCRIPT is located at the bottom of
-  the window.
- 
-  As with the FRAME and DESIGN windows, you may use the "Zoom"
-  commands to make your work easier. The "Zoom" commands can be found in
-  the "Modify" menu or in the contextual menu for the FRAME. Use the
-  "Zoom to Fit" command now to make your window look like Figure 26
-  below.
+In the SCRIPT editor window, you will interact with the DESIGN
+to record a sequence of SCRIPT STEPS in a SCRIPT. The
+beginning FRAME appears in the left pane, and the current list of
+STEPS in the SCRIPT appears in the right pane. A set of
+buttons for manipulating the SCRIPT is located at the bottom of
+the window.
 
-![](media/image80.jpg){width="4.876666666666667in"
-height="4.1866666666666665in"}
+As with the FRAME and DESIGN windows, you may use the "Zoom"
+commands to make your work easier. The "Zoom" commands can be found in
+the "Modify" menu or in the contextual menu for the FRAME. Use the
+"Zoom to Fit" command now to make your window look like Figure 26
+below.
 
-  Figure 26. The SCRIPT editor window.
- 
-  To record new STEPS, interact with the storyboard as a user would
-  interact with an actual device. In the case of a touch screen
-  interface like a Palm OS®-based handheld, CogTool automatically
-  interprets mouse clicks that you make in your demonstration as taps
-  that a user would make on a Palm. The TRANSITIONS associated with
-  your actions will be followed automatically. That is, the current
-  FRAME will be replaced with the destination FRAME of the
-  TRANSITION. For each action you perform, a new STEP will be
-  added to the SCRIPT.
- 
-  Click on the Museums button now to demonstrate the first STEP in
-  the TASK. The window changes to look like Figure 27.
+![](/assets/tutorial-1/image080.jpg\)
 
-![](media/image81.jpg){width="5.123333333333333in"
-height="3.8066666666666666in"}
+Figure 26. The SCRIPT editor window.
 
-  Figure 27. Result of demonstrating the first STEP in the TASK.
- 
-  In the SCRIPT STEP list on the right, CogTool has put three
-  STEPS in response to the single action demonstrated (clicking on
-  the "Museums Button"). They are a "Think" action for 1.2 seconds, a
-  "Look At" to find the "Museums Button", and a "Move and Tap" action to
-  the "Museums Button". Think and Look-at STEPS are inserted
-  automatically because prior research in psychology and human-computer
-  interaction has shown that when people tap on a button, they think to
-  remember which button to press, they look at the button, and then they
-  tap that button. The tap results in the FRAME changing to the
-  "Museums List" FRAME, which is now shown on the left and listed as
-  the last line of the SCRIPT STEP List. Automatically inserting
-  Think and Look-at STEPS is an important part of CogTool's
-  functionality. By doing this automatically, CogTool allows analysts to
-  produce valid models whether they have studied psychology or not. The
-  placement of Think and Look-at STEPS is backed by decades of
-  psychology research and HCI data and is at the core of the research
-  that produced CogTool.
- 
-  The STEPS that are inserted automatically are shaded in yellow to
-  distinguish them from STEPS deliberately demonstrated by the
-  analyst (white STEPS). All of the yellow STEPS above a white
-  STEP are associated with that white STEP. If a white STEP
-  is deleted, all its yellow STEPS will be deleted as well.
- 
-  If you have difficulty remembering which TRANSITIONS are
-  associated with which WIDGETS, hold the mouse over a WIDGET to
-  display a tool-tip. You can also use the WIDGET'S contextual menu
-  to select a specific TRANSITION (Figure 28).
+To record new STEPS, interact with the storyboard as a user would
+interact with an actual device. In the case of a touch screen
+interface like a Palm OS®-based handheld, CogTool automatically
+interprets mouse clicks that you make in your demonstration as taps
+that a user would make on a Palm. The TRANSITIONS associated with
+your actions will be followed automatically. That is, the current
+FRAME will be replaced with the destination FRAME of the
+TRANSITION. For each action you perform, a new STEP will be
+added to the SCRIPT.
 
-![](media/image89.jpg){width="4.22in" height="3.1166666666666667in"}
+Click on the Museums button now to demonstrate the first STEP in
+the TASK. The window changes to look like Figure 27.
 
-  Figure 28. Contextual menu on the Graffiti® WIDGET.
- 
-  When a TRANSITION is a tap or double-tap, you can demonstrate the
-  STEP simply by performing the action on the WIDGET (tap or
-  double-tap). If the TRANSITION is some other type, you must open
-  the contextual menu on the WIDGET and select the action you want
-  to perform to record a STEP. Figure 28 shows the contextual menu
-  displaying the choices for the next STEP: entering Graffiti®
-  strokes "m" on the Graffiti® Letter WIDGET, looking at the
-  Graffiti® Letter WIDGET, or entering new text into the Graffiti®
-  Letter WIDGET. Select "Perform Enter Graffiti® Strokes m On Letter
-  Input" as the next STEP in our TASK which results in the
-  screen shown in Figure 29.
+![](/assets/tutorial-1/image081.jpg\)
 
-![](media/image97.jpg){width="4.456666666666667in"
-height="2.753332239720035in"}
+Figure 27. Result of demonstrating the first STEP in the TASK.
 
-  Figure 29. Two STEPS have been demonstrated.
+In the SCRIPT STEP list on the right, CogTool has put three
+STEPS in response to the single action demonstrated (clicking on
+the "Museums Button"). They are a "Think" action for 1.2 seconds, a
+"Look At" to find the "Museums Button", and a "Move and Tap" action to
+the "Museums Button". Think and Look-at STEPS are inserted
+automatically because prior research in psychology and human-computer
+interaction has shown that when people tap on a button, they think to
+remember which button to press, they look at the button, and then they
+tap that button. The tap results in the FRAME changing to the
+"Museums List" FRAME, which is now shown on the left and listed as
+the last line of the SCRIPT STEP List. Automatically inserting
+Think and Look-at STEPS is an important part of CogTool's
+functionality. By doing this automatically, CogTool allows analysts to
+produce valid models whether they have studied psychology or not. The
+placement of Think and Look-at STEPS is backed by decades of
+psychology research and HCI data and is at the core of the research
+that produced CogTool.
+
+The STEPS that are inserted automatically are shaded in yellow to
+distinguish them from STEPS deliberately demonstrated by the
+analyst (white STEPS). All of the yellow STEPS above a white
+STEP are associated with that white STEP. If a white STEP
+is deleted, all its yellow STEPS will be deleted as well.
+
+If you have difficulty remembering which TRANSITIONS are
+associated with which WIDGETS, hold the mouse over a WIDGET to
+display a tool-tip. You can also use the WIDGET'S contextual menu
+to select a specific TRANSITION (Figure 28).
+
+![](/assets/tutorial-1/image089.jpg\)
+
+Figure 28. Contextual menu on the Graffiti® WIDGET.
+
+When a TRANSITION is a tap or double-tap, you can demonstrate the
+STEP simply by performing the action on the WIDGET (tap or
+double-tap). If the TRANSITION is some other type, you must open
+the contextual menu on the WIDGET and select the action you want
+to perform to record a STEP. Figure 28 shows the contextual menu
+displaying the choices for the next STEP: entering Graffiti®
+strokes "m" on the Graffiti® Letter WIDGET, looking at the
+Graffiti® Letter WIDGET, or entering new text into the Graffiti®
+Letter WIDGET. Select "Perform Enter Graffiti® Strokes m On Letter
+Input" as the next STEP in our TASK which results in the
+screen shown in Figure 29.
+
+![](/assets/tutorial-1/image097.jpg\)
+
+Figure 29. Two STEPS have been demonstrated.
 
 #### 3.3.1 System Delays 
 
-  An accurate prediction of user task time must include time spent
-  waiting for the system to complete requested actions. Sometimes
-  systems are so fast that system delays are negligible and you don't
-  need to include waiting time, but sometimes (as in the case of this
-  Palm app), the delays are noticeable. To simulate a system delay,
-  press the "Wait for System" button, and then enter the amount of time
-  in seconds the user will wait.
- 
-  You can insert system delay in two ways, while you are demonstrating
-  the STEPS or after a STEP has been demonstrated.
- 
-  In the task we are currently demonstrating, there is actually several
-  seconds of system delay time between the tap on the Museums Button and
-  the display of the 2-Museums\_List FRAME. Since we have already
-  demonstrated that STEP, we can now go back and insert the system
-  delay.
- 
-  The first system delay is 3.82 seconds (this system delay was actually
-  observed in videotapes and log files of the application). Select the
-  first occurrence of the delayed screen, i.e., the first line in the
-  SCRIPT STEP list where the FRAME is 2-Museum\_List. Figure
-  30 shows this line selected, indicated by the blue highlighting.
- 
-  ![](media/image105.png){width="6.025in" height="3.5360520559930007in"}
- 
-  Figure 30. The first occurrence of the delayed FRAME is selected.
- 
-  Then hit the "Wait for System" button below the displayed FRAME. A
-  dialog box comes up asking for the duration of the delay. Figure
-  31shows 3.82 seconds being entered into this dialog box.
+An accurate prediction of user task time must include time spent
+waiting for the system to complete requested actions. Sometimes
+systems are so fast that system delays are negligible and you don't
+need to include waiting time, but sometimes (as in the case of this
+Palm app), the delays are noticeable. To simulate a system delay,
+press the "Wait for System" button, and then enter the amount of time
+in seconds the user will wait.
 
-![](media/image107.png){width="5.29in" height="2.98in"}
+You can insert system delay in two ways, while you are demonstrating
+the STEPS or after a STEP has been demonstrated.
 
-  Figure 31. The system delay is entered.
- 
-  After you hit the OK button (or the Enter key), the system delay is
-  entered into the SCRIPT STEP List in between the last action on
-  the "Start" FRAME and the first action on the "2Museums\_List"
-  FRAME, as shown in Figure 32.
+In the task we are currently demonstrating, there is actually several
+seconds of system delay time between the tap on the Museums Button and
+the display of the 2-Museums\_List FRAME. Since we have already
+demonstrated that STEP, we can now go back and insert the system
+delay.
 
-![](media/image108.png){width="5.043333333333333in"
-height="2.966667760279965in"}
+The first system delay is 3.82 seconds (this system delay was actually
+observed in videotapes and log files of the application). Select the
+first occurrence of the delayed screen, i.e., the first line in the
+SCRIPT STEP list where the FRAME is 2-Museum\_List. Figure
+30 shows this line selected, indicated by the blue highlighting.
 
-  Figure 32. The result of entering system delay before the
-  2-Museums\_List **_FRAME_**.
- 
-  We can continue with the demonstration by selecting the last line in
-  the SCRIPT STEP List.
- 
-  Enter the next STEP through the contextual menu on the Graffiti®
-  area (enter an "e").
- 
-  During actual observation after that character was entered, another
-  system delay was observed, this time for 3.76 seconds. For our
-  demonstration purposes this time, we can enter the system delay in the
-  process of demonstrating the TASK. Right after the STEP that
-  caused the delay is entered, (entering an "e" in using the Graffiti®
-  area) simply hit the "Wait for System" button and enter the duration
-  and CogTool will place the system delay correctly, as shown Figure 33.
+![](/assets/tutorial-1/CogTool105.png\)
 
-![](media/image109.png){width="5.450001093613299in" height="3.16in"}
+Figure 30. The first occurrence of the delayed FRAME is selected.
 
-  Figure 33. The system delay appears in the correct position when
-  entered after the step that caused the delay during the
-  demonstration
- 
-  Continue demonstrating the TASK, adding 2.62 seconds of system
-  delay before the last screen appears, and the final STEPS SCRIPT
-  List is shown in Figure 32.
+Then hit the "Wait for System" button below the displayed FRAME. A
+dialog box comes up asking for the duration of the delay. Figure
+31shows 3.82 seconds being entered into this dialog box.
 
-![](media/image110.png){width="5.483333333333333in" height="3.13in"}
+![](/assets/tutorial-1/CogTool107.png\)
 
-  Figure 34. Final **_SCRIPT_**.
+Figure 31. The system delay is entered.
 
- 3.4 Review and Edit Steps 
+After you hit the OK button (or the Enter key), the system delay is
+entered into the SCRIPT STEP List in between the last action on
+the "Start" FRAME and the first action on the "2Museums\_List"
+FRAME, as shown in Figure 32.
+
+![](/assets/tutorial-1/CogTool108.png\)
+
+Figure 32. The result of entering system delay before the
+2-Museums\_List **_FRAME_**.
+
+We can continue with the demonstration by selecting the last line in
+the SCRIPT STEP List.
+
+Enter the next STEP through the contextual menu on the Graffiti®
+area (enter an "e").
+
+During actual observation after that character was entered, another
+system delay was observed, this time for 3.76 seconds. For our
+demonstration purposes this time, we can enter the system delay in the
+process of demonstrating the TASK. Right after the STEP that
+caused the delay is entered, (entering an "e" in using the Graffiti®
+area) simply hit the "Wait for System" button and enter the duration
+and CogTool will place the system delay correctly, as shown Figure 33.
+
+![](/assets/tutorial-1/CogTool0109.png\)
+
+Figure 33. The system delay appears in the correct position when
+entered after the step that caused the delay during the
+demonstration
+
+Continue demonstrating the TASK, adding 2.62 seconds of system
+delay before the last screen appears, and the final STEPS SCRIPT
+List is shown in Figure 32.
+
+![](/assets/tutorial-1/CogTool0110.png\)
+
+Figure 34. Final **_SCRIPT_**.
+
+3.4 Review and Edit Steps 
 -------------------------
 
-  Now that you have demonstrated all the steps that comprise the task of
-  "Look-up the Met", spend just a few minutes, to check to make sure the
-  actions are in the correct order and that the frames were properly
-  linked together.
+Now that you have demonstrated all the steps that comprise the task of
+"Look-up the Met", spend just a few minutes, to check to make sure the
+actions are in the correct order and that the frames were properly
+linked together.
 
 #### 3.4.1 View Previous STEPS 
 
-  You may view the FRAME being used in a particular SCRIPT STEP
-  by clicking on the STEP in the history list.
+You may view the FRAME being used in a particular SCRIPT STEP
+by clicking on the STEP in the history list.
 
 #### 3.4.2 Recovering from a Mistake when Demonstrating STEPS 
 
-  CogTool 1.0b18 does not allow you to recover from a mistake when you
-  are demonstrating STEPS in a TASK. The development team is
-  working hard to fix this obvious deficiency in upcoming releases,
-  until thenyou must delete each step and start your demonstration over.
-  Fortunately, demonstrating STEPS doesn't take very long for most
-  TASKS.
- 
-  KNOWN BUG \#2. The CogTool interface looks like it can change
-  STEPS in the middle of a TASK successfully, but it does not
-  produce reliable human performance predictions if you do. It does not
-  reliably tell you that it is not producing a reliable prediction. This
-  is a serious bug and the development team is working on it. To be
-  safe, always delete an erroneous SCRIPT completely and
-  re-demonstrate the STEPS. Likewise, if you change the design after
-  demonstrating a TASK, re-demonstrate the STEPS.
+CogTool 1.0b18 does not allow you to recover from a mistake when you
+are demonstrating STEPS in a TASK. The development team is
+working hard to fix this obvious deficiency in upcoming releases,
+until thenyou must delete each step and start your demonstration over.
+Fortunately, demonstrating STEPS doesn't take very long for most
+TASKS.
 
- 3.5 Compute Predictions 
+KNOWN BUG \#2. The CogTool interface looks like it can change
+STEPS in the middle of a TASK successfully, but it does not
+produce reliable human performance predictions if you do. It does not
+reliably tell you that it is not producing a reliable prediction. This
+is a serious bug and the development team is working on it. To be
+safe, always delete an erroneous SCRIPT completely and
+re-demonstrate the STEPS. Likewise, if you change the design after
+demonstrating a TASK, re-demonstrate the STEPS.
+
+3.5 Compute Predictions 
 -----------------------
 
-  Once you have finished creating the SCRIPT, press the "Close and
-  Compute" button to return to the PROJECT window and compute a
-  prediction. The result will appear as a value in the table cell for
-  the SCRIPT (Figure 35).
+Once you have finished creating the SCRIPT, press the "Close and
+Compute" button to return to the PROJECT window and compute a
+prediction. The result will appear as a value in the table cell for
+the SCRIPT (Figure 35).
 
-![](media/image111.jpg){width="4.223333333333334in"
-height="0.6733333333333333in"}
+![](/assets/tutorial-1/image0111.jpg\)
 
-  Figure 35. Predicted task execution time appears in the PROJECT
-  window.
- 
-  That's all there is to it! You can read the value directly out of the
-  table cell for the SCRIPT.
- 
-  NOTE \#5. Do not worry if the predictions in your model are
-  slightly different than the ones shown in this tutorial document. The
-  predictions depend on the exact size and position of the WIDGETS
-  and yours are unlikely to be exactly the same as ours. However, if
-  they are off by more than a few tens of milliseconds, you might
-  compare your designs to ours to see if there are major differences.
- 
-  NOTE \#6. If the computation process has an error, it will often
-  return either "0.000" or "600.000" as the answer. This is NOT a
-  correct prediction! If you get an erroneous result, please check your
-  DESIGN and SCRIPT.
+Figure 35. Predicted task execution time appears in the PROJECT
+window.
+
+That's all there is to it! You can read the value directly out of the
+table cell for the SCRIPT.
+
+NOTE \#5. Do not worry if the predictions in your model are
+slightly different than the ones shown in this tutorial document. The
+predictions depend on the exact size and position of the WIDGETS
+and yours are unlikely to be exactly the same as ours. However, if
+they are off by more than a few tens of milliseconds, you might
+compare your designs to ours to see if there are major differences.
+
+NOTE \#6. If the computation process has an error, it will often
+return either "0.000" or "600.000" as the answer. This is NOT a
+correct prediction! If you get an erroneous result, please check your
+DESIGN and SCRIPT.
 
 4 Extending a DESIGN to Support Multiple TASKS 
 ==============================================
 
-  Now that we have used CogTool to create a single DESIGN and
-  TASK, we can extend our work to support a second TASK. A
-  strength of the Keystroke-Level Model type of cognitive performance
-  modeling, employed by CogTool, is the ability to compare alternatives.
-  To this end, we will use CogTool to predict the time for an alternate
-  way to complete the "Lookup the Met" TASK. We will follow the same
-  basic steps outlined in Sections 2 and 3 to model the following new
-  steps.
+Now that we have used CogTool to create a single DESIGN and
+TASK, we can extend our work to support a second TASK. A
+strength of the Keystroke-Level Model type of cognitive performance
+modeling, employed by CogTool, is the ability to compare alternatives.
+To this end, we will use CogTool to predict the time for an alternate
+way to complete the "Lookup the Met" TASK. We will follow the same
+basic steps outlined in Sections 2 and 3 to model the following new
+steps.
 
 1.  Tap the button labeled "Museums" from the first screen.
 
-2.  Tap the on-screen keyboard to enter the characters "m" and "e" to
-    filter the museums.
+2.  Tap the on-screen keyboard to enter the characters "m" and "e" to filter the museums.
 
 3.  Tap the list item labeled "Metropolitan Museum of Art"
 
- 4.1 Extend the DESIGN 
+4.1 Extend the DESIGN 
 ---------------------
 
-  To perform the new variation of the TASK, you need to add two
-  WIDGETS to the DESIGN:
+To perform the new variation of the TASK, you need to add two
+WIDGETS to the DESIGN:
 
-[In FRAME ]{.underline} [Type of WIDGET]{.underline} [Placed
-Over]{.underline}
+[In FRAME ] [Placed
+Over]
 
 2-Museum\_List Button the on-screen keyboard "M"
 
 3-m\_List Button the on-screen keyboard "E"
 
-  To add new WIDGETS to a DESIGN, open the DESIGN window,
-  and then the FRAME windows for the FRAMES you wish to edit.
- 
-  Similarly, you will need to add two new TRANSITIONS to reflect the
-  alternative path through the storyboard:
+To add new WIDGETS to a DESIGN, open the DESIGN window,
+and then the FRAME windows for the FRAMES you wish to edit.
 
-[In FRAME ]{.underline} [From WIDGET]{.underline} [To
-FRAME]{.underline} [Action]{.underline}
+Similarly, you will need to add two new TRANSITIONS to reflect the
+alternative path through the storyboard:
+
+[In FRAME ] [To
+FRAME]
 
 2-Museum\_List over "M" 3-m\_List Tap
 
 3-m\_List over "E" 4-me\_List Tap
 
-  When you have finished your modifications, the DESIGN should look
-  like Figure 36.
- 
-  ![](media/image112.jpg){width="3.236666666666667in"
-  height="2.8366666666666664in"}
- 
-  Figure 36. Augmented design that can now support two tasks.
- 
-  Now, close the DESIGN window to return to the main PROJECT
-  window.
+When you have finished your modifications, the DESIGN should look
+like Figure 36.
 
- 4.2 Add a Second TASK 
+![](/assets/tutorial-1/image0112.jpg\)
+
+Figure 36. Augmented design that can now support two tasks.
+
+Now, close the DESIGN window to return to the main PROJECT
+window.
+
+4.2 Add a Second TASK 
 ---------------------
 
-  Now that the DESIGN has the necessary additions to support the
-  second variation of "Lookup the MET", let's add a TASK to the
-  PROJECT for that variation. Use the "New Task" command in the
-  "Create" menu (Figure 37). Call it "Lookup the MET -- Soft Keyboard."
- 
-  ![](media/image116.jpg){width="3.3733333333333335in"
-  height="1.0266666666666666in"}
- 
-  Figure 37. "New Task" command in the "Create" menu.
- 
-  To distinguish the old version of the TASK from the new one,
-  double click on the old TASK name and rename it to be "Lookup the
-  MET -- Graffiti".
- 
-  Now, since both these TASKS accomplish the same goal of finding
-  the information about the MET, we will put them in a TASK GROUP.
-  Select both TASKS and then select the "New Task Group" command
-  from the "Create" menu (above). Call the task group "Lookup the MET".
-  When this is done, the PROJECT window should look like Figure 38.
+Now that the DESIGN has the necessary additions to support the
+second variation of "Lookup the MET", let's add a TASK to the
+PROJECT for that variation. Use the "New Task" command in the
+"Create" menu (Figure 37). Call it "Lookup the MET -- Soft Keyboard."
 
-![](media/image117.png){width="4.82in" height="0.6666666666666666in"}
+![](/assets/tutorial-1/image0116.jpg\)
 
-  Figure 38. A group of tasks that both accomplish the goal of looking
-  up information about the Metropolitan Museum of Art (the MET).
- 
-  By default, the computation assigned to a group of tasks is the sum of
-  all the tasks in the group. This is useful when the tasks in the group
-  are subtasks of the task group because their sum would then be the
-  total time for the whole task. However, in this case, the two tasks
-  are alternative methods for accomplishing the same goal. Therefore, we
-  may want to see the mean, minimum or maximum time for accomplishing
-  this goal. To change the computation displayed for the TASK
-  GROUP to one more meaningful for this tutorial, choose the "Show
-  Minimum" option in the "Modify" menu (Figure 39) to get the results in
-  Figure 40.
- 
-  ![](media/image118.png){width="2.8633333333333333in"
-  height="0.8766666666666667in"}
- 
-  Figure 39. Other options for the contents of TASK GROUP cells.
- 
-  ![](media/image119.png){width="3.96in" height="0.6733344269466317in"}
- 
-  Figure 40.Calculation changed to showing the minimum time for a TASK
-  GROUP.
+Figure 37. "New Task" command in the "Create" menu.
 
- 4.3 Demonstrate a Second SCRIPT 
+To distinguish the old version of the TASK from the new one,
+double click on the old TASK name and rename it to be "Lookup the
+MET -- Graffiti".
+
+Now, since both these TASKS accomplish the same goal of finding
+the information about the MET, we will put them in a TASK GROUP.
+Select both TASKS and then select the "New Task Group" command
+from the "Create" menu (above). Call the task group "Lookup the MET".
+When this is done, the PROJECT window should look like Figure 38.
+
+![](/assets/tutorial-1/CogTool0117.png\)
+
+Figure 38. A group of tasks that both accomplish the goal of looking
+up information about the Metropolitan Museum of Art (the MET).
+
+By default, the computation assigned to a group of tasks is the sum of
+all the tasks in the group. This is useful when the tasks in the group
+are subtasks of the task group because their sum would then be the
+total time for the whole task. However, in this case, the two tasks
+are alternative methods for accomplishing the same goal. Therefore, we
+may want to see the mean, minimum or maximum time for accomplishing
+this goal. To change the computation displayed for the TASK
+GROUP to one more meaningful for this tutorial, choose the "Show
+Minimum" option in the "Modify" menu (Figure 39) to get the results in
+Figure 40.
+
+![](/assets/tutorial-1/CogTool0118.png\)
+
+Figure 39. Other options for the contents of TASK GROUP cells.
+
+![](/assets/tutorial-1/CogTool0119.png\)
+
+Figure 40.Calculation changed to showing the minimum time for a TASK
+GROUP.
+
+4.3 Demonstrate a Second SCRIPT 
 -------------------------------
 
-  Finally, to compute the prediction of the second TASK'S
-  performance time, we need to demonstrate the steps of the SCRIPT.
-  Open the SCRIPT window by double-clicking the table cell at the
-  intersection of the "New York Guide" DESIGN and "Lookup the MET--
-  Soft Keyboard" TASK. In the FRAME chooser window, select the
-  "1-Start" FRAME. Demonstrate the steps of the new TASK by
-  clicking on the appropriate WIDGETS, in this sequence:
+Finally, to compute the prediction of the second TASK'S
+performance time, we need to demonstrate the steps of the SCRIPT.
+Open the SCRIPT window by double-clicking the table cell at the
+intersection of the "New York Guide" DESIGN and "Lookup the MET--
+Soft Keyboard" TASK. In the FRAME chooser window, select the
+"1-Start" FRAME. Demonstrate the steps of the new TASK by
+clicking on the appropriate WIDGETS, in this sequence:
 
 1.  "1-Start" FRAME: tap the button labeled "Museums"
 
 Insert a system delay of 3.82 seconds
 
 2.  "2-Museums\_List" FRAME: tap the on-screen keyboard character
-    "M"
+"M"
 
 3.  "3-m\_List" FRAME: tap the on-screen keyboard character "E"
 
 Insert a system delay of 3.76 seconds
 
 4.  "4-me\_List" FRAME: tap the list item labeled "Metropolitan
-    Museum of Art" Insert a system delay of 2.62 seconds
+Museum of Art" Insert a system delay of 2.62 seconds
 
-  When you have completed these SCRIPT STEPS, press the "Close and
-  Compute" button on the SCRIPT window to close the window and
-  compute the prediction. When you have done this, the PROJECT
-  window should look like Figure 41.
+When you have completed these SCRIPT STEPS, press the "Close and
+Compute" button on the SCRIPT window to close the window and
+compute the prediction. When you have done this, the PROJECT
+window should look like Figure 41.
 
-![](media/image120.jpg){width="5.036666666666667in" height="1.08in"}
+![](/assets/tutorial-1/image0120.jpg\)
 
-  Figure 41. The PROJECT window is populated with the desired
-  predictions.
- 
-  As you can see, the Soft Keyboard method is about 0.1 seconds slower
-  than the Graffiti® method, a mere 0.7% of the total time. However, the
-  magnitude of the total time is heavily influenced by the more than 10
-  seconds of system delay observed in the application. If you want to
-  see how much time is contributed just by using the soft keyboard,
-  behavior that might be obtainable if the application were made much
-  faster, edit the scripts by deleting the wait-for-system steps and
-  re-compute -- its just that easy!
- 
-  NOTE \#7. Again, do not worry if the predictions in your model are
-  slightly different than the ones shown in this tutorial document. The
-  predictions depend on the exact size and position of the WIDGETS
-  and yours are unlikely to be exactly the same as ours. However, if
-  they are off by more than a few tens of milliseconds, you might
-  compare your designs to ours to see if there are major differences.
+Figure 41. The PROJECT window is populated with the desired
+predictions.
+
+As you can see, the Soft Keyboard method is about 0.1 seconds slower
+than the Graffiti® method, a mere 0.7% of the total time. However, the
+magnitude of the total time is heavily influenced by the more than 10
+seconds of system delay observed in the application. If you want to
+see how much time is contributed just by using the soft keyboard,
+behavior that might be obtainable if the application were made much
+faster, edit the scripts by deleting the wait-for-system steps and
+re-compute -- its just that easy!
+
+NOTE \#7. Again, do not worry if the predictions in your model are
+slightly different than the ones shown in this tutorial document. The
+predictions depend on the exact size and position of the WIDGETS
+and yours are unlikely to be exactly the same as ours. However, if
+they are off by more than a few tens of milliseconds, you might
+compare your designs to ours to see if there are major differences.
 
 5 Conclusion 
 ============
 
-  You can continue adding new DESIGNS and new TASKS as much as
-  you would like to explore options with your DESIGN. You can group
-  tasks either as alternatives (as we did in the tutorial example) or as
-  subtasks that add up to a whole task denoted by A TASK GROUP.
-  Breaking a whole task into subtasks lets you explore alternatives for
-  parts of a task instead of having to demonstrate the entire task each
-  time (which can get tedious for longer tasks).
- 
-  PS. Don't forget to look at the "Two More Fun Things" on the next few
-  pages.
+You can continue adding new DESIGNS and new TASKS as much as
+you would like to explore options with your DESIGN. You can group
+tasks either as alternatives (as we did in the tutorial example) or as
+subtasks that add up to a whole task denoted by A TASK GROUP.
+Breaking a whole task into subtasks lets you explore alternatives for
+parts of a task instead of having to demonstrate the entire task each
+time (which can get tedious for longer tasks).
+
+PS. Don't forget to look at the "Two More Fun Things" on the next few
+pages.
 
 6 Two More Fun Things 
 =====================
 
- 6.1 Capturing Backgrounds to Move Widgets 
+6.1 Capturing Backgrounds to Move Widgets 
 -----------------------------------------
 
-  Our tutorial example did not provide the opportunity to show a neat
-  feature of CogTool, the ability to capture the look of a WIDGET
-  and move it around to find a better arrangement of WIDGETS.
- 
-  Look back at
- 
-  ![](media/image121.jpg){width="2.0in" height="0.95in"}Figure 16, where
-  the "Museums" button was created on the "1-Start" FRAME. The
-  Capture Background button on the bottom right of the window captures
-  the bit-map within the orange WIDGET bounding box. In this case,
-  it would be the rounded rectangle button labeled "Museums". This
-  button can now be moved around to anywhere in the Frame and it retains
-  the look of the "Museums" button. In Figure 42, we have put the
-  Museums button in the middle of the Graffiti® area -- a silly thing to
-  do, but easy to see how the feature works.
- 
-  This feature can be used to create totally new layouts from one
-  screenshot of all the
- 
-  WIDGETS in a FRAME. Simply create a FRAME with all the
-  desired WIDGETS and capture the background for each one. Copy each
-  WIDGET and paste it onto a FRAME with a blank or neutral
-  background and move the WIDGETS wherever you want them to be.
- 
-  ![](media/image122.jpg){width="1.7633333333333334in"
-  height="2.5166666666666666in"}
- 
-  Figure 42. The background of the "Museums" button WIDGET has been
-  captured and the WIDGET has been moved to the center of the Graffiti®
-  area.
+Our tutorial example did not provide the opportunity to show a neat
+feature of CogTool, the ability to capture the look of a WIDGET
+and move it around to find a better arrangement of WIDGETS.
 
- 6.2 Understanding the Predictions 
+Look back at
+
+![](/assets/tutorial-1/image0121.jpg\)Figure 16, where
+the "Museums" button was created on the "1-Start" FRAME. The
+Capture Background button on the bottom right of the window captures
+the bit-map within the orange WIDGET bounding box. In this case,
+it would be the rounded rectangle button labeled "Museums". This
+button can now be moved around to anywhere in the Frame and it retains
+the look of the "Museums" button. In Figure 42, we have put the
+Museums button in the middle of the Graffiti® area -- a silly thing to
+do, but easy to see how the feature works.
+
+This feature can be used to create totally new layouts from one
+screenshot of all the
+
+WIDGETS in a FRAME. Simply create a FRAME with all the
+desired WIDGETS and capture the background for each one. Copy each
+WIDGET and paste it onto a FRAME with a blank or neutral
+background and move the WIDGETS wherever you want them to be.
+
+![](/assets/tutorial-1/image0122.jpg\)
+
+Figure 42. The background of the "Museums" button WIDGET has been
+captured and the WIDGET has been moved to the center of the Graffiti®
+area.
+
+6.2 Understanding the Predictions 
 ---------------------------------
 
-  The underlying computation cognitive engine that makes the predictions
-  is called ACT-R and is very complex. To learn more about it, you can
-  go to the ACT-R website. [http://act-r.psy.cmu.edu/]{.underline}
- 
-  We have built a visualization tool into CogTool so you can see what
-  ACT-R is doing to produce the predictions. Although this visualization
-  is meant for cognitive psychology researcher to validate CogTool's and
-  ACT-R's predictions, it is fun and may entice you to learn more about
-  computational cognitive modeling.
- 
-  To see the visualization, in the PROJECT window use the contextual
-  menu on a SCRIPT cell to select "Show Model Visualization" (Figure
-  43). You can open as many visualization windows as you wish, and align
-  them to compare the execution traces and see where their times differ.
+The underlying computation cognitive engine that makes the predictions
+is called ACT-R and is very complex. To learn more about it, you can
+go to the ACT-R website. [http://act-r.psy.cmu.edu/]
 
-![](media/image123.jpg){width="3.953333333333333in"
-height="2.0033333333333334in"}
+We have built a visualization tool into CogTool so you can see what
+ACT-R is doing to produce the predictions. Although this visualization
+is meant for cognitive psychology researcher to validate CogTool's and
+ACT-R's predictions, it is fun and may entice you to learn more about
+computational cognitive modeling.
 
-  Figure 43. The Contextual menu on a SCRIPT cell for the TASK "Lookup
-  the MET -- Graffiti".
- 
-  To see what ACT-R is doing, select the "Model Trace" tab located at
-  the top of the right pane of the window.
+To see the visualization, in the PROJECT window use the contextual
+menu on a SCRIPT cell to select "Show Model Visualization" (Figure
+43). You can open as many visualization windows as you wish, and align
+them to compare the execution traces and see where their times differ.
 
-![](media/image134.png){width="4.126666666666667in"
-height="1.2166666666666666in"}
+![](/assets/tutorial-1/image0123.jpg\)
 
-  Figure 44. Tabs in the right pane of a visualization window.
- 
-  Once both Visualization windows are open, place one above the other
-  and resize them so you can see both windows (see Figure 45).
+Figure 43. The Contextual menu on a SCRIPT cell for the TASK "Lookup
+the MET -- Graffiti".
 
-![](media/image135.jpg){width="5.996666666666667in"
-height="3.8533333333333335in"}
+To see what ACT-R is doing, select the "Model Trace" tab located at
+the top of the right pane of the window.
 
-  Figure 45. Comparison of Graffiti to Soft-keyboard methods in ACT-R
-  visualization windows
- 
-  In the left pane is a timeline showing the different activities ACT-R
-  goes through to make the predictions. The right pane shows a textual
-  trace of these same activities.
- 
-  In the left pane, time runs from left to right and the width of the
-  boxes are proportional to the time they take to execute. The rows of
-  boxes are different types of "operators" that happen in the course of
-  performing these tasks.
- 
-  The top row is labeled "Frame" and shows the duration that each frame
-  is visible as the task is performed.
- 
-  KNOWN BUG \#3. The frames are not actually visible as long as
-  these boxes indicate. When there is a system wait, one frame
-  disappears and the next one doesn't show up for the duration of the
-  system wait. This is not shown correctly in the current visualization.
-  For example, frame 2-Museum\_List is shown as visible at about 1.6 s
-  into the task. It is really not visible until about 5.7 s into the
-  task. A person well-versed in ACT-R would be able to see this
-  discrepancy in the visualization because the vision row and the
-  production row have many short pairs of operators between 1.6 s and
-  5.7 s. This pattern of operators represents the eyes trying to see the
-  next button, but the frame not being visible, so the vision system
-  returns a "failure" signal to cognition. As soon as the frame is
-  visible, the vision operator is much longer, as it actually find the
-  next button to press and returns its location to cognition.
- 
-  The next row (purple) is Vision, which represents the eyes seeing
-  objects on the frame.
- 
-  The next row (grey) is labeled "Productions" (the elements of a
-  production system, which is the type of cognitive engine that ACT-R
-  employs), which represent the thoughts the model has when performing
-  this task. The long boxes in this row are the Think operators. Short
-  boxes are other types of cognitive operators that initiate motor
-  movements motor and visual attention shifts.
- 
-  The next three rows (shades of red) represent different aspects of the
-  motor system employed by ACT-R. ACT-R’s motor system is complex and
-  beyond the scope of this tutorial, but the bottom row (darkest red)
-  shows the motor movement that would be observable on a video:
-  horizontal movements of a finger, stylus, or mouse, clicks of a mouse
-  button or key presses. In these models, only horizontal movements of
-  the stylus is shown, because it uses a Palm device that uses a stylus
-  (not a mouse or keyboard).
- 
-  If you click on a box in the left pane, it highlights the part of the
-  model trace that corresponds to it in the right pane.
- 
-  The biggest difference between the two models evident in the timelines
-  is that the Graffiti® model has long red motor operators where the
-  Graffiti® gestures are (around 6.4 s and 7.2 s) and the Soft-keyboard
-  model has much shorter motor movements to poke the M-key and the
-  E-key. This is because Graffiti® gestures take about 0.5 seconds to
-  complete, on average and the soft-key poking time is calculated from
-  Fitts’s law. Offsetting this savings in motor time, the Soft-keyboard
-  model has an additional Think operator between the M-key and the E-key
-  that the Graffiti® model does not have between the m-gesture and the
-  e-gesture. By default, “me” is treated as a “cognitive unit” by
-  CogTool when entered as successive Graffiti® gestures that are not
-  commands, and successive soft-keyboard presses are not because each
-  key is modeled as a button. We are currently collecting data to
-  validate these approximations. If you would like to see what the times
-  would be if the Think operator was not inserted between the M-key and
-  the E-key, simply delete it from the script and close and compute.
-  (Deleting and inserting Think steps and System Wait steps are the only
-  safe modifications you can make to scripts without re-demonstrating.)
- 
-  Have fun with this visualization.
+![](/assets/tutorial-1/CogTool0134.png\)
+
+Figure 44. Tabs in the right pane of a visualization window.
+
+Once both Visualization windows are open, place one above the other
+and resize them so you can see both windows (see Figure 45).
+
+![](/assets/tutorial-1/image0135.jpg\)
+
+Figure 45. Comparison of Graffiti to Soft-keyboard methods in ACT-R
+visualization windows
+
+In the left pane is a timeline showing the different activities ACT-R
+goes through to make the predictions. The right pane shows a textual
+trace of these same activities.
+
+In the left pane, time runs from left to right and the width of the
+boxes are proportional to the time they take to execute. The rows of
+boxes are different types of "operators" that happen in the course of
+performing these tasks.
+
+The top row is labeled "Frame" and shows the duration that each frame
+is visible as the task is performed.
+
+KNOWN BUG \#3. The frames are not actually visible as long as
+these boxes indicate. When there is a system wait, one frame
+disappears and the next one doesn't show up for the duration of the
+system wait. This is not shown correctly in the current visualization.
+For example, frame 2-Museum\_List is shown as visible at about 1.6 s
+into the task. It is really not visible until about 5.7 s into the
+task. A person well-versed in ACT-R would be able to see this
+discrepancy in the visualization because the vision row and the
+production row have many short pairs of operators between 1.6 s and
+5.7 s. This pattern of operators represents the eyes trying to see the
+next button, but the frame not being visible, so the vision system
+returns a "failure" signal to cognition. As soon as the frame is
+visible, the vision operator is much longer, as it actually find the
+next button to press and returns its location to cognition.
+
+The next row (purple) is Vision, which represents the eyes seeing
+objects on the frame.
+
+The next row (grey) is labeled "Productions" (the elements of a
+production system, which is the type of cognitive engine that ACT-R
+employs), which represent the thoughts the model has when performing
+this task. The long boxes in this row are the Think operators. Short
+boxes are other types of cognitive operators that initiate motor
+movements motor and visual attention shifts.
+
+The next three rows (shades of red) represent different aspects of the
+motor system employed by ACT-R. ACT-R’s motor system is complex and
+beyond the scope of this tutorial, but the bottom row (darkest red)
+shows the motor movement that would be observable on a video:
+horizontal movements of a finger, stylus, or mouse, clicks of a mouse
+button or key presses. In these models, only horizontal movements of
+the stylus is shown, because it uses a Palm device that uses a stylus
+(not a mouse or keyboard).
+
+If you click on a box in the left pane, it highlights the part of the
+model trace that corresponds to it in the right pane.
+
+The biggest difference between the two models evident in the timelines
+is that the Graffiti® model has long red motor operators where the
+Graffiti® gestures are (around 6.4 s and 7.2 s) and the Soft-keyboard
+model has much shorter motor movements to poke the M-key and the
+E-key. This is because Graffiti® gestures take about 0.5 seconds to
+complete, on average and the soft-key poking time is calculated from
+Fitts’s law. Offsetting this savings in motor time, the Soft-keyboard
+model has an additional Think operator between the M-key and the E-key
+that the Graffiti® model does not have between the m-gesture and the
+e-gesture. By default, “me” is treated as a “cognitive unit” by
+CogTool when entered as successive Graffiti® gestures that are not
+commands, and successive soft-keyboard presses are not because each
+key is modeled as a button. We are currently collecting data to
+validate these approximations. If you would like to see what the times
+would be if the Think operator was not inserted between the M-key and
+the E-key, simply delete it from the script and close and compute.
+(Deleting and inserting Think steps and System Wait steps are the only
+safe modifications you can make to scripts without re-demonstrating.)
+
+Have fun with this visualization.
 
 [^1]: Luo, L. & John, B. (2005) Predicting task execution time on
-    handheld devices using the keystroke-level model. Proceedings of
-    CHI, 2005 (Portland, OR, April 2-7, 2005) ACM, New York.
+handheld devices using the keystroke-level model. Proceedings of
+CHI, 2005 (Portland, OR, April 2-7, 2005) ACM, New York.
