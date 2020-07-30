@@ -24,9 +24,8 @@ Bonnie E. John, Principal Investigator
 
 <div class="wp-block-buttons">
   <div class="wp-block-button" style="display:grid;grid-template-columns:1fr 1fr 1fr;">
-  <a class="wp-block-button__link" href="https://github.com/cogtool/cogtool/releases/download/1.2.2/CogTool-1_2_2setup.exe"><button>CogTool installer for Microsoft Windows</button></a>
-<a class="wp-block-button__link" href="https://github.com/cogtool/cogtool/releases/download/1.2.2/CogToolMac-1_2_2.tgz"><button>CogTool.app macOS (Snow Leopard - Mojave)</button></a>
-<a class="wp-block-button__link" href="https://github.com/CogTool-Modern/cogtool/releases/download/1.3-2020-06-10/CogTool.app.zip"><button>CogTool.app macOS (Catalina and newer) (Pre-release)</button></a>
+  <a class="wp-block-button__link" href="https://github.com/CogTool-Modern/cogtool/releases/download/1.4/CogTool-1_4-setup.exe"><button>Download for Windows</button></a>
+<a class="wp-block-button__link" href="https://github.com/CogTool-Modern/cogtool/releases/download/1.4/CogTool.app.zip"><button>Donwload for macOS</button></a>
   </div>
 </div>
-<a href="https://github.com/cogtool/cogtool/releases">View all releases</a>
+<a href="https://github.com/cogtool/cogtool/releases">View older releases</a>
