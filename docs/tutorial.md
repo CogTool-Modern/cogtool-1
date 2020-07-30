@@ -428,164 +428,186 @@ Materials). Select the folder and then hit the "Choose" button (Figure
 ![](/assets/tutorial-1/image027.png\)
 ![](/assets/tutorial-1/image029.png\)
 
+
+Figure 11. "Select a directory of images" dialog box for importing
+background images from a folder into FRAMES.
+
+Your "New York Guide" DESIGN window should appear as in Figure 12.
+
+![](/assets/tutorial-1/image029.jpg\)
+
+Figure 12. The "New York Guide" DESIGN window after the
+"tutorial-images" files were imported as background images for new
+FRAMES.
+
+KNOWN BUG \#1. When FRAMES are stacked, the stacking order is
+mysterious and may even seem to change over time. Work around: move
+the FRAMES apart so they are not stacked.
+
+You will need to see each FRAME in its entirety so it'll be
+necessary to move the FRAMES apart. Simply press the left mouse
+button inside the body of a FRAME, drag the mouse to the new
+location, and release the mouse button. Make your DESIGN window
+resemble Figure 13.
+
+![](/assets/tutorial-1/image033.jpg)
+
+Figure 13. "New York Guide" DESIGN window after five FRAMES have
+been created using the "Import Background Frame Images" command and
+have been rearranged so that the entirety of each FRAME could be
+seen.
+
+2.7 Define WIDGETS 
 ------------------
 
-  In order to interact with your DESIGN storyboard, you must define
-  WIDGETS on each FRAME for each interface element that the user
-  would manipulate in a TASK, e.g. buttons, check boxes, radio
-  buttons, or menus. In CogTool, a WIDGET is a "hot-spot" that you
-  create in a FRAME to indicate the area that is interactive on the
-  actual physical device.
- 
-  In this tutorial, the first step of our TASK is to tap the
-  "Museum" button on the FRAME called "1-Start". Therefore, we need
-  to define a WIDGET for the "Museums" button. (In general, there is
-  no need to create WIDGETS for every element of the original
-  interface, only for those needed for the tasks you want to
-  investigate.) On the screen shot of the PalmPilot the area on the
-  screen under the words "Museum" is the area our first WIDGET is to
-  represent. To create the WIDGET, open FRAME "1-Start" by
-  double clicking on the FRAME in the DESIGN window (Figure 14).
+In order to interact with your DESIGN storyboard, you must define
+WIDGETS on each FRAME for each interface element that the user
+would manipulate in a TASK, e.g. buttons, check boxes, radio
+buttons, or menus. In CogTool, a WIDGET is a "hot-spot" that you
+create in a FRAME to indicate the area that is interactive on the
+actual physical device.
 
-![](media/image41.jpg){width="4.573333333333333in"
-height="4.203333333333333in"}
+In this tutorial, the first step of our TASK is to tap the
+"Museum" button on the FRAME called "1-Start". Therefore, we need
+to define a WIDGET for the "Museums" button. (In general, there is
+no need to create WIDGETS for every element of the original
+interface, only for those needed for the tasks you want to
+investigate.) On the screen shot of the PalmPilot the area on the
+screen under the words "Museum" is the area our first WIDGET is to
+represent. To create the WIDGET, open FRAME "1-Start" by
+double clicking on the FRAME in the DESIGN window (Figure 14).
 
-  Figure 14. FRAME 1\_Start. The WIDGET toolbar is along the left
-  side. The FRAME on which to place WIDGETS is in the center (in this
-  case, it has the first screen of the New
- 
-  York Guide Palm application as its background). The WIDGET property
-  pane is on the right side (it is grayed out in this figure because no
-  WIDGET is selected).
- 
-  It is important to select the proper type for a WIDGET so that
-  CogTool can make accurate predictions. The type is based on its
-  function in the interface. Different values are used for different
-  types of user interface elements, such as the "List Box Item" type for
-  each row of a list box, the "Menu" type for the menu header in a menu
-  bar, the "Menu Item" type for individual menu items, and the
-  "Pull-Down List" and "Pull-Down Item" types for interface elements
-  that allow you to select a single item from a list of items (sometimes
-  referred to as a "combo box"). See Table 1 in the CogTool Users Guide
-  for a list of the WIDGETS supported by CogTool and guidelines for
-  when to use each WIDGET.
- 
-  ![](media/image42.jpg){width="0.46in"
-  height="4.403333333333333in"}Button
- 
-  Checkbox
- 
-  Radio Button
- 
-  Text Box
- 
-  Text itself, e.g. text you would select to delete or copy
- 
-  Pull-Down List (when it is closed, interacting with this widget opens
-  it)
- 
-  Pull-Down List Item (a thing that can be selected in a pull-down list)
- 
-  List Box Item (when the entire list is visible all the time)
- 
-  Menu header
- 
-  Submenu
- 
-  Menu Item (of either a Menu header or a Sub-menu)
- 
-  Graffiti™ area
- 
-  Non-Interactive area, that someone could look at by not act on.
- 
-  Figure 15. Types of WIDGETS and the tools that insert them. See the
-  CogTool User Guide (p. 45) for more detailed descriptions and examples
-  of each type of WIDGET.
- 
-  ![](media/image43.png){width="0.37in"
-  height="0.44666666666666666in"}The widget needed in Frame "1-Start"
-  needs to function as a button (see examples in Table 1 of the CogTool
-  User Guide, p 45). The button tool at the top of the toolbar is
-  selected by default when you open a FRAME. Make sure this tool is
-  selected (it will be outlined in a darker shade of gray than the other
-  tools).
- 
-  ![](media/image44.png){width="1.4466666666666668in"
-  height="0.58in"}Create a WIDGET over the area of the "Museums"
-  button on the background image by dragging a rectangle across that
-  area of the FRAME. Do this by pressing the left mouse button,
-  moving the mouse over the area you wish to select, and then releasing
-  the mouse button.
- 
-  ![](media/image45.jpg){width="1.6266666666666667in" height="1.29in"}
- 
-  As an alternative, you could also use the "New WIDGET..." command
-  in the "Create" menu, which will place a WIDGET in the upper left
-  corner of the FRAME. You then move and resize the WIDGET to
-  the appropriate position.
- 
-  Move a WIDGET by pressing with the left mouse button on the
-  translucent area of the WIDGET and dragging the mouse to the
- 
-  new location. To more precisely position a WIDGET, use the Nudge
-  commands available in the Modify menu or in the contextual menu
-  available on the WIDGET. You can also use the arrow keys to nudge
-  a selected WIDGET into place.
- 
-  Resize a WIDGET by clicking and dragging the small white square
-  handles at the corners of a selected WIDGET.
- 
-  You may zoom in and out on the background image to make placing
-  WIDGETS easier. These commands are available in the "Modify" menu
-  or in the contextual menu that pops up for the FRAME background.
-  (You may open the contextual menu by clicking the background of the
-  FRAME with the right mouse button. On a Mac, you click with the
-  left mouse button while holding the CTRL key.) The "Zoom to Fit"
-  command is particularly useful, making the background image exactly
-  fit the available space in the window. The keyboard shortcuts for
-  Zoom-to-Fit are apple-/ for Mac and CTRL-/ for PC. You can also zoom
-  to preset percentages by selecting the desired percentage in the
-  "Zoom" field in the bottom portion of the FRAME.
+![](/assets/tutorial-1/image041.jpg)
+
+Figure 14. FRAME 1\_Start. The WIDGET toolbar is along the left
+side. The FRAME on which to place WIDGETS is in the center (in this
+case, it has the first screen of the New York Guide Palm application as its background). The WIDGET property pane is on the right side (it is grayed out in this figure because no
+WIDGET is selected).
+
+It is important to select the proper type for a WIDGET so thatCogTool can make accurate predictions. The type is based on its function in the interface. Different values are used for different types of user interface elements, such as the "List Box Item" type for each row of a list box, the "Menu" type for the menu header in a menu bar, the "Menu Item" type for individual menu items, and the "Pull-Down List" and "Pull-Down Item" types for interface elements
+that allow you to select a single item from a list of items (sometimes
+referred to as a "combo box"). See Table 1 in the CogTool Users Guide
+for a list of the WIDGETS supported by CogTool and guidelines for
+when to use each WIDGET.
+
+![](/assets/tutorial-1/image042.jpg\)
+Button
+
+Checkbox
+
+Radio Button
+
+Text Box
+
+Text itself, e.g. text you would select to delete or copy
+
+Pull-Down List (when it is closed, interacting with this widget opens
+it)
+
+Pull-Down List Item (a thing that can be selected in a pull-down list)
+
+List Box Item (when the entire list is visible all the time)
+
+Menu header
+
+Submenu
+
+Menu Item (of either a Menu header or a Sub-menu)
+
+Graffiti™ area
+
+Non-Interactive area, that someone could look at by not act on.
+
+Figure 15. Types of WIDGETS and the tools that insert them. See the
+CogTool User Guide (p. 45) for more detailed descriptions and examples
+of each type of WIDGET.
+
+<span style="float:right;" markdown="1">
+![](/assets/tutorial-1/image043.png\)
+</span>
+The widget needed in Frame "1-Start"
+needs to function as a button (see examples in Table 1 of the CogTool
+User Guide, p 45). The button tool at the top of the toolbar is
+selected by default when you open a FRAME. Make sure this tool is
+selected (it will be outlined in a darker shade of gray than the other
+tools).
+
+<span style="float:right;" markdown="1">
+![](/assets/tutorial-1/image045.png\)
+</span>
+Create a WIDGET over the area of the "Museums"
+button on the background image by dragging a rectangle across that
+area of the FRAME. Do this by pressing the left mouse button,
+moving the mouse over the area you wish to select, and then releasing
+the mouse button.
+
+<span style="float:right;" markdown="1">
+![](/assets/tutorial-1/image047.jpg\)<br>![](/assets/tutorial-1/image048.jpg\)
+</span>
+As an alternative, you could also use the "New WIDGET..." commandin the "Create" menu, which will place a WIDGET in the upper left corner of the FRAME. You then move and resize the WIDGET to the appropriate position.
+
+Move a WIDGET by pressing with the left mouse button on the
+translucent area of the WIDGET and dragging the mouse to the new location. To more precisely position a WIDGET, use the Nudge commands available in the Modify menu or in the contextual menu
+available on the WIDGET. You can also use the arrow keys to nudge
+a selected WIDGET into place.
+
+Resize a WIDGET by clicking and dragging the small white square
+handles at the corners of a selected WIDGET.
+
+You may zoom in and out on the background image to make placing
+WIDGETS easier. These commands are available in the "Modify" menu
+or in the contextual menu that pops up for the FRAME background.
+(You may open the contextual menu by clicking the background of the
+FRAME with the right mouse button. On a Mac, you click with the
+left mouse button while holding the CTRL key.) The "Zoom to Fit"
+command is particularly useful, making the background image exactly
+fit the available space in the window. The keyboard shortcuts for
+Zoom-to-Fit are apple-/ for Mac and CTRL-/ for PC. You can also zoom
+to preset percentages by selecting the desired percentage in the
+"Zoom" field in the bottom portion of the FRAME.
 
 #### 2.7.1 Set WIDGET Properties 
 
-  The property pane on the right side of the FRAME window shows the
-  properties of the selected WIDGET. Each WIDGET must have a
-  unique name. A WIDGET name can be used by only one WIDGET on a
-  particular FRAME. For this WIDGET, use the name "Museums". You
-  may use any text you wish for the name of a WIDGET.
- 
-  A WIDGET can simply be a hot-spot over a background image, as is
-  the case with this Museums button, or you can check the Use Rendered
-  Version checkbox. This puts a thin border around the hotspot, so you
-  can see the button when there is no background image. (In future
-  versions of CogTool, there will be rendered images for Mac, PC and
-  Palm platforms.) When you use a rendered version, the Displayed Label
-  textbox allows you to enter text that will be displayed on the
-  WIDGET. Since our frame has a background image with the word
-  "Museums" already on it, we will leave the checkbox unchecked and the
-  textbox blank. ( Figure 16). A WIDGET can also have its own image
-  (set with the Set Widget Image button) or capture the background image
-  (see the last section of this tutorial), but these features are
-  unnecessary for this tutorial.
- 
-  ![](media/image47.jpg){width="3.4566666666666666in" height="2.61in"}
- 
-  Figure 16. A **_WIDGET_****_,_** Type: Button, has been placed over the
-  image of the Museums button on the Palm Pilot and named "Museums".
- 
-  A FRAME can have many WIDGETS to mock-up as much of the
-  interactivity of a DESIGN as you would like. In this task, we only
-  need a single WIDGET on this FRAME, so we are now done with
-  this FRAME. Close the FRAME window and return to the
-  DESIGN window. The DESIGN window will reflect the changes you
-  have made to the "1-Start" FRAME by showing the orange hotspot on
-  the Museum button (Figure 17).
- 
-  ![](media/image51.png){width="2.85in" height="1.9466666666666668in"}
- 
-  Figure 17. The DESIGN window reflects the changes made to
-  the"1-Start" FRAME.
+The property pane on the right side of the FRAME window shows the
+properties of the selected WIDGET. Each WIDGET must have a
+unique name. A WIDGET name can be used by only one WIDGET on a
+particular FRAME. For this WIDGET, use the name "Museums". You
+may use any text you wish for the name of a WIDGET.
+
+A WIDGET can simply be a hot-spot over a background image, as is
+the case with this Museums button, or you can check the Use Rendered
+Version checkbox. This puts a thin border around the hotspot, so you
+can see the button when there is no background image. (In future
+versions of CogTool, there will be rendered images for Mac, PC and
+Palm platforms.) When you use a rendered version, the Displayed Label
+textbox allows you to enter text that will be displayed on the
+WIDGET. Since our frame has a background image with the word
+"Museums" already on it, we will leave the checkbox unchecked and the
+textbox blank. ( Figure 16). A WIDGET can also have its own image
+(set with the Set Widget Image button) or capture the background image
+(see the last section of this tutorial), but these features are
+unnecessary for this tutorial.
+
+![](/assets/tutorial-1/image049.jpg\)
+![](/assets/tutorial-1/image050.jpg\)
+![](/assets/tutorial-1/image051.jpg\)
+![](/assets/tutorial-1/image052.jpg\)
+
+Figure 16. A **_WIDGET_****_,_** Type: Button, has been placed over the
+image of the Museums button on the Palm Pilot and named "Museums".
+
+A FRAME can have many WIDGETS to mock-up as much of the
+interactivity of a DESIGN as you would like. In this task, we only
+need a single WIDGET on this FRAME, so we are now done with
+this FRAME. Close the FRAME window and return to the
+DESIGN window. The DESIGN window will reflect the changes you
+have made to the "1-Start" FRAME by showing the orange hotspot on
+the Museum button (Figure 17).
+
+![](/assets/tutorial-1/image053.png\)
+
+Figure 17. The DESIGN window reflects the changes made to
+the"1-Start" FRAME.
 
 #### 2.7.2 Add Content to All FRAMES 
 
