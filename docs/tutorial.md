@@ -35,42 +35,41 @@ the official policies, either expressed or implied,
 of the Office of Naval Research or the U. S. Government
 
 ### Conventions For This Tutorial
- 
+
 #### NOTES about CogTool 1.0b18:
- 
-  This document is about CogTool 1.0b18, but other releases will follow.
-  When some behavior is specific to CogTool 1.0b18 and is expected to
-  change in a future release, a note appears in a gray box like this
-  one.
- 
+
+⬜️ This document is about CogTool 1.0b18, but other releases will follow.
+When some behavior is specific to CogTool 1.0b18 and is expected to
+change in a future release, a note appears in a gray box like this
+one.
+
 #### KNOWN BUGS in CogTool 1.0b18:
- 
-  When there is a known bug in CogTool 1.0b18, it is indicated with a
-  note in a yellow box like this one.
- 
-  This tutorial demonstrates an example of using CogTool to make a
-  prediction. Therefore, it discusses only the aspects of CogTool that
-  are necessary for completing this example. If you have additional
-  questions, please consult the full **_CogTool User Guide_**.
- 
-  Terms in this guide that are CAPITALIZED (in this fashion) refer
-  to the items that are created and edited in CogTool. If the
-  conventional English definition is intended, the words will have no
-  special formatting.
- 
+🟨 When there is a known bug in CogTool 1.0b18, it is indicated with a
+note in a yellow box like this one.
+
+This tutorial demonstrates an example of using CogTool to make a
+prediction. Therefore, it discusses only the aspects of CogTool that
+are necessary for completing this example. If you have additional
+questions, please consult the full [CogTool User Guide](https://raw.githubusercontent.com/cogtool/documentation/master/end-user/user-guide/CogToolUserGuide_1_2%202.pdf).
+
+Terms in this guide that are CAPITALIZED (in this fashion) refer
+to the items that are created and edited in CogTool. If the
+conventional English definition is intended, the words will have no
+special formatting.
+
 ## System Requirements
-  CogTool is a cross-platform application. Unless otherwise noted,
-  instructions are identical whether CogTool is running on Mac OS X or
-  Windows-based computers. Screen images of CogTool in this guide are
-  taken from a Macintosh; only minor visual differences exist between
-  these images and the PC.
- 
-  CogTool is compatible with MacOS X 10.4 and above including Intel Macs
-  (i.e., those shipped after December 2005). It is also compatible with
-  Microsoft Windows XP. CogTool will function on older versions of
-  Windows (down to Windows 98) but requires the GDI+ library, which you
-  can install from Microsoft at [http://www.microsoft.com/msdownload/platformsdk/sdkupdate/psdkredist.htm]
- 
+CogTool is a cross-platform application. Unless otherwise noted,
+instructions are identical whether CogTool is running on Mac OS X or
+Windows-based computers. Screen images of CogTool in this guide are
+taken from a Macintosh; only minor visual differences exist between
+these images and the PC.
+
+CogTool is compatible with MacOS X 10.4 and above including Intel Macs
+(i.e., those shipped after December 2005). It is also compatible with
+Microsoft Windows XP. CogTool will function on older versions of
+Windows (down to Windows 98) but requires the GDI+ library, which you
+can install from Microsoft at [http://www.microsoft.com/msdownload/platformsdk/sdkupdate/psdkredist.htm](http://www.microsoft.com/msdownload/platformsdk/sdkupdate/psdkredist.htm).
+
 ## Table of Contents
 
 [1 CogTool Overview 6](#cogtool-overview)
@@ -135,323 +134,300 @@ of the Office of Naval Research or the U. S. Government
 
 ### What does CogTool do for me? 
 
-  **_Predicts execution time of a skilled user._**
- 
-  CogTool predicts total execution time for a skilled user performing a
-  particular sequence of actions on a system.
- 
-  The predictions made by CogTool are based on a psychological theory of
-  human cognitive and motor capabilities, called the Keystroke-Level
-  Model (KLM), which has been used and validated repeatedly by academics
-  and practitioners since 1980 (Card, S. K., Moran, T. P., & Newell, A.
-  The keystroke-level model for user performance time with interactive
-  systems. **_Communications of the ACM, 23_** (7), (1980) 396-410). CogTool
-  automates the application of KLM to specific problems, providing an
-  alternative to time-consuming and expensive user testing.
- 
-  CogTool can only predict what KLM can predict, that is, execution time
-  for a skilled user of a system. It cannot predict learning time,
-  problem-solving paths, or user satisfaction with a system. It also
-  cannot predict the path of hurricanes.
+**_Predicts execution time of a skilled user._**
+
+CogTool predicts total execution time for a skilled user performing a
+particular sequence of actions on a system.
+
+The predictions made by CogTool are based on a psychological theory of
+human cognitive and motor capabilities, called the Keystroke-Level
+Model (KLM), which has been used and validated repeatedly by academics
+and practitioners since 1980 (Card, S. K., Moran, T. P., & Newell, A.
+The keystroke-level model for user performance time with interactive
+systems. **_Communications of the ACM, 23_** (7), (1980) 396-410). CogTool
+automates the application of KLM to specific problems, providing an
+alternative to time-consuming and expensive user testing.
+
+CogTool can only predict what KLM can predict, that is, execution time
+for a skilled user of a system. It cannot predict learning time,
+problem-solving paths, or user satisfaction with a system. It also
+cannot predict the path of hurricanes.
 
 *Produces a “reusable” design mock-up that is as useful for user testing with novices as it is for predicting skilled performance time* 
 
-  When you use CogTool to predict skilled performance time, you create a
-  storyboard of a system design that can be exported to HTML and used in
-  user tests. A discussion of multipurpose prototypes can be found in;
-  John, B. E. & Salvucci, D. D. (2005) Multi-Purpose Prototypes for
-  Assessing User Interfaces in Pervasive Computing Systems. *IEEE
-  Pervasive Computing 4*(4), 27-34.
+When you use CogTool to predict skilled performance time, you create a
+storyboard of a system design that can be exported to HTML and used in
+user tests. A discussion of multipurpose prototypes can be found in;
+John, B. E. & Salvucci, D. D. (2005) Multi-Purpose Prototypes for
+Assessing User Interfaces in Pervasive Computing Systems. *IEEE
+Pervasive Computing 4*(4), 27-34.
 
 ### How do I make it work? 
-
-  This section gives a brief overview of the stages of using CogTool.
-  Subsequent sections will explain each item in more detail.
+This section gives a brief overview of the stages of using CogTool.
+Subsequent sections will explain each item in more detail.
 
 #### Install and Launch CogTool
 
-  This guide assumes that you have downloaded and installed CogTool
-  1.0b18 from [http://www.cogtool.org/download.html]{.underline}. If you
-  have not yet done so, please visit the Download page of the CogTool
-  website and follow the instructions now. Sections 2.1 and 2.2,
-  provides more details.
+This guide assumes that you have downloaded and installed CogTool
+1.0b18 from [http://www.cogtool.org/download.html](http://www.cogtool.org/download.html). If you
+have not yet done so, please visit the Download page of the CogTool
+website and follow the instructions now. Sections 2.1 and 2.2,
+provides more details.
 
 #### Create a PROJECT
 
-  In CogTool, a PROJECT is the center of your work and contains the
-  user interface DESIGN and the TASK for which you would like to
-  make predictions. Therefore, the first step in working with CogTool is
-  to create a PROJECT. Section 2.3 has more information on how to
-  work with PROJECT.
+In CogTool, a PROJECT is the center of your work and contains the
+user interface DESIGN and the TASK for which you would like to
+make predictions. Therefore, the first step in working with CogTool is
+to create a PROJECT. Section 2.3 has more information on how to
+work with PROJECT.
 
 #### Create a DESIGN Storyboard
 
-  The interfaces that you want to make predictions about are expressed
-  in storyboards. Sections 2.5 thru 2.8 describe how to create a
-  storyboard for the interface DESIGN upon which TASKS will be
-  performed.
+The interfaces that you want to make predictions about are expressed
+in storyboards. Sections 2.5 thru 2.8 describe how to create a
+storyboard for the interface DESIGN upon which TASKS will be
+performed.
 
 #### Define TASKS
 
-  Once the storyboard for your DESIGN has been created, you will
-  define a set of TASKS whose performance you would like to predict.
-  Section 3 of this guide will show how to create TASKS and use
-  TASK GROUPS to organize them.
+Once the storyboard for your DESIGN has been created, you will
+define a set of TASKS whose performance you would like to predict.
+Section 3 of this guide will show how to create TASKS and use
+TASK GROUPS to organize them.
 
 #### Record a SCRIPT
 
-  The steps a user would perform to accomplish a TASK are recorded
-  in SCRIPTS. Section 3.1 shows how to record a SCRIPT of
-  specific user actions by demonstrating them on the DESIGN you
-  created in Sections 2.5 thru 2.8. Once the SCRIPTS are defined,
-  CogTool will make its predictions.
- 
-  **_Rinse, Repeat!_**
- 
-  Creating a DESIGN, a set of TASKS, and SCRIPTS is the
-  starting point for creating new DESIGNS, exploring different
-  TASKS, and comparing the predictions. With a basic familiarity
-  with CogTool, you now have a great new tool for improving your user
-  interface designs. Section 4 discusses best practices and helpful tips
-  for getting the most out of CogTool.
+The steps a user would perform to accomplish a TASK are recorded
+in SCRIPTS. Section 3.1 shows how to record a SCRIPT of
+specific user actions by demonstrating them on the DESIGN you
+created in Sections 2.5 thru 2.8. Once the SCRIPTS are defined,
+CogTool will make its predictions.
+
+**_Rinse, Repeat!_**
+
+Creating a DESIGN, a set of TASKS, and SCRIPTS is the
+starting point for creating new DESIGNS, exploring different
+TASKS, and comparing the predictions. With a basic familiarity
+with CogTool, you now have a great new tool for improving your user
+interface designs. Section 4 discusses best practices and helpful tips
+for getting the most out of CogTool.
 
 ### The Example: ChoiceWay™ Guide to New York City for Palm OS® 
 
-  To help guide you through the process of using CogTool, we will be
-  working with an example user interface: the ChoiceWay™ Guide to New
-  York City for Palm OS®. This software provides a directory of
-  attractions in New York City for Palm OS®-based handheld devices. The
-  storyboard and tasks are adapted from those used by Luo and John in
-  their 2005 paper.[^1] This tutorial will show how to predict the
-  performance time for two simple tasks using that interface: looking up
-  the stored information for the Metropolitan Museum of Art.
+To help guide you through the process of using CogTool, we will be
+working with an example user interface: the ChoiceWay™ Guide to New
+York City for Palm OS®. This software provides a directory of
+attractions in New York City for Palm OS®-based handheld devices. The
+storyboard and tasks are adapted from those used by Luo and John in
+their 2005 paper.[^1] This tutorial will show how to predict the
+performance time for two simple tasks using that interface: looking up
+the stored information for the Metropolitan Museum of Art.
 
 ## Creating a DESIGN storyboard 
 
-  The first step of working with CogTool is to create a storyboard of a
-  user interface design. This storyboard will show the individual
-  screens of the user interface, the interactive elements on those
-  screens, and the user actions that trigger changes from one screen to
-  another. In CogTool, a storyboard like this is referred to as a
-  DESIGN.
- 
-  In this tutorial, we will be building a DESIGN that is sufficient
-  to demonstrate one specific
- 
-  TASK. Here is a zoomed-out view of what our final storyboard will
-  look like: (Figure 1)
+The first step of working with CogTool is to create a storyboard of a
+user interface design. This storyboard will show the individual
+screens of the user interface, the interactive elements on those
+screens, and the user actions that trigger changes from one screen to
+another. In CogTool, a storyboard like this is referred to as a
+DESIGN.
 
-![](media/image2.jpg){width="4.22in" height="2.9966666666666666in"}
+In this tutorial, we will be building a DESIGN that is sufficient
+to demonstrate one specific
 
-  Figure 1. Storyboard for the ChoiceWay™ Guide to New York City that
-  illustrates a museum look-up task (the subject of this tutorial).
- 
-  The TASK will be to lookup information about the Metropolitan
-  Museum of Art in the ChoiceWay™ Guide to New York City for Palm OS®,
-  using these steps:
+TASK. Here is a zoomed-out view of what our final storyboard will
+look like: (Figure 1)
+
+![](/assets/tutorial-1/image002.jpg)
+
+Figure 1. Storyboard for the ChoiceWay™ Guide to New York City that
+illustrates a museum look-up task (the subject of this tutorial).
+
+The TASK will be to lookup information about the Metropolitan
+Museum of Art in the ChoiceWay™ Guide to New York City for Palm OS®,
+using these steps:
 
 1.  Tap the button labeled "Museums" on the first screen of the
-    ChoiceWay™ Guide to New York City
-
+ChoiceWay™ Guide to New York City
 2.  Use Graffiti® to enter the characters "m" and "e" into a live search
-    field.
-
+field.
 3.  Tap the list item labeled "Metropolitan Museum of Art"
 
- 2.1 Prepare Tutorial Materials 
+2.1 Prepare Tutorial Materials 
 ------------------------------
 
-  Before we begin work, let's gather some materials that we'll need. The
-  link below leads to a zip format archive containing screen captures of
-  the interface we'll be mocking up. Download the archive to your
-  computer and expand the contents. On the Macintosh, some browsers will
-  automatically expand downloaded archives. Otherwise, simply
-  double-click the archive to expand it. A folder containing JPG-format
-  image files should be created at the same location as the saved
-  archive. On Windows, you may need to use a zip archive utility such as
-  WinZip to expand the archive. On Windows XP, you may double-click the
-  archive to expand it. Remember where the archive has been expanded,
-  because we will need the contents later in this section.
- 
-  [http://www.cogtool.org/software/tutorial-images.zip]{.underline}
+Before we begin work, let's gather some materials that we'll need. The
+link below leads to a zip format archive containing screen captures of
+the interface we'll be mocking up. Download the archive to your
+computer and expand the contents. On the Macintosh, some browsers will
+automatically expand downloaded archives. Otherwise, simply
+double-click the archive to expand it. A folder containing JPG-format
+image files should be created at the same location as the saved
+archive. On Windows, you may need to use a zip archive utility such as
+WinZip to expand the archive. On Windows XP, you may double-click the
+archive to expand it. Remember where the archive has been expanded,
+because we will need the contents later in this section.
 
- 2.2 Launch CogTool 
+[http://www.cogtool.org/software/tutorial-images.zip]
+
+2.2 Launch CogTool 
 ------------------
 
-  Open the CogTool application that you've previously installed. If you
-  haven't installed it yet, follow the instructions at
-  [http://www.cogtool.org/download.html.]{.underline} If you are working
-  on a Windows-based PC, CogTool should have a folder in the Start Menu.
-  If you are working on Mac OS X, CogTool will be wherever you placed it
-  after extracting it from the download archive.
+Open the CogTool application that you've previously installed. If you
+haven't installed it yet, follow the instructions at
+[http://www.cogtool.org/download.html.] If you are working
+on a Windows-based PC, CogTool should have a folder in the Start Menu.
+If you are working on Mac OS X, CogTool will be wherever you placed it
+after extracting it from the download archive.
 
- 2.3 Create a PROJECT 
+2.3 Create a PROJECT 
 --------------------
 
-  A PROJECT contains the user interface DESIGNS, the TASKS
-  being studied and the SCRIPTS that define the performance being
-  predicted. A PROJECT is a center of work. All the parts necessary
-  for CogTool to make performance predictions is kept in a PROJECT
-  file. The PROJECT name is also the name of the .cgt file that is
-  created by CogTool. You are asked to name the PROJECT file at the
-  first Save.
- 
-  When you launch CogTool, a dialog box appears and gives you the choice
-  of creating a new
- 
-  PROJECT or opening an existing one (Figure 2). To follow the
-  tutorial click the "Create" Button.
- 
-  ![](media/image3.jpg){width="1.9166666666666667in"
-  height="1.4966666666666666in"}
- 
-  Figure 2. The CogTool Start-up box that appears when CogTool is
-  launched
- 
-  Since all PROJECTS must have at least one DESIGN a New Design
-  dialog box will appear asking you to "Please enter the name of an
-  initial design" and the default name will be highlighted ready for you
-  to type in a more appropriate name. (Figure 3)
- 
-  ![](media/image4.jpg){width="2.8366666666666664in" height="2.34in"}
- 
-  Figure 3.The New Design box that appears when a new PROJECT is
-  created.
- 
-  You may choose any name you wish. For the tutorial, we used "New York
-  Guide." This dialog box also asks which devices will be used with the
-  DESIGN. In this case, the
- 
-  DESIGN is for a Palm®, so the only device needed to be checked is
-  the touch screen device. Confirm your choice by pressing "OK" or
-  hitting the enter key
- 
-  ![](media/image5.jpg){width="2.94in" height="2.3866666666666667in"}
- 
-  Figure 4. "New York Guide" appears as the DESIGN name
- 
-  The new DESIGN appears as a new column in the PROJECT window
-  with the name you specified (Figure 5). Since all DESIGNS must
-  have at least on TASK, a new TASK is also created with a
-  default name highlighted and ready for a more appropriate name to be
-  entered.
+A PROJECT contains the user interface DESIGNS, the TASKS
+being studied and the SCRIPTS that define the performance being
+predicted. A PROJECT is a center of work. All the parts necessary
+for CogTool to make performance predictions is kept in a PROJECT
+file. The PROJECT name is also the name of the .cgt file that is
+created by CogTool. You are asked to name the PROJECT file at the
+first Save.
 
-![](media/image7.png){width="5.153333333333333in"
-height="0.8366655730533683in"}
+When you launch CogTool, a dialog box appears and gives you the choice
+of creating a new
+
+PROJECT or opening an existing one (Figure 2). To follow the
+tutorial click the "Create" Button.
+
+![](/assets/tutorial-1/image003.jpg)
+
+Figure 2. The CogTool Start-up box that appears when CogTool is
+launched
+
+Since all PROJECTS must have at least one DESIGN a New Design
+dialog box will appear asking you to "Please enter the name of an
+initial design" and the default name will be highlighted ready for you
+to type in a more appropriate name. (Figure 3)
+
+![](/assets/tutorial-1/image004.jpg\)
+
+Figure 3.The New Design box that appears when a new PROJECT is
+created.
+
+You may choose any name you wish. For the tutorial, we used "New York
+Guide." This dialog box also asks which devices will be used with the
+DESIGN. In this case, the
+
+DESIGN is for a Palm®, so the only device needed to be checked is
+the touch screen device. Confirm your choice by pressing "OK" or
+hitting the enter key
+
+![](/assets/tutorial-1/image005.jpg\)
+
+Figure 4. "New York Guide" appears as the DESIGN name
+
+The new DESIGN appears as a new column in the PROJECT window
+with the name you specified (Figure 5). Since all DESIGNS must
+have at least on TASK, a new TASK is also created with a
+default name highlighted and ready for a more appropriate name to be
+entered.
+
+![](/assets/tutorial-1/image007.png\)
 
 Figure 5. DESIGN name "New York Guide" appears as a column
 heading. "Task 1" is highlighted and ready for a new name.
 
-  To follow the tutorial call the first task "Lookup the MET" (Figure
-  6).
+To follow the tutorial call the first task "Lookup the MET" (Figure
+6).
 
-![](media/image8.jpg){width="5.27in" height="0.72in"}
+![](/assets/tutorial-1/image008.jpg\)
 
-  Figure 6. "Lookup the MET" appears as a TASK name.
+Figure 6. "Lookup the MET" appears as a TASK name.
 
- 2.4 Save the PROJECT 
+2.4 Save the PROJECT 
 --------------------
 
-  Now save the PROJECT by selecting the "Save" command in the "File"
-  menu. A standard
- 
-  Save dialog box comes up to ask for a file name and location. Call
-  this file "Tutorial Project.cgt". You'll notice that the file name
-  (without the extension) now appears in title bar of all windows
-  associated with this PROJECT (Figure 7).
- 
-  When a PROJECT has been changed from a saved state, an asterisk
-  appears in each window title bar. For example, Figure 6 was before we
-  saved the project, and it has an asterisk; Figure 7 shows the window
-  after we saved the project and there is no asterisk.
+Now save the PROJECT by selecting the "Save" command in the "File"
+menu. A standard
 
-![](media/image9.jpg){width="5.443333333333333in"
-height="0.7266666666666667in"}
+Save dialog box comes up to ask for a file name and location. Call
+this file "Tutorial Project.cgt". You'll notice that the file name
+(without the extension) now appears in title bar of all windows
+associated with this PROJECT (Figure 7).
 
-  Figure 7. The PROJECT has been saved as "TutorialProject". Notice
-  that no asterisk appears in the window title.
+When a PROJECT has been changed from a saved state, an asterisk
+appears in each window title bar. For example, Figure 6 was before we
+saved the project, and it has an asterisk; Figure 7 shows the window
+after we saved the project and there is no asterisk.
 
- 2.5 Open the DESIGN 
+![](/assets/tutorial-1/image009.jpg\)
+
+Figure 7. The PROJECT has been saved as "TutorialProject". Notice
+that no asterisk appears in the window title.
+
+2.5 Open the DESIGN 
 -------------------
 
-  Now you must open the DESIGN so you can create the DESIGN
-  storyboard for the New York Guide. You may double-click on the name of
-  the DESIGN, or you may click on the name once to select it and
-  then choose the "Edit" command from the "Edit" menu, or select "Edit"
-  from the DESIGN name's contextual menu. The SCRIPT cell below
-  the DESIGN name will highlight, and a dot will appear next to the
-  DESIGN name, to show that the DESIGN is selected (Figure 8).
+Now you must open the DESIGN so you can create the DESIGN
+storyboard for the New York Guide. You may double-click on the name of
+the DESIGN, or you may click on the name once to select it and
+then choose the "Edit" command from the "Edit" menu, or select "Edit"
+from the DESIGN name's contextual menu. The SCRIPT cell below
+the DESIGN name will highlight, and a dot will appear next to the
+DESIGN name, to show that the DESIGN is selected (Figure 8).
 
-![](media/image10.png){width="5.663333333333333in" height="0.68in"}
+![](/assets/tutorial-1/image010.png\)
 
-  Figure 8. The "New York Guide" DESIGN has been selected, which is
-  indicated by the dot next to the DESIGN name.
+Figure 8. The "New York Guide" DESIGN has been selected, which is
+indicated by the dot next to the DESIGN name.
 
- 2.6 Add FRAMES 
+2.6 Add FRAMES 
 --------------
 
-  When the new DESIGN window opens a new FRAME is automatically
-  created (Figure 9).
+When the new DESIGN window opens a new FRAME is automatically
+created (Figure 9).
 
-![](media/image11.jpg){width="5.6866666666666665in"
-height="1.1733333333333333in"}
+![](/assets/tutorial-1/image011.jpg\)
+![](/assets/tutorial-1/image012.jpg\)
 
-  Figure 9. The DESIGN window for the "New York Guide" DESIGN has a
-  single FRAME automatically placed in it
- 
-  At this point, we could add content to Frame 1 and add new FRAMES
-  one at a time. However, we know we are going to have five FRAMES
-  in the "New York Guide" DESIGN and already have images that we
-  want to place inside the FRAMES. Adding each FRAME one at a
-  time would be slow, but we can use the "Import Frame Background
-  Images" command to automatically create a FRAME for each image in
-  the folder and place the image in the FRAME as the background.
-  Select the "Modify" menu, then the "Import Frame Background Images"
-  from the drop down list (Figure 10)
+Figure 9. The DESIGN window for the "New York Guide" DESIGN has a
+single FRAME automatically placed in it
 
-![](media/image13.jpg){width="5.416666666666667in"
-height="3.9466666666666668in"}
+At this point, we could add content to Frame 1 and add new FRAMES
+one at a time. However, we know we are going to have five FRAMES
+in the "New York Guide" DESIGN and already have images that we
+want to place inside the FRAMES. Adding each FRAME one at a
+time would be slow, but we can use the "Import Frame Background
+Images" command to automatically create a FRAME for each image in
+the folder and place the image in the FRAME as the background.
+Select the "Modify" menu, then the "Import Frame Background Images"
+from the drop down list (Figure 10)
 
-  Figure 10. Selecting the "Import Frame Background Images" command
-  from the Modify menu in the "New York Guide" DESIGN window.
- 
-  Navigate through the "Select a directory of images" dialog box to the
-  "tutorial-images" folder you down loaded (See 2.1 Prepare Tutorial
-  Materials). Select the folder and then hit the "Choose" button (Figure
-  11).
+![](/assets/tutorial-1/image013.jpg\)
+![](/assets/tutorial-1/image014.jpg\)
+![](/assets/tutorial-1/image015.jpg\)
+![](/assets/tutorial-1/image016.jpg\)
+![](/assets/tutorial-1/image017.jpg\)
+![](/assets/tutorial-1/image018.jpg\)
+![](/assets/tutorial-1/image019.jpg\)
+![](/assets/tutorial-1/image020.jpg\)
 
-![](media/image21.png){width="5.16in" height="2.79in"}
+Figure 10. Selecting the "Import Frame Background Images" command
+from the Modify menu in the "New York Guide" DESIGN window.
 
-  Figure 11. "Select a directory of images" dialog box for importing
-  background images from a folder into FRAMES.
- 
-  Your "New York Guide" DESIGN window should appear as in Figure 12.
- 
-  ![](media/image29.jpg){width="4.056666666666667in"
-  height="2.3033333333333332in"}
- 
-  Figure 12. The "New York Guide" DESIGN window after the
-  "tutorial-images" files were imported as background images for new
-  FRAMES.
- 
-  KNOWN BUG \#1. When FRAMES are stacked, the stacking order is
-  mysterious and may even seem to change over time. Work around: move
-  the FRAMES apart so they are not stacked.
- 
-  You will need to see each FRAME in its entirety so it'll be
-  necessary to move the FRAMES apart. Simply press the left mouse
-  button inside the body of a FRAME, drag the mouse to the new
-  location, and release the mouse button. Make your DESIGN window
-  resemble Figure 13.
+Navigate through the "Select a directory of images" dialog box to the
+"tutorial-images" folder you down loaded (See 2.1 Prepare Tutorial
+Materials). Select the folder and then hit the "Choose" button (Figure
+11).
 
-![](media/image33.jpg){width="4.32in" height="2.7533333333333334in"}
+![](/assets/tutorial-1/image021.png\)
+![](/assets/tutorial-1/image022.png\)
+![](/assets/tutorial-1/image023.png\)
+![](/assets/tutorial-1/image024.png\)
+![](/assets/tutorial-1/image025.png\)
+![](/assets/tutorial-1/image026.png\)
+![](/assets/tutorial-1/image027.png\)
+![](/assets/tutorial-1/image029.png\)
 
-  Figure 13. "New York Guide" DESIGN window after five FRAMES have
-  been created using the "Import Background Frame Images" command and
-  have been rearranged so that the entirety of each FRAME could be
-  seen.
-
- 2.7 Define WIDGETS 
 ------------------
 
   In order to interact with your DESIGN storyboard, you must define
