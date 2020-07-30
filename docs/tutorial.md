@@ -1050,9 +1050,7 @@ basic steps outlined in Sections 2 and 3 to model the following new
 steps.
 
 1.  Tap the button labeled "Museums" from the first screen.
-
 2.  Tap the on-screen keyboard to enter the characters "m" and "e" to filter the museums.
-
 3.  Tap the list item labeled "Metropolitan Museum of Art"
 
 4.1 Extend the DESIGN 
@@ -1084,7 +1082,7 @@ FRAME]
 When you have finished your modifications, the DESIGN should look
 like Figure 36.
 
-![](/assets/tutorial-1/image0112.jpg\)
+![](/assets/tutorial-1/image114.jpg\)
 
 Figure 36. Augmented design that can now support two tasks.
 
@@ -1099,7 +1097,7 @@ second variation of "Lookup the MET", let's add a TASK to the
 PROJECT for that variation. Use the "New Task" command in the
 "Create" menu (Figure 37). Call it "Lookup the MET -- Soft Keyboard."
 
-![](/assets/tutorial-1/image0116.jpg\)
+![](/assets/tutorial-1/image118.jpg\)
 
 Figure 37. "New Task" command in the "Create" menu.
 
@@ -1113,7 +1111,7 @@ Select both TASKS and then select the "New Task Group" command
 from the "Create" menu (above). Call the task group "Lookup the MET".
 When this is done, the PROJECT window should look like Figure 38.
 
-![](/assets/tutorial-1/CogTool0117.png\)
+![](/assets/tutorial-1/image119.png\)
 
 Figure 38. A group of tasks that both accomplish the goal of looking
 up information about the Metropolitan Museum of Art (the MET).
@@ -1129,11 +1127,11 @@ GROUP to one more meaningful for this tutorial, choose the "Show
 Minimum" option in the "Modify" menu (Figure 39) to get the results in
 Figure 40.
 
-![](/assets/tutorial-1/CogTool0118.png\)
+![](/assets/tutorial-1/image121.png\)
 
 Figure 39. Other options for the contents of TASK GROUP cells.
 
-![](/assets/tutorial-1/CogTool0119.png\)
+![](/assets/tutorial-1/image123.png\)
 
 Figure 40.Calculation changed to showing the minimum time for a TASK
 GROUP.
@@ -1168,7 +1166,7 @@ Compute" button on the SCRIPT window to close the window and
 compute the prediction. When you have done this, the PROJECT
 window should look like Figure 41.
 
-![](/assets/tutorial-1/image0120.jpg\)
+![](/assets/tutorial-1/image125.jpg\)
 
 Figure 41. The PROJECT window is populated with the desired
 predictions.
@@ -1213,13 +1211,10 @@ Our tutorial example did not provide the opportunity to show a neat
 feature of CogTool, the ability to capture the look of a WIDGET
 and move it around to find a better arrangement of WIDGETS.
 
-Look back at
-
-![](/assets/tutorial-1/image0121.jpg\)Figure 16, where
-the "Museums" button was created on the "1-Start" FRAME. The
-Capture Background button on the bottom right of the window captures
-the bit-map within the orange WIDGET bounding box. In this case,
-it would be the rounded rectangle button labeled "Museums". This
+<span style="float:right;" markdown="1">
+![](/assets/tutorial-1/image126.jpg\)
+</span>
+Look back at Figure 16, where the "Museums" button was created on the "1-Start" FRAME. The Capture Background button on the bottom right of the window captures the bit-map within the orange WIDGET bounding box. In this case, it would be the rounded rectangle button labeled "Museums". This
 button can now be moved around to anywhere in the Frame and it retains
 the look of the "Museums" button. In Figure 42, we have put the
 Museums button in the middle of the Graffiti® area -- a silly thing to
@@ -1233,7 +1228,7 @@ desired WIDGETS and capture the background for each one. Copy each
 WIDGET and paste it onto a FRAME with a blank or neutral
 background and move the WIDGETS wherever you want them to be.
 
-![](/assets/tutorial-1/image0122.jpg\)
+![](/assets/tutorial-1/image127.jpg\)
 
 Figure 42. The background of the "Museums" button WIDGET has been
 captured and the WIDGET has been moved to the center of the Graffiti®
@@ -1257,7 +1252,9 @@ menu on a SCRIPT cell to select "Show Model Visualization" (Figure
 43). You can open as many visualization windows as you wish, and align
 them to compare the execution traces and see where their times differ.
 
-![](/assets/tutorial-1/image0123.jpg\)
+![](/assets/tutorial-1/image128.jpg\)
+
+![](/assets/tutorial-1/image129.jpg\)
 
 Figure 43. The Contextual menu on a SCRIPT cell for the TASK "Lookup
 the MET -- Graffiti".
@@ -1265,14 +1262,14 @@ the MET -- Graffiti".
 To see what ACT-R is doing, select the "Model Trace" tab located at
 the top of the right pane of the window.
 
-![](/assets/tutorial-1/CogTool0134.png\)
+![](/assets/tutorial-1/image132.png\)
 
 Figure 44. Tabs in the right pane of a visualization window.
 
 Once both Visualization windows are open, place one above the other
 and resize them so you can see both windows (see Figure 45).
 
-![](/assets/tutorial-1/image0135.jpg\)
+![](/assets/tutorial-1/image134.jpg\)
 
 Figure 45. Comparison of Graffiti to Soft-keyboard methods in ACT-R
 visualization windows
