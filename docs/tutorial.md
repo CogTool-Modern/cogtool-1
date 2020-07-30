@@ -784,7 +784,7 @@ contextual menu for a script by clicking the right mouse button in the
 cell. (On a Mac, click while holding the CTRL key.) Then, choose the
 "Edit SCRIPT" command from the contextual menu (Figure 24).
 
-![](/assets/tutorial-1/image064.jpg\)
+![](/assets/tutorial-1/image067.jpg\)
 
 Figure 24. Edit the SCRIPT by using the contextual menu.
 
@@ -801,6 +801,7 @@ FRAME in this the Look-up-the-Met task the "1-Start" FRAME.
 Double-click on the "1Start" FRAME to begin. The FRAME-chooser
 window will be replaced by the main SCRIPT editor window.
 
+![](/assets/tutorial-1/image071.jpg\)
 ![](/assets/tutorial-1/image072.jpg\)
 
 Figure 25. The initial SCRIPT window with the "1-Start" FRAME
@@ -822,7 +823,7 @@ the "Modify" menu or in the contextual menu for the FRAME. Use the
 "Zoom to Fit" command now to make your window look like Figure 26
 below.
 
-![](/assets/tutorial-1/image080.jpg\)
+![](/assets/tutorial-1/image079.jpg\)
 
 Figure 26. The SCRIPT editor window.
 
@@ -874,6 +875,8 @@ to select a specific TRANSITION (Figure 28).
 
 ![](/assets/tutorial-1/image089.jpg\)
 
+![](/assets/tutorial-1/image090.jpg\)
+
 Figure 28. Contextual menu on the Graffiti® WIDGET.
 
 When a TRANSITION is a tap or double-tap, you can demonstrate the
@@ -888,7 +891,13 @@ Letter WIDGET. Select "Perform Enter Graffiti® Strokes m On Letter
 Input" as the next STEP in our TASK which results in the
 screen shown in Figure 29.
 
-![](/assets/tutorial-1/image097.jpg\)
+![](/assets/tutorial-1/image084.jpg\)
+
+![](/assets/tutorial-1/image085.jpg\)
+
+![](/assets/tutorial-1/image086.jpg\)
+
+![](/assets/tutorial-1/image087.jpg\)
 
 Figure 29. Two STEPS have been demonstrated.
 
@@ -917,7 +926,9 @@ first occurrence of the delayed screen, i.e., the first line in the
 SCRIPT STEP list where the FRAME is 2-Museum\_List. Figure
 30 shows this line selected, indicated by the blue highlighting.
 
-![](/assets/tutorial-1/CogTool105.png\)
+![](/assets/tutorial-1/image088.jpg\)
+
+![](/assets/tutorial-1/image089.jpg\)
 
 Figure 30. The first occurrence of the delayed FRAME is selected.
 
@@ -925,7 +936,7 @@ Then hit the "Wait for System" button below the displayed FRAME. A
 dialog box comes up asking for the duration of the delay. Figure
 31shows 3.82 seconds being entered into this dialog box.
 
-![](/assets/tutorial-1/CogTool107.png\)
+![](/assets/tutorial-1/image105.png\)
 
 Figure 31. The system delay is entered.
 
@@ -934,7 +945,7 @@ entered into the SCRIPT STEP List in between the last action on
 the "Start" FRAME and the first action on the "2Museums\_List"
 FRAME, as shown in Figure 32.
 
-![](/assets/tutorial-1/CogTool108.png\)
+![](/assets/tutorial-1/image107.png\)
 
 Figure 32. The result of entering system delay before the
 2-Museums\_List **_FRAME_**.
@@ -953,7 +964,7 @@ caused the delay is entered, (entering an "e" in using the Graffiti®
 area) simply hit the "Wait for System" button and enter the duration
 and CogTool will place the system delay correctly, as shown Figure 33.
 
-![](/assets/tutorial-1/CogTool0109.png\)
+![](/assets/tutorial-1/image109.png\)
 
 Figure 33. The system delay appears in the correct position when
 entered after the step that caused the delay during the
@@ -963,7 +974,7 @@ Continue demonstrating the TASK, adding 2.62 seconds of system
 delay before the last screen appears, and the final STEPS SCRIPT
 List is shown in Figure 32.
 
-![](/assets/tutorial-1/CogTool0110.png\)
+![](/assets/tutorial-1/image111.png\)
 
 Figure 34. Final **_SCRIPT_**.
 
@@ -1006,7 +1017,7 @@ Compute" button to return to the PROJECT window and compute a
 prediction. The result will appear as a value in the table cell for
 the SCRIPT (Figure 35).
 
-![](/assets/tutorial-1/image0111.jpg\)
+![](/assets/tutorial-1/image113.jpg\)
 
 Figure 35. Predicted task execution time appears in the PROJECT
 window.
