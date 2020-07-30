@@ -10,8 +10,7 @@ used today to baseline your current interface, or compare competitors'
 interfaces, and predict how much better your new designs will be.
 
 CogTool is free software, released under the FSF Lesser Gnu Public
-License. [See LICENSE.txt for details](https://github.com/cogtool/cogtool/blob/master/LICENSE.txt).
-
+License. [See LICENSE.txt for details](https://github.com/CogTool-Modern/cogtool/blob/master/LICENSE.txt).
 
 There is a separate repository of documentation, both for end users
 and for developers:
