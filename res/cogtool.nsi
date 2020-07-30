@@ -40,7 +40,7 @@ Var StartMenuGroup
 !insertmacro MUI_LANGUAGE English
 
 # Installer attributes
-OutFile ..\dist\CogTool-1_3trunk-setup.exe
+OutFile ..\dist\CogTool-1_4-setup.exe
 InstallDir $PROGRAMFILES\CogTool
 CRCCheck on
 XPStyle on
