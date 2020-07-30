@@ -16,4 +16,5 @@ There is a separate repository of documentation, both for end users
 and for developers:
 
 [https://github.com/cogtool/documentation.git](https://github.com/cogtool/documentation.git)
+TODO Merge this seperate repo with the in-branch, GitHub Pages-powered `docs/` folder.
 
