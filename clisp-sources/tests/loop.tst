@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 (loop for x from 1 to 9
       for y = nil then x
@@ -591,6 +591,7 @@ February 17
   (sort
     (loop for key being each hash-key in hash-table using (hash-value val)
           for key+1 = (1+ key)
+          do (assert (= 100 (/ val key)))
           collect (list key key+1 val))
     #'<
     :key #'car))
@@ -881,6 +882,33 @@ NIL
     (eval (macroexpand '(loop :for i :from 1 :to 20 :sum i :always (evenp i))))
   (program-error (c) (princ c) (values '(correct program-error))))
 (correct program-error)
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1516684&group_id=1355
+(with-output-to-string (*standard-output*)
+  (loop :initially (write-char #\a)
+    :for char :across "" :for code = (char-code char)
+    :do (princ code)
+    :finally (write-char #\b)))
+"ab"
+(with-output-to-string (*standard-output*)
+  (loop :initially (write-char #\a)
+    :for char :across ""
+    :do (write-char char)
+    :finally (write-char #\b)))
+"ab"
+(with-output-to-string (*standard-output*)
+  (loop :initially (write-char #\a)
+    :for char :across "1" :for code = (char-code char)
+    :do (princ code)
+    :finally (write-char #\b)))
+"a49b"
+(with-output-to-string (*standard-output*)
+  (loop :initially (write-char #\a)
+    :for char :across "1"
+    :do (write-char char)
+    :finally (write-char #\b)))
+"a1b"
+
 
 ;; local variables:
 ;; eval: (make-local-variable 'write-file-functions)

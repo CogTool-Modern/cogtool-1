@@ -1,15 +1,14 @@
-# intparam.m4 serial 1
-dnl Copyright (C) 2005 Free Software Foundation, Inc.
+# intparam.m4 serial 3  -*- Autoconf -*-
+dnl Copyright (C) 2005-2008 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
 
-dnl From Bruno Haible.
+dnl From Bruno Haible, Sam Steingold
 
 AC_DEFUN([CL_INTPARAM_CROSS],
 [
-  AC_REQUIRE([gl_AC_TYPE_LONG_LONG])
-  AC_REQUIRE([gt_TYPE_LONGDOUBLE])
+  AC_REQUIRE([AC_TYPE_LONG_LONG_INT])
   AC_REQUIRE([AC_C_BIGENDIAN])
   cl_machine_file_h=$1
   {
@@ -17,14 +16,14 @@ AC_DEFUN([CL_INTPARAM_CROSS],
     CL_INTPARAM_BITSIZE([short], [short_bitsize])
     CL_INTPARAM_BITSIZE([int], [int_bitsize])
     CL_INTPARAM_BITSIZE([long], [long_bitsize])
-    if test $ac_cv_type_long_long = yes; then
+    if test $ac_cv_type_long_long_int = yes; then
       CL_INTPARAM_BITSIZE([long long], [longlong_bitsize])
     fi
     CL_INTPARAM_BITSIZE([unsigned char], [uchar_bitsize])
     CL_INTPARAM_BITSIZE([unsigned short], [ushort_bitsize])
     CL_INTPARAM_BITSIZE([unsigned int], [uint_bitsize])
     CL_INTPARAM_BITSIZE([unsigned long], [ulong_bitsize])
-    if test $ac_cv_type_long_long = yes; then
+    if test $ac_cv_type_long_long_int = yes; then
       CL_INTPARAM_BITSIZE([unsigned long long], [ulonglong_bitsize])
     fi
     if test -n "$char_bitsize"; then
@@ -55,7 +54,7 @@ AC_DEFUN([CL_INTPARAM_CROSS],
     else
       echo "#error \"Integers of type long have no binary representation!!\""
     fi
-    if test $ac_cv_type_long_long = yes; then
+    if test $ac_cv_type_long_long_int = yes; then
       if test -n "$longlong_bitsize"; then
         echo "/* Integers of type long long have $longlong_bitsize bits. */"
         echo "#define long_long_bitsize $longlong_bitsize"
@@ -88,7 +87,7 @@ AC_DEFUN([CL_INTPARAM_CROSS],
     else
       echo "#error \"Integers of type unsigned long have no binary representation!!\""
     fi
-    if test $ac_cv_type_long_long = yes; then
+    if test $ac_cv_type_long_long_int = yes; then
       if test -n "$ulonglong_bitsize"; then
         echo "/* Integers of type unsigned long long have $ulonglong_bitsize bits. */"
         echo
@@ -108,12 +107,13 @@ AC_DEFUN([CL_INTPARAM_CROSS],
     if test "$long_bitsize" != "$ulong_bitsize"; then
       echo "#error \"Integer types long and unsigned long have different sizes!!\""
     fi
-    if test $ac_cv_type_long_long = yes; then
+    if test $ac_cv_type_long_long_int = yes; then
       if test "$longlong_bitsize" != "$ulonglong_bitsize"; then
         echo "#error \"Integer types long long and unsigned long long have different sizes!!\""
       fi
     fi
-    AC_TRY_COMPILE([], [typedef int verify[2*(sizeof(char*)<=sizeof (long))-1];],
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+      [[typedef int verify[2*(sizeof(char*)<=sizeof (long))-1];]])],
       [], [echo "#error \"Type char * does not fit into a long!!\""])
     _AC_COMPUTE_INT([sizeof (char *)], [pointer_size])
     pointer_bitsize=`expr $pointer_size '*' $char_bitsize`
@@ -160,7 +160,7 @@ AC_DEFUN([CL_INTPARAM_CROSS],
     CL_INTPARAM_ALIGNOF([unsigned long], [alignment_ulong])
     echo "/* Type unsigned long has sizeof = $sizeof_ulong and alignment = $alignment_ulong. */"
     echo
-    if test $ac_cv_type_long_long = yes; then
+    if test $ac_cv_type_long_long_int = yes; then
       CL_INTPARAM_SIZEOF([long long], [sizeof_longlong])
       CL_INTPARAM_ALIGNOF([long long], [alignment_longlong])
       echo "/* Type long long has sizeof = $sizeof_longlong and alignment = $alignment_longlong. */"
@@ -184,14 +184,12 @@ AC_DEFUN([CL_INTPARAM_CROSS],
     echo "#define sizeof_double $sizeof_double"
     echo "#define alignment_double $alignment_double"
     echo
-    if test $gt_cv_c_long_double = yes; then
-      CL_INTPARAM_SIZEOF([long double], [sizeof_longdouble])
-      CL_INTPARAM_ALIGNOF([long double], [alignment_longdouble])
-      echo "/* Type long double has sizeof = $sizeof_longdouble and alignment = $alignment_longdouble. */"
-      echo "#define sizeof_long_double $sizeof_longdouble"
-      echo "#define alignment_long_double $alignment_longdouble"
-      echo
-    fi
+    CL_INTPARAM_SIZEOF([long double], [sizeof_longdouble])
+    CL_INTPARAM_ALIGNOF([long double], [alignment_longdouble])
+    echo "/* Type long double has sizeof = $sizeof_longdouble and alignment = $alignment_longdouble. */"
+    echo "#define sizeof_long_double $sizeof_longdouble"
+    echo "#define alignment_long_double $alignment_longdouble"
+    echo
     CL_INTPARAM_SIZEOF([char *], [sizeof_char_ptr])
     CL_INTPARAM_ALIGNOF([char *], [alignment_char_ptr])
     echo "/* Type char * has sizeof = $sizeof_char_ptr and alignment = $alignment_char_ptr. */"
@@ -200,8 +198,13 @@ AC_DEFUN([CL_INTPARAM_CROSS],
     CL_INTPARAM_ALIGNOF([long *], [alignment_long_ptr])
     echo "/* Type long * has sizeof = $sizeof_long_ptr and alignment = $alignment_long_ptr. */"
     echo
-    CL_INTPARAM_SIZEOF([void (*)(void)], [sizeof_function_ptr])
-    CL_INTPARAM_ALIGNOF([void (*)(void)], [alignment_function_ptr])
+    dnl disabled because:
+    dnl - the results of these are not used anywhere
+    dnl - the results of non-cross are not generated (see src/intparam.h)
+    dnl - the C code fails with "expected identifier or '(' before ')' token"
+    dnl   on the line "typedef int verify[2*(alignof(void (*)(void)) == 256) - 1];"
+    dnl CL_INTPARAM_SIZEOF([void (*)(void)], [sizeof_function_ptr])
+    dnl CL_INTPARAM_ALIGNOF([void (*)(void)], [alignment_function_ptr])
     echo "/* Type function * has sizeof = $sizeof_function_ptr and alignment = $alignment_function_ptr. */"
     echo
     case $ac_cv_c_bigendian in
@@ -212,7 +215,7 @@ AC_DEFUN([CL_INTPARAM_CROSS],
         echo "#define int_big_endian"
         echo "/* Type unsigned long is stored BIG-ENDIAN in memory (i.e. like mc68000 or sparc). */"
         echo "#define long_big_endian"
-        if test $ac_cv_type_long_long = yes; then
+        if test $ac_cv_type_long_long_int = yes; then
           echo "/* Type unsigned long long is stored BIG-ENDIAN in memory (i.e. like mc68000 or sparc). */"
           echo "#define long_long_big_endian"
         fi
@@ -224,7 +227,7 @@ AC_DEFUN([CL_INTPARAM_CROSS],
         echo "#define int_little_endian"
         echo "/* Type unsigned long is stored LITTLE-ENDIAN in memory (i.e. like Z80 or VAX). */"
         echo "#define long_little_endian"
-        if test $ac_cv_type_long_long = yes; then
+        if test $ac_cv_type_long_long_int = yes; then
           echo "/* Type unsigned long long is stored LITTLE-ENDIAN in memory (i.e. like Z80 or VAX). */"
           echo "#define long_long_little_endian"
         fi
@@ -233,7 +236,7 @@ AC_DEFUN([CL_INTPARAM_CROSS],
         echo "#error \"Type short is stored in memory in an obscure manner!!\""
         echo "#error \"Type int is stored in memory in an obscure manner!!\""
         echo "#error \"Type long is stored in memory in an obscure manner!!\""
-        if test $ac_cv_type_long_long = yes; then
+        if test $ac_cv_type_long_long_int = yes; then
           echo "#error \"Type long long is stored in memory in an obscure manner!!\""
         fi
         ;;
@@ -258,7 +261,8 @@ AC_DEFUN([CL_INTPARAM_BITSIZE],
 [
   n=1; x="($1)2"
   while true; do
-    AC_TRY_COMPILE([], [typedef int verify[2*(($1)($x) == 0) - 1];],
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],
+      [[typedef int verify[2*(($1)($x) == 0) - 1];]])],
       [$2=$n; break;],
       [if test $n = 1000; then $2=; break; fi;])
     n=`expr $n + 1`; x="$x * ($1)2"
@@ -274,12 +278,12 @@ AC_DEFUN([CL_INTPARAM_SIZEOF],
 
 dnl CL_INTPARAM_ALIGNOF(type, variable)
 dnl puts into variable the determined alignment of the type.
-AC_DEFUN([CL_INTPARAM_ALIGNOF],
-[
+AC_DEFUN([CL_INTPARAM_ALIGNOF],[
   dnl Simplify the guessing by assuming that the alignment is a power of 2.
   n=1
   while true; do
-    AC_TRY_COMPILE([
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <stddef.h>
 #ifdef __cplusplus
 # ifdef __GNUC__
 #  define alignof(type)  __alignof__ (type)
@@ -290,7 +294,7 @@ AC_DEFUN([CL_INTPARAM_ALIGNOF],
 #else
 # define alignof(type)  offsetof (struct { char slot1; type slot2; }, slot2)
 #endif
-], [typedef int verify[2*(alignof($1) == $n) - 1];],
+]], [[typedef int verify[2*(alignof($1) == $n) - 1];]])],
       [$2=$n; break;]
       [if test $n = 0; then $2=; break; fi])
     n=`expr $n '*' 2`

@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 (setf a-vector (make-array 10))
 #+(or XCL CMU SBCL OpenMCL) #(0 0 0 0 0 0 0 0 0 0)

@@ -6,7 +6,8 @@ BD=../
 # executable extension (.exe on win32, .run everywhere else)
 LEXE=.run
 
-LISP=$(BD)lisp$(LEXE) -E utf-8 -norc -B $(BD) -N $(BD)locale -M $(BD)lispinit.mem -m 30000KW
+# ensure that all messages are in English
+LISP = LC_MESSAGES=en_US $(BD)lisp$(LEXE) -E utf-8 -norc -B $(BD) -N $(BD)locale -M $(BD)lispinit.mem -m 30MW -L english
 # LISP=../clisp -norc
 # LISP=clisp -norc
 
@@ -24,7 +25,10 @@ tests : force tests.fas
 	$(LISP) -i tests -x "(time (run-all-tests))"
 
 complete : force tests.fas
-	$(LISP) -i tests -x "(time (run-all-tests nil))"
+	$(LISP) -i tests -x "(time (run-all-tests :disable-risky nil))"
+
+parallel: force tests.fas
+	$(LISP) -i tests -x "(time (run-all-tests-parallel))"
 
 compare : force
 	(echo *.erg | grep '*' >/dev/null) || (echo "Test failed:" ; ls -l *erg; echo "To see which tests failed, type" ; echo "    cat "`pwd`"/*.erg" ; exit 1)

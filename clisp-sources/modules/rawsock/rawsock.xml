@@ -8,7 +8,7 @@
  <filename role="unix">sys/socket.h</filename>.
 Sockets are represented by their &fixnum-t; &file-des;s.</para>
 
-<simpara>When this module is present, &features-var; contains the
+<simpara>When this module is present, &features-my; contains the
  symbol <constant>:RAWSOCK</constant>.</simpara>
 
 <warning id="rawsock-use-sockets"><title>Try &socket-stream; first!</title>
@@ -21,13 +21,17 @@ Sockets are represented by their &fixnum-t; &file-des;s.</para>
 <warning id="rawsock-not-streams"><title>Do &not-e; use &make-stream;!</title>
  <simpara>You can turn such a raw socket into a usual lisp &stream-t;
   using &make-stream;, but you should be <emphasis>extremely</emphasis>
-  careful with such dubious actions!  See the &clisp-devel;
+  careful with such dubious actions!
+  See the <ulink url="ml">clisp-devel</ulink>
   <ulink url="http://sourceforge.net/mailarchive/message.php?msg_id=7203955"
          >mailing list archives</ulink> for more details.
-  Note that &make-stream; will duplicate the &file-des;
-  (using <function role="unix">dup</function>),
+  Note that &make-stream; will duplicate the &file-des; (using &dup;),
   so you <emphasis>still</emphasis> have to &close; the original raw socket.
 </simpara></warning>
+
+<para>Test file <filename role="clisp-cvs">modules/rawsock/test.tst</filename>
+ and the demos in <filename role="clisp-cvs">modules/rawsock/demos/</filename>
+ contain plenty of examples.</para>
 </section>
 
 <section id="rawsock-func"><title>Single System Call Functions</title>
@@ -68,10 +72,8 @@ Sockets are represented by their &fixnum-t; &file-des;s.</para>
     &sock-r; &buf-r; &addr-r; &key-amp; start end oob eor)</code></member>
   <member><code>(<function role="unix">sockatmark</function>
     &sock-r;)</code></member>
-  <member><code>(<function role="unix">socket</function>
-    <replaceable>domain</replaceable> &type-r; &proto-r;)</code></member>
-  <member><code>(<function role="unix">socketpair</function>
-    <replaceable>domain</replaceable> &type-r; &proto-r;)</code></member>
+  <member><code>(&socket; &dom-r; &type-r; &proto-r;)</code></member>
+  <member><code>(&socketpair; &dom-r; &type-r; &proto-r;)</code></member>
  </simplelist>using same-named lisp functions in package
  <quote role="package">RAWSOCK</quote>.
  Additionally,<simplelist columns="1">
@@ -81,6 +83,9 @@ Sockets are represented by their &fixnum-t; &file-des;s.</para>
     &optional-amp; (<replaceable>backlog</replaceable> SOMAXCONN))</code>
    calls <function role="unix">listen</function>.</member>
 </simplelist></para>
+<note><para>When the OS does not provide &socketpair;, it is emulated
+  using &socket; + <function role="unix">connect</function> +
+  <function role="unix">accept</function>.</para></note>
 </section>
 
 <section id="rawsock-args"><title>Common arguments</title>
@@ -94,11 +99,10 @@ Sockets are represented by their &fixnum-t; &file-des;s.</para>
    to, you can use &end-k; argument for that.
 </simpara></listitem></varlistentry>
 <varlistentry><term><type>int</type> &sock-r;</term>
- <listitem><simpara>An &integer-t; (returned by
-   <function role="unix">socketpair</function> or
-   <function role="unix">socket</function>).</simpara></listitem></varlistentry>
-<varlistentry><term><type>int</type> <replaceable>family</replaceable></term>
- <term><type>int</type> <replaceable>domain</replaceable></term>
+ <listitem><simpara>An &integer-t; (returned by &socketpair; or
+   &socket;).</simpara></listitem></varlistentry>
+<varlistentry><term><type>int</type> &family-r;</term>
+ <term><type>int</type> &dom-r;</term>
  <listitem><simpara>A &nil; (stands for <constant>AF_UNSPEC</constant>),
    &integer-t;, or a platform-specific keyword, e.g.,
    <constant>:INET</constant> stands for <constant>AF_INET</constant>.
@@ -185,32 +189,35 @@ Sockets are represented by their &fixnum-t; &file-des;s.</para>
 
 </section>
 
+<section id="rawsock-errors"><title>Errors</title>
+<para>Errors in <function role="unix">getaddrinfo</function>
+ and <function role="unix">getnameinfo</function> are &signal;ed
+ as &condition-t;s of type <type>RAWSOCK:EAI</type>
+ using <function role="unix">gai_strerror</function>.</para>
+<para>Errors in other functions are reported as the usual OS errors
+ (using &strerror;).</para></section>
+
 <section id="rawsock-high-level"><title>High-Level Functions</title>
 <variablelist id="rawsock-high-level-list"><title>Functions that do not
   correspond to a single system call</title>
-<varlistentry><term><code>(<function>RAWSOCK:SOCK-READ</function>
+<varlistentry id="sock-read"><term><code>(<function>RAWSOCK:SOCK-READ</function>
    &sock-r; &buf-r; &key-amp; start end)</code></term>
  <term><code>(<function>RAWSOCK:SOCK-WRITE</function>
    &sock-r; &buf-r; &key-amp; start end)</code></term>
-<listitem><simpara>Call one of
- <function role="unix">read</function>/<function role="unix">readv</function> or
- <function role="unix">write</function>/<function role="unix">writev</function>
-   (depending on whether &buf-r; is a &ubyte-vec; or
-   a <literal role="type">(&vector-t; &ubyte-vec;)</literal>).
- Return the number of bytes read or written.</simpara>
+<listitem><simpara>Call one of &read-U;/<function role="unix">readv</function>
+  or &write-U;/<function role="unix">writev</function>
+  (depending on whether &buf-r; is a &ubyte-vec; or
+  a <literal role="type">(&vector-t; &ubyte-vec;)</literal>).
+  Return the number of bytes read or written.</simpara>
  <simpara>When <function role="unix">readv</function> and
   <function role="unix">writev</function> and not available, they are
-  emulated by repeated calls to <function role="unix">read</function>
-  and <function role="unix">write</function>.</simpara>
+  emulated by repeated calls to &read-U; and &write-U;.</simpara>
  <simpara>On &win32; we have to use <function role="unix">recv</function>
-  instead of <function role="unix">read</function>
-  and <function role="unix">send</function> instead of
-  <function role="unix">write</function> because &win32;
-  <function role="unix">read</function> and
-  <function role="unix">write</function> do not work on sockets, only
-  on regular files.</simpara></listitem></varlistentry>
-<varlistentry><term><code>(RAWSOCK:PROTOCOL &optional-amp;
-   &proto-r;)</code></term>
+  instead of &read-U; and <function role="unix">send</function> instead of
+  &write-U; because &win32; &read-U; and &write-U; do not work on sockets,
+  only on regular files.</simpara></listitem></varlistentry>
+<varlistentry id="rawsock-protocol"><term><code>(RAWSOCK:PROTOCOL
+   &optional-amp; &proto-r;)</code></term>
  <listitem><simpara>Call <function role="unix">getprotobyname</function>
    when &proto-r; is a &string-t;,
    or call <function role="unix">getprotobynumber</function> when
@@ -221,31 +228,49 @@ Sockets are represented by their &fixnum-t; &file-des;s.</para>
    <function role="unix">getprotoent</function>, and
    <function role="unix">endprotoent</function>.
 </simpara></listitem></varlistentry>
-<varlistentry><term><code>(RAWSOCK:NETWORK &optional-amp;
-   <replaceable>network</replaceable> &type-r;)</code></term>
+<varlistentry id="rawsock-network"><term><code>(RAWSOCK:NETWORK
+   &optional-amp; &net-r; &type-r;)</code></term>
  <listitem><simpara>Call <function role="unix">getnetbyname</function>
-   when <replaceable>network</replaceable> is a &string-t;,
-   or call <function role="unix">getnetbynumber</function> when
-   <replaceable>network</replaceable> is an &integer-t;.
+   when &net-r; is a &string-t;,
+   or call <function role="unix">getnetbyaddr</function> when
+   &net-r; is an &integer-t;.
    Return a <type>RAWSOCK:NETWORK</type> structure object.
-   When <replaceable>network</replaceable> is &nil;, return a &list-t;
-   of all known networks using <function role="unix">setnetent</function>,
+   When &net-r; is &nil;, return a &list-t; of all known networks
+   using <function role="unix">setnetent</function>,
    <function role="unix">getnetent</function>, and
    <function role="unix">endnetent</function>.
 </simpara></listitem></varlistentry>
-<varlistentry><term><code>(RAWSOCK:SOCKET-OPTION &sock-r; &name-r;
-   &key-amp; :LEVEL)</code></term>
+<varlistentry id="rawsock-if-name-index"><term><code>(RAWSOCK:IF-NAME-INDEX
+   &optional-amp; &what-r;)</code></term>
+ <listitem><simpara>Call <function role="unix">if_nametoindex</function>
+   when &what-r; is a &string-t; and return an &integer-t;;
+   or call <function role="unix">if_indextoname</function> when
+   &what-r; is an &integer-t; and return a &string-t;.
+   When &what-r; is &nil;, return an &alist; of
+   pairs <literal role="data">(&index-r; . &name-r;)</literal>
+   using <function role="unix">if_nameindex</function>.
+</simpara></listitem></varlistentry>
+<varlistentry id="rawsock-ifaddrs"><term><code>(RAWSOCK:IFADDRS
+   &key-amp; :FLAGS-OR :FLAGS-AND)</code></term>
+ <listitem><simpara>Call <function role="bsd">getifaddrs</function>
+   and return a &list-t; of <type>ifaddrs</type> objects, optionally
+   filtered using flags, e.g., <code>(ifaddrs :flags-or '(a b)
+    :flags-and '(c d))</code> will return a list of objects which have
+   flags <literal>c</literal> &and-e; <literal>d</literal> &and-e; at
+   least one of <literal>a</literal> &or-e; <literal>b</literal> set.
+</simpara></listitem></varlistentry>
+<varlistentry id="rawsock-sockopt"><term><code>(RAWSOCK:SOCKET-OPTION
+   &sock-r; &name-r; &key-amp; :LEVEL)</code></term>
  <term><code>(&setf; (RAWSOCK:SOCKET-OPTION &sock-r; &name-r;
    &key-amp; :LEVEL) &value-r;)</code></term>
  <listitem><simpara>Call <function role="unix">getsockopt</function>
-   and <function role="unix">setsockopt</function>, returns and sets
-   individual (for specific option &name-r; and
-   <replaceable>level</replaceable>) and multiple (when &name-r; is
-   &nil; and/or <replaceable>level</replaceable> is &all-k;) options.
+   and &setsockopt;, returns and sets individual (for specific option
+   &name-r; and <replaceable>level</replaceable>) and multiple (when &name-r;
+   is &nil; and/or <replaceable>level</replaceable> is &all-k;) options.
    (See also &so-opt;.)</simpara></listitem></varlistentry>
-<varlistentry><term><code>(RAWSOCK:CONVERT-ADDRESS
-   <replaceable>family</replaceable> &addr-r;)</code></term>
- <listitem><para>Convert between &string-t; and &integer-t; IP
+<varlistentry id="rawsock-convert-address"><term><code>(&convert-address;
+   &family-r; &addr-r;)</code></term>
+ <listitem><para>Convert between &string-t; and &integer-t; &ip;
    &addr-r; representations using<simplelist columns="2">
     <member><function role="unix">inet_addr</function></member>
     <member><function role="unix">inet_ntoa</function></member>
@@ -253,14 +278,14 @@ Sockets are represented by their &fixnum-t; &file-des;s.</para>
     <member><function role="unix">inet_pton</function></member>
 </simplelist></para></listitem></varlistentry>
 <varlistentry id="make-sockaddr"><term><code>(RAWSOCK:MAKE-SOCKADDR
-   <replaceable>family</replaceable> &optional-amp; &data-r;)</code></term>
+   &family-r; &optional-amp; &data-r;)</code></term>
  <listitem><simpara>Create a <type>sockaddr</type> object.
    &data-r; should be a sequence of &ubyte-8; or an &integer-t;
    (meaning <code>(&make-list; &data-r; :initial-element 0)</code>).
    When omitted, the standard platform-specific size is used.
 </simpara></listitem></varlistentry>
 <varlistentry><term><code>(RAWSOCK:SOCKADDR-FAMILY &addr-r;)</code></term>
- <listitem><simpara>Return the numeric family of the
+ <listitem><simpara>Return the symbolic &family-r; of the
    <type>sockaddr</type> object.</simpara></listitem></varlistentry>
 <varlistentry><term><code>(RAWSOCK:SOCKADDR-DATA &addr-r;)</code></term>
  <listitem><simpara>Return a &fresh; &vector-t; displaced to the
@@ -268,9 +293,18 @@ Sockets are represented by their &fixnum-t; &file-des;s.</para>
    &c-lang; <type>struct sockaddr</type> object.</simpara>
   <warning><simpara>Modifying this &vector-t;'s content will modify the
     &addr-r; argument data!</simpara></warning></listitem></varlistentry>
-<varlistentry><term><code>(RAWSOCK:OPEN-UNIX-SOCKET
-   &path-r; &optional-amp; &type-r;)</code></term>
+<varlistentry id="rawsock-unix-socket"><term><code>(RAWSOCK:OPEN-UNIX-SOCKET
+   &path-r; &optional-amp; (&type-r; &stream-k;))</code></term>
  <listitem><simpara>Open a &unix; socket special file.
+   Returns two values: &sock-r; and &addr-r;.
+</simpara></listitem></varlistentry>
+<varlistentry><term><code>(RAWSOCK:OPEN-UNIX-SOCKET-STREAM &path-r;
+   &rest-amp; &options-r; &key-amp; (&type-r; &stream-k;)
+   &allow-other-keys-amp;)</code></term>
+ <listitem><simpara>Open a &unix; socket special file.
+   Returns two values: &stream-r; and &addr-r;.  &type-r; is passed
+   to <function>RAWSOCK:OPEN-UNIX-SOCKET</function>, other &options-r;
+   to &make-stream; (but see <xref linkend="rawsock-not-streams"/>).
 </simpara></listitem></varlistentry>
 <varlistentry>
  <term><code>(RAWSOCK:IPCSUM &buf-r; &key-amp; start end)</code>
@@ -283,14 +317,21 @@ Sockets are represented by their &fixnum-t; &file-des;s.</para>
   - &udp;</term>
  <listitem><simpara>Compute the appropriate protocol checksum and record
    it in the appropriate location.  &buf-r; is assumed to be a suitable
-   packet for the protocol, with the appropriate header etc.
-   The typical packet you send is both &ip; and &tcp; and thus has two
-   checksums, so you would want to call <emphasis>two</emphasis> functions.
-</simpara></listitem></varlistentry>
-<varlistentry><term><code>(RAWSOCK:CONFIGDEV &sock-r; &name-r; &addr-r;
-   &key-amp; <replaceable>promisc</replaceable>
+   ethernet frame for the protocol, with the appropriate header etc.</simpara>
+  <simpara>Note that &buf-r; is an <emphasis>ethernet frame</emphasis>,
+   starting with 6 bytes of the destination MAC address, 6 bytes of the
+   source MAC address, and 2 bytes specifying the next level protocol,
+   (e.g., <literal>#x0800</literal> for &ip; and <literal>#x0806</literal>
+   for &arp;), i.e., the first 14 bytes of &buf-r; are ignored by these
+   functions.</simpara>
+  <simpara>A typical packet you send is both &ip; and &tcp; and thus
+   has two checksums, so you would want to call <emphasis>two</emphasis>
+   functions.</simpara></listitem></varlistentry>
+<varlistentry><term><code>(RAWSOCK:CONFIGDEV &sock-r;
+   <replaceable>ifname</replaceable> &addr-r; &key-amp;
+   <replaceable>promisc</replaceable>
    <replaceable>noarp</replaceable>)</code></term>
- <listitem><simpara>Set some socket options and IP &addr-r;
+ <listitem><simpara>Set some socket options and &ip; &addr-r;
    with <function role="unix">ioctl</function>.
 </simpara></listitem></varlistentry>
 </variablelist>

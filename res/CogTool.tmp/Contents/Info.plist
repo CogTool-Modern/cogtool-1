@@ -22,20 +22,6 @@
 	<string>CgTl</string>
 	<key>CFBundleVersion</key>
 	<string>VERSTRING</string>
-	<key>Java</key>
-	<dict>
-		<key>ClassPath</key>
-		<string>$JAVAROOT/DISTJARSTR:$JAVAROOT/CogTool.jar</string>
-		<key>JVMVersion</key>
-		<string>1.5*</string>
-		<key>MainClass</key>
-		<string>edu.cmu.cs.hcii.cogtool.CogTool</string>
-		<key>VMOptions</key>
-		<!-- WARNING: this is currently ignored; the JVM options really used are in cogtoolstart -->
-		<string>-d32 -Djava.library.path=$JAVAROOT/dll -Dcogtool.version=VERSION -Dcogtool.revision=REVISION -Dcogtool.build=BUILDTIME -Dorg.eclipse.swt.internal.carbon.noFocusRing -Dorg.eclipse.swt.internal.carbon.smallFonts -XstartOnFirstThread -Xmx400000000</string>
-		<key>WorkingDirectory</key>
-		<string>$APP_PACKAGE/Contents/Resources/</string>
-	</dict>
 	<key>LSEnvironment</key>
 	<dict>
 		<key>BLDREV</key>
@@ -47,7 +33,5 @@
 	</dict>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.3</string>
-	<key>LSRequiresCarbon</key>
-	<string>1</string>
 </dict>
 </plist>

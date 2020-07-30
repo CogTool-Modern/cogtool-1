@@ -1,7 +1,7 @@
 /*
  * Information about the build environment
- * Bruno Haible 2004-2005
- * Sam Steingold 2004-2006
+ * Bruno Haible 2004-2008
+ * Sam Steingold 2004-2009
  */
 
 #include "lispbibl.c"
@@ -10,6 +10,10 @@
 
 #if defined(GNU_READLINE)
 #include <readline/readline.h>
+#endif
+
+#if defined(DYNAMIC_FFI)
+#include <avcall.h>
 #endif
 
 /* Returns a multiline string containing some info about the flags with which
@@ -36,7 +40,15 @@ global object built_flags (void) {
    #endif
   #endif
   #ifdef WIDE
+   #if defined(WIDE_HARD)
+    " WIDE_HARD"
+   #elif defined(WIDE_SOFT)
+    " WIDE_SOFT"
+   #elif defined(WIDE_AUXI)
+    " WIDE_AUXI"
+   #else
     " WIDE"
+   #endif
   #endif
   #ifdef GENERATIONAL_GC
     " GENERATIONAL_GC"
@@ -53,15 +65,6 @@ global object built_flags (void) {
   #ifdef SPVW_PURE
     " SPVW_PURE"
   #endif
-  #ifdef MULTIMAP_MEMORY
-    " MULTIMAP_MEMORY"
-   #ifdef MULTIMAP_MEMORY_VIA_SHM
-    " MULTIMAP_MEMORY_VIA_SHM"
-   #endif
-   #ifdef MULTIMAP_MEMORY_VIA_FILE
-    " MULTIMAP_MEMORY_VIA_FILE"
-   #endif
-   #endif
   #ifdef SINGLEMAP_MEMORY
     " SINGLEMAP_MEMORY"
   #endif
@@ -88,6 +91,12 @@ global object built_flags (void) {
   sprintf(libreadline_ver, "\nlibreadline %d.%d",
           RL_VERSION_MAJOR,RL_VERSION_MINOR);
   pushSTACK(ascii_to_string(libreadline_ver)); count++;
+ #endif
+ #ifdef LIBFFCALL_VERSION
+  var char libffcall_ver[BUFSIZ];
+  sprintf(libffcall_ver, "\nlibffcall %d.%d",
+          LIBFFCALL_VERSION >> 8, LIBFFCALL_VERSION & 0xff);
+  pushSTACK(ascii_to_string(libffcall_ver)); count++;
  #endif
   return count == 1 ? (object)popSTACK() : string_concat(count);
 }

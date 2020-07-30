@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2003 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -11,13 +11,6 @@ dnl From Bruno Haible, Marcus Daniels, Sam Steingold.
 AC_PREREQ(2.57)
 
 AC_DEFUN([CL_GETHOSTBYNAME],
-[AC_REQUIRE([CL_NETDB])dnl
-if test $ac_cv_header_netdb_h = yes; then
-  have_netdb=1
-else
-  AC_CHECK_HEADER(sun/netdb.h, have_netdb=1)
-fi
-if test -n "$have_netdb"; then
-AC_DEFINE(HAVE_GETHOSTBYNAME,,[have gethostbyname()])
-fi
-])
+[AC_CHECK_HEADERS(netdb.h,
+[AC_DEFINE(HAVE_GETHOSTBYNAME,,[have gethostbyname()])dnl
+break])])

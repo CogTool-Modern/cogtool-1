@@ -1,6 +1,6 @@
                                                Hey Emacs! -*- coding: utf-8 -*-
 
-       Copyright (c) 1992-2006 Bruno Haible, Michael Stoll, Sam Steingold
+       Copyright (c) 1992-2010 Bruno Haible, Michael Stoll, Sam Steingold
                            All Rights Reserved
 
 
@@ -22,7 +22,7 @@ Summary:
 
 Note:
 
-  This copyright does *not* cover user programs that run in CLISP and
+  This copyright does NOT cover user programs that run in CLISP and
   third-party packages not part of CLISP, if
     a) They only reference external symbols in CLISP's public packages
        that define API also provided by many other Common Lisp implementations
@@ -66,12 +66,14 @@ Authors:
   DOS version:   Bruno Haible, Bernhard Degel, Jürgen Weber
   OS/2 version:  Bruno Haible
   Unix version:  Bruno Haible
+  Multithreading: Vladimir Tzankov
 
-Maintenance:     Bruno Haible, Michael Stoll 1992-1993
-                 Bruno Haible, Marcus Daniels 1994-1997
-                 Bruno Haible, Pierpaolo Bernardi, Sam Steingold 1998
-                 Bruno Haible, Sam Steingold 1999-2001
-                 Sam Steingold 2002-2006
+Maintenance:
+  Bruno Haible, Michael Stoll 1992-1993
+  Bruno Haible, Marcus Daniels 1994-1997
+  Bruno Haible, Pierpaolo Bernardi, Sam Steingold 1998
+  Bruno Haible, Sam Steingold 1999-2001
+  Sam Steingold 2002-2010
 
 Email addresses (September 1992 or newer):
   Bruno Haible       bruno@clisp.org

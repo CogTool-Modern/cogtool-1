@@ -1,11 +1,7 @@
-file_list=''
-mod_list=''
-if test -f linux.c; then
-  file_list="$file_list"' linux.o'
-  mod_list="$mod_list"' linux'
-fi
-make clisp-module CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}" INCLUDES="$absolute_linkkitdir"
-NEW_FILES="$file_list"
-NEW_LIBS="$file_list -lm"
-NEW_MODULES="$mod_list"
+${MAKE-make} clisp-module \
+  CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}" \
+  CLISP_LINKKIT="$absolute_linkkitdir" CLISP="${CLISP}"
+NEW_FILES="linux.o"
+NEW_LIBS="${NEW_FILES} -lm"
+NEW_MODULES="linux"
 TO_LOAD='linux wrap'

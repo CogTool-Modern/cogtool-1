@@ -1,6 +1,6 @@
 ;;; Inspect
 ;;;
-;;; Copyright (C) 2000-2005 by Sam Steingold
+;;; Copyright (C) 2000-2008 by Sam Steingold
 ;;; This is Free Software, covered by the GNU GPL (v2)
 ;;; See http://www.gnu.org/copyleft/gpl.html
 ;;;
@@ -406,6 +406,12 @@ Supplies some HTTP/1.0 headers and calls `with-html-output'."
               (get-insp (insp-up insp) (1- (insp-pos insp)))))
         (:r (when (insp-pos insp)
               (get-insp (insp-up insp) (1+ (insp-pos insp)))))
+        (:w (setq *inspect-length* (* *inspect-length* 2))
+            (inspect-backend (insp-self insp) :up (insp-up insp)
+                             :pos (insp-pos insp) :id (insp-id insp)))
+        (:n (setq *inspect-length* (round *inspect-length* 2))
+            (inspect-backend (insp-self insp) :up (insp-up insp)
+                             :pos (insp-pos insp) :id (insp-id insp)))
         (t (when (and (integerp com) (< -1 com (insp-num-slots insp)))
              (inspect-backend (funcall (insp-nth-slot insp) com)
                               :up insp :pos com)))))))
@@ -455,7 +461,11 @@ Supplies some HTTP/1.0 headers and calls `with-html-output'."
   (when (insp-nth-slot insp)
     (loop :for ii :from 0 :to (insp-num-slots-print insp)
           :do (multiple-value-bind (val name) (funcall (insp-nth-slot insp) ii)
-                (format out "~d~@[ [~a]~]:  ~s~%" ii name val)))))
+                (format out "~d~@[ [~a]~]:  ~s~%" ii name val)))
+    (let ((last (insp-last-slot insp)))
+      (when (< *inspect-length* last)
+        (format out "~:D more slot~:P available (use :e to increase ~S)"
+                (- last *inspect-length*) '*inspect-length*)))))
 
 (clos:defmethod inspect-frontend ((insp inspection) (frontend (eql :tty)))
   (print-inspection insp *terminal-io* frontend)
@@ -469,13 +479,16 @@ Supplies some HTTP/1.0 headers and calls `with-html-output'."
       ((:h :?) (format t " *** commands:~% :h, :?~15t this help
  :p, :a~15t Print the current item Again
  :s~15t re-inspect this item (Self)
- :d~15t Describe the current item~%")
+ :d~15t Describe the current item
+ :w~15t Widen: double ~S and re-inspect
+ :n~15t Narrow: halve ~S and re-inspect
+" '*inspect-length* '*inspect-length*)
        (when (insp-up insp)
          (format t " :u~15t return UP to the parent~%"))
        (when (insp-left-p insp)
-         (format t " :l~15t inspect the left neighbor~%"))
+         (format t " :l~15t inspect the Left neighbor~%"))
        (when (insp-right-p insp)
-        (format t " :r~15t inspect the right neighbor~%"))
+        (format t " :r~15t inspect the Right neighbor~%"))
        (when (insp-nth-slot insp)
          (format t " number~15t inspect this slot~%"))
        (format t " :e lisp-form~15t eval this form, with these substitutions:
@@ -524,7 +537,12 @@ Supplies some HTTP/1.0 headers and calls `with-html-output'."
                       (with-tag (:li)
                         (with-tag (:a :href (href ii))
                           (princ (or name "inspect") out))
-                        (with-tag (:pre) (write val :stream out)))))))
+                        (with-tag (:pre) (write val :stream out))))))
+        (let ((last (insp-last-slot insp)))
+          (when (< *inspect-length* last)
+            (with-tag (:p)
+              (format out "~:D more slot~:P available"
+                      (- last *inspect-length*))))))
       (with-tag (:hr))
       (with-tag (:h2) (princ "describe:" out))
       (with-tag (:pre) (describe (insp-self insp) out))
@@ -542,6 +560,11 @@ Supplies some HTTP/1.0 headers and calls `with-html-output'."
           (when (insp-up insp)
             (with-tag (:td :align "center")
               (with-tag (:a :href (href :u)) (princ "parent" out))))
+          (with-tag (:td :align "center")
+            (format out "~S: " '*inspect-length*)
+            (with-tag (:a :href (href :w)) (princ "double" out))
+            (princ " " out)
+            (with-tag (:a :href (href :n)) (princ "halve" out)))
           (with-tag (:td :align "right")
             (with-tag (:a :href (href :s)) (princ "self" out))))))))
 
@@ -648,6 +671,7 @@ Supplies some HTTP/1.0 headers and calls `with-html-output'."
                 ((:browser *inspect-browser*) *inspect-browser*))
   (let* ((*print-array* nil) (*print-pretty* t)
          (*print-circle* t) (*print-escape* t)
+         (*inspect-length* *inspect-length*)
          (*print-lines* *inspect-print-lines*)
          (*print-level* *inspect-print-level*)
          (*print-length* *inspect-print-length*)

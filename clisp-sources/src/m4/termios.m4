@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2003 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -9,57 +9,6 @@ dnl the same distribution terms as the rest of that program.
 dnl From Bruno Haible, Marcus Daniels, Sam Steingold.
 
 AC_PREREQ(2.57)
-
-AC_DEFUN([RL_TERM],
-[AC_CHECK_HEADERS(termios.h termio.h sys/termio.h sgtty.h)dnl
-if test $ac_cv_header_termios_h = yes; then
-  dnl HAVE_TERMIOS_H defined
-  AC_CHECK_FUNCS(tcgetattr tcflow)dnl
-fi
-AC_CHECK_HEADERS(sys/stream.h sys/ptem.h)dnl
-ioctl_decl='
-#include <stdlib.h>
-#ifdef HAVE_UNISTD_H
-#include <sys/types.h>
-#include <unistd.h>
-#endif
-#if defined(HAVE_TERMIOS_H) && defined(HAVE_TCGETATTR) && defined(HAVE_TCFLOW)
-#include <termios.h>
-#else
-#if defined(HAVE_TERMIO_H) || defined(HAVE_SYS_TERMIO_H)
-#ifdef HAVE_SYS_TERMIO_H
-#include <sys/termio.h>
-#else
-#include <termio.h>
-#endif
-#else
-#include <sgtty.h>
-#include <sys/ioctl.h>
-#endif
-#endif
-#ifdef HAVE_SYS_STREAM_H
-#include <sys/stream.h>
-#endif
-#ifdef HAVE_SYS_PTEM_H
-#include <sys/ptem.h>
-#endif
-'
-ioctl_prog='int x = FIONREAD;'
-CL_COMPILE_CHECK([FIONREAD], cl_cv_decl_FIONREAD_termio_h,
-$ioctl_decl, $ioctl_prog, ioctl_ok=1)dnl
-if test -z "$ioctl_ok"; then
-CL_COMPILE_CHECK([FIONREAD in sys/filio.h], cl_cv_decl_FIONREAD_sys_filio_h,
-$ioctl_decl[#include <sys/filio.h>], $ioctl_prog,
-AC_DEFINE(NEED_SYS_FILIO_H,,[need <sys/filio.h> for using ioctl FIONREAD])
-ioctl_ok=1)dnl
-fi
-if test -z "$ioctl_ok"; then
-CL_COMPILE_CHECK([FIONREAD in sys/ioctl.h], cl_cv_decl_FIONREAD_sys_ioctl_h,
-$ioctl_decl[#include <sys/ioctl.h>], $ioctl_prog,
-AC_DEFINE(NEED_SYS_IOCTL_H,,[need <sys/ioctl.h> for using ioctl FIONREAD])
-ioctl_ok=1)dnl
-fi
-])
 
 AC_DEFUN([CL_TERM],
 [AC_BEFORE([$0], [CL_IOCTL])

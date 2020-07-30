@@ -1,4 +1,4 @@
-What is this? 
+What is this?
 =============
 
 Hadn't we CLX for CLISP for centuries? Yes, but this is a re-implementation
@@ -17,7 +17,7 @@ distribution. [Maybe there will appear also an a.out version.]
 
 Benefits vs. CLX coded in Lisp
 ==============================
- 
+
 - it is faster
 
   This mainly to two reasons. The CLISP compiler is not very good, when it
@@ -32,7 +32,7 @@ Benefits vs. CLX coded in Lisp
   just too slow and I had declared all the types in the numeric portions of
   the code proper. [all the usual matrix and vector stuff.] Sometime I will
   have to justify that with some benchmarks.
- 
+
 - it is virtually smaller
 
   Currently I was able to blow up code size to somewhat near 120k, but it is
@@ -72,110 +72,58 @@ Drawbacks
   complete. Let me repeat this: Send me bug reports!
 
 Functions which are incomplete:
-  PUT-IMAGE 
+  PUT-IMAGE
     works only for images of depth 1.
-  DRAW-IMAGE-GLYPHS and DRAW-GLYPHS 
+  DRAW-IMAGE-GLYPHS and DRAW-GLYPHS
     do not work with the :translate argument
-  GCONTEXT-FONT and (SETF GCONTEXT-FONT) 
+  GCONTEXT-FONT and (SETF GCONTEXT-FONT)
     do not have the pseudo-font-p argument
-  TEXT-EXTENTS 
+  TEXT-EXTENTS
     with arguments not of type string
-  TEXT-WIDTH 
+  TEXT-WIDTH
     with arguments not of type string
   DEFAULT-ERROR-HANDLER
     currently there is no condition hierarchy, so default-error-handler uses the
     traditional cerror to report the error.
 
   - Many functions lack proper reporting of errors. [They just abort()]
-  
+
 Functions which are not defined at all:
   - DRAW-IMAGE-GLYPH
   - DRAW-GLYPH
   - GET-IMAGE
-  - DISPLAY-RESOURCE-ID-BASE
-  - DISPLAY-RESOURCE-ID-MASK 
-  - DISPLAY-XID
   - DISPLAY-TRACE
-  - QUEUE-EVENT
-  - CHANGE-KEYBOARD-CONTROL (anybody needs this anyway?)
-  - SET-MODIFIER-MAPPING 
-  - CHANGE-KEYBOARD-MAPPING
-  - KEYBOARD-MAPPING
-  - KEYSYM->KEYCODES
-  - ACCESS-HOSTS
-  - ADD-ACCESS-HOST
-  - REMOVE-ACCESS-HOST
-  - DEFAULT-KEYSYM-INDEX
-  - KEYSYM->CHARACTER (too weird)
-
-There is a useful preprocessor e2d, which should make writing modules
-easier, but it should be documented, it should be totally reimplemented
-from scratch and it should be distributed separately.
 
 
 Installation
 ============
 
-Read the INSTALL file. (as usual)
+To install the NEW-CLX module, do the following:
 
+$ ./configure --with-module=clx/new-clx --cbc build-X
 
-Availability
-============
+If your X libraries and includes are in a weird place,
+pass --x-includes=... and/or --x-libraries=... to configure above.
 
-This CLX lives in:
+If you have built clisp already,
 
-ftp://clisp.cons.org/pub/lisp/clisp/packages/nclx-1997-06-12.tar.gz
+$ cd build-dir && make MODULES=clx/new-clx MODULE_CONFIGURE_FLAGS='--x-includes=... --x-libraries=...'
 
-There may be additional binary distributions. I'll call them
-  nclx-<date1>+clisp-<date2>.<platform>.bin.tar.gz
-
-I chose the 'n' in front of clx, because there live versions of MIT-CLX
-in the same directory. As you probably noticed I refuse to give this CLX
-another name. My understanding of the term CLX is that it refers to some
-semi-standard, so calling it different is not an option. But you may
-call it NCLX; Calling it GCLX [first letter, first letter of my name] would
-be most likely confused with GCL, so NCLX is the obvious way.
+If the configure script detects xshape and xpm extensions, it enables them.
+To avoid that, edit clx/new-clx/Makefile in your build directory
+and replace -DWANT_XPM=1 and/or -DWANT_XSHAPE=1 with "...=0",
+and then run "make full" again.
 
 
 Demos
 =====
 
-There are two little demos in this package. Qix and sokoban. They both live
-in the demos subdirectory. To run them simple move into demos/ directory and
-lauch CLISP. Example 
+There is a dozen little demos in the demos subdirectory.
+Run clisp as
 
-[using source dist after successful built]
+$ clisp -K full -i clx/new-clx/demos/clx-demos -p CLX-DEMOS
 
-% cd .../clisp-1996-07-22/src/clx-1996-10-11/demos
-% ../../base+clx/lisp.run -M ../../base+clx/lispinit.mem -q -i sokoban -i qix
-
-[.. or using the binary distribution:]
-
-% cd demos
-% ../lisp.run -M ../lispinit.mem -q -i sokoban -i qix
-
-[then it barks something like this:]
-
-;; Loading file /usr/gilbert/lisp/clisp-1996-07-22/src/clx-1996-10-11/demos/sokoban.lisp ...
- Call (sokoban:sokoban).
-;; Loading of file /usr/gilbert/lisp/clisp-1996-07-22/src/clx-1996-10-11/demos/sokoban.lisp is finished.
-;; Loading file /usr/gilbert/lisp/clisp-1996-07-22/src/clx-1996-10-11/demos/qix.lisp ...
- CLX-DEMOS:QIX :host :width :height :delay
-   The famous swirling vectors.
-;; Loading of file /usr/gilbert/lisp/clisp-1996-07-22/src/clx-1996-10-11/demos/qix.lisp is finished.
-> 
-
-Now you may try
-
-(clx-demos:qix) or (clx-demos:qix :delay 0).
-
-Or you just want to play a couple of rounds of sokoban:
-
-(sokoban:sokoban)
-
-[Sokoban works only with Xpm and XSHAPE extension.]
-
-You probably want to compile the files before trying.
+and follow the instructions.
 
 
 Glossary
@@ -191,16 +139,16 @@ CLX
    in Lisp. It is also a good source for comparing the foreign function calls
    in various Lisps. Does *not* depend on CLOS.  Available free as part of the
    X release in the contrib directory.  Also available by anonymous ftp from
-   ftp.x.org:/R5contrib/ as the files CLX.Manual.tar.Z and CLX.R5.02.tar.Z. 
+   ftp.x.org:/R5contrib/ as the files CLX.Manual.tar.Z and CLX.R5.02.tar.Z.
    [Note: The new version of CLX for X11R6 can be found (untarred) in
-      ftp://ftp.x.org/pub/R6.1/contrib/lib/CLX/ 
+      ftp://ftp.x.org/pub/R6.1/contrib/lib/CLX/
    with documentation in
-      ftp://ftp.x.org/pub/R6.1/contrib/doc/CLX/ 
+      ftp://ftp.x.org/pub/R6.1/contrib/doc/CLX/
    and includes some slight modifications for CLtL2 compatibility. You
    can get it in tarred form from the CMU AI Repository, Lisp section.]
    Primary Interface Author: Robert W. Scheifler <rws@zermatt.lcs.mit.edu>
-   Send bug reports to bug-clx@expo.lcs.mit.edu. 
-   The 232 page manual is available in /pub/R5untarred/mit/hardcopy/CLX 
+   Send bug reports to bug-clx@expo.lcs.mit.edu.
+   The 232 page manual is available in /pub/R5untarred/mit/hardcopy/CLX
    (PostScript format) and /pub/R5untarred/mit/doc/CLX (Interleaf source).
 
 CLUE
@@ -221,7 +169,7 @@ Garnet
    so it is available to all foreign sites and for commercial uses.
    Detailed instructions for obtaining it by anonymous ftp are available
    by anonymous ftp as
-      a.gp.cs.cmu.edu:/usr/garnet/garnet/README [128.2.242.7] 
+      a.gp.cs.cmu.edu:/usr/garnet/garnet/README [128.2.242.7]
    Garnet includes the Lapidiary interactive design tool, C32 constraint
    editor, spreadsheet object, Gilt Interface Builder, automatic display
    management, two widget sets (Motif look-and-feel and Garnet
@@ -247,15 +195,16 @@ Garnet
 A word on copyright
 ===================
 
-I am affraid that some of the files lack a proper copyright statement. So I
-state it here again: 
+I am affraid that some of the files lack a proper copyright statement.
+So I state it here again:
 
-All files in this distribution expect image.lisp are copyrighted
+All files in this distribution except image.lisp and resource.lisp
+are copyrighted
 
  "Copyright (c) 1996 by Gilbert Baumann, distributed under GPL"
  (GPL = The GNU Public Licence).
 
-image.lisp and parts of clx.lisp are copyrighted 
+image.lisp, resource.lisp, and parts of clx.lisp are copyrighted
  "Copyright (C) 1987 Texas Instruments Incorporated."
 
 Hope that is suffient and nobody will hinder me from improving, using,

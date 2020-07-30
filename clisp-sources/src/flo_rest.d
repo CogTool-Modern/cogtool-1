@@ -48,7 +48,7 @@ local maygc void warn_floating_point_contagion (void) {
 }
 
 
-/* generates a Float-operation F_op_F like F_minus_F or F_durch_F */
+/* generates a Float-operation F_op_F like F_minus_F or F_div_F */
 #define GEN_F_op1(op)                                \
     local maygc object CONCAT3(F_,op,_F) (object x)  \
     {                                                \
@@ -73,45 +73,45 @@ local maygc object F_abs_F (object x) {
 }
 
 /* SF_square_SF(x) returns (* x x), with x being a SF. */
-#define SF_square_SF(x)  SF_SF_mal_SF(x,x)
+#define SF_square_SF(x)  SF_SF_mult_SF(x,x)
 
 /* FF_square_FF(x) returns (* x x), with x being a FF.
  can trigger GC */
-#define FF_square_FF(x)  FF_FF_mal_FF(x,x)
+#define FF_square_FF(x)  FF_FF_mult_FF(x,x)
 
 /* DF_square_DF(x) returns (* x x), with x being a DF.
  can trigger GC */
-#define DF_square_DF(x)  DF_DF_mal_DF(x,x)
+#define DF_square_DF(x)  DF_DF_mult_DF(x,x)
 
 /* F_square_F(x) returns (* x x), with x being a Float.
  can trigger GC */
 local maygc object F_square_F (object x);
 GEN_F_op1(square)
 
-/* SF_durch_SF(x) returns (/ x), with x being a SF. */
-#define SF_durch_SF(x)  SF_SF_durch_SF(SF_1,x)
+/* SF_div_SF(x) returns (/ x), with x being a SF. */
+#define SF_div_SF(x)  SF_SF_div_SF(SF_1,x)
 
-/* FF_durch_FF(x) returns (/ x), with x being a FF.
+/* FF_div_FF(x) returns (/ x), with x being a FF.
  can trigger GC */
-#define FF_durch_FF(x)  FF_FF_durch_FF(FF_1,x)
+#define FF_div_FF(x)  FF_FF_div_FF(FF_1,x)
 
-/* DF_durch_DF(x) returns (/ x), with x being a DF.
+/* DF_div_DF(x) returns (/ x), with x being a DF.
  can trigger GC */
-#define DF_durch_DF(x)  DF_DF_durch_DF(DF_1,x)
+#define DF_div_DF(x)  DF_DF_div_DF(DF_1,x)
 
-/* LF_durch_LF(x) returns (/ x), with x being a LF.
+/* LF_div_LF(x) returns (/ x), with x being a LF.
  can trigger GC */
-local maygc object LF_durch_LF (object x)
+local maygc object LF_div_LF (object x)
 {
   pushSTACK(x);
   encode_LF1(Lfloat_length(x), x=);
-  return LF_LF_durch_LF(x,popSTACK());
+  return LF_LF_div_LF(x,popSTACK());
 }
 
-/* F_durch_F(x) returns (/ x), with x being a Float.
+/* F_div_F(x) returns (/ x), with x being a Float.
  can trigger GC */
-local maygc object F_durch_F (object x);
-GEN_F_op1(durch)
+local maygc object F_div_F (object x);
+GEN_F_op1(div)
 
 /* F_sqrt_F(x) returns (sqrt x), with x being a Float >=0.
  can trigger GC */
@@ -347,18 +347,18 @@ local maygc object F_F_minus_F (object x, object y)
             1,0,return)
 }
 
-/* F_F_mal_F(x,y) returns (* x y), with x and y being Floats.
+/* F_F_mult_F(x,y) returns (* x y), with x and y being Floats.
  can trigger GC */
-local maygc object F_F_mal_F (object x, object y)
+local maygc object F_F_mult_F (object x, object y)
 {
-  GEN_F_op2(x,y,SF_SF_mal_SF,FF_FF_mal_FF,DF_DF_mal_DF,LF_LF_mal_LF,1,0,return)
+  GEN_F_op2(x,y,SF_SF_mult_SF,FF_FF_mult_FF,DF_DF_mult_DF,LF_LF_mult_LF,1,0,return)
 }
 
-/* F_F_durch_F(x,y) returns (/ x y), with x and y being Floats.
+/* F_F_div_F(x,y) returns (/ x y), with x and y being Floats.
  can trigger GC */
-local maygc object F_F_durch_F (object x, object y)
+local maygc object F_F_div_F (object x, object y)
 {
-  GEN_F_op2(x,y,SF_SF_durch_SF,FF_FF_durch_FF,DF_DF_durch_DF,LF_LF_durch_LF,
+  GEN_F_op2(x,y,SF_SF_div_SF,FF_FF_div_FF,DF_DF_div_DF,LF_LF_div_LF,
             1,0,return)
 }
 
@@ -722,9 +722,9 @@ GEN_F_round(round)
   local maygc void CONCAT3(F_F_,rounding,_I_F) (object x, object y) {   \
     GCTRIGGER2(x,y);                                                    \
     pushSTACK(y);                                                       \
-    CONCAT3(F_,rounding,_I_F) (F_F_durch_F(x,y)); /* form whole-numbered part of the quotient */ \
+    CONCAT3(F_,rounding,_I_F) (F_F_div_F(x,y)); /* form whole-numbered part of the quotient */ \
     y = STACK_2; STACK_2 = STACK_1;                                     \
-    STACK_1 = F_F_mal_F(y,STACK_0); /* multiply fractional part with y */ \
+    STACK_1 = F_F_mult_F(y,STACK_0); /* multiply fractional part with y */ \
     skipSTACK(1);                                                       \
   }
 
@@ -840,12 +840,12 @@ local uintC lf_len_extend (uintC n)
  #define TEST(i)  FITS(n_max,1UL<<i) || FITS(n,1UL<<i) ? 1UL<<i :
     TEST(0) TEST(1) TEST(2) TEST(3) TEST(4) TEST(5) TEST(6) TEST(7)
     TEST(8) TEST(9) TEST(10) TEST(11) TEST(12) TEST(13)
-    (fehler_LF_toolong(),0);
+    (error_LF_toolong(),0);
  #undef TEST
  #undef n_max
  #undef FITS
   if ((uintWC)(n = n+inc) < (uintWC)inc)
-    fehler_LF_toolong();
+    error_LF_toolong();
   return n;
 }
 
@@ -997,7 +997,7 @@ local object SF_I_scale_float_SF (object x, object delta)
       exp = exp+udelta;
       encode_SF(sign,exp,mant, return);
     } else {
-      fehler_overflow();
+      error_overflow();
     }
   } else { /* delta<0 */
     var uintV udelta;
@@ -1009,7 +1009,7 @@ local object SF_I_scale_float_SF (object x, object delta)
       encode_SF(sign,exp,mant, return);
     } else {
       if (underflow_allowed())
-        fehler_underflow();
+        error_underflow();
       else
         return SF_0;
     }
@@ -1036,7 +1036,7 @@ local maygc object FF_I_scale_float_FF (object x, object delta)
       exp = exp+udelta;
       encode_FF(sign,exp,mant, return);
     } else {
-      fehler_overflow();
+      error_overflow();
     }
   } else { /* delta<0 */
     var uintV udelta;
@@ -1048,7 +1048,7 @@ local maygc object FF_I_scale_float_FF (object x, object delta)
       encode_FF(sign,exp,mant, return);
     } else {
       if (underflow_allowed())
-        fehler_underflow();
+        error_underflow();
       else
         return FF_0;
     }
@@ -1085,7 +1085,7 @@ local maygc object DF_I_scale_float_DF (object x, object delta)
       encode2_DF(sign,exp,manthi,mantlo, return);
      #endif
     } else {
-      fehler_overflow();
+      error_overflow();
     }
   } else { /* delta<0 */
     var uintV udelta;
@@ -1101,7 +1101,7 @@ local maygc object DF_I_scale_float_DF (object x, object delta)
      #endif
     } else {
       if (underflow_allowed())
-        fehler_underflow();
+        error_underflow();
       else
         return DF_0;
     }
@@ -1182,7 +1182,7 @@ local maygc object LF_I_scale_float_LF (object x, object delta)
          || (uexp > LF_exp_high) /* or exponent too large? */
        #endif
         )
-      fehler_overflow(); /* yes -> overflow */
+      error_overflow(); /* yes -> overflow */
     break; /* else OK */
     neg: /* delta <0, udelta = 2^32+delta */
     if (((uexp = uexp+udelta) >= udelta) /* or exponent-underflow? */
@@ -1191,11 +1191,11 @@ local maygc object LF_I_scale_float_LF (object x, object delta)
     break; /* else OK */
     default: /* unfitting Integer */
       if (!R_minusp(delta)) {
-       overflow: fehler_overflow(); /* delta too large */
+       overflow: error_overflow(); /* delta too large */
       } else {
        underflow: /* delta too small */
         if (underflow_allowed()) {
-          fehler_underflow();
+          error_underflow();
         } else {
           skipSTACK(1);
           encode_LF0(Lfloat_length(x),return);
@@ -1358,7 +1358,7 @@ local maygc void F_integer_decode_float_I_I_I (object x)
     pushSTACK(x); /* save x */
     var uintC len = Lfloat_length(x); /* number of mantissa digits */
     var uintC len1 = len+1; /* need one more digit */
-    if (uintWCoverflow(len1)) { fehler_LF_toolong(); }
+    if (uintWCoverflow(len1)) { error_LF_toolong(); }
     /* intDsize*len >= 53 implies intDsize*len >= 64 >= oint_data_len+1,
        hence len >= bn_minlength. */
     {

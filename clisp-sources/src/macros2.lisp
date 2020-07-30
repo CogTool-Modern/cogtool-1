@@ -2,7 +2,7 @@
 ;; ----------------------------------------------------------------------------
 (defmacro typecase (&whole whole-form
                     keyform &rest typeclauselist)
-  (let* ((tempvar (gensym))
+  (let* ((tempvar (gensym "TYPECASE-KEY-"))
          (condclauselist nil))
     (do ((typeclauselistr typeclauselist (cdr typeclauselistr)) spec)
         ((atom typeclauselistr))
@@ -29,14 +29,14 @@
     (TEXT "The value of ~S should be ~:[of type ~S~;~:*~A~].")
     place string typespec))
 (defun report-one-new-value-string () ; ABI
-  (TEXT "You may input a new value for ~S."))
+  (TEXT "Input a new value for ~S."))
 (defun report-one-new-value-string-instead ()
-  (TEXT "You may input a value to be used instead~@[ of ~S~]."))
+  (TEXT "Input a value to be used instead~@[ of ~S~]."))
 (defun prompt-for-new-value-string () ; ABI
-  (concatenate 'string "~&" (TEXT "New ~S: ")))
+  (concatenate 'string "~&" (TEXT "New ~S") (prompt-finish)))
 (predefmacro check-type (place typespec &optional (string nil))
-  (let ((tag1 (gensym))
-        (tag2 (gensym)))
+  (let ((tag1 (gensym "CHECK-TYPE-"))
+        (tag2 (gensym "OK-")))
     `(TAGBODY
        ,tag1
        (WHEN (TYPEP ,place ',typespec) (GO ,tag2))
@@ -52,14 +52,14 @@
 (defun report-no-new-value-string () ; ABI
   (TEXT "Retry"))
 (defun report-new-values-string () ; ABI
-  (TEXT "You may input new values for ~@{~S~^, ~}."))
+  (TEXT "Input new values for ~@{~S~^, ~}."))
 (defun assert-error-string (test-form) ; ABI
   (format nil
     (TEXT "~S must evaluate to a non-NIL value.")
     test-form))
 (predefmacro assert (test-form &optional (place-list nil) (string nil) &rest args)
-  (let ((tag1 (gensym))
-        (tag2 (gensym)))
+  (let ((tag1 (gensym "ASSERT-"))
+        (tag2 (gensym "OK-")))
     `(TAGBODY
        ,tag1
        (WHEN ,test-form (GO ,tag2))
@@ -169,12 +169,7 @@
 ;; ----------------------------------------------------------------------------
 (defmacro deftype (&whole whole-form
                    name lambdalist &body body)
-  (unless (symbolp name)
-    (error-of-type 'source-program-error
-      :form whole-form
-      :detail name
-      (TEXT "type name should be a symbol, not ~S")
-      name))
+  (setq name (check-not-declaration name 'deftype))
   (if (or (get name 'TYPE-SYMBOL) (get name 'TYPE-LIST))
     (error-of-type 'source-program-error
       :form whole-form
@@ -184,7 +179,7 @@
   (multiple-value-bind (body-rest declarations docstring)
       (SYSTEM::PARSE-BODY body t)
     (if declarations (setq declarations (list (cons 'DECLARE declarations))))
-    (let ((%whole-form whole-form)
+    (let ((%whole-form whole-form) (%proper-list-p t)
           (%arg-count 0) (%min-args 0) (%restp nil) (%null-tests nil)
           (%let-list nil) (%keyword-tests nil) (%default-form '(QUOTE *)))
       (analyze1 lambdalist '(CDR <DEFTYPE-FORM>) name '<DEFTYPE-FORM>)
@@ -222,16 +217,10 @@
       'define-symbol-macro symbol))
   `(LET ()
      (EVAL-WHEN (COMPILE LOAD EVAL)
-       (CHECK-NOT-SPECIAL-VARIABLE-P ',symbol)
+       (SYSTEM::%PROCLAIM-SYMBOL-MACRO ',symbol)
        (SYSTEM::%PUT ',symbol 'SYSTEM::SYMBOLMACRO
-                     (SYSTEM::MAKE-GLOBAL-SYMBOL-MACRO ',expansion))
-       (SYSTEM::%PROCLAIM-SYMBOL-MACRO ',symbol))
+                     (SYSTEM::MAKE-GLOBAL-SYMBOL-MACRO ',expansion)))
      ',symbol))
-(defun check-not-special-variable-p (symbol) ; ABI
-  (when (special-variable-p symbol)
-    (error-of-type 'program-error
-      (TEXT "~S: the symbol ~S names a global variable")
-      'define-symbol-macro symbol)))
 ;; ----------------------------------------------------------------------------
 ;; X3J13 vote <123>
 ;; Macro (nth-value n form) == (nth n (multiple-value-list form)), CLtL2 S. 184
@@ -240,12 +229,12 @@
     (if (< n (1- multiple-values-limit))
       (if (= n 0)
         `(PROG1 ,form)
-        (let* ((resultvar (gensym))
+        (let* ((resultvar (gensym "RESULT-"))
                (vars (list resultvar))
                (ignores '()))
           (do ((i n (1- i)))
               ((zerop i))
-            (let ((g (gensym)))
+            (let ((g (gensym "IG")))
               (setq vars (cons g vars))
               (setq ignores (cons g ignores))
           ) )
@@ -270,10 +259,10 @@
       (UNWIND-PROTECT ,form (MULTIPLE-VALUE-CALL #'%TIME (%%TIME) ,@vars)))))
 ;; ----------------------------------------------------------------------------
 (defmacro times (form)
-  (let ((var1 (gensym))
-        (var2 (gensym))
-        (var3 (gensym))
-        (var4 (gensym))
+  (let ((var1 (gensym "HEAP1-"))
+        (var2 (gensym "GC-STAT1-"))
+        (var3 (gensym "VALUES-"))
+        (var4 (gensym "GC-STAT2-"))
         (timevars1 (gensym-list 9))
         (timevars2 (gensym-list 9)))
     (setq form
@@ -328,20 +317,22 @@
 (defmacro with-output-to-string ((var &optional (string nil)
                                   &key (element-type ''CHARACTER))
                                  &body body)
+  ;; use SYS::BUILT-IN-STREAM-CLOSE instead of CLOSE for bootstrapping
+  ;; because CLOSE is only defined in gray.lisp - fairly late in the game
   (multiple-value-bind (body-rest declarations) (SYSTEM::PARSE-BODY body)
     (if string
-      (let ((ignored-var (gensym)))
+      (let ((ignored-var (gensym "IG")))
         `(LET ((,var (SYS::MAKE-STRING-PUSH-STREAM ,string))
                (,ignored-var ,element-type))
            (DECLARE (READ-ONLY ,var) (IGNORE ,ignored-var) ,@declarations)
            (UNWIND-PROTECT
              (PROGN ,@body-rest)
-             (CLOSE ,var))))
+             (SYS::BUILT-IN-STREAM-CLOSE ,var))))
       `(LET ((,var (MAKE-STRING-OUTPUT-STREAM :ELEMENT-TYPE ,element-type)))
          (DECLARE (READ-ONLY ,var) ,@declarations)
          (UNWIND-PROTECT
            (PROGN ,@body-rest (GET-OUTPUT-STREAM-STRING ,var))
-           (CLOSE ,var))))))
+           (SYS::BUILT-IN-STREAM-CLOSE ,var))))))
 ;; ----------------------------------------------------------------------------
 ;; X3J13 vote <40>
 (defmacro print-unreadable-object

@@ -1,10 +1,8 @@
 /*
  * CLISP: directory key: win32 registry, LDAP, Gnome-config
- * Copyright (C) 2000-2005 by Sam Steingold
+ * Copyright (C) 2000-2007 by Sam Steingold
  */
 
-/* have to undefing UNICODE _here_ because clisp.h will #include <windows.h> */
-#undef UNICODE
 #include "clisp.h"
 
 #include "config.h"
@@ -15,18 +13,13 @@
 
 #define WIN32_LEAN_AND_MEAN  /* avoid including junk */
 #if defined(UNIX_CYGWIN32) || defined(__MINGW32__)
-/* `unused' is used in function declarations. */
-# undef unused
 # define ULONGLONG OS_ULONGLONG
 # define ULONG OS_ULONG
 # include <windows.h>
 # undef ULONG
 # undef ULONGLONG
-# define unused (void)
 #else
-# undef unused
 # include <windows.h>
-# define unused
 #endif
 
 #if defined(WIN32_NATIVE) || defined(UNIX_CYGWIN32)
@@ -60,10 +53,10 @@ typedef enum {
 #if defined(WIN32_REGISTRY)
 # define SYSCALL_WIN32(call)     do {                                  \
     uintL status;                                                      \
-    begin_system_call();                                               \
+    begin_blocking_system_call();                                      \
     status = call;                                                     \
     if (status != ERROR_SUCCESS) { SetLastError(status); OS_error(); } \
-    end_system_call();                                                 \
+    end_blocking_system_call();                                        \
   } while(0)
 #endif
 
@@ -73,10 +66,10 @@ typedef enum {
 #else
 # define SYSCALL_LDAP(call)      do {                                  \
     uintL status;                                                      \
-    begin_system_call();                                               \
+    begin_blocking_system_call();                                      \
     status = call;                                                     \
     if (status != LDAP_SUCCESS) { errno=status; OS_error(); }          \
-    end_system_call();                                                 \
+    end_blocking_system_call();                                        \
   } while(0)
 #endif
 #endif
@@ -128,7 +121,7 @@ static object test_dir_key (object obj, bool check_open) {
     if (check_open && nullp(slots[DK_OPEN])) {
       pushSTACK(obj);
       pushSTACK(TheSubr(subr_self)->name);
-      check_value(error,GETTEXT("~S on ~S is illegal"));
+      check_value(error_condition,GETTEXT("~S on ~S is illegal"));
       obj = value1; goto start;
     }
     XOUT(obj,"directory key");
@@ -330,7 +323,7 @@ static void open_reg_key (HKEY hkey, char* path, direction_t dir,
     default: perms = KEY_READ; break;
   }
  {DWORD status;
-  begin_system_call();
+  begin_blocking_system_call();
   status = RegOpenKeyEx(hkey,path,0,perms,p_hkey);
   if (status != ERROR_SUCCESS) {
     if ((if_not_exists == IF_DOES_NOT_EXIST_UNBOUND /*ignore*/)
@@ -347,20 +340,20 @@ static void open_reg_key (HKEY hkey, char* path, direction_t dir,
       }
     } else { SetLastError(status); OS_error(); }
   }
-  end_system_call();
+  end_blocking_system_call();
 }}
 #endif
 
 #if defined(ACCESS_LDAP)
-nonreturning_function(static, fehler_ldap,
+nonreturning_function(static, error_ldap,
                       (object dk, object path, char* errmsg)) {
-  end_system_call();
+  end_blocking_system_call();
   pushSTACK(NIL); pushSTACK(path); pushSTACK(dk);
   pushSTACK(TheSubr(subr_self)->name);
   STACK_3 = CLSTEXT(errmsg);
-  fehler(error,"~S(~S ~S): ~S");
+  error(error_condition,"~S(~S ~S): ~S");
 }
-#define LDAP_ERR2STR(d,p,status) fehler_ldap(d,p,ldap_err2string(status))
+#define LDAP_ERR2STR(d,p,status) error_ldap(d,p,ldap_err2string(status))
 #define LDAP_RES2STR(d,p,ld,res) LDAP_ERR2STR(d,p,ldap_result2error(ld,res,1))
 #endif
 
@@ -409,23 +402,23 @@ DEFUN(LDAP::DIR-KEY-OPEN, key path &key DIRECTION IF-DOES-NOT-EXIST) {
   if (eq(type,`:LDAP`)) {
     if (NULL != slots) {
       root = test_dir_key(root,true);
-      begin_system_call();
+      begin_blocking_system_call();
       with_string_0(path,GLO(misc_encoding),pathz,{
         status = ldap_simple_bind_s((LDAP*)ret_handle,pathz,NULL);
       });
       if (status != LDAP_SUCCESS)
         LDAP_ERR2STR(root,path,status);
-      end_system_call();
+      end_blocking_system_call();
     } else { /* :LDAP */
       struct ldap_url_desc* ldap_url = NULL;
-      begin_system_call();
+      begin_blocking_system_call();
       with_string_0(path,GLO(misc_encoding),pathz,
                     { status = ldap_url_parse(pathz,&ldap_url); });
       if (status != 0) {
-        end_system_call();
+        end_blocking_system_call();
         pushSTACK(path);
         pushSTACK(TheSubr(subr_self)->name);
-        fehler(error,GETTEXT("~S: ~S is not an LDAP URL"));
+        error(error_condition,GETTEXT("~S: ~S is not an LDAP URL"));
       }
       ret_handle = (void*)ldap_open(ldap_url->lud_host,ldap_url->lud_port);
       if (ret_handle == NULL) OS_error();
@@ -437,7 +430,7 @@ DEFUN(LDAP::DIR-KEY-OPEN, key path &key DIRECTION IF-DOES-NOT-EXIST) {
         LDAP_ERR2STR(path,dn,status);
       }}
       ldap_free_urldesc(ldap_url);
-      end_system_call();
+      end_blocking_system_call();
     }
   } else
 # endif
@@ -452,7 +445,7 @@ DEFUN(LDAP::DIR-KEY-OPEN, key path &key DIRECTION IF-DOES-NOT-EXIST) {
     pushSTACK(`LDAP::DIR-KEY`);
     pushSTACK(type);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: ~S is not a ~S"));
+    error(type_error,GETTEXT("~S: ~S is not a ~S"));
   }
   /* create the DIR-KEY */
   pushSTACK(type);
@@ -491,10 +484,10 @@ DEFUN(LDAP::DIR-KEY-OPEN, key path &key DIRECTION IF-DOES-NOT-EXIST) {
   DWORD n_obj;                                                          \
   DWORD maxlen;                                                         \
   HKEY hkey = (HKEY)SLOT_HANDLE(dir_key_slots(dkey));                   \
-  begin_system_call();                                                  \
+  begin_blocking_system_call();                                         \
   status = (COUNT_EXPR);                                                \
   if (status != ERROR_SUCCESS) { SetLastError(status); OS_error(); }    \
-  end_system_call();                                                    \
+  end_blocking_system_call();                                           \
   if (n_obj > 0) {                                                      \
     unsigned int ii;                                                    \
     char* buf = (char*)alloca(maxlen+1); /* one extra char for '\0' */  \
@@ -502,10 +495,10 @@ DEFUN(LDAP::DIR-KEY-OPEN, key path &key DIRECTION IF-DOES-NOT-EXIST) {
     for (ii = 0; ii < n_obj; ii++) {                                    \
       DWORD len = maxlen;                                               \
       DWORD status;                                                     \
-      begin_system_call();                                              \
+      begin_blocking_system_call();                                     \
       status = (GET_NEXT_OBJ_EXPR);                                     \
       if (status != ERROR_SUCCESS) { SetLastError(status); OS_error(); } \
-      end_system_call();                                                \
+      end_blocking_system_call();                                       \
       { object new_cons = allocate_cons();                              \
         Cdr(new_cons) = STACK_0;                                        \
         STACK_0 = new_cons; }                                           \
@@ -592,7 +585,7 @@ static scope_t parse_scope (object scope) {
   pushSTACK(`:SCOPE`);
   pushSTACK(scope);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: ~S is not a ~S"));
+  error(type_error,GETTEXT("~S: ~S is not a ~S"));
 }
 
 /* return a simple vector with the iteration state
@@ -644,14 +637,15 @@ static void init_iteration_node (object state, object subkey,
   test_dir_key(ITST_DKEY(STACK_4),true);
  {object dk = test_dir_key(ITST_DKEY(STACK_4/*state*/),true);
   gcv_object_t *slots = dir_key_slots(dk);
-  FOREIGN *fp = &(TheFpointer(STACK_0/*handle*/)->fp_pointer);
+  FOREIGN fp;
   with_string_0(*new_path,GLO(misc_encoding),pathz,{
     open_reg_key((HKEY)SLOT_HANDLE(slots),pathz,check_direction(slots[DK_DIR]),
-                 IF_DOES_NOT_EXIST_UNBOUND/*ignore*/,(HKEY*)fp);
+                 IF_DOES_NOT_EXIST_UNBOUND/*ignore*/,(HKEY*)&fp);
   });
-  if (*fp) {
+  TheFpointer(STACK_0/*handle*/)->fp_pointer = fp;
+  if (fp) {
     DWORD k_size, a_size, d_size;
-    SYSCALL_WIN32(RegQueryInfoKey((HKEY)*fp,NULL,NULL,NULL,NULL,&k_size,
+    SYSCALL_WIN32(RegQueryInfoKey((HKEY)fp,NULL,NULL,NULL,NULL,&k_size,
                                   NULL,NULL,&a_size,&d_size,NULL,NULL));
     NODE_KEY_S(STACK_1) = fixnum(k_size+1); /* node */
     NODE_ATT_S(STACK_1) = fixnum(a_size+1); /* node */
@@ -749,7 +743,7 @@ DEFUN(LDAP::DKEY-SEARCH-NEXT-ATT,state)
     pushSTACK(`LDAP::DKEY-SEARCH-NEXT-KEY`);
     pushSTACK(state);
     pushSTACK(`LDAP::DKEY-SEARCH-NEXT-ATT`);
-    fehler(error,GETTEXT("~S from ~S without ~S before it"));
+    error(error_condition,GETTEXT("~S from ~S without ~S before it"));
   }
  {object node = Car(stack);
   Fpointer fp = TheFpointer(NODE_HANDLE(node));
@@ -806,12 +800,12 @@ DEFUN(LDAP::DIR-KEY-VALUE, key name &optional default) {
     DWORD size;
     char* buffer = NULL;
     HKEY hk = (HKEY)SLOT_HANDLE(dir_key_slots(dkey));
-    begin_system_call();
+    begin_blocking_system_call();
     status = RegQueryValueEx(hk,namez,NULL,NULL,NULL,&size);
     if (status != ERROR_SUCCESS) {
       if ((status == ERROR_FILE_NOT_FOUND) && boundp(default_value)) {
         value1 = default_value;
-        end_system_call();
+        end_blocking_system_call();
         goto end;
       }
       SetLastError(status); OS_error();
@@ -820,7 +814,7 @@ DEFUN(LDAP::DIR-KEY-VALUE, key name &optional default) {
     buffer = (char*)alloca(size);
     status = RegQueryValueEx(hk,namez,NULL,&type,(BYTE*)buffer,&size);
     if (status != ERROR_SUCCESS) { SetLastError(status); OS_error(); }
-    end_system_call();
+    end_blocking_system_call();
     value1 = registry_value_to_object(type,size,buffer);
   end:;
   });
@@ -855,7 +849,7 @@ DEFUN(LDAP::SET-DKEY-VALUE, key name value)
     } else {
       pushSTACK(value);
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(error,GETTEXT("~S on ~S is illegal"));
+      error(error_condition,GETTEXT("~S on ~S is illegal"));
     }
   });
   VALUES1(value);
@@ -912,7 +906,7 @@ DEFUN(LDAP::DKEY-INFO,key) {
                                 &max_value_length,
                                 &security_descriptor,
                                 &write_time));
-  value1 = (class_name ? asciz_to_string(class_name,GLO(misc_encoding)) : NIL);
+  value1 = safe_to_string(class_name);
   value2 = L_to_I(num_sub_keys);
   value3 = L_to_I(max_sub_key_length);
   value4 = L_to_I(max_class_length);

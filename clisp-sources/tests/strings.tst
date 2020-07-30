@@ -1,4 +1,4 @@
-;; -*- lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 (CHAR  "abcdef-dg1ndh" 0)
 #\a
@@ -1212,6 +1212,9 @@ X
   (char y 5))
 error
 
+(length (adjust-array (make-array 0 :element-type 'character :adjustable t) 1))
+1
+
 #+(and clisp unicode)
 (let ((s (make-array 10 :element-type 'character :initial-element #\a)))
   (list
@@ -1248,3 +1251,6 @@ error
 
 #+clisp (string-invertcase "AbCdEfGh" :start 1 :end 5)
 #+clisp "ABcDefGh"
+
+#+clisp (trim-if #'sys::whitespacep "  asdf 	 ")
+#+clisp "asdf"

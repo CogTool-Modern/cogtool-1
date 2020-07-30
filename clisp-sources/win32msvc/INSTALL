@@ -1,22 +1,22 @@
-Installation on Win32 (WinNT, Win95) using the MSVC4.0 or MSVC5.0 or MSVC6.0
-============================================================================
-or MSVC7.0 development environment, using native system calls
-=============================================================
+Installation on Win32 (WinNT, Win95 et al) using the MSVC
+=========================================================
+development environment, using native system calls
+==================================================
 
-** Note! Binaries created with MSVC 7.0 with MFLAGS=-MD should not be
-   distributed: They depend on a closed-source library 'msvcr70.dll' which is
-   not normally part of a Woe32 installation. You cannot distribute
-   'msvcr70.dll' with the binaries - this would be a violation of the GPL and
-   of the Microsoft EULA. You can distribute the binaries without including
-   'msvcr70.dll', but this will cause problems for users that don't have this
-   library on their system. Therefore it is not recommended. This problem does
-   not occur with MSVC 6.0 and earlier.
+** Note! Binaries created with MSVC 7.0 (and later) with MFLAGS=-MD depend
+   on a closed-source library 'Msvcr70.dll' (or similar) which is not
+   normally part of a Woe32 installation.
+   While Microsoft (see article Q326922 "Redistribution of the shared C
+   runtime component in Visual C++" http://support.microsoft.com/kb/326922)
+   seems to permit redistribution of these files, they _cannot_ be
+   _bundled_ with CLISP in a _single_ distribution - this would be a
+   violation of the GPL.  You must distribute it in a separate file.
 
 ** Note! The easiest way to get a native win32 version of CLISP is to use
    -- cygwin <http://cywgin.com> or
-   -- mingw/msys <http://gnuwin32.sourceforge.net/>.
-   Either way, read ../unix/INSTALL, get libsigsegv, and do
-   $ ./configure --with-mingw --build build-mingw --with-module=...
+   -- mingw/msys <http://www.mingw.org/>.
+   Either way, read ../unix/INSTALL, get libsigsegv, libffcall &c, and do
+   $ ./configure --with-mingw --cbc build-mingw --with-module=...
    $ cd build-mingw
    $ make distrib
    unzip the distribution in your preferred location, and run install.bat.
@@ -28,11 +28,12 @@ If you still want to use the MS C compiler, here are the steps:
 1. Build a few recommended libraries: libiconv and libsigsegv.
    - GNU libsigsegv (highly recommended for C stack overflow detection
      and high-performance Generational GC),
+   - GNU libffcall (for the foreign language interface),
    - GNU libiconv (for more character set conversions).
 
 2. Unpack the source, start a console with a shell.
-   Make sure that the MSVC4.0 or MSVC5.0 or MSVC6.0 utilities ("cl" etc.)
-   are found in PATH. For example, I use the following settings:
+   Make sure that the MSVC utilities ("cl" etc.) are found in PATH.
+   For example, I use the following settings:
 
         set MSDEVDIR=C:\Program Files\Microsoft Visual Studio
         set MSVCDIR=%MSDEVDIR%\VC98
@@ -57,56 +58,18 @@ If you still want to use the MS C compiler, here are the steps:
    - GnuWin32 <http://gnuwin32.sourceforge.net/> or
    - cygwin <http://cywgin.com> (overkill for this particular case).
 
-4. Then build a few tools and libraries:
-
-        cd utils
-        cd gcc-cccp
-        nmake -f Makefile.msvc
-        cd ..
-        cd ..
-
-        cd ffcall
-        nmake -f Makefile.msvc check
-        cd ..
-
-        cd libcharset
-        nmake -f Makefile.msvc check
-        cd ..
-
-   Copy the appropriate makefile to src\makefile:
-
-     for MSVC4.0:
-
-        copy win32msvc\makefile.msvc4 src\makefile
-
-     for MSVC5.0:
-
-        copy win32msvc\makefile.msvc5 src\makefile
-
-     for MSVC6.0:
-
-        copy win32msvc\makefile.msvc6 src\makefile
-
-     for MSVC7.0:
-
-        copy win32msvc\makefile.msvc7 src\makefile
-
-     same, debug versions:
-
-        copy win32msvc\makefile.msvc5d src\makefile
-        copy win32msvc\makefile.msvc6d src\makefile
+4. Copy the appropriate makefile from win32msvc to src\makefile:
 
    Check that environment variable MSVCDIR points to VC98 directory
    or uncomment and modify the value of MSVCDIR in src\makefile to
    match your site.
 
    Now that the libraries recommended in 1. are not distributed with
-   CLISP anymore, the makefiles do not make use of them. For
-   actually using libsigsegv with CLISP, here is a way to go:
+   CLISP anymore, the makefiles do not make use of them.
+   To actually use libsigsegv with CLISP, here is a way to go:
         a) Compile the library as per libsigsegv\README.woe32
         b) Copy sigsegv.lib and sigsegv.h to src
-        c) Remove -DNO_SIGSEGV from CFLAGS in src\makefile
-        d) Add sigsegv.lib to LIBS in src\makefile
+        c) Add sigsegv.lib to LIBS in src\makefile
 
         cd src
         nmake

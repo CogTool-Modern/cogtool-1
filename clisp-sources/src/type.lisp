@@ -1,7 +1,7 @@
-;;;; TYPEP und Verwandtes
+;;;; TYPEP and friends
 ;;;; Michael Stoll, 21. 10. 1988
 ;;;; Bruno Haible, 10.6.1989
-;;;; Sam Steingold 2000-2005
+;;;; Sam Steingold 2000-2009
 
 ;;; Datenstrukturen für TYPEP:
 ;;; - Ein Type-Specifier-Symbol hat auf seiner Propertyliste unter dem
@@ -256,16 +256,11 @@
          (eq (array-element-type x)
              #+BASE-CHAR=CHARACTER 'CHARACTER #-BASE-CHAR=CHARACTER 'BASE-CHAR
 ) ) )    )
-(def-atomic-type BIGNUM
-  (lambda (x) (and (integerp x) (not (fixnump x))))
-)
-(def-atomic-type BIT
-  (lambda (x) (or (eql x 0) (eql x 1)))
-)
+(def-atomic-type BIGNUM (lambda (x) (and (integerp x) (not (fixnump x)))))
+(def-atomic-type BIT (lambda (x) (or (eql x 0) (eql x 1))))
 (def-atomic-type BIT-VECTOR bit-vector-p)
-(def-atomic-type BOOLEAN
-  (lambda (x) (or (eq x 'nil) (eq x 't)))
-)
+(def-atomic-type BOOLEAN (lambda (x) (or (eq x 'nil) (eq x 't))))
+(def-atomic-type BYTE bytep)
 (def-atomic-type CHARACTER characterp)
 (def-atomic-type COMPILED-FUNCTION compiled-function-p)
 (def-atomic-type COMPLEX complexp)
@@ -343,9 +338,14 @@
 (def-atomic-type ffi::foreign-address
   (lambda (x) (eq 'ffi::foreign-address (type-of x))))
 ;; see lispbibl.d (#define FOREIGN) and predtype.d (TYPE-OF):
-#+(or unix ffi affi win32)
+#+(or unix ffi win32)
 (def-atomic-type foreign-pointer
   (lambda (x) (eq 'foreign-pointer (type-of x))))
+;; threads.lisp is loaded after this file,
+;; so these symbols are not external yet
+#+mt (def-atomic-type threads::thread threads::threadp)
+#+mt (def-atomic-type threads::mutex threads::mutexp)
+#+mt (def-atomic-type threads::exemption threads::exemptionp)
 (def-atomic-type VECTOR vectorp)
 (def-atomic-type PLIST
     (lambda (x) (multiple-value-bind (length tail) (list-length-dotted x)
@@ -493,7 +493,7 @@
    )
 )
 (def-compound-type SIMPLE-VECTOR (&optional (size '*)) (x)
-  (ensure-dim SIMLPE-VECTOR size)
+  (ensure-dim SIMPLE-VECTOR size)
   (and (simple-vector-p x)
        (or (eq size '*) (eql size (array-dimension x 0)))
   )
@@ -528,9 +528,8 @@
 )
 (def-compound-type SIGNED-BYTE (&optional (n '*)) (x)
   (unless (or (eq n '*) (integerp n))
-    (error (TEXT "~S: argument to SIGNED-BYTE must be an integer or * : ~S")
-           'typep n
-  ) )
+    (error (TEXT "~S: argument to ~S must be an integer or * : ~S")
+           'typep 'signed-byte n))
   (and (integerp x) (or (eq n '*) (< (integer-length x) n)))
   `(AND (INTEGERP ,x)
         ,@(if (eq n '*) '() `((< (INTEGER-LENGTH ,x) ,n)))
@@ -538,9 +537,8 @@
 )
 (def-compound-type UNSIGNED-BYTE (&optional (n '*)) (x)
   (unless (or (eq n '*) (integerp n))
-    (error (TEXT "~S: argument to UNSIGNED-BYTE must be an integer or * : ~S")
-           'typep n
-  ) )
+    (error (TEXT "~S: argument to ~S must be an integer or * : ~S")
+           'typep 'unsigned-byte n))
   (and (integerp x)
        (not (minusp x))
        (or (eq n '*) (<= (integer-length x) n))

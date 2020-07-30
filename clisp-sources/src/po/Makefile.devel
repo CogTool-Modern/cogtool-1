@@ -7,7 +7,7 @@
 SHELL = /bin/sh
 RM = rm -rf
 
-GMSGFMT = /cygdrive/d/gnu/gettext-0.15-pre1/gettext-tools/src/msgfmt.exe --statistics --check
+GMSGFMT = msgfmt --statistics --check
 
 all : tmp pot gmo
 
@@ -22,10 +22,10 @@ LINGUAS = $(PREDEF_LINGUAS) $(OTHER_LINGUAS)
 DSOURCES = \
  lispbibl fsubr subr pseudofun constsym constobj constpack avl sort subrkw \
     bytecode unix win32 xthread \
- spvw spvw_module spvw_debug spvw_alloca spvw_mmap spvw_multimap \
+ spvw spvw_module spvw_debug spvw_alloca spvw_mmap \
     spvw_singlemap spvw_page spvw_heap spvw_global spvw_gcstat spvw_space \
     spvw_mark spvw_objsize spvw_update spvw_fault spvw_sigsegv spvw_sigcld \
-    spvw_sigpipe spvw_sigint spvw_sigwinch spvw_garcol spvw_genera1 \
+    spvw_sigpipe spvw_sigint spvw_sigwinch spvw_garcol spvw_garcol_old spvw_genera1 \
     spvw_gcmark spvw_genera2 spvw_weak spvw_genera3 spvw_allocate spvw_sigterm \
     spvw_typealloc spvw_circ spvw_walk spvw_ctype spvw_language spvw_memfile \
  spvwtabf spvwtabs spvwtabo \
@@ -39,7 +39,7 @@ DSOURCES = \
     intlog intplus intcomp intbyte intmal intdiv intgcd int2adic intsqrt \
     intprint intread intserial rational sfloat ffloat dfloat lfloat flo_konv \
     flo_rest realelem realrand realtran compelem comptran \
- affi \
+ funarg \
  foreign \
  unixaux win32aux \
  built
@@ -65,7 +65,7 @@ LISPSOURCES = init defseq backquote defmacro macros1 macros2 defs1 \
               describe room edit macros3 clhs inspect gray threads \
               case-sensitive foreign1 exporting \
               german french spanish russian dutch danish \
-              deprecated affi1
+              deprecated
 
 SOURCES := $(patsubst %,%.d,$(DSOURCES)) $(patsubst %,%.lisp,$(LISPSOURCES))
 

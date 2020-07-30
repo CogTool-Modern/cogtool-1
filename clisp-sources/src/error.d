@@ -2,7 +2,7 @@
  * Error-Handling for CLISP
  * Bruno Haible 1990-2005
  * Marcus Daniels 8.4.1994
- * Sam Steingold 1998-2004
+ * Sam Steingold 1998-2010
  * German comments translated into English: Stefan Kain 2002-09-11
  */
 
@@ -37,24 +37,24 @@ local void begin_error (void)
 {
   end_system_call(); /* there is no system call running anymore */
   cancel_interrupts();
- #if defined(HAVE_SIGNALS) && defined(SIGPIPE)
-  writing_to_subprocess = false;
- #endif
+  STOP_WRITING_TO_SUBPROCESS;
+  /* make sure *ERROR-OUTPUT* is valid */
+  var_stream(S(error_output),strmflags_wr_ch_B);
+  if (!posfixnump(Symbol_value(S(recursive_error_count)))) /* should be a fixnum >=0 */
+    Symbol_value(S(recursive_error_count)) = Fixnum_0; /* otherwise emergency correction */
   /* increase error-count, if >3 abort output: */
   dynamic_bind(S(recursive_error_count),
                fixnum_inc(Symbol_value(S(recursive_error_count)),1));
-  if (!posfixnump(Symbol_value(S(recursive_error_count)))) /* should be a fixnum >=0 */
-    Symbol_value(S(recursive_error_count)) = Fixnum_0; /* otherwise emergency correction */
   if (posfixnum_to_V(Symbol_value(S(recursive_error_count))) > 3) {
     /* multiple nested error message. */
     Symbol_value(S(recursive_error_count)) = Fixnum_0; /* delete error count */
     /* bind *PRINT-PRETTY* to NIL (in order to save memory): */
     dynamic_bind(S(print_pretty),NIL);
-    fehler(serious_condition,
-           /* Note: All translations of this error message should be in
-              pure ASCII, to avoid endless recursion if *terminal-encoding*
-              supports only ASCII characters. */
-           GETTEXT("Unprintable error message"));
+    error(serious_condition,
+          /* Note: All translations of this error message should be in
+             pure ASCII, to avoid endless recursion if *terminal-encoding*
+             supports only ASCII characters. */
+          GETTEXT("Unprintable error message"));
   }
   var object error_handler = Symbol_value(S(error_handler)); /* *ERROR-HANDLER* */
   if (!nullp(error_handler)) { /* *ERROR-HANDER* /= NIL */
@@ -112,7 +112,7 @@ local void write_errorchar (object obj) {
  > start, end: delimit an unmovable string in UTF-8 encoding */
 local void write_errorasciz_substring (const uintB* start, const uintB* end)
 {
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   var object encoding = O(internal_encoding);
   var const uintB* bptr = start;
   var const uintB* bendptr = end;
@@ -161,7 +161,7 @@ local void write_errorasciz (const char* asciz) {
 local gcv_object_t* write_errorstring (const char* errorstring)
 {
   var gcv_object_t* argptr = args_end_pointer STACKop 7; /* pointer above stream and frame */
-  loop {
+  while (1) {
     var char ch = *errorstring; /* next character */
     if (ch==0) /* string finished? */
       break;
@@ -179,12 +179,12 @@ local gcv_object_t* write_errorstring (const char* errorstring)
         continue;
       }
       pushSTACK(asciz_to_string(errorstring,Symbol_value(S(utf_8))));
-      fehler(error,
+      error(error_condition,
              GETTEXT("internal error or error in message catalog: invalid low-level format string ~S"));
     }
     /* output all characters until the next special character */
     var const char* ptr = errorstring;
-    loop {
+    while (1) {
       ptr++;
       ch = *ptr;
       if (ch==0 || ch=='~')
@@ -198,6 +198,8 @@ local gcv_object_t* write_errorstring (const char* errorstring)
 
 /* SIGNAL the CONDITION and INVOKE the debugger */
 nonreturning_function(local, signal_and_debug, (object condition)) {
+  if (quit_on_signal_in_progress) /* if we are terminating on sighup, */
+    quit();              /* printing the "exiting" messages will fail */
   pushSTACK(condition); /* save condition */
   dynamic_bind(S(print_escape),T); /* bind *PRINT-ESCAPE* to NIL */
   dynamic_bind(S(print_readably),NIL); /* bind *PRINT-READABLY* to NIL */
@@ -212,6 +214,26 @@ nonreturning_function(local, signal_and_debug, (object condition)) {
  (when start_driver_p is true)
  can trigger GC */
 local maygc void end_error (gcv_object_t* stackptr, bool start_driver_p) {
+#ifdef MULTITHREAD
+  /* NB: just for debugging - but for now in the release as well.
+     this code is for checking whether there is no part of the runtime
+     that will signal an error while it is considered to be in safe for GC
+     region. Seems there are such possibilities in the xxxaux.d and socket.d.
+     Hope to catch all of them here (it is possible to miss some cases
+     however). */
+  if (spinlock_tryacquire(&current_thread()->_gc_suspend_ack)) {
+    /* this should never happen - we always hold this lock unless we are in
+       blocking system call (or waiting for the GC) */
+    fprintf(stderr,"*** thread is going into lisp land without calling end_blocking_call();");
+    abort();
+  }
+  if (current_thread()->_suspend_count) {
+    /* hmm aren't we supposed to be suspended? if we are here - there
+       is GC running NOW */
+    fprintf(stderr,"*** thread is going into lisp land while GC in progress.");
+    abort();
+  }
+#endif
   elastic_newline(&STACK_0);
   if (nullp(STACK_1)) {
     /* *ERROR-HANDER* = NIL, SYS::*USE-CLCS* = NIL */
@@ -254,9 +276,16 @@ local maygc void end_error (gcv_object_t* stackptr, bool start_driver_p) {
       pushSTACK(S(error)); pushSTACK(type);
       var uintC argcount = 4;
       /* arithmetic-error, division-by-zero, floating-point-overflow,
-         floating-point-underflow
-         --> complete :operation :operands ??
-         cell-error, uncound-variable, undefined-function, unbound-slot
+         floating-point-underflow --> complete :operation, :operands */
+      if (eq(type,S(simple_arithmetic_error))
+          || eq(type,S(simple_division_by_zero))
+          || eq(type,S(simple_floating_point_overflow))
+          || eq(type,S(simple_floating_point_underflow))) {
+        pushSTACK(S(Koperands)); pushSTACK(BEFORE(stackptr)); /* :operands */
+        pushSTACK(S(Koperation)); pushSTACK(BEFORE(stackptr)); /* :operation */
+        argcount += 4;
+      }
+      /* cell-error, uncound-variable, undefined-function, unbound-slot
          --> complete :name */
       if (eq(type,S(simple_cell_error))
           || eq(type,S(simple_unbound_variable))
@@ -319,10 +348,10 @@ local maygc void end_error (gcv_object_t* stackptr, bool start_driver_p) {
   }
 }
 
-/* helper -- see doc for fehler() */
+/* helper -- see doc for error() */
 local void prepare_error (condition_t errortype, const char* errorstring,
                           bool start_driver_p)
-{ /* the common part of fehler(), check_value() &c */
+{ /* the common part of error(), check_value() &c */
   begin_error(); /* start error message */
   if (!nullp(STACK_3)) { /* *ERROR-HANDLER* = NIL, SYS::*USE-CLCS* /= NIL ? */
     /* choose error-type-symbol for errortype: */
@@ -337,15 +366,15 @@ local void prepare_error (condition_t errortype, const char* errorstring,
 }
 
 /* Error message with Errorstring. Does not return.
- fehler(errortype,errorstring);
+ error(errortype,errorstring);
  > errortype: condition type
  > errorstring: Constant ASCIZ-string, in UTF-8 Encoding.
    At each tilde-S a LISP-object is taken from STACK and printed instead of
    the tilde-S.
  > on the STACK: initialization values for the condition,
                  according to errortype */
-nonreturning_function(global, fehler, (condition_t errortype,
-                                       const char* errorstring)) {
+nonreturning_function(modexp, error,
+                      (condition_t errortype, const char* errorstring)) {
   prepare_error(errortype,errorstring,true); /* finish error message */
   /* there is no point in using the condition system here:
      we will get into an infinite loop reporting the error */
@@ -363,11 +392,14 @@ nonreturning_function(global, fehler, (condition_t errortype,
  > on the STACK: PLACE (form to be shown to the user) or NIL, then
    the initial values for the Condition, depending on error-type
  < value1, value2: return values from CHECK-VALUE:
-   value1 = value supplied by the user,
+   value1 = value supplied by the user, as is, not evaluated.
+     This does present a problem when the object does not have a readable
+     syntax (e.g., a stream or a CLOS object). The workaround is to use [#.].
+     We can discuss calling eval1(value1) at the end of this function.
    value2 = indicates whether PLACE should be filled
  < STACK: cleaned up
  can trigger GC */
-global maygc void check_value (condition_t errortype, const char* errorstring)
+modexp maygc void check_value (condition_t errortype, const char* errorstring)
 {
   prepare_error(errortype,errorstring,nullpSv(use_clcs));
   /* if SYS::*USE-CLCS* /= NIL, use CHECK-VALUE */
@@ -383,8 +415,8 @@ global maygc void check_value (condition_t errortype, const char* errorstring)
    At every tilde-S, a LISP-object is taken from the STACK and printed
    instead of the tilde-S.
  > on the STACK: list of alternatives
-   ((restart-name restart-help-string . value-returned-by-the-restart)*), then
-   the initial values for the Condition, depending on error-type
+   ((restart-name restart-help-string . value-returned-by-the-restart)*),
+   then the initial values for the Condition, depending on error-type
  < value1: return value from CORRECTABLE-ERROR, one of the CDDRs of the
    alternatives
  < STACK: cleaned up
@@ -398,11 +430,11 @@ global maygc void correctable_error (condition_t errortype, const char* errorstr
 }
 
 #undef OS_error
-#undef OS_file_error
+#undef OS_error_arg
 #undef OS_filestream_error
 
 #ifdef UNIX
-  /* Define OS_error, OS_file_error. */
+  /* Define OS_error, OS_error_arg. */
   #include "errunix.c"
 #else
   /* Define just ANSIC_error. */
@@ -421,10 +453,12 @@ global maygc void correctable_error (condition_t errortype, const char* errorstr
  OS_filestream_error(stream);
  > stream: a channel stream
  > end_system_call() already called */
-nonreturning_function(global, OS_filestream_error, (object stream)) {
-  if (TheStream(stream)->strmtype == strmtype_file
-      && !nullp(TheStream(stream)->strm_file_truename)) {
-    OS_file_error(TheStream(stream)->strm_file_truename);
+nonreturning_function(modexp, OS_filestream_error, (object stream)) {
+  if (streamp(stream)) {
+    if (TheStream(stream)->strmtype == strmtype_file
+        && !nullp(TheStream(stream)->strm_file_truename))
+      OS_error_arg(S(simple_file_error),TheStream(stream)->strm_file_truename);
+    else OS_error_arg(S(simple_stream_error),stream);
   } else {
     OS_error();
   }
@@ -501,7 +535,13 @@ LISPFUN(error,seclass_default,1,0,rest,nokey,0,NIL)
    sets the data needed for ERROR-OF-TYPE. */
 LISPFUNN(defclcs,1)
 {
-  O(error_types) = popSTACK();
+  O(error_types) = check_vector(popSTACK());
+  var int i;
+  var Symbol conditions = &(symbol_tab.S_simple_condition);
+  var gcv_object_t* et_data = TheSvector(O(error_types))->data;
+  for (i=0; i < number_of_conditions_defined_in_c; i++)
+    ASSERT(eq(Symbol_name(Cdr(et_data[i])),conditions[i].pname));
+  ASSERT(Svector_length(O(error_types)) == number_of_conditions_defined_in_c);
   VALUES0;
 }
 
@@ -710,10 +750,9 @@ LISPFUNN(invoke_debugger,1)
  changes STACK, can trigger GC */
 global maygc void tast_break (void)
 {
+#if !defined(MULTITHREAD)
   cancel_interrupts();
- #if defined(HAVE_SIGNALS) && defined(SIGPIPE)
-  writing_to_subprocess = false;
- #endif
+  STOP_WRITING_TO_SUBPROCESS;
   if (!nullpSv(error_handler) || nullpSv(use_clcs)) {
     /* simulate begin_error(), 7 elements on the STACK: */
     pushSTACK(NIL); pushSTACK(NIL); pushSTACK(NIL);
@@ -732,6 +771,13 @@ global maygc void tast_break (void)
     funcall(L(cerror_of_type),4); /* (SYS::CERROR-OF-TYPE "..." 'SYSTEM::[SIMPLE-]INTERRUPT-CONDITION "..." caller) */
     skipSTACK(1);
   }
+#else
+  /* in MT - just clear the STACK */
+  /* it will be very rare to get called here - since the interruptp()
+     does not expand to anything in MT and most use of tast_break() was
+     from it.*/
+  skipSTACK(1);
+#endif
 }
 
 LISPFUN(clcs_signal,seclass_default,1,0,rest,nokey,0,NIL)
@@ -784,7 +830,7 @@ LISPFUN(clcs_signal,seclass_default,1,0,rest,nokey,0,NIL)
  > classname: a symbol expected to name a class with "proper name" classname
  < result: an object of the given type, either the same as obj or a replacement
  can trigger GC */
-global maygc object check_classname (object obj, object type) {
+modexp maygc object check_classname (object obj, object type) {
   while (!typep_classname(obj,type)) {
     pushSTACK(type);            /* save type */
     pushSTACK(NIL);             /* no PLACE */
@@ -804,7 +850,7 @@ global maygc object check_classname (object obj, object type) {
  > restart_p: flag whether to allow entering a replacement
  < result: a valid foreign pointer, either the same as obj or a replacement
  can trigger GC */
-global maygc object check_fpointer_replacement (object obj, bool restart_p) {
+modexp maygc object check_fpointer_replacement (object obj, bool restart_p) {
   for (;;) {
     if (!fpointerp(obj)) {
       pushSTACK(NIL);                /* no PLACE */
@@ -815,7 +861,7 @@ global maygc object check_fpointer_replacement (object obj, bool restart_p) {
       if (restart_p)
         check_value(type_error,GETTEXT("~S: ~S is not a ~S"));
       else
-        fehler(type_error,GETTEXT("~S: ~S is not a ~S"));
+        error(type_error,GETTEXT("~S: ~S is not a ~S"));
       obj = value1;
       continue;
     }
@@ -823,9 +869,9 @@ global maygc object check_fpointer_replacement (object obj, bool restart_p) {
       pushSTACK(NIL);                /* no PLACE */
       pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
       if (restart_p)
-        check_value(error,GETTEXT("~S: ~S comes from a previous Lisp session and is invalid"));
+        check_value(error_condition,GETTEXT("~S: ~S comes from a previous Lisp session and is invalid"));
       else
-        fehler(error,GETTEXT("~S: ~S comes from a previous Lisp session and is invalid"));
+        error(error_condition,GETTEXT("~S: ~S comes from a previous Lisp session and is invalid"));
       obj = value1;
       continue;
     }
@@ -836,54 +882,69 @@ global maygc object check_fpointer_replacement (object obj, bool restart_p) {
 #endif
 
 /* error-message, if an object is not a list.
- fehler_list(obj);
+ error_list(obj);
  > obj: non-list */
-nonreturning_function(global, fehler_list, (object obj)) {
+nonreturning_function(modexp, error_list, (object obj)) {
   pushSTACK(obj);     /* TYPE-ERROR slot DATUM */
   pushSTACK(S(list)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: ~S is not a list"));
+  error(type_error,GETTEXT("~S: ~S is not a list"));
 }
+
+/* define a global check_TYPE_replacement function
+ > name: type name
+ > expected_type: object O(...)
+ > test: test for the acceptability of the replacement value
+ > error_message: C string GETTEXT(...) */
+#define MAKE_CHECK_REPLACEMENT(typename,expected_type,test,error_message) \
+  modexp maygc object check_##typename##_replacement (object obj) {     \
+    do {                                                                \
+      pushSTACK(NIL); /* no PLACE */                                    \
+      pushSTACK(obj); /* TYPE-ERROR slot DATUM */                       \
+      pushSTACK(expected_type); /* TYPE-ERROR slot EXPECTED-TYPE */     \
+      pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);              \
+      check_value(type_error,error_message);                            \
+      obj = value1;                                                     \
+    } while (!test(obj));                                               \
+    return obj;                                                         \
+  }
 
 /* check_list_replacement(obj)
  > obj: not a list
  < result: a list, a replacement
  can trigger GC */
-global maygc object check_list_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);     /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(list)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a list"));
-    obj = value1;
-  } while (!listp(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(list,S(list),listp,GETTEXT("~S: ~S is not a list"))
 
 /* Error message, if an object isn't a proper list because it is dotted.
- fehler_proper_list_dotted(caller,obj);
+ error_proper_list_dotted(caller,obj);
  > caller: the caller (a symbol)
  > obj: end of the list, non-list */
-nonreturning_function(global, fehler_proper_list_dotted, (object caller, object obj))
-{
+nonreturning_function(modexp, error_proper_list_dotted,
+                      (object caller, object obj)) {
   pushSTACK(obj);                 /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_proper_list)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj); pushSTACK(caller);
-  fehler(type_error,GETTEXT("~S: A proper list must not end with ~S"));
+  error(type_error,GETTEXT("~S: A proper list must not end with ~S"));
 }
 
 /* Error message, if an object isn't a proper list because it is circular.
- fehler_proper_list_circular(caller,obj);
+ error_proper_list_circular(caller,obj);
  > caller: the caller (a symbol)
  > obj: circular list */
-nonreturning_function(global, fehler_proper_list_circular, (object caller, object obj))
-{
+nonreturning_function(global, error_proper_list_circular,
+                      (object caller, object obj)) {
   dynamic_bind(S(print_circle),T); /* bind *PRINT-CIRCLE* to T */
   pushSTACK(obj);                 /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_proper_list)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj); pushSTACK(caller);
-  fehler(type_error,GETTEXT("~S: A proper list must not be circular: ~S"));
+  error(type_error,GETTEXT("~S: A proper list must not be circular: ~S"));
+}
+
+/* return the name of the current caller (subr or fsubr)
+ this is only necessary for error signaled from both. */
+local inline object caller_name (void) {
+  var object caller = subr_self;
+  return subrp(caller) ? TheSubr(caller)->name : TheFsubr(caller)->name;
 }
 
 /* check_symbol_replacement(obj)
@@ -892,12 +953,10 @@ nonreturning_function(global, fehler_proper_list_circular, (object caller, objec
  can trigger GC */
 global maygc object check_symbol_replacement (object obj) {
   do {
-    var object caller = subr_self;
-    caller = (subrp(caller) ? TheSubr(caller)->name : TheFsubr(caller)->name);
     pushSTACK(NIL); /* no PLACE */
     pushSTACK(obj);       /* TYPE-ERROR slot DATUM */
     pushSTACK(S(symbol)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(caller);
+    pushSTACK(obj); pushSTACK(caller_name());
     check_value(type_error,GETTEXT("~S: ~S is not a symbol"));
     obj = value1;
   } while (!symbolp(obj));
@@ -909,19 +968,17 @@ global maygc object check_symbol_replacement (object obj) {
  > caller: a symbol
  < result: a non-constant symbol, a replacement
  can trigger GC */
-global maygc object check_symbol_non_constant_replacement (object obj, object caller)
-{
+global maygc object check_symbol_non_constant_replacement
+(object obj, object caller) {
   for (;;) {
     obj = check_symbol(obj);
-    if (constant_var_p(TheSymbol(obj))) {
-      pushSTACK(NIL); /* no PLACE */
-      pushSTACK(obj); /* SOURCE-PROGRAM-ERROR slot DETAIL */
-      pushSTACK(obj); pushSTACK(caller);
-      check_value(source_program_error,
-                  GETTEXT("~S: ~S is a constant, may not be used as a variable"));
-      obj = value1;
-    }
-    break;
+    if (!constant_var_p(TheSymbol(obj))) break;
+    pushSTACK(NIL); /* no PLACE */
+    pushSTACK(obj); /* SOURCE-PROGRAM-ERROR slot DETAIL */
+    pushSTACK(obj); pushSTACK(caller);
+    check_value(source_program_error,
+                GETTEXT("~S: ~S is a constant, may not be used as a variable"));
+    obj = value1;
   }
   return obj;
 }
@@ -929,8 +986,7 @@ global maygc object check_symbol_non_constant_replacement (object obj, object ca
 /* UP: signal an error if a non-symbol was declared special
  returns the symbol
  can trigger GC */
-global maygc object check_symbol_special (object obj, object caller)
-{
+global maygc object check_symbol_special (object obj, object caller) {
   while (!symbolp(obj)) {
     pushSTACK(caller);
     pushSTACK(NIL); /* no PLACE */
@@ -944,65 +1000,107 @@ global maygc object check_symbol_special (object obj, object caller)
   return obj;
 }
 
+/* UP: make sure that the symbol does not name a global symbol-macro
+ return the symbol
+ can trigger GC */
+global maygc object check_symbol_not_symbol_macro (object symbol) {
+  symbol = check_symbol(symbol);
+  if (symmacro_var_p(TheSymbol(symbol))) {
+    pushSTACK(symbol);                   /* save */
+    pushSTACK(NIL);                      /* 4 continue-format-string */
+    pushSTACK(S(simple_program_error));  /* 3 error-type */
+    pushSTACK(NIL);                      /* 2 error-format-string */
+    pushSTACK(TheSubr(subr_self)->name); /* 1 */
+    pushSTACK(symbol);                   /* 0 */
+    /* CLSTEXT "can trigger GC", so it cannot be called until
+       all the arguments have been already pushed on the STACK */
+    STACK_4 = CLSTEXT("Remove the global SYMBOL-MACRO definition");
+    if (eq(subr_self,L(proclaim)))
+      STACK_2 = CLSTEXT("~S: attempting to turn ~S into a SPECIAL variable, but it is already a global SYMBOL-MACRO.");
+    else if (eq(subr_self,L(proclaim_constant)))
+      STACK_2 = CLSTEXT("~S: attempting to turn ~S into a constant, but it is already a global SYMBOL-MACRO.");
+    else STACK_2 = CLSTEXT("~S: interning ~S into the KEYWORD package would turn it into a constant, but it is already a global SYMBOL-MACRO.");
+    funcall(L(cerror_of_type),5);
+    /* continue restart ==> remove SYMBOL-MACRO definition */
+    pushSTACK(STACK_0);                  /* save symbol */
+    clear_symmacro_flag(TheSymbol(STACK_0/*symbol*/));
+    pushSTACK(S(symbolmacro)); funcall(L(remprop),2);
+    symbol = popSTACK();
+  }
+  return symbol;
+}
+
+/* UP: make sure that the symbol does not name a global special variable
+ return the symbol
+ can trigger GC */
+global maygc object check_symbol_not_global_special (object symbol) {
+  symbol = check_symbol(symbol);
+  if (keywordp(symbol)) {
+    pushSTACK(symbol); pushSTACK(TheSubr(subr_self)->name);
+    error(program_error,
+          GETTEXT("~S: the symbol ~S names a global SPECIAL variable"));
+  }
+  if (special_var_p(TheSymbol(symbol))) {
+    pushSTACK(symbol);                   /* save */
+    pushSTACK(NIL);                      /* 4 continue-format-string */
+    pushSTACK(S(simple_program_error));  /* 3 error-type */
+    pushSTACK(NIL);                      /* 2 error-format-string */
+    pushSTACK(TheSubr(subr_self)->name); /* 1 */
+    pushSTACK(symbol);                   /* 0 */
+    /* CLSTEXT "can trigger GC", so it cannot be called until
+       all the arguments have been already pushed on the STACK */
+    STACK_4 = CLSTEXT("Remove the global SPECIAL variable binding");
+    STACK_2 = CLSTEXT("~S: the symbol ~S names a global SPECIAL variable");
+    funcall(L(cerror_of_type),5);
+    /* continue restart ==> remove the global SPECIAL binding */
+    symbol = popSTACK();
+    Symbol_value(symbol) = unbound;
+    clear_special_flag(TheSymbol(symbol));
+    clear_const_flag(TheSymbol(symbol));
+  }
+  return symbol;
+}
+
 /* error-message, if an object is not a simple-vector.
- fehler_kein_svector(caller,obj);
+ error_no_svector(caller,obj);
  > caller: caller (a symbol)
  > obj: non-Svector */
-nonreturning_function(global, fehler_kein_svector, (object caller, object obj))
-{
+nonreturning_function(modexp, error_no_svector, (object caller, object obj)) {
   pushSTACK(obj);              /* TYPE-ERROR slot DATUM */
   pushSTACK(S(simple_vector)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(S(simple_vector)); pushSTACK(obj); pushSTACK(caller);
-  fehler(type_error,GETTEXT("~S: ~S is not a ~S"));
+  error(type_error,GETTEXT("~S: ~S is not a ~S"));
 }
 
 /* error-message, if an object is not a vector.
- fehler_vector(obj);
+ error_vector(obj);
  > obj: non-vector */
-nonreturning_function(global, fehler_vector, (object obj)) {
+nonreturning_function(modexp, error_vector, (object obj)) {
   pushSTACK(obj);       /* TYPE-ERROR slot DATUM */
   pushSTACK(S(vector)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: ~S is not a vector"));
+  error(type_error,GETTEXT("~S: ~S is not a vector"));
 }
 
 /* check_array_replacement(obj)
  > obj: not an array
  < result: an array, a replacement
  can trigger GC */
-global maygc object check_array_replacement (object obj) {
-  do {
-    pushSTACK(NIL);             /* no PLACE */
-    pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(array));        /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: argument ~S is not an array"));
-    obj = value1;
-  } while (!arrayp(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(array,S(array),arrayp,
+                       GETTEXT("~S: argument ~S is not an array"))
 
 /* check_vector_replacement(obj)
  > obj: not an vector
  < result: an vector, a replacement
  can trigger GC */
-global maygc object check_vector_replacement (object obj) {
-  do {
-    pushSTACK(NIL);             /* no PLACE */
-    pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(vector));       /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: argument ~S is not a vector"));
-    obj = value1;
-  } while (!vectorp(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(vector,S(vector),vectorp,
+                       GETTEXT("~S: argument ~S is not a vector"))
 
 /* check_byte_vector_replacement(obj)
  > obj: not an (ARRAY (UNSIGNED-BYTE 8) (*))
  < result: an (ARRAY (UNSIGNED-BYTE 8) (*)), a replacement
  can trigger GC */
-global maygc object check_byte_vector_replacement (object obj) {
+modexp maygc object check_byte_vector_replacement (object obj) {
   do {
     pushSTACK(NIL);             /* no PLACE */
     pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
@@ -1017,63 +1115,44 @@ global maygc object check_byte_vector_replacement (object obj) {
 
 
 /* error-message, if an object is not an environment.
- fehler_environment(obj);
+ error_environment(obj);
  > obj: non-vector */
-nonreturning_function(global, fehler_environment, (object obj)) {
+nonreturning_function(global, error_environment, (object obj)) {
   pushSTACK(obj);              /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_svector5)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: ~S may not be used as an environment"));
+  error(type_error,GETTEXT("~S: ~S may not be used as an environment"));
 }
 
 /* error-message, if an argument is not a Fixnum >=0 :
- fehler_posfixnum(obj);
+ error_posfixnum(obj);
  > obj: the erroneous argument */
-nonreturning_function(global, fehler_posfixnum, (object obj)) {
+nonreturning_function(global, error_posfixnum, (object obj)) {
   pushSTACK(obj);               /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_posfixnum)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S should be a nonnegative fixnum"));
+  error(type_error,GETTEXT("~S: argument ~S is not a nonnegative fixnum"));
 }
 
 /* check_posfixnum_replacement(obj)
  > obj: not a fixnum >= 0
  < result: a fixnum >= 0, a replacement
  can trigger GC */
-global maygc object check_posfixnum_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);               /* TYPE-ERROR slot DATUM */
-    pushSTACK(O(type_posfixnum)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: argument ~S should be a nonnegative fixnum"));
-    obj = value1;
-  } while (!posfixnump(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(posfixnum,O(type_posfixnum),posfixnump,
+                       GETTEXT("~S: argument ~S is not a nonnegative fixnum"))
 
 /* check_integer_replacement(obj)
  > obj: not an integer
  < result: an integer, a replacement
  can trigger GC */
-global maygc object check_integer_replacement (object obj) {
-  do {
-    pushSTACK(NIL);             /* no PLACE */
-    pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(integer));      /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj);
-    pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not an integer"));
-    obj = value1;
-  } while (!integerp(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(integer,S(integer),integerp,
+                       GETTEXT("~S: ~S is not an integer"))
 
 /* check_pos_integer_replacement(obj)
  > obj: not an integer >= 0
  < result: an integer >= 0, a replacement
  can trigger GC */
-global maygc object check_pos_integer_replacement (object obj) {
+modexp maygc object check_pos_integer_replacement (object obj) {
   do {
     pushSTACK(NIL);                /* no PLACE */
     pushSTACK(obj);                /* TYPE-ERROR slot DATUM */
@@ -1087,98 +1166,78 @@ global maygc object check_pos_integer_replacement (object obj) {
 }
 
 /* error-message, if an argument is not a Character:
- fehler_char(obj);
+ error_char(obj);
  > obj: the erroneous argument */
-nonreturning_function(global, fehler_char, (object obj)) {
+nonreturning_function(global, error_char, (object obj)) {
   pushSTACK(obj);          /* TYPE-ERROR slot DATUM */
   pushSTACK(S(character)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not a character"));
+  error(type_error,GETTEXT("~S: argument ~S is not a character"));
 }
 
 /* check_char_replacement(obj)
  > obj: not a character
  < result: a character, a replacement
  can trigger GC */
-global maygc object check_char_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);          /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(character)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj);
-    pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: argument ~S is not a character"));
-    obj = value1;
-  } while (!charp(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(char,S(character),charp,
+                       GETTEXT("~S: argument ~S is not a character"))
 
 /* check_string_replacement(obj)
  > obj: not a string
  < result: a string, a replacement
  can trigger GC */
-global maygc object check_string_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);       /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(string)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: argument ~S is not a string"));
-    obj = value1;
-  } while (!stringp(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(string,S(string),stringp,
+                       GETTEXT("~S: argument ~S is not a string"))
 
 /* error-message, if an argument is not a Simple-String:
  > obj: the erroneous argument */
-nonreturning_function(global, fehler_sstring, (object obj)) {
+nonreturning_function(modexp, error_sstring, (object obj)) {
   pushSTACK(obj);              /* TYPE-ERROR slot DATUM */
   pushSTACK(S(simple_string)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(S(simple_string)); pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not a ~S"));
+  error(type_error,GETTEXT("~S: argument ~S is not a ~S"));
 }
 
 /* error-message, if a Simple-String is immutable:
- fehler_sstring_immutable(obj);
+ error_sstring_immutable(obj);
  > obj: the String */
-nonreturning_function(global, fehler_sstring_immutable, (object obj)) {
+nonreturning_function(global, error_sstring_immutable, (object obj)) {
   pushSTACK(obj);
-  fehler(error,GETTEXT("Attempt to modify a read-only string: ~S"));
+  error(error_condition,GETTEXT("Attempt to modify a read-only string: ~S"));
 }
 
 /* Error message, if an argument is not of type (OR STRING INTEGER).
- fehler_string_integer(obj)  */
-nonreturning_function(global, fehler_string_integer, (object obj)) {
+ error_string_integer(obj)  */
+nonreturning_function(modexp, error_string_integer, (object obj)) {
   pushSTACK(obj);                    /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_string_integer)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,
-         GETTEXT("~S: argument ~S is neither a string nor an integer"));
+  error(type_error,
+        GETTEXT("~S: argument ~S is neither a string nor an integer"));
 }
 
 /* Error message, if a string size is too big.
- fehler_stringsize(size);
+ error_stringsize(size);
  > size: the desired string length  */
-nonreturning_function(global, fehler_stringsize, (uintV size)) {
+nonreturning_function(global, error_stringsize, (uintV size)) {
   var object obj = UV_to_I(size);
   pushSTACK(obj);                /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_stringsize)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj);
-  fehler(type_error,
-         GETTEXT("string too long: desired length ~S exceeds the supported maximum length"));
+  error(type_error,GETTEXT("string too long: desired length ~S exceeds the supported maximum length"));
 }
 
 /* error message if an argument is not a class.
- fehler_class(caller,obj);
+ error_class(caller,obj);
  > obj: the erroneous argument */
-nonreturning_function(global, fehler_class, (object obj)) {
+nonreturning_function(global, error_class, (object obj)) {
   pushSTACK(obj);      /* TYPE-ERROR slot DATUM */
   pushSTACK(S(class)); /* CLOS:CLASS, TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name); /* function name */
-  fehler(type_error,GETTEXT("~S: ~S is not a class"));
+  error(type_error,GETTEXT("~S: ~S is not a class"));
 }
 
 /* error-message, if an argument is not a Stream:
@@ -1186,17 +1245,8 @@ nonreturning_function(global, fehler_class, (object obj)) {
  > obj: not a stream
  < obj: a stream
  can trigger GC */
-global maygc object check_stream_replacement (object obj) {
-  do {
-    pushSTACK(NIL);             /* no PLACE */
-    pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(stream));       /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: argument ~S is not a stream"));
-    obj = value1;
-  } while (!streamp(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(stream,S(stream),streamp,
+                       GETTEXT("~S: argument ~S is not a stream"))
 
 /* Report an error when the argument is not an encoding:
  > obj: the (possibly) bad argument
@@ -1211,7 +1261,7 @@ global maygc object check_encoding (object arg, const gcv_object_t *e_default,
     return *e_default;
   if (encodingp(arg))
     return arg;
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   if (symbolp(arg) && constant_var_p(TheSymbol(arg))
       && encodingp(Symbol_value(arg)))
     return Symbol_value(arg);
@@ -1248,28 +1298,44 @@ global maygc object check_encoding (object arg, const gcv_object_t *e_default,
   if (keyword_p) pushSTACK(S(Kexternal_format));
   pushSTACK(TheSubr(subr_self)->name);
   check_value(type_error,
-              keyword_p ? GETTEXT("~S: illegal ~S argument ~S")
-              : GETTEXT("~S: argument ~S is not a character set"));
+              keyword_p ? GETTEXT("~S: Illegal ~S argument ~S")
+              : GETTEXT("~S: Argument ~S is not a character set"));
   arg = value1;
   goto restart;
 }
 
+/* Signal an Error on illegal argument
+ > arg: bad object
+ > typ: expected type (may be nullobj to signal a regular error
+        instead of a type-error)
+ > key: the argument name (usually a keyword) */
+nonreturning_function(global, error_illegal_arg,
+                      (object arg, object typ, object key)) {
+  condition_t errtype = error_condition;
+  if (!eq(typ,nullobj)) {
+    pushSTACK(arg); /* TYPE-ERROR slot DATUM */
+    pushSTACK(typ); /* TYPE-ERROR slot EXPECTED-TYPE */
+    errtype = type_error;
+  }
+  pushSTACK(arg); pushSTACK(key); pushSTACK(TheSubr(subr_self)->name);
+  error(errtype,GETTEXT("~S: Illegal ~S argument ~S"));
+}
+
 /* Error when the property list has odd length
- fehler_plist_odd(caller,plist);
+ error_plist_odd(caller,plist);
  > plist: bad plist */
-nonreturning_function(global, fehler_plist_odd, (object plist)) {
+nonreturning_function(modexp, error_plist_odd, (object plist)) {
   pushSTACK(plist);             /* TYPE-ERROR slot DATUM */
   pushSTACK(S(plist));          /* TYPE-ERROR slot EXPECTED-TYPE*/
   pushSTACK(plist); pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: the property list ~S has an odd length"));
+  error(type_error,GETTEXT("~S: the property list ~S has an odd length"));
 }
 
 /* error-message for non-paired keyword-arguments
- fehler_key_odd(argcount,caller);
+ error_key_odd(argcount,caller);
  > argcount: the number of arguments on the STACK
  > caller: function */
-nonreturning_function(global, fehler_key_odd, (uintC argcount, object caller))
-{
+nonreturning_function(modexp, error_key_odd, (uintC argcount, object caller)) {
   var uintC count;
   pushSTACK(NIL); pushSTACK(NIL);
   for (count=0; count<argcount; count++) STACK_(count) = STACK_(count+2);
@@ -1277,29 +1343,28 @@ nonreturning_function(global, fehler_key_odd, (uintC argcount, object caller))
   var object arglist = listof(argcount);
   STACK_1 = arglist;
   /* ANSI CL 3.5.1.6. wants a PROGRAM-ERROR here. */
-  fehler(program_error,
-         GETTEXT("~S: keyword arguments in ~S should occur pairwise"));
+  error(program_error,
+        GETTEXT("~S: keyword arguments in ~S should occur pairwise"));
 }
 
 /* error-message for flawed keyword
- fehler_key_notkw(kw);
+ error_key_notkw(kw);
  > kw: Non-Symbol
  > caller: function */
-nonreturning_function(global, fehler_key_notkw, (object kw, object caller)) {
+nonreturning_function(global, error_key_notkw, (object kw, object caller)) {
   pushSTACK(kw);        /* KEYWORD-ERROR slot DATUM */
   pushSTACK(S(symbol)); /* KEYWORD-ERROR slot EXPECTED-TYPE */
   pushSTACK(kw); pushSTACK(S(LLkey)); pushSTACK(caller);
-  fehler(keyword_error,
-         GETTEXT("~S: ~S marker ~S is not a symbol"));
+  error(keyword_error,GETTEXT("~S: ~S marker ~S is not a symbol"));
 }
 
 /* error-message for flawed keyword
- fehler_key_badkw(fun,kw,kwlist);
+ error_key_badkw(fun,kw,kwlist);
  > fun: function
  > key: illegal keyword
  > val: its value
  > kwlist: list of legal keywords */
-nonreturning_function(global, fehler_key_badkw,
+nonreturning_function(modexp, error_key_badkw,
                       (object fun, object key, object val, object kwlist)) {
   pushSTACK(key); /* KEYWORD-ERROR slot DATUM */
   pushSTACK(kwlist);
@@ -1312,9 +1377,9 @@ nonreturning_function(global, fehler_key_badkw,
     Car(type) = S(member); Cdr(type) = STACK_4;
     STACK_4 = type;
   }
-  fehler(keyword_error,
-         GETTEXT("~S: illegal keyword/value pair ~S, ~S in argument list.\n"
-                 "The allowed keywords are ~S"));
+  error(keyword_error,
+        GETTEXT("~S: illegal keyword/value pair ~S, ~S in argument list.\n"
+                "The allowed keywords are ~S"));
 }
 
 /* check_function_replacement(obj)
@@ -1404,7 +1469,8 @@ global maygc object check_fdefinition (object funname, object caller)
  > obj: not a function name
  < result: a function name, either the same as obj or a replacement
  can trigger GC */
-global maygc object check_funname_replacement (condition_t errtype, object caller, object obj) {
+global maygc object check_funname_replacement
+(condition_t errtype, object caller, object obj) {
   pushSTACK(caller); /* save */
   do {
     caller = STACK_0;
@@ -1430,33 +1496,33 @@ global maygc object check_funname_replacement (condition_t errtype, object calle
 /* error-message, if an argument is a lambda-expression instead of a function:
  caller: caller (a symbol)
  obj: the erroneous argument */
-nonreturning_function(global, fehler_lambda_expression,
+nonreturning_function(global, error_lambda_expression,
                       (object caller, object obj)) {
   pushSTACK(obj);         /* TYPE-ERROR slot DATUM */
   pushSTACK(S(function)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj); pushSTACK(caller);
-  fehler(type_error,
-         GETTEXT("~S: argument ~S is not a function.\n"
-                 "To get a function in the current environment, write (FUNCTION ...).\n"
-                 "To get a function in the global environment, write (COERCE '... 'FUNCTION)."));
+  error(type_error,
+        GETTEXT("~S: argument ~S is not a function.\n"
+                "To get a function in the current environment, write (FUNCTION ...).\n"
+                "To get a function in the global environment, write (COERCE '... 'FUNCTION)."));
 }
 
 /* too many arguments in a function call
- > caller : the function that is reporting the error
+ > caller : the function that is reporting the error (unbound == EVAL/APPLY)
  > func   : the function being incorrectly called
  > ngiven : the number of arguments given
  < nmax   : the maximum number of arguments accepted */
-nonreturning_function(global, fehler_too_many_args,
+nonreturning_function(global, error_too_many_args,
                       (object caller, object func, uintL ngiven, uintL nmax)) {
   pushSTACK(func);
   pushSTACK(fixnum(nmax));
   pushSTACK(fixnum(ngiven));
   /* ANSI CL 3.5.1.3. wants a PROGRAM-ERROR here. */
   if (!boundp(caller))
-    fehler(program_error,GETTEXT("EVAL/APPLY: Too many arguments (~S instead of at most ~S) given to ~S"));
+    error(program_error,GETTEXT("EVAL/APPLY: Too many arguments (~S instead of at most ~S) given to ~S"));
   else {
     pushSTACK(caller);
-    fehler(program_error,GETTEXT("~S: Too many arguments (~S instead of at most ~S) given to ~S"));
+    error(program_error,GETTEXT("~S: Too many arguments (~S instead of at most ~S) given to ~S"));
   }
 }
 
@@ -1465,330 +1531,149 @@ nonreturning_function(global, fehler_too_many_args,
  > func   : the function being incorrectly called
  > ngiven : the number of arguments given
  < nmin   : the minimum number of arguments required */
-nonreturning_function(global, fehler_too_few_args,
+nonreturning_function(global, error_too_few_args,
                       (object caller, object func, uintL ngiven, uintL nmin)) {
   pushSTACK(func);
   pushSTACK(fixnum(nmin));
   pushSTACK(fixnum(ngiven));
   /* ANSI CL 3.5.1.2. wants a PROGRAM-ERROR here. */
   if (!boundp(caller))
-    fehler(program_error,GETTEXT("EVAL/APPLY: Too few arguments (~S instead of at least ~S) given to ~S"));
+    error(program_error,GETTEXT("EVAL/APPLY: Too few arguments (~S instead of at least ~S) given to ~S"));
   else {
     pushSTACK(caller);
-    fehler(program_error,GETTEXT("~S: Too few arguments (~S instead of at least ~S) given to ~S"));
+    error(program_error,GETTEXT("~S: Too few arguments (~S instead of at least ~S) given to ~S"));
   }
 }
 
-# Error message, if an argument isn't of a given elementary C type.
-# fehler_<ctype>(obj);
-# > obj: the faulty argument
-nonreturning_function(global, fehler_uint8, (object obj)) {
+/* error-message, if a symbol has no value.
+ > symbol_: unbound symbol
+ > restart_p: false if nonreturning
+ < value1: bound value
+ < value2: T if STORE-VALUE was selected, NIL otherwise
+ can trigger GC */
+global maygc void check_variable_value_replacement (gcv_object_t *symbol_,
+                                                    bool restart_p) {
+  do {
+    if (restart_p) pushSTACK(*symbol_); /* PLACE */
+    pushSTACK(*symbol_); /* CELL-ERROR Slot NAME */
+    pushSTACK(*symbol_); pushSTACK(caller_name());
+    if (restart_p)
+      check_value(unbound_variable,GETTEXT("~S: variable ~S has no value"));
+    else error(unbound_variable,GETTEXT("~S: variable ~S has no value"));
+  } while (!boundp(value1));
+}
+
+/* error if an argument is not of a given elementary integer C type.
+ error_c_integer(obj);
+ > obj: the faulty argument
+ > tcode: type code: 0 for int8, 1 for int16, 2 for int32, 3 for int64
+ > signedp: sint or uint */
+local const char* prepare_c_integer_signal (object obj, int tcode, bool signedp)
+{
   pushSTACK(obj);           /* TYPE-ERROR slot DATUM */
-  pushSTACK(O(type_uint8)); /* TYPE-ERROR slot EXPECTED-TYPE */
-  pushSTACK(fixnum(8)); pushSTACK(obj);
+  pushSTACK((signedp?&O(type_sint8):&O(type_uint8))[tcode]); /*EXPECTED-TYPE*/
+  pushSTACK(fixnum(8<<tcode)); pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not a nonnegative integer with at most ~S bits"));
+  return signedp
+    ? GETTEXT("~S: argument ~S is not an integer with at most ~S bits (including the sign bit)")
+    : GETTEXT("~S: argument ~S is not a nonnegative integer with at most ~S bits");
 }
-nonreturning_function(global, fehler_sint8, (object obj)) {
-  pushSTACK(obj);           /* TYPE-ERROR slot DATUM */
-  pushSTACK(O(type_sint8)); /* TYPE-ERROR slot EXPECTED-TYPE */
-  pushSTACK(fixnum(8)); pushSTACK(obj);
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not an integer with at most ~S bits (including the sign bit)"));
-}
-nonreturning_function(global, fehler_uint16, (object obj)) {
-  pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-  pushSTACK(O(type_uint16)); /* TYPE-ERROR slot EXPECTED-TYPE */
-  pushSTACK(fixnum(16)); pushSTACK(obj);
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not a nonnegative integer with at most ~S bits"));
-}
-nonreturning_function(global, fehler_sint16, (object obj)) {
-  pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-  pushSTACK(O(type_sint16)); /* TYPE-ERROR slot EXPECTED-TYPE */
-  pushSTACK(fixnum(16)); pushSTACK(obj);
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not an integer with at most ~S bits (including the sign bit)"));
-}
-nonreturning_function(global, fehler_uint32, (object obj)) {
-  pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-  pushSTACK(O(type_uint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
-  pushSTACK(fixnum(32)); pushSTACK(obj);
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not a nonnegative integer with at most ~S bits"));
-}
-nonreturning_function(global, fehler_sint32, (object obj)) {
-  pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-  pushSTACK(O(type_sint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
-  pushSTACK(fixnum(32)); pushSTACK(obj);
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not an integer with at most ~S bits (including the sign bit)"));
-}
-nonreturning_function(global, fehler_uint64, (object obj)) {
-  pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-  pushSTACK(O(type_uint64)); /* TYPE-ERROR slot EXPECTED-TYPE */
-  pushSTACK(fixnum(64)); pushSTACK(obj);
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not a nonnegative integer with at most ~S bits"));
-}
-nonreturning_function(global, fehler_sint64, (object obj)) {
-  pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-  pushSTACK(O(type_sint64)); /* TYPE-ERROR slot EXPECTED-TYPE */
-  pushSTACK(fixnum(64)); pushSTACK(obj);
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not an integer with at most ~S bits (including the sign bit)"));
+nonreturning_function(modexp, error_c_integer,
+                      (object obj, int tcode, bool signedp)) {
+  error(type_error,prepare_c_integer_signal(obj,tcode,signedp));
 }
 
-/* error, if argument is not an integer in the range of the C type 'uint8'.
- check_uint8_replacement(obj)
- > obj: not an integer in the range of uint8
- < obj: an integer in the range of uint8
+/* get a replacement of a given elementary integer C type.
+ check_c_integer_replacement(obj)
+ > obj: not an integer in the range specified by tcode and signedp (see above)
+ < obj: an integer in the range specified by tcode and signedp
  can trigger GC */
-global maygc object check_uint8_replacement (object obj) {
-  do {
+modexp maygc object check_c_integer_replacement (object obj, int tcode,
+                                                 bool signedp) {
+  while (1) {
     pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);           /* TYPE-ERROR slot DATUM */
-    pushSTACK(O(type_uint8)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not an 8-bit number"));
+    check_value(type_error,prepare_c_integer_signal(obj,tcode,signedp));
     obj = value1;
-  } while (!uint8_p(obj));
-  return obj;
+    switch (signedp ? tcode : tcode + 4) {
+      case 0: if (sint8_p(obj)) return obj; else break;
+      case 1: if (sint16_p(obj)) return obj; else break;
+      case 2: if (sint32_p(obj)) return obj; else break;
+      case 3: if (sint64_p(obj)) return obj; else break;
+      case 4: if (uint8_p(obj)) return obj; else break;
+      case 5: if (uint16_p(obj)) return obj; else break;
+      case 6: if (uint32_p(obj)) return obj; else break;
+      case 7: if (uint64_p(obj)) return obj; else break;
+      default: NOTREACHED;
+    }
+  };
 }
 
-/* error, if argument is not an integer in the range of the C type 'sint8'.
- check_sint8_replacement(obj)
- > obj: not an integer in the range of sint8
- < obj: an integer in the range of sint8
- can trigger GC */
-global maygc object check_sint8_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);           /* TYPE-ERROR slot DATUM */
-    pushSTACK(O(type_sint8)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not an 8-bit number"));
-    obj = value1;
-  } while (!sint8_p(obj));
-  return obj;
-}
-
-/* error, if argument is not an integer in the range of the C type 'uint16'.
- check_uint16_replacement(obj)
- > obj: not an integer in the range of uint16
- < obj: an integer in the range of uint16
- can trigger GC */
-global maygc object check_uint16_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-    pushSTACK(O(type_uint16)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a 16-bit number"));
-    obj = value1;
-  } while (!uint16_p(obj));
-  return obj;
-}
-
-/* error, if argument is not an integer in the range of the C type 'sint16'.
- check_sint16_replacement(obj)
- > obj: not an integer in the range of sint16
- < obj: an integer in the range of sint16
- can trigger GC */
-global maygc object check_sint16_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-    pushSTACK(O(type_sint16)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a 16-bit number"));
-    obj = value1;
-  } while (!sint16_p(obj));
-  return obj;
-}
-
-/* error, if argument is not an integer in the range of the C type 'uint32'.
- check_uint32_replacement(obj)
- > obj: not an integer in the range of uint32
- < obj: an integer in the range of uint32
- can trigger GC */
-global maygc object check_uint32_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-    pushSTACK(O(type_uint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a 32-bit number"));
-    obj = value1;
-  } while (!uint32_p(obj));
-  return obj;
-}
-
-/* error, if argument is not an integer in the range of the C type 'sint32'.
- check_sint32_replacement(obj)
- > obj: not an integer in the range of sint32
- < obj: an integer in the range of sint32
- can trigger GC */
-global maygc object check_sint32_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-    pushSTACK(O(type_sint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a 32-bit number"));
-    obj = value1;
-  } while (!sint32_p(obj));
-  return obj;
-}
-
-/* error, if argument is not an integer in the range of the C type 'uint64'.
- check_uint64_replacement(obj)
- > obj: not an integer in the range of uint64
- < obj: an integer in the range of uint64
- can trigger GC */
-global maygc object check_uint64_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-    pushSTACK(O(type_uint64)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a 64-bit number"));
-    obj = value1;
-  } while (!uint64_p(obj));
-  return obj;
-}
-
-/* error, if argument is not an integer in the range of the C type 'sint64'.
- check_sint64_replacement(obj)
- > obj: not an integer in the range of sint64
- < obj: an integer in the range of sint64
- can trigger GC */
-global maygc object check_sint64_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-    pushSTACK(O(type_sint64)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a 64-bit number"));
-    obj = value1;
-  } while (!sint64_p(obj));
-  return obj;
-}
+#if (int_bitsize==16)
+  #define uint_type_object  O(type_uint16)
+  #define sint_type_object  O(type_sint16)
+#else /* (int_bitsize==32) */
+  #define uint_type_object  O(type_uint32)
+  #define sint_type_object  O(type_sint32)
+#endif
 
 /* error, if argument is not an integer in the range of the C type 'uint'.
  check_uint_replacement(obj)
  > obj: not an integer in the range of uint
  < obj: an integer in the range of uint
  can trigger GC */
-global maygc object check_uint_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-   #if (int_bitsize==16)
-    pushSTACK(O(type_uint16)); /* TYPE-ERROR slot EXPECTED-TYPE */
-   #else /* (int_bitsize==32) */
-    pushSTACK(O(type_uint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
-   #endif
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not an `unsigned int' number"));
-    obj = value1;
-  } while (!uint_p(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(uint,uint_type_object,uint_p,
+                       GETTEXT("~S: ~S is not an `unsigned int' number"))
 
 /* error, if argument is not an integer in the range of the C type 'sint'.
  check_sint_replacement(obj)
  > obj: not an integer in the range of sint
  < obj: an integer in the range of sint
  can trigger GC */
-global maygc object check_sint_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-   #if (int_bitsize==16)
-    pushSTACK(O(type_sint16)); /* TYPE-ERROR slot EXPECTED-TYPE */
-   #else /* (int_bitsize==32) */
-    pushSTACK(O(type_sint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
-   #endif
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not an `int' number"));
-    obj = value1;
-  } while (!sint_p(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(sint,sint_type_object,sint_p,
+                       GETTEXT("~S: ~S is not an `int' number"))
+
+#undef uint_type_object
+#undef sint_type_object
+
+#if (long_bitsize==32)
+  #define ulong_type_object  O(type_uint32)
+  #define slong_type_object  O(type_sint32)
+#else /* (long_bitsize==64) */
+  #define ulong_type_object  O(type_uint64)
+  #define slong_type_object  O(type_sint64)
+#endif
 
 /* error, if argument is not an integer in the range of the C type 'ulong'.
  check_ulong_replacement(obj)
  > obj: not an integer in the range of ulong
  < obj: an integer in the range of ulong
  can trigger GC */
-global maygc object check_ulong_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-   #if (long_bitsize==32)
-    pushSTACK(O(type_uint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
-   #else /* (long_bitsize==64) */
-    pushSTACK(O(type_uint64)); /* TYPE-ERROR slot EXPECTED-TYPE */
-   #endif
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a `unsigned long' number"));
-    obj = value1;
-  } while (!ulong_p(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(ulong,ulong_type_object,ulong_p,
+                       GETTEXT("~S: ~S is not a `unsigned long' number"))
 
 /* error, if argument is not an integer in the range of the C type 'slong'.
  check_slong_replacement(obj)
  > obj: not an integer in the range of slong
  < obj: an integer in the range of slong
  can trigger GC */
-global maygc object check_slong_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);            /* TYPE-ERROR slot DATUM */
-   #if (long_bitsize==32)
-    pushSTACK(O(type_sint32)); /* TYPE-ERROR slot EXPECTED-TYPE */
-   #else /* (long_bitsize==64) */
-    pushSTACK(O(type_sint64)); /* TYPE-ERROR slot EXPECTED-TYPE */
-   #endif
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a `long' number"));
-    obj = value1;
-  } while (!slong_p(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(slong,slong_type_object,slong_p,
+                       GETTEXT("~S: ~S is not a `long' number"))
+
+#undef ulong_type_object
+#undef slong_type_object
 
 /* error, if argument is not a Single-Float.
  check_ffloat_replacement(obj)
  > obj: not a single-float
  < obj: a single-float
  can trigger GC */
-global maygc object check_ffloat_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(single_float)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a single-float"));
-    obj = value1;
-  } while (!single_float_p(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(ffloat,S(single_float),single_float_p,
+                       GETTEXT("~S: ~S is not a single-float"))
 
 /* error, if argument is not a Double-Float.
  check_dfloat_replacement(obj)
  > obj: not a double-float
  < obj: a double-float
  can trigger GC */
-global maygc object check_dfloat_replacement (object obj) {
-  do {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(double_float)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    check_value(type_error,GETTEXT("~S: ~S is not a double-float"));
-    obj = value1;
-  } while (!double_float_p(obj));
-  return obj;
-}
+MAKE_CHECK_REPLACEMENT(dfloat,S(double_float),double_float_p,
+                       GETTEXT("~S: ~S is not a double-float"))

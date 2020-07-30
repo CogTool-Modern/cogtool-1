@@ -1,3 +1,932 @@
+2010-07-04  Sam Steingold  <sds@gnu.org>
+
+	* streamslong.tst: bug#3024887: make-pipe-output-stream segfaults
+	when sending data
+
+2010-06-24  Sam Steingold  <sds@gnu.org>
+
+	* streamslong.tst: bug#3020933: (SETF STREAM-EXTERNAL-FORMAT)
+	fails on TWO-WAY-STREAM
+
+2010-06-15  Sam Steingold  <sds@gnu.org>
+
+	* streamslong.tst: test EXT:MAKE-BUFFERED-OUTPUT-STREAM,
+	including (close :abort)
+
+2010-06-13  Sam Steingold  <sds@gnu.org>
+
+	* streams.tst: bug#3014921: (stream-element-type
+	  (make-concatenated-stream)) ==> NIL
+
+2010-06-07  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst (machine-instance): MACHINE-INSTANCE return value
+	can be shorter (e.g., "sage [127.0.0.1]") than
+	gethostname's ("sage.math.washington.edu")
+
+2010-06-01  Sam Steingold  <sds@gnu.org>
+
+	* path.tst: fix bug#3009966: Problems with wild-inferiors in
+	DIRECTORY :FULL T
+
+2010-05-18  Sam Steingold  <sds@gnu.org>
+
+	* ext-clisp.tst: test *PRINT-CLOSURE* (RFE#3001956)
+
+2010-04-20  Sam Steingold  <sds@gnu.org>
+
+	* Makefile (LISP): use "LC_MESSAGES=en_US" & "-L english" to
+	ensure that all messages are in English
+
+2010-04-20  Sam Steingold  <sds@gnu.org>
+
+	* list-set.tst: add tests for INTERSECTION, UNION,
+	SET-EXCLUSIVE-OR, SUBSETP
+
+2010-04-20  Sam Steingold  <sds@gnu.org>
+
+	* macro8.tst: COMPILER-DIAGNOSTICS:USE-HANDLER:
+	COMPILE-FILE must notice the warnings signaled by EVAL-WHEN
+
+2010-02-11  Sam Steingold  <sds@gnu.org>
+
+	* conditions.tst: test "~" in function names
+
+2010-01-28  Sam Steingold  <sds@gnu.org>
+
+	* restarts.tst: fix bug#2941408: segfault after giving
+	invalid replacement value
+
+2009-11-25  Sam Steingold  <sds@gnu.org>
+
+	* streamslong.tst: fix bug#2902716: CLEAR-INPUT should clear
+	the EOF condition
+
+2009-11-19  Sam Steingold  <sds@gnu.org>
+
+	* path.tst: test RENAME-FILE :IF-EXISTS
+
+2009-10-29  Sam Steingold  <sds@gnu.org>
+
+	* streams.tst: test FRESH-LINE on broadcast streams
+
+2009-10-19  Sam Steingold  <sds@gnu.org>
+
+	* excepsit.tst, ffi.tst, path.tst: fix #-UNICODE
+
+2009-10-14  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst: revert last patch: do not conditionalize int64 tests:
+	most (all?) 32-bit platforms, including win32 and cygwin,
+	define HAVE_LONG_LONG_INT and thus support these tests
+
+2009-10-08  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst: fix bug#2874184: conditionalize 64-bit int use on
+	WORD-SIZE=64 (== WIDE_HARD): actually this is a _stronger_
+	condition than HAVE_LONG_LONG_INT which is required for 64-bit
+	integers to work, but this should be good enough for testing
+
+2009-09-27  Sam Steingold  <sds@gnu.org>
+
+	* macro8.tst: test bug#2868166: Do not eliminate function calls
+	which are advertised to have exceptional situation in unsafe code.
+
+2009-09-27  Sam Steingold  <sds@gnu.org>
+
+	* eval20.tst: test bug#2868147: declaim signals an error on
+	an invalid declaration
+
+2009-08-26  Sam Steingold  <sds@gnu.org>
+
+	* pack11.tst: also test combinations of packages using
+	with-package-iterator-*
+
+2009-08-12  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (report-results): accept :HERE
+	(run-some-tests): accept :SRCDIR and :OUTDIR
+
+2009-07-28  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* mt.tst: do not "reuse" *TH1* in some tests; use *TH3*
+
+2009-07-13  Sam Steingold  <sds@gnu.org>
+
+	* mt.tst: text thread-name, mutex-name, exemptions-name
+
+2009-07-13  Sam Steingold  <sds@gnu.org>
+
+	* mt.tst: test printing of threads, mutexes, and exemptions
+
+2009-07-06  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: check ARITHMETIC-ERROR slots
+
+2009-06-27  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* mt.tst: add EXEMPTION-BROADCAST and another WITH-DEFERRED-INTERRUPTS,
+	WITH-LOCK tests
+
+2009-06-27  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* mt.tst: add EXEMPTION-SIGNAL, EXEMPTION-WAIT and WITH-LOCK test
+
+2009-06-26  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* mt.tst: INTERN/UNINTERN use internally the package lock. No need for
+	another synchronization
+
+2009-06-26  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* mt.tst: fix tests that spawn more than 128 threads (MAXNTHREADS from
+	spvw.d)
+
+2009-06-25  Sam Steingold  <sds@gnu.org>
+
+	* mt.tst: test interaction of threads with hash-tables and packages
+
+2009-06-22  Sam Steingold  <sds@gnu.org>
+
+	* excepsit.tst: add a test for bug#2807311: (expt 10 10000000) segfaults
+
+2009-06-19  Sam Steingold  <sds@gnu.org>
+
+	* mt.tst: check that THREAD, MUTEX & EXEMPTION are valid types
+
+2009-06-19  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst: test size_t
+
+2009-06-14  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst (test-float-io-consistency): add
+
+2009-06-12  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: yet another test of printing of round numbers
+
+2009-06-07  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* mt.tst: reduce the timeout for WITH-TIMEOUT test. Currently on WIN32
+	it will fail anyway - 100 seconds are too much to wait for it
+
+2009-06-05  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* mt.tst: add tests for timed mutex wait. fix mutex tests that
+	were using MUTEX-LOCK/MUTEX-UNLOCK return value
+
+2009-05-17  Sam Steingold  <sds@gnu.org>
+
+	* strings.tst: add a test for trim-if
+
+2009-05-13  Sam Steingold  <sds@gnu.org>
+
+	* format.tst: add a test for (format "~G" 10^N)
+
+2009-02-27  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* mt.tst: fix thread-interrupt test (upon return from it - it is no
+	guaranteed that the function has finished it's execution in the
+	interrupted thread)
+
+2009-02-20  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* mt.tst: add tests for mutexes, per thread bindings of special
+	variables, thread interruption
+
+2009-01-18  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: test (log VERY-BIG-NUM)
+
+2009-01-07  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: move the ~E + float limits tests to format.tst
+
+2009-01-06  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: test ~E printing of float limits
+
+2008-12-31  Sam Steingold  <sds@gnu.org>
+
+	* ext-clisp.tst: test (declare (compile [name]))
+
+2008-12-29  Sam Steingold  <sds@gnu.org>
+
+	* econnreset.lisp: new file for testing the ECONNRESET problem in
+	socket-status, as reported by Don Cohen
+
+2008-12-28  Sam Steingold  <sds@gnu.org>
+
+	* ext-clisp.tst: add a test for c-CONCATENATE
+
+2008-12-21  Sam Steingold  <sds@gnu.org>
+
+	* ext-clisp.tst: add tests for MAKE-PIPE-INPUT-STREAM,
+	MAKE-PIPE-OUTPUT-STREAM, LAUNCH
+
+2008-12-18  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (run-test): remove the spurious (break), mistakenly
+	committed on 2008-11-26
+
+2008-12-16  Sam Steingold  <sds@gnu.org>
+
+	* streamslong.tst: test (SETF STREAM-ELEMENT-TYPE) and (SETF
+	STREAM-EXTERNAL-FORMAT) on CONCATENATED and BROADCAST streams
+
+2008-02-05  Jörg Höhle  <hoehle@users.sourceforge.net>
+
+	* unportable.tst, exceptsit.tst: more examples of unportable or
+	border-case ANSI-CL code.
+	* ext-clisp.tst: test VALUES places with EXT:LETF/LETF* as well as
+	PUSH, POP and PUSHNEW.
+
+2008-12-01  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (diff-seq): export for new-clx
+	(type-error-handler): export for rawsock
+
+2008-11-28  Sam Steingold  <sds@gnu.org>
+
+        * modules/berkeley-db/bdb.c, modules/dirkey/dirkey.c,
+	* modules/gdbm/gdbm.c, modules/i18n/gettext.c,
+	* modules/rawsock/rawsock.c, modules/syscalls/calls.c:
+	use begin/end_blocking_system_call instead of begin/end_system_call
+	for all file and network operations
+
+2008-11-28  Sam Steingold  <sds@gnu.org>
+
+	* gllib/stdint.in.h, gllib/sys_time.in.h, glm4/include_next.m4:
+	update from gnulib to fix the rpl_gettimeofday problem
+
+2008-11-27  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: check (log 0) in all incarnations (bug#2354265)
+
+2008-11-27  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* tests.lisp (run-test): use log file name as package name
+
+2008-11-26  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (run-test): accept :OWN-PACKAGE (defaults to T) to
+	run tests in an ad hoc package to avoid symbol value conflicts
+	in run-all-tests-parallel
+	* ffi.tst: do not create FTEST package
+	* iofkts.tst, streams.tst, symbol10.tst: remove IN-PACKAGE forms
+	* pack11.tst: prefix all package names with PACK11
+
+2008-11-25  Sam Steingold  <sds@gnu.org>
+
+	* mt.tst: check that DESCRIBE and TIMES work on
+	THREAD/MUTEX/EXEMPTION objects
+
+2008-11-25  Sam Steingold  <sds@gnu.org>
+
+	* bin-io.tst, clos.tst, encoding.tst, eval20.tst, excepsit.tst,
+	* ext-clisp.tst, lambda.tst, macro8.tst, mop.tst, pack11.tst,
+	* path.tst, socket.tst, streams.tst, streamslong.tst:
+	prefix all open file names with the test file name to avoid
+	conflicts when run in parallel
+
+2008-11-22  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* tests.lisp (run-all-tests-parallel): do not share args between threads
+
+2008-11-21  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* tests.lisp (run-all-tests-parallel): allow "approximately"
+	:concurrency threads to run simultaneously (default 5) and initialize
+	the C stack size to 16 MB
+
+2008-11-21  Vladimir Tzankov  <vtzankov@gmail.com>
+
+	* tests.lisp (run-all-tests-parallel): use keyword argument for mutex
+	name and WITH-LOCK for locking.
+
+2008-11-20  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (*all-tests*, test-weakptr): extracted from run-all-tests
+	(run-all-tests): use them
+	(run-all-tests-parallel) [(and CLISP MT)]: add
+	* Makefile (parallel): new target (calls run-all-tests-parallel)
+
+2008-11-06  Sam Steingold  <sds@gnu.org>
+
+	* macro8.tst: check unused function warnings
+
+2008-10-28  Sam Steingold  <sds@gnu.org>
+
+	* path.tst: add 2 tests for bug#2198109:
+	LOAD-LOGICAL-PATHNAME-TRANSLATIONS confuses "many" and "one"
+	when *LOAD-PATHS* is wild
+
+2008-10-16  Sam Steingold  <sds@gnu.org>
+
+	* symbol10.tst: check keyword reading
+
+2008-09-17  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (cmd-args): new function
+	* ext-clisp.tst (ext:run-program): use it;
+	avoid the potential of a dotted result list which breaks PRETTY-COMPARE
+	* modules/syscalls/test.tst: use CMD-ARGS and starting *PROC1* & *PROC2*
+
+2008-09-11  Sam Steingold  <sds@gnu.org>
+
+	* ext-clisp.tst: test ARGV, RUN-PROGRAM, and EXIT
+
+2008-08-12  Sam Steingold  <sds@gnu.org>
+
+	* alltest.tst: add tests for LISP-IMPLEMENTATION-TYPE,
+	LISP-IMPLEMENTATION-VERSION, MACHINE-INSTANCE, MACHINE-TYPE,
+	MACHINE-VERSION
+
+2008-08-11  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst: fix the gethostname=machine-instance case for systems
+	where gethostbyname(gethostname) /= gethostname (NetBSD 4.99.72 i386)
+	Reported by Aleksej Saushev <asau@inbox.ru>
+
+2008-08-10  Sam Steingold  <sds@gnu.org>
+
+	* path.tst (test-weird-pathnames): work around systems which only
+	accept ASCII pathnames (e.g., OSX PPC 10.4.11 (Darwin 8.11.0))
+
+2008-08-09  Sam Steingold  <sds@gnu.org>
+
+	* streams.tst: fix tests for the 2008-08-06 FILL-STREAM change;
+	use symbol-cleanup
+
+2008-08-05  Sam Steingold  <sds@gnu.org>
+
+	* ext-clisp.tst: many *REOPEN-OPEN-FILE* tests
+
+2008-07-30  Sam Steingold  <sds@gnu.org>
+
+	* ext-clisp.tst (check-load): test wildcards in *load-paths*
+
+2008-07-30  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (kill-down): kill files at all levels down
+	(rmrf): kill directories at all levels down
+
+2008-07-27  Sam Steingold  <sds@gnu.org>
+
+	* hashtable.tst: test support for circular keys
+
+2008-07-24  Sam Steingold  <sds@gnu.org>
+
+	* eval20.tst: add tests based on ansi-tests eval-when.15 & eval-when.17
+
+2008-07-23  Sam Steingold  <sds@gnu.org>
+
+	* bind.tst: test that flet/labels/macrolet respect SPECIAL declarations
+
+2008-07-23  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (run-test): return logname instead of testname to
+	clarify the output when the same test (e.g., bind) is run in both
+	compiled and interpreted variants
+
+2008-07-23  Sam Steingold  <sds@gnu.org>
+
+	* eval20.tst: add examples from
+	http://www.lisp.org/HyperSpec/Body/speope_fletcm_scm_macrolet.html
+
+2008-07-21  Sam Steingold  <sds@gnu.org>
+
+	* type.tst: check that the sets of declaration and type names are
+	disjoint (see http://www.lisp.org/HyperSpec/Body/dec_type.html)
+
+2008-07-21  Sam Steingold  <sds@gnu.org>
+
+	* streamslong.tst: add a test for bug#2022362: after a ((setf
+	stream-element-type) '(unsigned-byte 8)) after read-line on a :dos
+	stream an NL byte (10) is read from the stream
+
+2008-07-20  Sam Steingold  <sds@gnu.org>
+
+	* iofkts.tst: (copy-pprint-dispatch) returns a fresh object
+
+2008-07-18  Sam Steingold  <sds@gnu.org>
+
+	* iofkts.tst: enable the formerly risky test
+
+2008-07-17  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst (float-rational-cmp): also compare x with ~10x to
+	check the overflow handling
+
+2008-07-17  Sam Steingold  <sds@gnu.org>
+
+	* ext-clisp.tst: test canonicalize
+
+2008-07-16  Sam Steingold  <sds@gnu.org>
+
+	* path.tst: namespace cleanup (string -> my-string &c)
+
+2008-07-16  Sam Steingold  <sds@gnu.org>
+
+	* path.tst: test DIRECTORY on poorly encoded names
+
+2008-07-15  Bruno Haible  <bruno@clisp.org>
+
+	* excepsit.tst: Change expected condition type in last commit.
+
+2008-07-15  Sam Steingold  <sds@gnu.org>
+
+	* alltest.tst: lambda-parameters-limit is exclusive;
+	instead of disabling the test on win32/g++,
+	reduce the g++ limit to 256 on all platforms
+	Reported by Vladimir Tzankov <vtzankov@gmail.com>
+
+2008-07-15  Sam Steingold  <sds@gnu.org>
+
+	* excepsit.tst: (convert-string-from-bytes #(1) charset:ucs-4)
+
+2008-07-12  Sam Steingold  <sds@gnu.org>
+
+	* path.tst: test PROBE-PATHNAME
+
+2008-07-10  Sam Steingold  <sds@gnu.org>
+
+	* excepsit.tst: add tests for bug#2015118: huge shifts cause
+	arithmetic-error instead of a stack overflow
+
+2008-07-09  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst (float-rational-cmp): check float/rational comparison
+
+2008-07-09  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (symbol-cleanup): new helper
+	* bind.tst, clos.tst, eval20.tst, format.tst, iofkts.tst:
+	* macro8.tst, number2.tst, setf.tst, weakptr.tst: use it
+
+2008-07-01  Reini Urban  <rurban@x-ray.at>
+
+	* tests.lisp (kill-down, rmrf): ext:delete-dir is deprecated
+
+2008-06-30  Sam Steingold  <sds@gnu.org>
+
+	* socket.tst: check socket-connect with timeout to a dead port
+
+2008-06-27  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (run-all-tests): run "bind" both :EVAL and :COMPILE
+	regardless of disable-risky
+
+2008-06-24  Sam Steingold  <sds@gnu.org>
+
+	* eval20.tst: add some let/eval/symbol-value tests
+
+2008-06-24  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (kill-down, rmrf, prepare-dir): #+CLISP-specific
+
+2008-06-21  Sam Steingold  <sds@gnu.org>
+
+	* macro8.tst (test-pr-kw): check that we can write a literal
+	structure in the FAS file compiled in a modern package
+
+2008-06-14  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst: import princ-error into ftest
+
+2008-06-13  Sam Steingold  <sds@gnu.org>
+
+	* macro8.tst (test-macro-dotted-args): check dotted macro forms
+
+2008-06-03  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst: do not require errno and strerror
+
+2008-05-30  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst (gethostname): test 2 approaches
+
+2008-05-28  Sam Steingold  <sds@gnu.org>
+
+	* format.tst: use defparameter instead of setq; do a full cleanup
+
+2008-05-28  Sam Steingold  <sds@gnu.org>
+
+	* streamslong.tst (gray-out): test stream-write-sequence et al
+
+2008-05-12  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (kill-down, rmrf, prepare-dir, show-file, finish-file):
+	move here from modules/berkeley-db/test.tst
+
+2008-05-06  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (report-results): since we now have more than 10,000
+	tests, we need more space for numbers...
+
+2008-05-06  Sam Steingold  <sds@gnu.org>
+
+	* weak.tst: test DESCRIBE on weak objects
+
+2008-05-01  Sam Steingold  <sds@gnu.org>
+
+	* format.tst: move numeric formatting tests here from number2.tst
+
+2008-04-30  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: add tests for bug#1928759:
+	(format nil "~8e" .999999d0) => " 10.0d-1"
+
+2008-04-14  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: add tests for bug#1942246:
+	(coerce 1 '(double-float 0d0)) fails
+
+2008-04-07  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: updated for improved accuracy of log(complex)
+
+2008-04-06  Sam Steingold  <sds@gnu.org>
+
+	* setf.tst: check that macro doc strings are preserved by compile
+
+2008-04-06  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst: test DESCRIBE and DOCUMENTATION of foreign functions and
+	variables
+
+2008-04-03  Sam Steingold  <sds@gnu.org>
+
+	* format.tst: add tests for bug#1790496:
+	float format directive ~ve prints spurious digits
+
+2008-03-27  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: add tests for bug#1683394:
+	TANH floating point overflow for large floats
+
+2008-03-18  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst: update tests for versioned symbols
+
+2008-03-02  Sam Steingold  <sds@gnu.org>
+
+	* macro8.tst (check-const-fold): check constant folding
+
+2008-02-19  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst: foreign-library --> open-foreign-library;
+	lookup-foreign-variable --> find-foreign-variable
+
+2008-02-19  Sam Steingold  <sds@gnu.org>
+
+	* macro8.tst: test new macro COMPILE-TIME-VALUE
+
+2008-02-11  Sam Steingold  <sds@gnu.org>
+
+	* iofkts.tst: test for bug#1890854:
+	read-preserving-whitespace eats whitespace after quoted obj
+
+2008-02-06  Sam Steingold  <sds@gnu.org>
+
+	* macro8.tst ("test-crlf-print-read.lisp"): use
+	sys::set-output-stream-fasl to ensure faithful i/o
+
+2008-01-30  Sam Steingold  <sds@gnu.org>
+
+	* iofkts.tst: check that (copy-pprint-dispatch)
+	returns *print-pprint-dispatch-table*;
+	in all tests, bind *print-pprint-dispatch-table*
+	to (copy-pprint-dispatch nil), not (copy-pprint-dispatch)
+
+2008-01-25  Sam Steingold  <sds@gnu.org>
+
+	* path.tst: use EXT:DELETE-DIRECTORY, EXT:MAKE-DIRECTORY, and
+	EXT:RENAME-DIRECTORY instead of the deprecated EXT:DELETE-DIR,
+	EXT:MAKE-DIR, and EXT:RENAME-DIR
+	test (directory "foo/" :full t)
+
+2008-01-22  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst (toupper, pcre_version): add tests
+
+2008-01-17  Sam Steingold  <sds@gnu.org>
+
+	* path.tst: test (open "..." :direction :output :if-exists
+	:rename-and-delete)
+
+2008-01-13  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (run-all-tests) [mt]: also run mt.tst
+	* mt.tst: new file
+
+2007-12-12  Sam Steingold  <sds@gnu.org>
+
+	* type.tst: test all atomic types in table 4-2
+	http://www.lisp.org/HyperSpec/Body/sec_4-2-3.html
+
+2007-12-20  Sam Steingold  <sds@gnu.org>
+
+	* type.tst: add tests for bug#1854698:
+	BYTE is a type, but is unacceptable input to TYPEP
+
+2007-11-25  Sam Steingold  <sds@gnu.org>
+
+	* mop.tst: add a test for
+	http://clisp.cons.org/impnotes/mop-clisp.html#mop-clisp-warn
+
+2007-11-21  Sam Steingold  <sds@gnu.org>
+
+	* iofkts.tst: add a test for bug#1835520:
+	PPRINT-LOGICAL-BLOCK ignores *PRINT-PPRINT-DISPATCH-TABLE*
+
+2007-11-19  Sam Steingold  <sds@gnu.org>
+
+	* iofkts.tst: add a test for bug#1834193:
+	fresh-line at the end of a line containing only tabs
+
+2007-10-02  Sam Steingold  <sds@gnu.org>
+
+	* streams.tst: test file-length and file-position on unbuffered streams
+
+2007-09-25  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (diff-seq): add
+
+2007-09-20  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (do-test, do-errcheck): do (force-output log) so that
+	we have a non-empty log file in case of a hard crash
+
+2007-08-24  Sam Steingold  <sds@gnu.org>
+
+	* path.tst: test rename-dir
+
+2007-08-23  Sam Steingold  <sds@gnu.org>
+
+	* ffi.tst (ffi_uintp, my-uintp): add one argument def-c-type test
+
+2007-06-09  Jörg Höhle  <hoehle@users.sourceforge.net>
+
+	* clos.tst [CLISP]: Added (declare (ext:unspecial a b c))
+	Better yet portably rename (defparameter a) to *a*
+	* setf.tst: Added rotatef example from CLHS
+
+2007-06-05  Jörg Höhle  <hoehle@users.sourceforge.net>
+
+	* ext-clisp.tst: new file
+	check clisp specific extensions not tested in alltest or other files.
+
+2007-05-06  Sam Steingold  <sds@gnu.org>
+
+	* excepsit.tst: (defun if) signals a PROGRAM-ERROR
+
+2007-05-06  Sam Steingold  <sds@gnu.org>
+
+	* symbols.tst: test for bug#1713130: some CL symbols are not locked
+
+2007-04-27  Jörg Höhle  <hoehle@users.sourceforge.net>
+
+	* unportable.tst: new file
+	check behaviour ANSI CL says implementation-defined or -dependent
+
+2007-01-10  Sam Steingold  <sds@podval.org>
+
+	* encoding.tst: test for bug#1632718: CONVERT-STRING-FROM-BYTES
+	does not check incomplete byte sequence
+
+2007-01-08  Sam Steingold  <sds@podval.org>
+
+	* encoding.tst: test for
+	bug#1564818: CRLF handling does not work for UNICODE-16
+	bug#1631760: unicode-16 cannot be used with unbuffered streams
+
+2007-01-04  Sam Steingold  <sds@podval.org>
+
+	* streams.tst: must compare encoding with EQUALP, not EQ
+
+2006-12-29  Sam Steingold  <sds@podval.org>
+
+	* macro8.tst: check ARGLIST interaction with (OPTIMIZE SPACE)
+
+2006-12-29  Sam Steingold  <sds@podval.org>
+
+	* macro8.tst: check that we always pass a second argument to MAKE-MACRO
+
+2006-12-28  Sam Steingold  <sds@podval.org>
+
+	* hashlong.tst: tests for bug#948868: hashcode[34]_cons weakness
+
+2006-12-28  Sam Steingold  <sds@podval.org>
+
+	* number2.tst: test for bug#1208124: hashcode_bignum weakness
+
+2006-12-27  Sam Steingold  <sds@podval.org>
+
+	* streams.tst: test for
+	bug#1483762: socket's stream-external-format always :default
+	bug#1623179: broken (setf (stream-external-format stream direction) enc)
+
+2006-12-27  Sam Steingold  <sds@podval.org>
+
+	* iofkts.tst: test for bug#1412454: format/*print-pretty*
+	interaction: extra newlines
+
+2006-12-27  Sam Steingold  <sds@podval.org>
+
+	* streams.tst: tests for bug#1482465: confusing format error
+	report, cause fill-stream
+
+2006-12-26  Sam Steingold  <sds@podval.org>
+
+	* macro8.tst: test for bug#1578179: Compile-file: non-similarity
+	of strings with cr/lf
+
+2006-12-26  Sam Steingold  <sds@podval.org>
+
+	* streams.tst: test for bug#1622642: DESCRIBE: confusing spacing
+
+2006-12-19  Sam Steingold  <sds@podval.org>
+
+	* macro8.tst: test for bug#1420585: compiler-macro:
+	FBOUNDP: (LAMBDA (X) #) not a function name
+
+2006-12-19  Sam Steingold  <sds@podval.org>
+
+	* macro8.tst: bug#1618724: broken compiler warning for
+	invalid optimize quality
+
+2006-12-18  Sam Steingold  <sds@podval.org>
+
+	* pack11.tst: bug#1612313: DEFPACKAGE code executed
+	during non top-level compilation
+
+2006-12-12  Jörg Höhle  <hoehle@users.sourceforge.net>
+
+	* ffi.tst: bug#1525366: fix for #-unicode,
+	#+unicode: insist on UTF-8 file encoding for the tests to succeed
+
+2006-12-11  Sam Steingold  <sds@podval.org>
+
+	* iofkts.tst: bug#1613300: extra space in unreadable output
+
+2006-12-10  Sam Steingold  <sds@gnu.org>
+
+	* macro8.tst, excepsit.tst: bug#1612859: import into
+	KEYWORD should not change symbol-value
+
+2006-11-28  Sam Steingold  <sds@gnu.org>
+
+	* setf.tst: bug#1604579: (SETF DOCUMENTATION) and COMPILE
+
+2006-11-28  Sam Steingold  <sds@gnu.org>
+
+	* number2.tst: added a test for IMAGPART ATANH sign on reals
+
+2006-11-27  Sam Steingold  <sds@gnu.org>
+
+	* tests.lisp (post-compile-file-cleanup): added
+
+2006-11-27  Sam Steingold  <sds@podval.org>
+
+	* lambda.tst: bug#1603260: Loading a compiled definition
+	of functions does not reset the FUNCTION-LAMBDA-EXPRESSION
+
+2006-11-20  Sam Steingold  <sds@podval.org>
+
+	* number2.tst: bug#1436987: ATANH branch cut continuity
+
+2006-11-17  Sam Steingold  <sds@gnu.org>
+
+	* iofkts.tst: test for bug#1483768, bug#1598053: repect PPRINT
+	dispatch for nested objects, not just the top-level
+
+2006-11-10  Bruno Haible  <bruno@clisp.org>
+
+	* clos.tst: Add test for TYPEP and SUBTYPEP on incomplete and undefined
+	classes.
+
+2006-11-08  Sam Steingold  <sds@podval.org>
+
+	* number2.tst: bug#1589311: ROUND is broken for long floats
+
+2006-10-12  Sam Steingold  <sds@podval.org>
+
+	* macro8.tst: bug#1575946: broken COMPILE of APPLY in LABELS
+
+2006-10-01  Sam Steingold  <sds@gnu.org>
+
+	* setf.tst: test DOCUMENTATION on special operators
+
+2006-09-28  Sam Steingold  <sds@podval.org>
+
+	* list-set.tst: new file
+
+2006-09-27  Sam Steingold  <sds@podval.org>
+
+	* conditions.tst: bug#1566466: assoc error when combining
+	compiled and interpreted code
+
+2006-09-10  Sam Steingold  <sds@podval.org>
+
+	* path.tst: bug#1555096: cannot create pathnames with
+	:wild-inferiors
+
+2006-09-09  Sam Steingold  <sds@podval.org>
+
+	* excepsit.tst: check that top-level READ with recursive-p=T
+	signals an error
+
+2006-09-07  Sam Steingold  <sds@podval.org>
+
+	* ffi.tst: test FUNCTION-LAMBDA-EXPRESSION on a foreign function
+
+2006-09-04  Sam Steingold  <sds@podval.org>
+
+	* restarts.tst: do not use DOCUMENTATION 'FUNCTION on an
+	un-fboundp symbol
+
+2006-09-03  Sam Steingold  <sds@podval.org>
+
+	* path.tst: check that make-pathname does not ignore explicit
+	:DIRECTORY NIL (bug#1550803)
+
+2006-08-10  Sam Steingold  <sds@podval.org>
+
+	* excepsit.tst: test ADJUST-ARRAY on non-adjustable vectors
+	without a fill pointer
+
+2006-07-27  Sam Steingold  <sds@podval.org>
+
+	* iofkts.tst: check pprint-dispatch on built-in objects
+
+2006-07-25  Sam Steingold  <sds@podval.org>
+
+	* mop.tst: check that REINITIALIZE-INSTANCE calls
+	FINALIZE-INHERITANCE bug#1526448
+
+2006-07-25  Sam Steingold  <sds@podval.org>
+
+	* clos.tst: bug#1528201: (make-instance 'standard-class :name 3)
+
+2006-07-20  Sam Steingold  <sds@podval.org>
+
+	* loop.tst: added tests for initially/across interaction
+
+2006-07-19  Sam Steingold  <sds@podval.org>
+
+	* streams.tst: avoid a race condition in a file-write-date test
+
+2006-07-19  Sam Steingold  <sds@podval.org>
+
+	* ffi.tst, type.tst: fixed tests for #-unicode
+
+2006-04-21  Bruno Haible  <bruno@clisp.org>
+
+	* clos.tst: Add test against bug with make-instance cache after class
+	redefinition.
+
+2006-04-10  Bruno Haible  <bruno@clisp.org>
+
+	* mop.tst: Check ability to specify a default method-combination on the
+	generic-function class.
+
+2006-03-22  Jörg Höhle  <hoehle@users.sourceforge.net>
+
+	* strings.tst: Fix bug#1445842,
+	ADJUST-ARRAY on 0-length adjustable string
+	Reported by David Tolpin <dtolpin@users.sourceforge.net>
+
+2006-03-06  Bruno Haible  <bruno@clisp.org>
+
+	* backquot.tst: Add test for bug#1308444.
+	Proposed by Matthew Cross <mcross@irobot.com>.
+
+2006-03-01  Jörg Höhle  <hoehle@users.sourceforge.net>
+
+	* macro8.tst [CLISP|CMUCL|SBCL]: destructuring-bind (() a b)
+	matches (NIL 2 3)
+
+2006-02-23  Sam Steingold  <sds@gnu.org>
+
+	* socket.tst: test that socket-server-host recovers the :interface
+	argument to socket-server
+
+2006-02-23  Jörg Höhle  <hoehle@users.sourceforge.net>
+
+	* socket.tst: tests with '(unsigned-byte 8) element-type
+
+2006-02-03  Jörg Höhle  <hoehle@users.sourceforge.net>
+
+	* ffi.tst: foreign-address<->unsigned were broken on [WIDE]
+
+2006-01-25  Sam Steingold  <sds@gnu.org>
+
+	* streams.tst: avoid a race condition by calling file-write-date
+	on a closed stream
+	Reported by Lennart Staflin <lenst@lysator.liu.se>
+
 2006-01-22  Sam Steingold  <sds@gnu.org>
 
 	* streams.tst: test opening files with too long names
@@ -35,7 +964,7 @@
 2005-12-25  Sam Steingold  <sds@gnu.org>
 
 	* alltest.tst: disabled the lambda-parameters-limit test on win32/g++
-	as a work-around for bug 1390134
+	as a work-around for bug#1390134
 
 2005-12-22  Sam Steingold  <sds@gnu.org>
 
@@ -121,7 +1050,7 @@
 
 2005-11-17  Sam Steingold  <sds@gnu.org>
 
-	* symbol10.tst (clrvar) [clisp]: use (proclaim `(ext:notspecial var))
+	* symbol10.tst (clrvar) [CLISP]: use (proclaim `(ext:notspecial var))
 
 2005-11-17  Sam Steingold  <sds@gnu.org>
 
@@ -195,7 +1124,7 @@
 
 2005-10-06  Sam Steingold  <sds@gnu.org>
 
-	* alltest.tst [clisp]: test module-info
+	* alltest.tst [CLISP]: test module-info
 
 2005-10-06  Sam Steingold  <sds@gnu.org>
 
@@ -294,7 +1223,7 @@
 
 2005-06-26  Sam Steingold  <sds@gnu.org>
 
-	* macros8.tst: test (cond (t)) compilation
+	* macro8.tst: test (cond (t)) compilation
 
 2005-06-22  Sam Steingold  <sds@gnu.org>
 
@@ -588,7 +1517,7 @@
 
 2005-03-22  Sam Steingold  <sds@gnu.org>
 
-	* macro8.tst: bug 1167991 (SP-DEPTH <0)
+	* macro8.tst: bug#1167991 (SP-DEPTH <0)
 
 2005-03-08  Sam Steingold  <sds@gnu.org>
 
@@ -2148,3 +3077,8 @@
 1997-10-18  Bruno Haible  <bruno@linuix.mathematik.uni-karlsruhe.de>
 
 	* testsuite: Support ACL 4.3 for Linux (Allegro CL from Franz Inc).
+
+;; Local Variables:
+;; mode: bug-reference
+;; bug-reference-url-format: clisp-bug-reference-url-format
+;; End:

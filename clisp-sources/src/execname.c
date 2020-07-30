@@ -1,7 +1,7 @@
 /*
  * Finding the full path of the executable.
  * Bruno Haible 20.12.1994
- * Sam Steingold 2004-2006
+ * Sam Steingold 2004-2006, 2008
  */
 
 /* This assumes that the executable is not removed or renamed while
@@ -153,5 +153,5 @@ int find_executable (const char * program_name) {
   #error "not implemented: find_executable()"
 #endif
  notfound:
-  executable_name = default_executable_name; return -1;
+  executable_name = (char*)default_executable_name; return -1;
 }

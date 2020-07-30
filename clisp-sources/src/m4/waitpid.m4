@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2003 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -19,7 +19,6 @@ CL_PROTO_TRY([
 #endif
 #include <sys/types.h>
 ], [pid_t waitpid (pid_t pid, int* statusp, int options);],
-[pid_t waitpid();],
 cl_cv_proto_waitpid_arg1="pid_t", cl_cv_proto_waitpid_arg1="int")
 ], [extern pid_t waitpid ($cl_cv_proto_waitpid_arg1, int*, int);])
 AC_DEFINE_UNQUOTED(PID_T,$cl_cv_proto_waitpid_arg1,[type of `pid' in waitpid() declaration])

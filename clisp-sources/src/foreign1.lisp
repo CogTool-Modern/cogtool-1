@@ -1,6 +1,6 @@
 ;;; Foreign function interface for CLISP
 ;;; Bruno Haible 19.2.1995
-;;; Sam Steingold 1998-2005
+;;; Sam Steingold 1998-2009
 
 #+UNICODE
 (progn
@@ -12,29 +12,30 @@
 (in-package "FFI")
 
 (export '(def-c-type def-c-var def-c-const parse-c-type deparse-c-type
-          def-c-call-out def-call-out #+AFFI def-lib-call-out
+          def-c-call-out def-call-out
           def-c-call-in def-call-in default-foreign-language
           c-lines *output-c-functions* *output-c-variables* *foreign-guard*
           nil boolean character char uchar short ushort int uint long ulong
           uint8 sint8 uint16 sint16 uint32 sint32 uint64 sint64
-          single-float double-float
+          single-float double-float default-foreign-library
           c-pointer c-string c-struct c-union c-array c-array-max
           c-function c-ptr c-ptr-null c-array-ptr
+          size_t ssize_t |file|
           def-c-enum def-c-struct element deref slot cast typeof
           sizeof bitsizeof c-var-object c-var-address offset
           validp with-c-place foreign-value enum-from-value enum-to-value
           foreign-address foreign-address-unsigned unsigned-foreign-address
           with-foreign-object with-c-var with-foreign-string
           foreign-allocate allocate-deep allocate-shallow foreign-free
-          foreign-pointer set-foreign-pointer
-          close-foreign-library memory-as
+          foreign-pointer set-foreign-pointer foreign-pointer-info
+          open-foreign-library close-foreign-library memory-as
           foreign-variable foreign-function))
 
 (eval-when (load compile eval)
-  (import (intern "*COUTPUT-FILE*" "COMPILER"))
-  (import (intern "*COUTPUT-STREAM*" "COMPILER"))
-  (import (intern "*FFI-MODULE*" "COMPILER"))
-  (import (intern "FINALIZE-COUTPUT-FILE" "COMPILER"))
+  (import (intern "*COUTPUT-FILE*" "SYSTEM"))
+  (import (intern "*COUTPUT-STREAM*" "SYSTEM"))
+  (import (intern "*FFI-MODULE*" "SYSTEM"))
+  (import (intern "FINALIZE-COUTPUT-FILE" "SYSTEM"))
   (import (intern "TEXT" "SYSTEM")) ; messages
   (import (intern "SYMBOL-TO-KEYWORD" "SYSTEM"))
   (import (intern "CHECK-SYMBOL" "SYSTEM")) ; error checking
@@ -125,6 +126,11 @@
             single-float double-float
             c-pointer c-string))
   (setf (gethash c-type *c-type-table*) c-type))
+(dolist (c-type '(size_t ssize_t)) ; see foreign.d:init_ffi()
+  (setf (gethash c-type *c-type-table*)
+        (CS-CL:symbol-name c-type))) ; prefer lower case
+;; FILE* is used by modern ffi packages
+(setf (gethash '|file| *c-type-table*) 'c-pointer) ; (def-c-type FILE c-pointer)
 
 ;; parse the components of a C-STRUCT or C-UNION
 (defun parse-components (typespec)
@@ -154,7 +160,7 @@
                 h)
            (eval `(FUNCTION
                    (LAMBDA ,vars
-                    (DECLARE (COMPILE))
+                    (DECLARE (COMPILE ,(intern (string-concat "MAKE-" (symbol-name class)) (symbol-package class))))
                     ,(if (and (setq h (get class 'clos::closclass))
                               (typep h clos::<structure-class>)
                               (setq h (clos::class-kconstructor h)))
@@ -207,8 +213,12 @@
                  typespec))
         (when name (setf (gethash name *c-type-table*) c-type))
         c-type)
-      (error (TEXT "FFI type should be a symbol, not ~S")
-             typespec))
+      (if (stringp typespec)
+        (let ((c-type (parse-foreign-inttype typespec)))
+          (when name (setf (gethash name *c-type-table*) c-type))
+          c-type)
+        (error (TEXT "FFI type should be a symbol, not ~S")
+               typespec)))
     (flet ((invalid (typespec)
              (error (TEXT "Invalid FFI type: ~S")
                     typespec))
@@ -321,7 +331,8 @@
         (error (TEXT "Only one ~S option is allowed: ~S")
               (first option) whole))
       (push option alist))
-    alist))
+    ;; maximize sharing: return accepted options, not alist
+    options))
 
 ;; check whether C-TYPE is a C type spec and return the type
 (defun ctype-type (c-type)
@@ -352,20 +363,27 @@
   `(eval-when (load compile eval)
      (without-package-lock ("FFI") (setq *foreign-language* ',lang))))
 
+;; the default foreign library for this compilation unit
+(defvar *foreign-library* nil) ; ABI
+
+(defmacro default-foreign-library (library)
+  `(eval-when (load compile eval)
+     (without-package-lock ("FFI") (setq *foreign-library* ,library))))
+
 ;; get the even (start=0) or odd (start=1) elements of the simple vector
 (defun split-c-fun-arglist (args start)
   (do ((ii start (+ ii 2)) (res '()))
       ((>= ii (length args)) (nreverse res))
     (push (svref args ii) res)))
 
-(defun parse-c-function (alist whole)
+(defun parse-c-function (alist whole) ; ABI
   (vector
     'C-FUNCTION
     (parse-c-type (or (second (assoc ':return-type alist)) 'nil))
     (coerce (mapcap (lambda (argspec)
                       (unless (and (listp argspec)
                                    (symbolp (first argspec))
-                                   (<= 2 (length argspec) #-AFFI 4 #+AFFI 5))
+                                   (<= 2 (length argspec) 4))
                         (error (TEXT "Invalid parameter specification in ~S: ~S")
                                whole argspec))
                       (let* ((argtype (parse-c-type (second argspec)))
@@ -380,26 +398,22 @@
                         ;; see FOREIGN-CALL-OUT in foreign.d
                         (when (and (or (eq argmode :OUT) (eq argmode :IN-OUT))
                                    (not (eq (ctype-type argtype) 'C-PTR)))
-                          (warn (TEXT "~s argument ~s is not a pointer in ~s")
+                          (warn (TEXT "~S argument ~S is not a pointer in ~S")
                                 argmode argtype whole))
                         (list argtype
-                              (+ (ecase argmode
+                              (+ (sys::mecase whole argmode
                                    ((:IN :READ-ONLY) 0)
                                    ((:OUT :WRITE-ONLY) ff-flag-out)
                                    ((:IN-OUT :READ-WRITE) ff-flag-in-out))
-                                 (ecase argalloc
+                                 (sys::mecase whole argalloc
                                    (:NONE 0)
                                    (:ALLOCA ff-flag-alloca)
-                                   (:MALLOC-FREE ff-flag-malloc-free))
-                                 #+AFFI
-                                 (if (cddddr argspec)
-                                   (ash (1+ (position (fifth argspec) *registers*)) 8)
-                                   0)))))
+                                   (:MALLOC-FREE ff-flag-malloc-free))))))
                     (or (rest (assoc ':arguments alist)) '()))
             'simple-vector)
     (+ (let ((rettype (assoc ':return-type alist)))
          (if (cddr rettype)
-           (ecase (third rettype)
+           (sys::mecase whole (third rettype)
              (:NONE 0)
              (:MALLOC-FREE ff-flag-malloc-free))
            0))
@@ -409,7 +423,7 @@
            (language-to-flag
             (or *foreign-language*
                 (progn
-                  (warn (TEXT "~s: No ~s argument and no ~s form in this compilation unit; ~s assumed now and for the rest of this unit")
+                  (warn (TEXT "~S: No ~S argument and no ~S form in this compilation unit; ~S assumed now and for the rest of this unit")
                         whole :language 'default-foreign-language :stdc)
                   (setq *foreign-language* :STDC))))))))) ; Default is ANSI C
 
@@ -422,10 +436,14 @@
     (error (TEXT "The name ~S is not a valid C identifier")
            name)))
 
-(defmacro DEF-C-TYPE (&whole whole-form name typespec)
+(defmacro DEF-C-TYPE (&whole whole-form name &optional typespec)
   (setq name (check-symbol name (first whole-form)))
   `(EVAL-WHEN (LOAD COMPILE EVAL)
-     (PARSE-C-TYPE ',typespec ',name)
+     ,(if typespec
+          `(PARSE-C-TYPE ',typespec ',name)
+          `(SETF (GETHASH ',name FFI::*C-TYPE-TABLE*)
+                 ;; prefer lower case
+                 (CS-CL:symbol-name ',name)))
      ',name))
 
 ;; Convert back a C type from internal (vector) to external (list)
@@ -439,7 +457,7 @@
                (list slot (deparse slottype)))
              (deparse (ctype)
                (or (cdr (assoc ctype alist :test #'eq))
-                   (if (symbolp ctype)
+                   (if (or (symbolp ctype) (stringp ctype))
                      ;; <simple-c-type>, c-pointer, c-string
                      (new-type ctype ctype)
                      (let ((typespec (list (svref ctype 0))))
@@ -485,19 +503,14 @@
                                                 ((null args) (nreverse argspecs))
                                               (let ((argtype (first args))
                                                     (argflags (second args)))
-                                                (push `(,(intern (format nil "arg~D" i) compiler::*keyword-package*)
+                                                (push `(,(intern (format nil "arg~D" i) system::*keyword-package*)
                                                         ,(deparse argtype)
                                                         ,(cond ((flag-set-p argflags ff-flag-out) ':OUT)
                                                                ((flag-set-p argflags ff-flag-in-out) ':IN-OUT)
                                                                (t ':IN))
                                                         ,(cond ((flag-set-p argflags ff-flag-alloca) ':ALLOCA)
                                                                ((flag-set-p argflags ff-flag-malloc-free) ':MALLOC-FREE)
-                                                               (t ':NONE))
-                                                        #+AFFI
-                                                        ,@(let ((h (logand (ash argflags -8) #xF)))
-                                                            (if (not (zerop h))
-                                                              (list (svref *registers* (- h 1)))
-                                                              '())))
+                                                               (t ':NONE)))
                                                       argspecs))))
                                       (list ':return-type
                                             (deparse (svref ctype 1))
@@ -529,8 +542,8 @@
   (init-always '())
   (fini '())
   ;; type -> (function-name . #(const1 const2 const3 ...))
-  (constant-table (make-hash-table :test 'stablehash-eq
-                                   :key-type 'symbol :value-type 'string
+  (constant-table (make-hash-table :test 'stablehash-eq :key-type 'symbol
+                                   :value-type '(cons string vector)
                                    :warn-if-needs-rehash-after-gc t))
   (variable-list '())
   (function-list '()))
@@ -682,7 +695,7 @@
           (let ((module-name (pathname-name *coutput-file*)))
             (make-ffi-module :name module-name
                              :c-name (to-module-name module-name))))
-    (format *coutput-stream* "extern object module__~A__object_tab[];~%"
+    (format *coutput-stream* "extern gcv_object_t module__~A__object_tab[];~%"
             *c-name*)))
 (defun finalize-coutput-file ()
   (when *ffi-module*
@@ -692,11 +705,11 @@
             *c-name* *c-name* *c-name*)
     (let ((count (hash-table-count *object-table*)))
       (if (zerop count)
-        (format *coutput-stream* "object module__~A__object_tab[1];~%~
+        (format *coutput-stream* "gcv_object_t module__~A__object_tab[1];~%~
                 object_initdata_t module__~A__object_tab_initdata[1];~%"
                 *c-name* *c-name*)
         (let ((v (make-array count)))
-          (format *coutput-stream* "object module__~A__object_tab[~D];~%~
+          (format *coutput-stream* "gcv_object_t module__~A__object_tab[~D];~%~
                   object_initdata_t module__~A__object_tab_initdata[~D] = {~%"
                   *c-name* count *c-name* count)
           (dohash (key value *object-table*)
@@ -711,19 +724,26 @@
               *c-name* count))
     (format *coutput-stream* "~%")
     (maphash (lambda (type fun-vec)
-               (let* ((fun (car fun-vec)) (vec (cdr fun-vec))
+               (let* ((fun (first fun-vec)) (vec (second fun-vec))
                       (c-decl (to-c-typedecl type fun)))
+                 (when (eq type 'c-string)
+                   ;; avoid warning:
+                   ;; deprecated conversion from string constant to 'char*'
+                   (setq c-decl (string-concat "const " c-decl)))
                  (format *coutput-stream* "~A (int number, int *definedp);~%~
                                            ~A (int number, int *definedp) {
   *definedp=1;~%  switch (number) {~%"
                          c-decl c-decl)
                  (dotimes (num (length vec))
-                   (let ((const (aref vec num)))
-                     (format *coutput-stream* "#  if defined(~A)
-    case ~D: return ~A;~%#  endif~%"
-                             const num const)))
+                   (destructuring-bind (const . guard) (aref vec num)
+                     (when guard
+                       (format *coutput-stream* "#  if ~A~%" guard))
+                     (format *coutput-stream* "    case ~D: return ~A;~%"
+                             num const)
+                     (when guard
+                       (format *coutput-stream* "#  endif~%"))))
                  (format *coutput-stream* "    default: *definedp=0; return 0;
-  }~%}~%#define HAVE_~A~%" (string-upcase (symbol-name fun)))))
+  }~%}~%")))
              *constant-table*)
     (setq *variable-list*
           (nreverse (delete-duplicates
@@ -757,11 +777,23 @@
             ~%void module__~A__init_function_2 (module_t* module);~%~
             ~%void module__~A__fini_function (module_t* module);~%~
             ~2%void module__~A__init_function_1 (module_t* module)~%~
-            {~{~%~A~}~%}~2%~
-            void module__~A__init_function_2 (module_t* module)~%~
             {~{~%~A~}~%"
-            *c-name* *c-name* *c-name*
-            *c-name* *init-once* *c-name* *init-always*)
+            *c-name* *c-name* *c-name* *c-name* *init-once*)
+    (let ((done (make-hash-table :test 'equal)))
+      (maphash (lambda (type spec)
+                 (declare (ignore type))
+                 (when (and (stringp spec) (not (gethash spec done)))
+                   (setf (gethash spec done) spec)
+                   (when *foreign-guard*
+                     (format *coutput-stream* "# if HAVE_~A~%"
+                             (string-upcase spec)))
+                   (format *coutput-stream* "  register_foreign_inttype(~S,sizeof(~A),(~A)-1<=(~A)0);~%" spec spec spec spec)
+                   (when *foreign-guard* (format *coutput-stream* "# endif~%"))))
+               *c-type-table*))
+    (format *coutput-stream*
+            "}~2%void module__~A__init_function_2 (module_t* module)~%~
+            {~{~%~A~}~%"
+             *c-name* *init-always*)
     (dolist (variable *variable-list*)
       (let ((c-name (first variable)))
         (when *foreign-guard*
@@ -780,6 +812,13 @@
                 "  register_foreign_function((void*)&~A,~A,~D);~%"
                 c-name (to-c-string c-name) (svref (second function) 3))
         (when *foreign-guard* (format *coutput-stream* "# endif~%"))))
+    (maphash (lambda (type fun-vec)
+               (declare (ignore type))
+               (let ((c-name (to-c-name (car fun-vec))))
+                 (format *coutput-stream*
+                         "  register_foreign_function((void*)&~A,\"~A\",~D);~%"
+                         c-name c-name (svref (third fun-vec) 3))))
+             *constant-table*)
     (format *coutput-stream*
             "}~2%void module__~A__fini_function (module_t* module)~%~
             {~{~%~A~}~%}~%"
@@ -799,7 +838,7 @@
 ; Pass an object from the compilation environment to the module.
 (defun pass-object (object)
   (new-object t
-              (let ((*package* compiler::*keyword-package*))
+              (let ((*package* system::*keyword-package*))
                 (write-to-string object :readably t :pretty nil))))
 
 ; Convert an object's index to a C lvalue.
@@ -811,7 +850,7 @@
   `(EVAL-WHEN (COMPILE)
      (DO-C-LINES ,format-string ,@args)))
 (defun do-c-lines (format-string &rest args) ; ABI
-  (when (compiler::prepare-coutput-file)
+  (when (system::prepare-coutput-file)
     (prepare-module)
     (etypecase format-string
       ((or string function)
@@ -830,6 +869,16 @@
     (parse-foreign-name (second name-option))
     (to-c-name lisp-name)))
 
+(defun get-assoc (key alist default)
+  (let ((pair (assoc key alist)))
+    (if pair (second pair) default)))
+
+(defun maximize-integer-type (type)
+  (case type
+    ((char short int long sint8 sint16 sint32 sint64) 'long)
+    ((uchar ushort uint ulong uint8 uint16 uint32 uint64) 'ulong)
+    (t type)))
+
 ;; CPP consts (#define'd in an *.h file):
 ;; for each type (int, string, pointer) there is a C function (and a
 ;;  foreign-function created when the first constant of this type is
@@ -838,39 +887,54 @@
 ;;  into the C file and compiled, so the numbers have to be pre-assigned
 (defmacro DEF-C-CONST (&whole whole-form name &rest options)
   (setq name (check-symbol name (first whole-form)))
-  (prepare-module)
-  (let* ((alist (parse-options options '(:name :type :documentation)
+  (let* ((alist (parse-options options '(:name :type :documentation :guard)
                                whole-form))
          (doc (cdr (assoc ':documentation alist))) ; ("doc string") or NIL
-         (c-type (or (second (assoc ':type alist)) 'ffi:int))
-         (c-name (foreign-name name (assoc ':name alist)))
-         f-name c-number)
-    (check-type c-type (member ffi:int ffi:c-string ffi:c-pointer)
-                "A constant must be either an integer, a string or a pointer")
-    (setq f-name (intern
-                  (format nil "module__~A__constant_map_~A" *name*
-                          (nstring-downcase
-                           (nsubstitute #\_ #\-
-                                        (copy-seq (symbol-name c-type))))))
-          c-number
+         (c-type (maximize-integer-type (get-assoc :type alist 'ffi:long)))
+         (c-name (get-assoc :name alist name))
+         (guard (get-assoc :guard alist (format nil "defined(~A)" c-name)))
+         (cftype (parse-c-function
+                  `((:arguments (number int) (defined-p (c-ptr int) :out))
+                    (:return-type ,c-type))
+                  whole-form)))
+    (check-type c-type (member ffi:long ffi:ulong ffi:c-string ffi:c-pointer)
+                "an integer, a string or a pointer")
+    `(let ((f-name&c-number
+            (compile-time-value (note-c-const ',c-name ',c-type
+                                              ',cftype ',guard))))
+       (let ((f-name (first f-name&c-number))
+             (c-number (second f-name&c-number)))
+         ;; c-number == 0 ==> need to output the def-call-out form
+         (when (zerop c-number)
+           (SYSTEM::%PUTD
+            ;; we do not really need to name this foreign function; this is just
+            ;; to avoid an HT lookup in FIND-FOREIGN-FUNCTION for each C const
+            f-name (FIND-FOREIGN-FUNCTION (to-c-name f-name)
+                                          ,cftype NIL NIL NIL NIL)))
+         (defconstant ,name (c-const-value f-name c-number ',name ',c-name)
+           ,@doc)))))
+
+(defun note-c-const (c-name c-type cftype guard) ; ABI
+  (unless (system::prepare-coutput-file)
+    (error (TEXT "~S(~S) requires writing to a C file") 'def-c-const c-name))
+  (prepare-module)
+  (let ((f-name (intern
+                 (format nil "module__~A__constant_map_~A" *name*
+                         (nstring-downcase
+                          (nsubstitute #\_ #\-
+                                       (copy-seq (symbol-name c-type))))))))
+    (list f-name
           (vector-push-extend
-           c-name (cdr (or (gethash c-type *constant-table*)
-                           (setf (gethash c-type *constant-table*)
-                                 (cons f-name (make-array 10 :adjustable t
-                                                          :fill-pointer 0)))))))
-    `(progn
-       ;; c-number == 0 ==> need to output the def-call-out form
-       ,@(when (zerop c-number)
-           `((ffi:def-call-out ,f-name
-                 (:arguments (number ffi:int)
-                             (defined-p (ffi:c-ptr ffi:int) :out))
-               (:return-type ,c-type))))
-       (defconstant ,name (c-const-value ',f-name ,c-number ',name ',c-name)
-         ,@doc))))
+           (cons c-name guard)
+           (second (or (gethash c-type *constant-table*)
+                       (setf (gethash c-type *constant-table*)
+                             (list f-name (make-array 10 :adjustable t
+                                                      :fill-pointer 0)
+                                   cftype))))))))
 
 (defun c-const-value (f-name c-number name c-name) ; ABI
   (multiple-value-bind (value value-p) (funcall f-name c-number)
-    (if value-p value
+    (if (plusp value-p) value
         (progn
           (warn (TEXT "~S(~S): CPP constant ~A is not defined")
                 'def-c-const name c-name)
@@ -880,7 +944,7 @@
                      name &rest options)
   (setq name (check-symbol name (first whole-form)))
   (let* ((alist (parse-options options '(:name :type :read-only :alloc
-                                         :library :documentation)
+                                         :library :version :documentation)
                                whole-form))
          (doc (assoc ':documentation alist))
          (c-name (foreign-name name (assoc ':name alist)))
@@ -894,23 +958,20 @@
          (flags (+ (if read-only fv-flag-readonly 0)
                    (let ((alloc (assoc ':alloc alist)))
                      (if (cdr alloc)
-                       (ecase (second alloc)
+                       (sys::mecase whole-form (second alloc)
                          (:NONE 0)
                          (:MALLOC-FREE fv-flag-malloc-free))
                        0))))
-         (library  (second (assoc :library alist)))
+         (library (get-assoc :library alist '*foreign-library*))
+         (version (second (assoc :version alist)))
          #|
          (getter-function-name (sys::symbol-suffix name "%GETTER%"))
          (setter-function-name (sys::symbol-suffix name "%SETTER%"))
          |#
          (def (gensym "DEF-C-VAR-")))
     `(LET ((,def (LOAD-TIME-VALUE
-                  ,(if library
-                       `(FFI::FOREIGN-LIBRARY-VARIABLE
-                         ',c-name (FFI::FOREIGN-LIBRARY ,library)
-                         nil (PARSE-C-TYPE ',type))
-                       `(LOOKUP-FOREIGN-VARIABLE
-                         ',c-name (PARSE-C-TYPE ',type))))))
+                  (FIND-FOREIGN-VARIABLE
+                   ',c-name (PARSE-C-TYPE ',type) ,library ,version NIL))))
        #|
        (LET ((FVAR (LOOKUP-FOREIGN-VARIABLE ',c-name (PARSE-C-TYPE ',type))))
          (DEFUN ,getter-function-name () (FOREIGN-VALUE FVAR))
@@ -921,8 +982,8 @@
        (DEFSETF ,getter-function-name ,setter-function-name)
        (DEFINE-SYMBOL-MACRO ,name (,getter-function-name))
        |#
-       ,(unless library
-          `(EVAL-WHEN (COMPILE) (NOTE-C-VAR ',c-name ',type ',flags)))
+       (EVAL-WHEN (COMPILE)
+         (UNLESS ,LIBRARY (NOTE-C-VAR ',c-name ',type ',flags)))
        (when ,def
          (SYSTEM::%PUT ',name 'FOREIGN-VARIABLE ,def)
          ,@(when doc `((SETF (DOCUMENTATION ',name 'VARIABLE) ',(second doc))))
@@ -931,13 +992,13 @@
        ',name)))
 
 (defun note-c-var (c-name type flags) ; ABI
-  (when (compiler::prepare-coutput-file)
+  (when (system::prepare-coutput-file)
     (prepare-module)
     (push (list c-name (parse-c-type type) flags) *variable-list*)))
 
-(defsetf foreign-value set-foreign-value)
+(defsetf foreign-value set-foreign-value) ; ABI
 ;(defsetf foreign-pointer set-foreign-pointer) ; no, incompatible with SETF
-(defsetf validp set-validp)
+(defsetf validp set-validp) ; ABI
 
 (defmacro with-c-place ((var fvar) &body body)
   (let ((fv (gensym (symbol-name var))))
@@ -1014,7 +1075,7 @@
 ;; ============================ named C functions ============================
 
 (defmacro DEF-C-CALL-OUT (name &rest options)
-  (warn (TEXT "~s is deprecated, use ~s instead")
+  (warn (TEXT "~S is deprecated, use ~S instead")
         'def-c-call-out 'def-call-out)
   `(DEF-CALL-OUT ,name ,@options (:LANGUAGE :STDC)))
 
@@ -1022,60 +1083,56 @@
   (setq name (check-symbol name (first whole-form)))
   (let* ((alist
           (parse-options options '(:name :arguments :return-type :language
-                                   :built-in :library :documentation)
+                                   :built-in :library :version :documentation)
                          whole-form))
          (def (gensym "DEF-CALL-OUT-"))
-         (doc (assoc ':documentation alist))
-         (parsed-function (parse-c-function alist whole-form))
-         (signature (argvector-to-signature (svref parsed-function 2)))
-         (library (second (assoc :library alist)))
-         (c-name (foreign-name name (assoc :name alist))))
-    (setq alist (remove-if (lambda (el) (sys::memq (car el) '(:name :library)))
-                           alist))
-    `(LET ((,def ,(if library
-                      `(FFI::FOREIGN-LIBRARY-FUNCTION
-                        ',c-name (FFI::FOREIGN-LIBRARY ,library)
-                        nil ,parsed-function)
-                      `(LOOKUP-FOREIGN-FUNCTION ',c-name ,parsed-function))))
-       ,(unless library
-          `(EVAL-WHEN (COMPILE) (NOTE-C-FUN ',c-name ',alist ',whole-form)))
-       (when ,def
+         (properties (and (>= 1 (system::declared-optimize
+                                 'space (and (boundp 'system::*denv*)
+                                             system::*denv*)))
+                          (assoc ':documentation alist)))
+         (library (get-assoc :library alist '*foreign-library*))
+         (version (second (assoc :version alist)))
+         (c-name (foreign-name name (assoc :name alist)))
+         (built-in (second (assoc :built-in alist)))
+         ;; Maximize sharing in .fas file, reuse options
+         ;; parse-c-function ignores unknown options, e.g. :name
+         (ctype `(PARSE-C-FUNCTION ',options ',whole-form)))
+    `(LET ((,def (FIND-FOREIGN-FUNCTION
+                  ',c-name ,ctype ',properties ,library ,version NIL)))
+       (EXT:COMPILER-LET ((,def ,ctype))
+         (EVAL-WHEN (COMPILE)
+           (UNLESS ,LIBRARY (NOTE-C-FUN ',c-name ,def ',built-in)))
+         (SYSTEM::EVAL-WHEN-COMPILE
+           (SYSTEM::C-DEFUN ',name (C-TYPE-TO-SIGNATURE ,ctype))))
+       (WHEN ,def                       ; found library function
          (SYSTEM::REMOVE-OLD-DEFINITIONS ',name)
-         (COMPILER::EVAL-WHEN-COMPILE (COMPILER::C-DEFUN ',name ',signature))
-         ,@(when doc `((SETF (DOCUMENTATION ',name 'FUNCTION) ',(second doc))))
          (SYSTEM::%PUTD ',name ,def))
        ',name)))
 
-(defun note-c-fun (c-name alist whole) ; ABI
-  (when (compiler::prepare-coutput-file)
+(defun note-c-fun (c-name ctype built-in) ; not ABI, compile-time only
+  (when (system::prepare-coutput-file)
     (prepare-module)
-    (push (list c-name (parse-c-function alist whole)
-                (cadr (assoc :built-in alist)))
+    (push (list c-name ctype built-in)
           *function-list*)))
 
-#+AFFI
-(defmacro DEF-LIB-CALL-OUT (&whole whole-form name library &rest options)
-  (setq name (check-symbol name (first whole-form)))
-  (let* ((alist (parse-options options
-                               '(:name :offset :arguments :return-type)
-                               whole-form))
-         (parsed-function
-           (parse-c-function (remove (assoc ':name alist) alist) whole-form))
-         (signature (argvector-to-signature (svref parsed-function 2)))
-         (c-name (foreign-name name (assoc ':name alist)))
-         (offset (second (assoc ':offset alist))))
-    `(LET ()
-       (SYSTEM::REMOVE-OLD-DEFINITIONS ',name)
-       (COMPILER::EVAL-WHEN-COMPILE (COMPILER::C-DEFUN ',name ',signature))
-       (SYSTEM::%PUTD ',name
-         (FOREIGN-LIBRARY-FUNCTION ',c-name
-           (FOREIGN-LIBRARY ',library)
-           ',offset
-           (PARSE-C-FUNCTION ',(remove (assoc ':name alist) alist) ',whole-form)))
-       ',name)))
+(defun count-inarguments (arg-vector)
+  (do* ((l (length arg-vector))
+        (inargcount 0)
+        (i 1 (+ i 2)))
+       ((>= i l)
+        inargcount)
+    (unless (flag-set-p ff-flag-out (svref arg-vector i))
+      (incf inargcount))))
+
+(defun c-type-to-signature (ctype) ; not ABI, compile-time only
+  (sys::make-signature :req-num (count-inarguments (svref ctype 2))))
+
+; Called by SYS::FUNCTION-SIGNATURE.
+(defun foreign-function-in-arg-count (obj)
+  (count-inarguments (sys::%record-ref obj 4))) ; ff_argtypes
 
 (defmacro DEF-C-CALL-IN (name &rest options)
-  (warn (TEXT "~s is deprecated, use ~s instead")
+  (warn (TEXT "~S is deprecated, use ~S instead")
         'def-c-call-in 'def-call-in)
   `(DEF-CALL-IN ,name ,@options (:LANGUAGE :STDC)))
 
@@ -1091,13 +1148,58 @@
          (NOTE-C-CALL-IN ',name ',c-name ',alist ',whole-form))
        ',name)))
 
-(defun convert-to-foreign-C (flags)
-  (if (flag-set-p flags ff-flag-malloc-free)
-      "convert_to_foreign_mallocing"
-      "convert_to_foreign_nomalloc"))
+;; convert-from-foreign & convert-to-foreign inline
+;; foreign.d:convert_from_foreign and foreign.d:convert_to_foreign
+;; for callbacks into lisp.
+;; we inline only a few most common cases - those used in the supplied modules.
+(defun convert-from-foreign (argtype argname)
+  ;; keep in sync with foreign.d:convert_from_foreign
+  (case argtype
+    (nil "NIL")
+    (boolean (format nil "~A ? T : NIL" argname))
+    ;; (character ...) too hairy
+    ((char sint8) (format nil "sint8_to_I(~A)" argname))
+    ((uchar uint8) (format nil "uint8_to_I(~A)" argname))
+    (sint16 (format nil "sint16_to_I(~A)" argname))
+    (uint16 (format nil "uint16_to_I(~A)" argname))
+    (sint32 (format nil "sint32_to_I(~A)" argname))
+    (uint32 (format nil "uint32_to_I(~A)" argname))
+    (sint64 (format nil "sint64_to_I(~A)" argname))
+    (uint64 (format nil "uint64_to_I(~A)" argname))
+    (int (format nil "sint_to_I(~A)" argname))
+    (uint (format nil "uint_to_I(~A)" argname))
+    (long (format nil "slong_to_I(~A)" argname))
+    (ulong (format nil "ulong_to_I(~A)" argname))
+    (single-float (format nil "c_float_to_FF((const ffloatjanus*)&~A)" argname))
+    (double-float (format nil "c_double_to_FF((const dfloatjanus*)&~A)" argname))
+    (c-pointer
+     (let ((addr (format nil "(uintP)(*(void* const *) ~A)" argname)))
+       (format nil "~A == 0 ? NIL : make_faddress(GLO(fp_zero),~A)"
+               addr addr)))
+    (c-string (format nil "~A == NULL ? NIL : asciz_to_string(~A,GLO(foreign_encoding))" argname argname))
+    (t (format nil "convert_from_foreign(~A,&~A)"
+               (object-to-c-value (pass-object argtype)) argname))))
+
+(defun convert-to-foreign (rettype lispobj retaddr flags)
+  ;; keep in sync with foreign.d:convert_to_foreign
+  (case rettype
+    (int (format nil "if (sint_p(~A)) *~A=I_to_sint(~A); else error_sint(~A)"
+                 lispobj retaddr lispobj lispobj))
+    (uint (format nil "if (uint_p(~A)) *~A=I_to_uint(~A); else error_uint(~A)"
+                  lispobj retaddr lispobj lispobj))
+    (long
+     (format nil "if (slong_p(~A)) *~A=I_to_slong(~A); else error_slong(~A)"
+             lispobj retaddr lispobj lispobj))
+    (ulong
+     (format nil "if (ulong_p(~A)) *~A=I_to_ulong(~A); else error_ulong(~A)"
+             lispobj retaddr lispobj lispobj))
+    (t (format nil "convert_to_foreign(~A,~A,~A,&~A)"
+               (object-to-c-value (pass-object rettype)) lispobj retaddr
+               (if (flag-set-p flags ff-flag-malloc-free)
+                   "mallocing" "nomalloc")))))
 
 (defun note-c-call-in (name c-name alist whole) ; ABI
-  (when (compiler::prepare-coutput-file)
+  (when (system::prepare-coutput-file)
     (prepare-module)
     (let* ((fvd (parse-c-function alist whole))
            (rettype (svref fvd 1))
@@ -1133,9 +1235,8 @@
             (flag-output (logior ff-flag-out ff-flag-in-out)))
         (mapc #'(lambda (argtype argflag argname)
                   (unless (flag-set-p argflag ff-flag-out)
-                    (format *coutput-stream*
-                            "  pushSTACK(convert_from_foreign(~A,&~A));~%"
-                            (object-to-c-value (pass-object argtype)) argname)
+                    (format *coutput-stream* "  pushSTACK(~A);~%"
+                            (convert-from-foreign argtype argname))
                     (incf inargcount))
                   (when (flag-set-p argflag flag-output)
                     (incf outargcount)))
@@ -1143,28 +1244,24 @@
         (format *coutput-stream* "  funcall(~A,~D);~%"
                 (object-to-c-value (pass-object name)) inargcount)
         (unless (eq rettype 'NIL)
-          (format *coutput-stream* " {~%  var ~A;~%~:
-  ~A(~A,value1,&retval);~%"
+          (format *coutput-stream* " {~%  ~A;~%  ~A;~%"
                   (to-c-typedecl rettype "retval")
-                  (convert-to-foreign-C flags)
-                  (object-to-c-value (pass-object rettype))))
+                  (convert-to-foreign rettype "value1" "&retval" flags)))
         (let ((outargcount (if (eq rettype 'NIL) 0 1)))
           (mapc #'(lambda (argtype argflag argname)
                     (when (flag-set-p argflag flag-output)
                       (unless (eq (ctype-type argtype) 'C-PTR)
                         (error (TEXT "~S: :OUT argument is not a pointer: ~S")
                                'DEF-CALL-IN argtype))
-                      (format *coutput-stream* "  ~A~A(~A,~A,~A);~%"
+                      (format *coutput-stream* "  ~A~A;~%"
                               (if (eql outargcount 0) ""
                                 (format nil "if (mv_count >= ~D) "
                                         (+ outargcount 1)))
-                              (convert-to-foreign-C argflag)
-                              (object-to-c-value
-                                (pass-object (svref argtype 1)))
-                              (if (eql outargcount 0)
-                                "value1"
-                                (format nil "mv_space[~D]" outargcount))
-                              argname)
+                              (convert-to-foreign
+                               (svref argtype 1)
+                               (if (eql outargcount 0) "value1"
+                                   (format nil "mv_space[~D]" outargcount))
+                               argname argflag))
                       (incf outargcount)))
                 argtypes argflags argnames))
         (format *coutput-stream* "  end_callback();~%")
@@ -1174,38 +1271,39 @@
 
 ;; ===========================================================================
 
-(defun argvector-to-signature (argvector)
-  (sys::make-signature :req-num (count-inarguments argvector)))
-
-(defun count-inarguments (arg-vector)
-  (do* ((l (length arg-vector))
-        (inargcount 0)
-        (i 1 (+ i 2)))
-       ((>= i l)
-        inargcount)
-    (unless (flag-set-p ff-flag-out (svref arg-vector i))
-      (incf inargcount))))
-
-; Called by SYS::FUNCTION-SIGNATURE.
-(defun foreign-function-in-arg-count (obj)
-  (count-inarguments (sys::%record-ref obj 3)))
+(defun form-1+ (form name)
+  "if form is a number, return a number, otherwise return `(1+ ,form)"
+  (typecase form
+    (number (1+ form))
+    (symbol `(1+ ,form))
+    (cons (case (first form)
+            (1+ `(+ 2 ,@(rest form)))
+            (+ (if (numberp (second form))
+                   `(+ ,(1+ (second form)) ,@(cddr form))
+                   `(+ 1 ,@(rest form))))
+            (t `(1+ ,form))))
+    (t (error "~S(~S): invalid value ~S" 'def-c-enum name form))))
 
 (defmacro def-c-enum (&whole whole-form name &rest items)
   (setq name (check-symbol name (first whole-form)))
-  (let ((forms '()) (ht (make-hash-table :key-type 'fixnum :value-type 'symbol))
-        (next-value 0) (this-val 0))
+  (let ((forms '()) (next-value 0) (this-val 0)
+        (ht (make-hash-table :test 'equal :key-type 'fixnum
+                             :value-type 'symbol)))
     (dolist (item items)
       (when (consp item)
         (when (rest item)
-          (setq next-value (second item)
-                this-val (second item)))
+          (let ((value (second item)))
+            (when (constantp value)
+              (setq value (eval value)))
+            (setq next-value value
+                  this-val value)))
         (setq item (first item)))
       (push `(DEFCONSTANT ,item ,next-value) forms)
       (when (gethash this-val ht)
         (warn (TEXT "~S (~S): value ~S will be assigned to both ~S and ~S")
               'def-c-enum name this-val (gethash this-val ht) item))
       (setf (gethash this-val ht) item)
-      (setq next-value `(1+ ,item) this-val (1+ this-val)))
+      (setq next-value `(1+ ,item) this-val (form-1+ this-val name)))
     `(PROGN ,@(nreverse forms) (setf (get ',name 'def-c-enum) ,ht)
             (def-c-type ,name int))))
 

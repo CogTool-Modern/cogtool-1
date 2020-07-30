@@ -1,14 +1,12 @@
 /*
  * CLISP: Berkeley-DB <http://www.sleepycat.com/docs/api_c/>
- * Copyright (C) 2003-2005 by Sam Steingold
+ * Copyright (C) 2003-2010 by Sam Steingold
  */
 
-/* have to undefing UNICODE _here_ because clisp.h will #include <windows.h> */
-#undef UNICODE
 #include "clisp.h"
 
 #ifndef FOREIGN
-# error "Berkeley-DB requires CLISP FOREIGN CPP macro"
+# error Berkeley-DB requires CLISP FOREIGN CPP macro
 #endif
 
 #include "config.h"
@@ -20,30 +18,21 @@
 #if defined(_WIN32) || defined(UNIX_CYGWIN32)
 # define WIN32_LEAN_AND_MEAN  /* avoid including junk */
 # if defined(UNIX_CYGWIN32) || defined(__MINGW32__)
-/* `unused' is used in function declarations. */
-#  undef unused
 #  define ULONGLONG OS_ULONGLONG
 #  define ULONG OS_ULONG
 #  include <windows.h>
 #  undef ULONG
 #  undef ULONGLONG
-#  define unused (void)
 # else
-#  undef unused
 #  include <windows.h>
-#  define unused
 # endif
 #endif
 
-#if defined(TIME_WITH_SYS_TIME)
+#if defined(HAVE_SYS_TIME_H)
 # include <sys/time.h>
+#endif
+#if defined(HAVE_TIME_H)
 # include <time.h>
-#else
-# if defined(HAVE_SYS_TIME_H)
-#  include <sys/time.h>
-# elif defined(HAVE_TIME_H)
-#  include <time.h>
-# endif
 #endif
 
 #include <string.h>             /* for memset() */
@@ -52,7 +41,7 @@
 /* #define DEBUG */
 #if defined(DEBUG)
 # include <dmalloc.h>
-# define my_malloc malloc
+# define clisp_malloc malloc
 extern object nobject_out (FILE* stream, object obj);
 # define XOUT(obj,label)                                                \
   (printf("[%s:%d] %s: %s:\n",__FILE__,__LINE__,STRING(obj),label),     \
@@ -70,11 +59,24 @@ static void vecout (unsigned char* v, int l) {
 # define VECOUT(v,l)
 #endif
 
-/* convert C string to Lisp string; NULL --> NIL  */
-static inline object asciz_to_string0 (const char* a, object e)
-{ return a ? asciz_to_string(a,e) : NIL; }
+/* convert C string to Lisp string; NULL --> NIL
+   first argument is evaluated twice - must be a variable
+   this is a macro and not a function for NO_UNICODE */
+#define asciz_to_string0(a,e) (a ? asciz_to_string(a,e) : NIL)
 
 #include <db.h>
+
+/* http://www.oracle.com/technology/products/berkeley-db/db/update/4.4.20/if.4.4.20.html
+ * DIRTY -> DB_READ_UNCOMMITTED; DEGREE_2 -> DB_READ_COMMITTED */
+#if !HAVE_DECL_DB_LOCK_READ_UNCOMMITTED
+# define DB_LOCK_READ_UNCOMMITTED DB_LOCK_DIRTY
+#endif
+#if !defined(DB_READ_UNCOMMITTED)
+# define DB_READ_UNCOMMITTED DB_DIRTY_READ
+#endif
+#if !defined(DB_READ_COMMITTED)
+# define DB_READ_COMMITTED DB_DEGREE_2
+#endif
 
 /* this has to be before DEFCHECKERs */
 typedef enum { DBT_RAW, DBT_STRING, DBT_INTEGER } dbt_o_t;
@@ -91,12 +93,12 @@ DEFUN(BDB:DB-VERSION,&optional subsystems-p)
   if (major != DB_VERSION_MAJOR || minor != DB_VERSION_MINOR) {
     pushSTACK(fixnum(DB_VERSION_MINOR)); pushSTACK(fixnum(DB_VERSION_MAJOR));
     pushSTACK(fixnum(minor)); pushSTACK(fixnum(major));
-    fehler(serious_condition,GETTEXT("Version mismatch: compile=~S.~S link=~S~S"));
+    error(serious_condition,GETTEXT("Version mismatch: compile=~S.~S link=~S~S"));
   }
   if (patch != DB_VERSION_PATCH) {
     /* is this warning warranted? */
     pushSTACK(fixnum(DB_VERSION_PATCH)); pushSTACK(fixnum(patch));
-    fehler(warning,GETTEXT("Patch level mismatch: compile=~S link=~S"));
+    error(warning,GETTEXT("Patch level mismatch: compile=~S link=~S"));
   }
   value1 = asciz_to_string(version,GLO(misc_encoding));
   value2 = fixnum(major);
@@ -147,13 +149,13 @@ static void error_callback (const char *errpfx, char *msg)
   char *data;
   if (error_message) { /* append the new message to the previous ones */
     int len = strlen(error_message);
-    error_message = (char*)my_realloc(error_message,3 + strlen(msg) + len);
+    error_message = (char*)clisp_realloc(error_message,3 + strlen(msg) + len);
     error_message[len++] = ';';
     error_message[len++] = ' ';
     data = error_message + len;
   } else {
     int offset = errpfx ? strlen(errpfx)+4 : 0;
-    data = error_message = (char*)my_malloc(1 + offset + strlen(msg));
+    data = error_message = (char*)clisp_malloc(1 + offset + strlen(msg));
     if (errpfx) {
       data[0] = '[';
       strcpy(data+1,errpfx);
@@ -167,16 +169,24 @@ static void error_callback (const char *errpfx, char *msg)
 }
 #define FREE_RESET(x) if (x) { free(x); x = NULL; }
 static void error_message_reset (void) { FREE_RESET(error_message) }
-nonreturning_function(static, error_bdb, (int status, char *caller)) {
-  end_system_call();
+DEFCHECKER(bdb_errno,default=,prefix=DB,BUFFER-SMALL DONOTINDEX KEYEMPTY \
+           KEYEXIST LOCK-DEADLOCK LOCK-NOTGRANTED LOG-BUFFER-FULL NOSERVER \
+           NOSERVER-HOME NOSERVER-ID NOTFOUND OLD-VERSION PAGE-NOTFOUND \
+           REP-DUPMASTER REP-HANDLE-DEAD REP-HOLDELECTION REP-ISPERM    \
+           REP-NEWMASTER REP-NEWSITE REP-NOTPERM REP-STARTUPDONE REP-UNAVAIL \
+           RUNRECOVERY SECONDARY-BAD VERIFY-BAD VERSION-MISMATCH        \
+           ALREADY-ABORTED DELETED LOCK-NOTEXIST NEEDSPLIT REP-EGENCHG  \
+           REP-LOGREADY REP-PAGEDONE SURPRISE-KID SWAPBYTES :TIMEOUT TXN-CKP \
+           VERIFY-FATAL)
+nonreturning_function(static, error_bdb, (int status, const char *caller)) {
   pushSTACK(`BDB::BDB-ERROR`);  /* error type */
-  pushSTACK(`:ERRNO`); pushSTACK(fixnum(status));
+  pushSTACK(S(Kcode)); pushSTACK(bdb_errno_reverse(status));
   if (error_message)
     pushSTACK(`"~S (~S): ~S: ~S"`);
   else pushSTACK(`"~S (~S): ~S"`);
   pushSTACK(TheSubr(subr_self)->name);
-  pushSTACK(asciz_to_string(caller,GLO(misc_encoding)));
-  pushSTACK(asciz_to_string(db_strerror(status),GLO(misc_encoding)));
+  pushSTACK(safe_to_string(caller));
+  pushSTACK(safe_to_string(db_strerror(status)));
   if (error_message) {
     pushSTACK(asciz_to_string(error_message,GLO(misc_encoding)));
     free(error_message); error_message = NULL;
@@ -192,7 +202,7 @@ struct messages { int max; int len; char* msgs[unspecified]; };
 /* allocate the struct+space for max pointers */
 static struct messages * make_messages (int max) {
   struct messages * data = (struct messages*)
-    my_malloc(sizeof(struct messages) + (max-unspecified)*sizeof(char*));
+    clisp_malloc(sizeof(struct messages) + (max-unspecified)*sizeof(char*));
   if (max<1) abort();
   data->len = 0;
   data->max = max;
@@ -231,13 +241,13 @@ static void add_message (struct messages* *data_, const char* msg) {
   if ((*data_)->max = (*data_)->len) {  /* double the space */
     int new_max = 2*(*data_)->max;
     (*data_) = (struct messages*)
-      my_realloc((*data_), (sizeof(struct messages) +
-                            (new_max-unspecified)*sizeof(char*)));
+      clisp_realloc((*data_), (sizeof(struct messages) +
+                               (new_max-unspecified)*sizeof(char*)));
     (*data_)->max = new_max;
   }
   { /* now max>len */
     int len = strlen(msg);
-    (*data_)->msgs[++(*data_)->len] = (char*)my_malloc(len+1);
+    (*data_)->msgs[++(*data_)->len] = (char*)clisp_malloc(len+1);
     strcpy((*data_)->msgs[(*data_)->len],msg);
   }
 }
@@ -254,10 +264,10 @@ static void message_callback (const DB_ENV* dbe, const char *msg) {
 
 #define SYSCALL1(caller,args,cleanup)     do {                  \
     int db_error_code;                                          \
-    begin_system_call();                                        \
+    begin_blocking_system_call();                               \
     db_error_code = caller args; cleanup                        \
+    end_blocking_system_call();                                 \
     if (db_error_code) error_bdb(db_error_code,#caller);        \
-    end_system_call();                                          \
   } while(0)
 #define SYSCALL(caller,args)     SYSCALL1(caller,args,)
 
@@ -311,6 +321,16 @@ static void wrap_finalize (void* pointer, object parents,
   pushSTACK(allocate_fpointer(pointer)); funcall(`BDB::MKHANDLE`,4);
 }
 
+/* convert a Lisp integer to a pair of (Giga-bytes bytes)
+ can trigger GC */
+DEFVAR(giga_byte,`#.(BYTE 30 0)`)
+static void size_to_giga_bytes (object size, u_int32_t *gb, u_int32_t *by) {
+  pushSTACK(size); pushSTACK(negfixnum(-30));
+  pushSTACK(O(giga_byte)); pushSTACK(size);
+  funcall(L(ldb),2); *by = I_to_uint32(value1);
+  funcall(L(ash),2); *gb = I_to_uint32(value1);
+}
+
 /* ===== Database Environment ===== */
 /* not exported:
  DB_ENV->err	Error message with error string
@@ -328,18 +348,17 @@ static void dbe_set_encryption (DB_ENV *dbe, gcv_object_t *o_flags_,
                 { SYSCALL(dbe->set_encrypt,(dbe,password,flags)); });
 }
 
-DEFUN(BDB:DBE-CREATE,&key :PASSWORD :ENCRYPT    \
-      :HOST :CLIENT-TIMEOUT :SERVER-TIMEOUT)
+DEFUN(BDB:DBE-CREATE,&key PASSWORD ENCRYPT :HOST CLIENT-TIMEOUT SERVER-TIMEOUT)
 { /* Create an environment handle */
   DB_ENV *dbe, *dbe_cl;
   bool remote_p = boundp(STACK_2); /* host ==> remote */
-  int status, cl_timeout = 0, sv_timeout = 0;
+  int cl_timeout = 0, sv_timeout = 0;
 # if defined(DB_RPCCLIENT)      /* 4.2 and later */
   SYSCALL(db_env_create,(&dbe,remote_p ? DB_RPCCLIENT : 0));
 # elif defined(DB_CLIENT)       /* 4.1 and before */
   SYSCALL(db_env_create,(&dbe,remote_p ? DB_CLIENT : 0));
 # else
-#  error "how does your Berkeley DB create a remote client?"
+#  error how does your Berkeley DB create a remote client?
 # endif
   if (remote_p) {
     if (uint_p(STACK_0)) sv_timeout = I_to_uint(STACK_0);
@@ -347,29 +366,24 @@ DEFUN(BDB:DBE-CREATE,&key :PASSWORD :ENCRYPT    \
    host_restart:
     if (stringp(STACK_2)) {     /* string host */
       with_string_0(STACK_2,GLO(misc_encoding),hostz, {
-          begin_system_call();
-          status = dbe->set_rpc_server(dbe,NULL,hostz,cl_timeout,sv_timeout,0);
-          end_system_call();
+          SYSCALL(dbe->set_rpc_server,(dbe,NULL,hostz,cl_timeout,sv_timeout,0));
         });
     } else if ((dbe_cl = (DB_ENV*)bdb_handle(STACK_2,`BDB::DBE`,
                                              BH_NIL_IS_NULL))) {
       /* reuse client */
-      begin_system_call();
-      status = dbe->set_rpc_server(dbe,dbe_cl->cl_handle,NULL,
-                                   cl_timeout,sv_timeout,0);
-      end_system_call();
+      SYSCALL(dbe->set_rpc_server,(dbe,dbe_cl->cl_handle,NULL,
+                                   cl_timeout,sv_timeout,0));
     } else {                    /* bad host */
       pushSTACK(NIL);           /* no PLACE */
       pushSTACK(STACK_(2+1));   /* TYPE-ERROR slot DATUM */
       pushSTACK(`(OR STRING BDB::DBE)`); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(STACK_2);                /* host */
-      pushSTACK(`BDB::DBE`); pushSTACK(S(string)); pushSTACK(`:HOST`);
+      pushSTACK(`BDB::DBE`); pushSTACK(S(string)); pushSTACK(S(Khost));
       pushSTACK(TheSubr(subr_self)->name);
       check_value(type_error,GETTEXT("~S: ~S should be a ~S or a ~S, not ~S"));
       STACK_2 = value1;
       goto host_restart;
     }
-    if (status) error_bdb(status,"set_rpc_server");
   }
   if (!missingp(STACK_4))       /* :PASSWD */
     dbe_set_encryption(dbe,&STACK_3,&STACK_4);
@@ -401,11 +415,11 @@ static void time_stamp (FILE* out, char* prefix) {
 static FILE* my_fopen (object path) {
   FILE *ret;
   with_string_0(path=physical_namestring(path),GLO(pathname_encoding),pathz,{
-      begin_system_call();
+      begin_blocking_system_call();
       ret = fopen(pathz,"w");
-      if (ret == NULL) OS_file_error(path);
+      if (ret == NULL) { end_blocking_system_call(); OS_file_error(path); }
       time_stamp(ret,"opened");
-      end_system_call();
+      end_blocking_system_call();
     });
   return ret;
 }
@@ -419,13 +433,13 @@ static FILE* my_fopen (object path) {
 #define CLOSE_FILE(which)                               \
   static void close_##which##file (DB_ENV *dbe) {       \
     FILE *file;                                         \
-    begin_system_call();                                \
+    begin_blocking_system_call();                       \
     dbe->get_##which##file(dbe,&file);                  \
     if (file && (file != stdout) && (file != stderr)) { \
       time_stamp(file,"closed");                        \
       fclose(file);                                     \
     }                                                   \
-    end_system_call();                                  \
+    end_blocking_system_call();                         \
   }
 CLOSE_FILE(err)
 /* set :ERRFILE to STACK_0
@@ -494,7 +508,7 @@ DEFUN(BDB:DBE-MESSAGES, dbe)
 #endif
 
 DEFFLAGSET(bdb_ac_flags, DB_AUTO_COMMIT)
-DEFUN(BDB:DBE-DBREMOVE, dbe file database &key :TRANSACTION :AUTO-COMMIT)
+DEFUN(BDB:DBE-DBREMOVE, dbe file database &key TRANSACTION AUTO-COMMIT)
 { /* remove DATABASE from FILE or the whole FILE */
   u_int32_t flags = bdb_ac_flags();
   DB_TXN *txn = (DB_TXN*)bdb_handle(popSTACK(),`BDB::TXN`,BH_NIL_IS_NULL);
@@ -511,8 +525,7 @@ DEFUN(BDB:DBE-DBREMOVE, dbe file database &key :TRANSACTION :AUTO-COMMIT)
   VALUES0; skipSTACK(3);
 }
 
-DEFUN(BDB:DBE-DBRENAME, dbe file database newname       \
-      &key :TRANSACTION :AUTO-COMMIT)
+DEFUN(BDB:DBE-DBRENAME, dbe file database newname &key TRANSACTION AUTO-COMMIT)
 { /* rename DATABASE to NEWNAME in FILE */
   u_int32_t flags = bdb_ac_flags();
   DB_TXN *txn = (DB_TXN*)bdb_handle(popSTACK(),`BDB::TXN`,BH_NIL_IS_NULL);
@@ -534,14 +547,14 @@ DEFFLAGSET(dbe_open_flags, DB_JOINENV DB_INIT_CDB DB_INIT_LOCK DB_INIT_LOG \
 DEFCHECKER(check_dbe_open_flags,prefix=DB,default=0,bitmasks=both,      \
            type=uint32_t, JOINENV INIT-CDB INIT-LOCK INIT-LOG           \
            INIT-MPOOL INIT-TXN RECOVER RECOVER-FATAL USE-ENVIRON        \
-           USE-ENVIRON-ROOT CREATE LOCKDOWN PRIVATE SYSTEM-MEM THREAD)
-DEFUN(BDB:DBE-OPEN, dbe &key :HOME :FLAGS :JOINENV :INIT-CDB :INIT-LOCK    \
-      :INIT-LOG :INIT-MPOOL :INIT-TXN :RECOVER :RECOVER-FATAL :USE-ENVIRON \
-      :USE-ENVIRON-ROOT :CREATE :LOCKDOWN :PRIVATE :SYSTEM-MEM :THREAD :MODE)
+           USE-ENVIRON-ROOT :CREATE LOCKDOWN PRIVATE SYSTEM-MEM THREAD)
+DEFUN(BDB:DBE-OPEN, dbe &key HOME FLAGS JOINENV INIT-CDB INIT-LOCK    \
+      INIT-LOG INIT-MPOOL INIT-TXN RECOVER RECOVER-FATAL USE-ENVIRON \
+      USE-ENVIRON-ROOT :CREATE LOCKDOWN PRIVATE SYSTEM-MEM THREAD MODE)
 { /* open DB environment */
   int mode = check_uint_default0(popSTACK());
   u_int32_t flags = dbe_open_flags()
-    | check_dbe_open_flags_from_list(popSTACK());
+    | check_dbe_open_flags_of_list(popSTACK());
   DB_ENV *dbe = (DB_ENV*)bdb_handle(STACK_1,`BDB::DBE`,BH_VALID);
   if (!missingp(STACK_0)) {
     with_string_0(physical_namestring(STACK_0),GLO(pathname_encoding),home,
@@ -551,7 +564,7 @@ DEFUN(BDB:DBE-OPEN, dbe &key :HOME :FLAGS :JOINENV :INIT-CDB :INIT-LOCK    \
 }
 
 DEFFLAGSET(dbe_remove_flags, DB_FORCE DB_USE_ENVIRON DB_USE_ENVIRON_ROOT)
-DEFUN(BDB:DBE-REMOVE, dbe &key :HOME :FORCE :USE-ENVIRON :USE-ENVIRON-ROOT)
+DEFUN(BDB:DBE-REMOVE, dbe &key HOME FORCE USE-ENVIRON USE-ENVIRON-ROOT)
 { /* destroy an environment */
   u_int32_t flags = dbe_remove_flags();
   DB_ENV *dbe = (DB_ENV*)bdb_handle(STACK_1,`BDB::DBE`,BH_INVALIDATE);
@@ -580,9 +593,11 @@ static void reset_errpfx (DB_ENV *dbe) {
     begin_system_call(); dbe->set_errpfx(dbe,NULL); end_system_call();
   } else
     with_string_0(check_string(STACK_0),GLO(misc_encoding), prefix, {
-        char *errpfx = (char*)my_malloc(prefix_bytelen+1);
+        char *errpfx = (char*)clisp_malloc(prefix_bytelen+1);
+        begin_system_call();
         strcpy(errpfx,prefix);
-        begin_system_call(); dbe->set_errpfx(dbe,errpfx); end_system_call();
+        dbe->set_errpfx(dbe,errpfx);
+        end_system_call();
       });
 }
 /* extract errpfx
@@ -592,7 +607,7 @@ static object dbe_get_errpfx (DB_ENV *dbe) {
   begin_system_call();
   dbe->get_errpfx(dbe,&errpfx);
   end_system_call();
-  return asciz_to_string0(errpfx,GLO(misc_encoding));
+  return safe_to_string(errpfx);
 }
 /* define a flag checker */
 #define FLAG_EXTRACTOR(name,type)                       \
@@ -606,9 +621,11 @@ static object dbe_get_errpfx (DB_ENV *dbe) {
    get_tas_spins was renamed to mutex_get_tas_spins: */
 #if defined(HAVE_DB_ENV_MUTEX_GET_TAS_SPINS)
 # define get_tas_spins mutex_get_tas_spins
+# define dbe_get_tas_spins dbe_mutex_get_tas_spins
 #endif
 #if defined(HAVE_DB_ENV_MUTEX_SET_TAS_SPINS)
 # define set_tas_spins mutex_set_tas_spins
+# define dbe_set_tas_spins dbe_mutex_set_tas_spins
 #endif
 /* todo: support mutexes properly */
 
@@ -621,20 +638,21 @@ static void my_set_verbose (DB_ENV *dbe, object arg, u_int32_t flag) {
   if (boundp(arg)) SYSCALL(dbe->set_verbose,(dbe,flag,!nullp(arg)));
 }
 DEFCHECKER(check_lk_detect,prefix=DB_LOCK, default=DB_LOCK_DEFAULT, NORUN \
-           DEFAULT EXPIRE MAXLOCKS MINLOCKS MINWRITE OLDEST RANDOM YOUNGEST)
+           :DEFAULT EXPIRE MAXLOCKS MINLOCKS MINWRITE OLDEST RANDOM YOUNGEST)
 DEFUN(BDB:DBE-SET-OPTIONS, dbe &key                                     \
-      :ERRFILE :ERRPFX :PASSWORD :ENCRYPT :LOCK-TIMEOUT :TXN-TIMEOUT :TIMEOUT \
-      :SHM-KEY :TAS-SPINS :TX-TIMESTAMP :TX-MAX :DATA-DIR :TMP-DIR      \
-      :LG-BSIZE :LG-DIR :LG-MAX :LG-REGIONMAX                           \
-      :LK-CONFLICTS :LK-DETECT :LK-MAX-LOCKERS :LK-MAX-LOCKS :LK-MAX-OBJECTS \
-      :AUTO-COMMIT :CDB-ALLDB :DIRECT-DB :DSYNC-LOG :LOG-AUTOREMOVE \
-      :LOG-INMEMORY :DIRECT-LOG :NOLOCKING                              \
-      :NOMMAP :NOPANIC :OVERWRITE :PANIC-ENVIRONMENT :REGION-INIT       \
-      :TXN-NOSYNC :TXN-WRITE-NOSYNC :YIELDCPU                           \
-      :VERB-CHKPOINT :VERB-DEADLOCK :VERB-RECOVERY :VERB-REPLICATION    \
-      :VERB-WAITSFOR :VERBOSE :MSGFILE)
+      ERRFILE ERRPFX PASSWORD ENCRYPT LOCK-TIMEOUT TXN-TIMEOUT TIMEOUT \
+      SHM-KEY TAS-SPINS TX-TIMESTAMP TX-MAX DATA-DIR TMP-DIR \
+      INTERMEDIATE-DIR-MODE                                      \
+      LG-BSIZE LG-DIR LG-MAX LG-REGIONMAX NCACHE CACHESIZE CACHE \
+      LK-CONFLICTS LK-DETECT LK-MAX-LOCKERS LK-MAX-LOCKS LK-MAX-OBJECTS \
+      LOG-DIRECT LOG-DSYNC LOG-AUTO-REMOVE LOG-IN-MEMORY LOG-ZERO \
+      AUTO-COMMIT CDB-ALLDB DIRECT-DB NOLOCKING                      \
+      NOMMAP NOPANIC :OVERWRITE PANIC-ENVIRONMENT REGION-INIT        \
+      TXN-NOSYNC TXN-WRITE-NOSYNC YIELDCPU                           \
+      VERB-CHKPOINT VERB-DEADLOCK VERB-RECOVERY VERB-REPLICATION    \
+      VERB-WAITSFOR :VERBOSE MSGFILE)
 { /* set many options */
-  DB_ENV *dbe = (DB_ENV*)bdb_handle(STACK_(45),`BDB::DBE`,BH_VALID);
+  DB_ENV *dbe = (DB_ENV*)bdb_handle(STACK_(50),`BDB::DBE`,BH_VALID);
   if (!missingp(STACK_0)) reset_msgfile(dbe);
   skipSTACK(1);                 /* drop :MSGFILE */
   { object arg = popSTACK();
@@ -666,7 +684,22 @@ DEFUN(BDB:DBE-SET-OPTIONS, dbe &key                                     \
     set_flags(popSTACK(),&flags_on,&flags_off,DB_NOPANIC);
     set_flags(popSTACK(),&flags_on,&flags_off,DB_NOMMAP);
     set_flags(popSTACK(),&flags_on,&flags_off,DB_NOLOCKING);
-    set_flags(popSTACK(),&flags_on,&flags_off,DB_DIRECT_LOG);
+    set_flags(popSTACK(),&flags_on,&flags_off,DB_DIRECT_DB);
+    set_flags(popSTACK(),&flags_on,&flags_off,DB_CDB_ALLDB);
+    set_flags(popSTACK(),&flags_on,&flags_off,DB_AUTO_COMMIT);
+# if defined(HAVE_DB_ENV_LOG_SET_CONFIG)
+    if (flags_off) SYSCALL(dbe->set_flags,(dbe,flags_off,0));
+    if (flags_on)  SYSCALL(dbe->set_flags,(dbe,flags_on,1));
+    flags_on = 0; flags_off = 0;
+    set_flags(popSTACK(),&flags_on,&flags_off,DB_LOG_ZERO);
+    set_flags(popSTACK(),&flags_on,&flags_off,DB_LOG_IN_MEMORY);
+    set_flags(popSTACK(),&flags_on,&flags_off,DB_LOG_AUTO_REMOVE);
+    set_flags(popSTACK(),&flags_on,&flags_off,DB_LOG_DSYNC);
+    set_flags(popSTACK(),&flags_on,&flags_off,DB_LOG_DIRECT);
+    if (flags_off) SYSCALL(dbe->log_set_config,(dbe,flags_off,0));
+    if (flags_on)  SYSCALL(dbe->log_set_config,(dbe,flags_on,1));
+# else
+    skipSTACK(1);               /* skip :LOG-ZERO */
 #  if defined(DB_LOG_INMEMORY)
     set_flags(popSTACK(),&flags_on,&flags_off,DB_LOG_INMEMORY);
 #  else
@@ -676,13 +709,12 @@ DEFUN(BDB:DBE-SET-OPTIONS, dbe &key                                     \
 #  if defined(DB_DSYNC_LOG)
     set_flags(popSTACK(),&flags_on,&flags_off,DB_DSYNC_LOG);
 #  else
-    skipSTACK(1);               /* skip :DSYNC-LOG */
+    skipSTACK(1);               /* skip :LOG-DSYNC */
 #  endif
-    set_flags(popSTACK(),&flags_on,&flags_off,DB_DIRECT_DB);
-    set_flags(popSTACK(),&flags_on,&flags_off,DB_CDB_ALLDB);
-    set_flags(popSTACK(),&flags_on,&flags_off,DB_AUTO_COMMIT);
+    set_flags(popSTACK(),&flags_on,&flags_off,DB_DIRECT_LOG);
     if (flags_off) SYSCALL(dbe->set_flags,(dbe,flags_off,0));
     if (flags_on)  SYSCALL(dbe->set_flags,(dbe,flags_on,1));
+# endif  /* HAVE_DB_ENV_LOG_SET_CONFIG */
   }
 #define DBE_SET1(what,type,get,how)    do {        \
     if (!missingp(STACK_0)) {                      \
@@ -714,13 +746,38 @@ DEFUN(BDB:DBE-SET-OPTIONS, dbe &key                                     \
       goto restart_LK_CONFLICTS;
     }
     { /* set the conflict matrix */
+      int db_error_code;
       uintL offset = 0;
       object data = array_displace_check(STACK_0,dims[0]*dims[1],&offset);
-      SYSCALL(dbe->set_lk_conflicts,
-              (dbe,TheSbvector(data)->data + offset,dims[0]));
+      /* the matrix is just copied and the call is not really "blocking" one.
+         if we use SYSCALL we should also pin the object */
+      begin_system_call();
+      db_error_code =
+        dbe->set_lk_conflicts(dbe,TheSbvector(data)->data + offset,dims[0]);
+      end_system_call();
+      if (db_error_code) error_bdb(db_error_code,"dbe->set_lk_conflicts");
     }
   }
   skipSTACK(1);
+  if (!missingp(STACK_0)) {     /* CACHE = (ncache cachesize) */
+    STACK_0 = check_list(STACK_0);
+    if (consp(STACK_0)) {
+      int ncache = I_to_uint(check_uint(Car(STACK_0)));
+      u_int32_t gbytes=0, bytes=0;
+      STACK_0 = check_list(Cdr(STACK_0));
+      if (consp(STACK_0))
+        size_to_giga_bytes(Car(STACK_0),&gbytes,&bytes);
+      SYSCALL(dbe->set_cachesize,(dbe,gbytes,bytes,ncache));
+    }
+  }
+  skipSTACK(1);
+  if (!missingp(STACK_0)) {     /* CACHESIZE & NCACHE */
+    int ncache = check_uint_default0(STACK_1);
+    u_int32_t gbytes, bytes;
+    size_to_giga_bytes(STACK_0,&gbytes,&bytes);
+    SYSCALL(dbe->set_cachesize,(dbe,gbytes,bytes,ncache));
+  }
+  skipSTACK(2);
   DBE_SET(lg_regionmax,u_int32_t,I_to_uint32(check_uint32(STACK_0)));
   DBE_SET(lg_max,u_int32_t,I_to_uint32(check_uint32(STACK_0)));
   if (!missingp(STACK_0)) {     /* LG_DIR */
@@ -728,6 +785,13 @@ DEFUN(BDB:DBE-SET-OPTIONS, dbe &key                                     \
                   { SYSCALL(dbe->set_lg_dir,(dbe,dirz)); });
   } else skipSTACK(1);
   DBE_SET(lg_bsize,u_int32_t,I_to_uint32(check_uint32(STACK_0)));
+#if defined(HAVE_DB_ENV_GET_INTERMEDIATE_DIR_MODE)
+  if (!missingp(STACK_0)) {     /* DB_ENV.get_intermediate_dir_mode */
+    with_string_0(physical_namestring(popSTACK()),GLO(pathname_encoding),idm,
+                  { SYSCALL(dbe->set_intermediate_dir_mode,(dbe,idm)); });
+  } else
+#endif
+    skipSTACK(1);                 /* drop intermediate_dir_mode */
   if (!missingp(STACK_0)) {     /* TMP_DIR */
     with_string_0(physical_namestring(popSTACK()),GLO(pathname_encoding),tmpz,
                   { SYSCALL(dbe->set_tmp_dir,(dbe,tmpz)); });
@@ -782,6 +846,30 @@ DEFUN(BDB:DBE-SET-OPTIONS, dbe &key                                     \
 #undef DBE_SET1
 }
 
+/* value1 == cachesize, value2 = ncache
+ can trigger GC */
+static void cache2lisp (u_int32_t gbytes, u_int32_t bytes, int ncache) {
+  pushSTACK(UL_to_I(gbytes)); pushSTACK(fixnum(30)); funcall(L(ash),2);
+  pushSTACK(value1); pushSTACK(UL_to_I(bytes)); funcall(L(plus),2);
+  value2 = fixnum(ncache);
+}
+
+/* get cache size and number of caches
+   value1 == cachesize, value2 = ncache
+ can trigger GC */
+static void dbe_get_cache (DB_ENV* dbe, int errorp) {
+  u_int32_t gbytes, bytes;
+  int ncache, status;
+  begin_system_call();
+  status = dbe->get_cachesize(dbe,&gbytes,&bytes,&ncache);
+  end_system_call();
+  if (status) {
+    if (errorp) error_bdb(status,"dbe->get_cachesize");
+    error_message_reset();
+    value1 = value2 = NIL;
+  } else cache2lisp (gbytes, bytes, ncache);
+}
+
 /* get the list of verbosity options
  can trigger GC */
 static object dbe_get_verbose (DB_ENV *dbe) {
@@ -803,11 +891,12 @@ static object dbe_get_verbose (DB_ENV *dbe) {
 /* get the data directory list
  can trigger GC */
 static object dbe_get_data_dirs (DB_ENV *dbe) {
-  const char **dirs; int ii;
+  const char **dirs;
   SYSCALL(dbe->get_data_dirs,(dbe,&dirs));
   if (dirs) {
-    for (ii=0; dirs[ii]; ii++)
-      pushSTACK(asciz_to_string(dirs[ii],GLO(pathname_encoding)));
+    int ii=0;
+    for (; *dirs; dirs++, ii++)
+      pushSTACK(asciz_to_string(*dirs,GLO(pathname_encoding)));
     return listof(ii);
   } else return NIL;
 }
@@ -851,18 +940,10 @@ static object dbe_get_flags_list (DB_ENV *dbe) {
   if (flags & DB_TXN_NOSYNC) { pushSTACK(`:TXN-NOSYNC`); count++; }
   if (flags & DB_REGION_INIT) { pushSTACK(`:REGION-INIT`); count++; }
   if (flags & DB_PANIC_ENVIRONMENT) {pushSTACK(`:PANIC-ENVIRONMENT`);count++;}
-  if (flags & DB_OVERWRITE) { pushSTACK(`:OVERWRITE`); count++; }
+  if (flags & DB_OVERWRITE) { pushSTACK(S(Koverwrite)); count++; }
   if (flags & DB_NOPANIC) { pushSTACK(`:NOPANIC`); count++; }
   if (flags & DB_NOMMAP) { pushSTACK(`:NOMMAP`); count++; }
   if (flags & DB_NOLOCKING) { pushSTACK(`:NOLOCKING`); count++; }
-#if defined(DB_LOG_INMEMORY)
-  if (flags & DB_LOG_INMEMORY) { pushSTACK(`:LOG-INMEMORY`); count++; }
-#endif
-  if (flags & DB_LOG_AUTOREMOVE) { pushSTACK(`:LOG-AUTOREMOVE`); count++; }
-#if defined(DB_DSYNC_LOG)
-  if (flags & DB_DSYNC_LOG) { pushSTACK(`:DSYNC-LOG`); count++; }
-#endif
-  if (flags & DB_DIRECT_LOG) { pushSTACK(`:DIRECT-LOG`); count++; }
   if (flags & DB_CDB_ALLDB) { pushSTACK(`:CDB-ALLDB`); count++; }
   if (flags & DB_AUTO_COMMIT) { pushSTACK(`:AUTO-COMMIT`); count++; }
   SYSCALL(dbe->get_encrypt_flags,(dbe,&flags));
@@ -871,6 +952,27 @@ static object dbe_get_flags_list (DB_ENV *dbe) {
     case 0: break;
     default: NOTREACHED;
   }
+#if defined(HAVE_DB_ENV_LOG_SET_CONFIG)
+ #define LGC(c,l) do {                                          \
+    int onoff; SYSCALL(dbe->log_get_config,(dbe,c,&onoff));     \
+    if (onoff) { pushSTACK(l); count++; }                       \
+  } while(0)
+  LGC(DB_LOG_DIRECT,`:LOG-DIRECT`);
+  LGC(DB_LOG_DSYNC,`:LOG-DSYNC`);
+  LGC(DB_LOG_AUTO_REMOVE,`:LOG-AUTO-REMOVE`);
+  LGC(DB_LOG_IN_MEMORY,`:LOG-IN-MEMORY`);
+  LGC(DB_LOG_ZERO,`:LOG-ZERO`);
+ #undef LGC
+#else
+# if defined(DB_LOG_INMEMORY)
+  if (flags & DB_LOG_INMEMORY) { pushSTACK(`:LOG-IN-MEMORY`); count++; }
+# endif
+  if (flags & DB_LOG_AUTOREMOVE) { pushSTACK(`:LOG-AUTO-REMOVE`); count++; }
+# if defined(DB_DSYNC_LOG)
+  if (flags & DB_DSYNC_LOG) { pushSTACK(`:LOG-DSYNC`); count++; }
+# endif
+  if (flags & DB_DIRECT_LOG) { pushSTACK(`:LOG-DIRECT`); count++; }
+#endif  /* HAVE_DB_ENV_LOG_SET_CONFIG */
   return listof(count);
 }
 #define DEFINE_GETTER1(handle,handle_type,getter,type,finish)   \
@@ -894,6 +996,9 @@ DEFINE_DBE_GETTER1(get_lg_max,u_int32_t,UL_to_I(value))
 DEFINE_DBE_GETTER1(get_lg_regionmax,u_int32_t,UL_to_I(value))
 DEFINE_DBE_GETTER1(get_tmp_dir,const char *,
                    asciz_to_string0(value,GLO(pathname_encoding)))
+#if defined(HAVE_DB_ENV_GET_INTERMEDIATE_DIR_MODE)
+DEFINE_DBE_GETTER1(get_intermediate_dir_mode,const char *,safe_to_string(value))
+#endif
 DEFINE_DBE_GETTER1(get_tx_max,u_int32_t,UL_to_I(value))
 DEFINE_DBE_GETTER1(get_tx_timestamp,time_t,convert_time_to_universal(&value))
 
@@ -929,23 +1034,32 @@ static object dbe_get_lk_conflicts (DB_ENV *dbe) {
   }
   return value1;
 }
+#if !defined(DB_GID_SIZE)
+# define DB_GID_SIZE DB_XIDDATASIZE
+#endif
 FLAG_EXTRACTOR(dbe_get_flags_num,DB_ENV*)
 DEFUNR(BDB:DBE-GET-OPTIONS, dbe &optional what) {
   object what = STACK_0;
-  /* dbe may be NULL only for DB_XIDDATASIZE */
+  /* dbe may be NULL only for DB_GID_SIZE */
   DB_ENV *dbe = (DB_ENV*)bdb_handle(STACK_1,`BDB::DBE`,
-                                    eq(what,`:DB-XIDDATASIZE`)
+                                    eq(what,`:DB-GID-SIZE`)
                                     ? BH_NIL_IS_NULL : BH_VALID);
   what = STACK_0; skipSTACK(2);
  restart_DBE_GET_OPTIONS:
   if (missingp(what)) {         /* get everything */
     uintL count = 0;
-    pushSTACK(`:VERBOSE`); value1 = dbe_get_verbose(dbe);
+    pushSTACK(S(Kverbose)); value1 = dbe_get_verbose(dbe);
+    pushSTACK(value1); count++;
+    pushSTACK(`:CACHE`); dbe_get_cache(dbe,false);
+    pushSTACK(value1); pushSTACK(value2); value1 = listof(2);
     pushSTACK(value1); count++;
     pushSTACK(`:FLAGS`); value1 = dbe_get_flags_list(dbe);
     pushSTACK(value1); count++;
     pushSTACK(`:TIMESTAMP`); pushSTACK(dbe_get_tx_timestamp(dbe)); count++;
     pushSTACK(`:TX-MAX`); pushSTACK(dbe_get_tx_max(dbe)); count++;
+#  if defined(HAVE_DB_ENV_GET_INTERMEDIATE_DIR_MODE)
+    pushSTACK(`:INTERMEDIATE-DIR-MODE`); pushSTACK(dbe_get_intermediate_dir_mode(dbe)); count++;
+#  endif
     pushSTACK(`:TMP-DIR`); pushSTACK(dbe_get_tmp_dir(dbe)); count++;
     pushSTACK(`:DATA-DIR`); value1 = dbe_get_data_dirs(dbe);
     pushSTACK(value1); count++;
@@ -971,6 +1085,8 @@ DEFUNR(BDB:DBE-GET-OPTIONS, dbe &optional what) {
     VALUES1(listof(count*2));
   } else if (eq(what,S(Kverbose))) {
     VALUES1(dbe_get_verbose(dbe));
+  } else if (eq(what,`:CACHE`)) {
+    dbe_get_cache(dbe,true); mv_count = 2;
   } else if (eq(what,`:FLAGS`)) {
     VALUES1(dbe_get_flags_list(dbe));
   } else if (eq(what,`:VERB-WAITSFOR`)) {
@@ -1005,7 +1121,7 @@ DEFUNR(BDB:DBE-GET-OPTIONS, dbe &optional what) {
     VALUES_IF(dbe_get_flags_num(dbe) & DB_REGION_INIT);
   } else if (eq(what,`:PANIC-ENVIRONMENT`)) {
     VALUES_IF(dbe_get_flags_num(dbe) & DB_PANIC_ENVIRONMENT);
-  } else if (eq(what,`:OVERWRITE`)) {
+  } else if (eq(what,S(Koverwrite))) {
     VALUES_IF(dbe_get_flags_num(dbe) & DB_OVERWRITE);
   } else if (eq(what,`:NOPANIC`)) {
     VALUES_IF(dbe_get_flags_num(dbe) & DB_NOPANIC);
@@ -1014,17 +1130,29 @@ DEFUNR(BDB:DBE-GET-OPTIONS, dbe &optional what) {
   } else if (eq(what,`:NOLOCKING`)) {
     VALUES_IF(dbe_get_flags_num(dbe) & DB_NOLOCKING);
 #if defined(DB_LOG_INMEMORY)
-  } else if (eq(what,`:LOG-INMEMORY`)) {
+  } else if (eq(what,`:LOG-IN-MEMORY`)) {
     VALUES_IF(dbe_get_flags_num(dbe) & DB_LOG_INMEMORY);
 #endif
-  } else if (eq(what,`:LOG-AUTOREMOVE`)) {
+  } else if (eq(what,`:LOG-AUTO-REMOVE`)) {
+#if defined(DB_LOG_AUTO_REMOVE)
+    VALUES_IF(dbe_get_flags_num(dbe) & DB_LOG_AUTO_REMOVE);
+#else
     VALUES_IF(dbe_get_flags_num(dbe) & DB_LOG_AUTOREMOVE);
-#if defined(DB_DSYNC_LOG)
-  } else if (eq(what,`:DSYNC-LOG`)) {
-    VALUES_IF(dbe_get_flags_num(dbe) & DB_DSYNC_LOG);
 #endif
-  } else if (eq(what,`:DIRECT-LOG`)) {
+  } else if (eq(what,`:LOG-DSYNC`)) {
+#  if defined(DB_DSYNC_LOG)
+    VALUES_IF(dbe_get_flags_num(dbe) & DB_DSYNC_LOG);
+#  elif defined(DB_LOG_DSYNC)
+    VALUES_IF(dbe_get_flags_num(dbe) & DB_LOG_DSYNC);
+#  else
+    VALUES1(NIL);
+#  endif
+  } else if (eq(what,`:LOG-DIRECT`)) {
+#  if defined(DB_LOG_DIRECT)
+    VALUES_IF(dbe_get_flags_num(dbe) & DB_LOG_DIRECT);
+#  else
     VALUES_IF(dbe_get_flags_num(dbe) & DB_DIRECT_LOG);
+#  endif
   } else if (eq(what,`:CDB-ALLDB`)) {
     VALUES_IF(dbe_get_flags_num(dbe) & DB_CDB_ALLDB);
   } else if (eq(what,`:AUTO-COMMIT`)) {
@@ -1055,6 +1183,10 @@ DEFUNR(BDB:DBE-GET-OPTIONS, dbe &optional what) {
     VALUES1(dbe_get_data_dirs(dbe));
   } else if (eq(what,`:TMP-DIR`)) {
     VALUES1(dbe_get_tmp_dir(dbe));
+#if defined(HAVE_DB_ENV_GET_INTERMEDIATE_DIR_MODE)
+  } else if (eq(what,`:INTERMEDIATE-DIR-MODE`)) {
+    VALUES1(dbe_get_intermediate_dir_mode(dbe));
+#endif
   } else if (eq(what,`:TAS-SPINS`)) {
     VALUES1(dbe_get_tas_spins(dbe));
   } else if (eq(what,`:SHM-KEY`)) {
@@ -1079,8 +1211,8 @@ DEFUNR(BDB:DBE-GET-OPTIONS, dbe &optional what) {
     VALUES1(dbe_get_errfile(dbe));
   } else if (eq(what,`:MSGFILE`)) {
     VALUES1(dbe_get_msgfile(dbe));
-  } else if (eq(what,`:DB-XIDDATASIZE`)) {
-    VALUES1(fixnum(DB_XIDDATASIZE));
+  } else if (eq(what,`:DB-GID-SIZE`)) {
+    VALUES1(fixnum(DB_GID_SIZE));
   } else if (eq(what,`:HOME`)) {
     VALUES1(dbe_get_home_dir(dbe,true));
   } else if (eq(what,`:OPEN`)) {
@@ -1088,7 +1220,7 @@ DEFUNR(BDB:DBE-GET-OPTIONS, dbe &optional what) {
   } else {
     pushSTACK(NIL);             /* no PLACE */
     pushSTACK(what); pushSTACK(TheSubr(subr_self)->name);
-    check_value(error,GETTEXT("~S: invalid argument ~S"));
+    check_value(error_condition,GETTEXT("~S: invalid argument ~S"));
     what = value1;
     goto restart_DBE_GET_OPTIONS;
   }
@@ -1102,22 +1234,21 @@ DEFUNR(BDB:DBE-GET-OPTIONS, dbe &optional what) {
  DB->errx	Error message
 */
 
-DEFUN(BDB:DB-CREATE, dbe &key :XA)
+DEFUN(BDB:DB-CREATE, dbe)
 { /* create database */
-  u_int32_t flags = missingp(STACK_0) ? 0 : DB_XA_CREATE;
-  DB_ENV *dbe = (DB_ENV*)bdb_handle(STACK_1,`BDB::DBE`,BH_NIL_IS_NULL);
+  DB_ENV *dbe = (DB_ENV*)bdb_handle(STACK_0,`BDB::DBE`,BH_NIL_IS_NULL);
   DB *db;
-  SYSCALL(db_create,(&db,dbe,flags));
+  SYSCALL(db_create,(&db,dbe,0));
   if (!dbe) {                   /* set error callback */
     begin_system_call();
     db->set_errcall(db,&error_callback);
     end_system_call();
   }
-  wrap_finalize(db,STACK_1,`BDB::MKDB`,``BDB::DB-CLOSE``);
-  skipSTACK(2);
+  wrap_finalize(db,STACK_0,`BDB::MKDB`,``BDB::DB-CLOSE``);
+  skipSTACK(1);
 }
 
-DEFUN(BDB:DB-CLOSE, db &key :NOSYNC)
+DEFUN(BDB:DB-CLOSE, db &key NOSYNC)
 { /* Close a database */
   u_int32_t flags = missingp(STACK_0) ? 0 : DB_NOSYNC;
   DB *db = (DB*)bdb_handle(STACK_1,`BDB::DB`,BH_INVALIDATE);
@@ -1125,9 +1256,10 @@ DEFUN(BDB:DB-CLOSE, db &key :NOSYNC)
     bool orphan_p = nullp(Parents(STACK_1));
     pushSTACK(STACK_1); funcall(`BDB::KILL-HANDLE`,1);
     if (orphan_p) {
-      close_errfile(db->dbenv);
-      close_errpfx(db->dbenv);
-      close_msgfile(db->dbenv);
+      DB_ENV *dbe = db->get_env(db);
+      close_errfile(dbe);
+      close_errpfx(dbe);
+      close_msgfile(dbe);
     }
     SYSCALL(db->close,(db,flags));
     VALUES1(T);
@@ -1150,7 +1282,7 @@ static object check_byte_vector_len (object obj, int length) {
     pushSTACK(NIL);             /* no PLACE */
     pushSTACK(fixnum(length)); pushSTACK(obj);
     pushSTACK(TheSubr(subr_self)->name);
-    check_value(error,GETTEXT("~S: byte vector ~S should have length ~S"));
+    check_value(error_condition,GETTEXT("~S: byte vector ~S should have length ~S"));
     obj = value1;
     goto check_byte_vector_len_restart;
   }
@@ -1183,7 +1315,7 @@ static object check_dbt_object (object obj) {
 # define db_recno_to_I(r)  uint32_to_I(r)
 # define I_to_db_recno(i)  I_to_uint32(check_uint32(i))
 #else
-# error "db_recno_t size if unknown!"
+# error db_recno_t size if unknown!
 #endif
 /* fill a DBT with contents of obj (a byte vector, string, or positive integer)
  dbt_type, when non-NULL, will contain the argument type
@@ -1209,13 +1341,13 @@ static dbt_o_t fill_dbt (object obj, DBT* key, int re_len)
   init_dbt(key,DB_DBT_MALLOC);
   if (re_len==-1) {
     db_recno_t value = I_to_db_recno(obj);
-    key->data = my_malloc(key->ulen = key->size = sizeof(db_recno_t));
+    key->data = clisp_malloc(key->ulen = key->size = sizeof(db_recno_t));
     *(db_recno_t*)key->data = value;
     return DBT_INTEGER;
   } else if (stringp(obj)) {
     with_string_0(obj,GLO(misc_encoding),linez, {
         key->ulen = key->size = linez_bytelen;
-        key->data = my_malloc(linez_bytelen);
+        key->data = clisp_malloc(linez_bytelen);
         begin_system_call();
         memcpy(key->data,linez,linez_bytelen);
         end_system_call();
@@ -1227,8 +1359,9 @@ static dbt_o_t fill_dbt (object obj, DBT* key, int re_len)
     key->ulen = key->size = vector_length(obj);
     obj = array_displace_check(obj,key->size,&idx);
     data_start = TheSbvector(obj)->data + idx;
+    /* no need to pin obj because memcpy does not block */
     handle_fault_range(PROT_READ,(aint)data_start,(aint)data_start + key->size);
-    key->data = my_malloc(key->size);
+    key->data = clisp_malloc(key->size);
     begin_system_call();
     memcpy(key->data,data_start,key->size);
     end_system_call();
@@ -1240,13 +1373,13 @@ static dbt_o_t fill_dbt (object obj, DBT* key, int re_len)
       if (bytesize > re_len) {
         pushSTACK(fixnum(bytesize)); pushSTACK(fixnum(re_len));
         pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-        check_value(error,GETTEXT("~S: ~S does not fit into ~S bytes (it requires at least ~S bytes)"));
+        check_value(error_condition,GETTEXT("~S: ~S does not fit into ~S bytes (it requires at least ~S bytes)"));
         obj = value1;
         goto restart_fill_dbt;
       } else bytesize = re_len;
     }
     key->ulen = key->size = bytesize;
-    key->data = my_malloc(bytesize);
+    key->data = clisp_malloc(bytesize);
     if (I_to_LEbytes(obj,8*bytesize,(uintB*)key->data))
       NOTREACHED;               /* there must not be an overflow! */
 #  if defined(DEBUG)
@@ -1268,6 +1401,7 @@ static object dbt_to_object (DBT *p_dbt, dbt_o_t type, int key_type) {
     case DBT_RAW: {
       object vec = allocate_bit_vector(Atype_8Bit,p_dbt->size);
       void* data = TheSbvector(vec)->data;
+      /* no need to pin vec because memcpy does not block */
       handle_fault_range(PROT_READ_WRITE,(aint)data,(aint)data + p_dbt->size);
       begin_system_call();
       memcpy(data,p_dbt->data,p_dbt->size);
@@ -1289,7 +1423,7 @@ static object dbt_to_object (DBT *p_dbt, dbt_o_t type, int key_type) {
           return db_recno_to_I(res);
         } else {
           pushSTACK(`BDB::BDB-ERROR`);  /* error type */
-          pushSTACK(`:ERRNO`); pushSTACK(Fixnum_0);
+          pushSTACK(S(Kcode)); pushSTACK(NIL);
           pushSTACK(`"~S: bad logical record number size: ~S should be ~S"`);
           pushSTACK(TheSubr(subr_self)->name);
           pushSTACK(uint32_to_I(p_dbt->size));
@@ -1311,24 +1445,34 @@ static object dbt_to_object (DBT *p_dbt, dbt_o_t type, int key_type) {
   }
 }
 
+/* get the type of the DB */
+static inline DBTYPE db_get_type (DB *db) {
+  DBTYPE db_type;
+  SYSCALL(db->get_type,(db,&db_type));
+  return db_type;
+}
+
 /* extract record length, not errors */
 static u_int32_t record_length (DB *db) {
-  u_int32_t ret;
-  int status;
-  begin_system_call();
-  status = db->get_re_len(db,&ret);
-  end_system_call();
-  if (status) {
-    error_message_reset();
-    return 0;
-  } else return ret;
+  switch (db_get_type(db)) {
+    case DB_RECNO: case DB_QUEUE: {
+      u_int32_t ret;
+      int status;
+      begin_system_call();
+      status = db->get_re_len(db,&ret);
+      end_system_call();
+      if (status) {
+        error_message_reset();
+        return 0;
+      } else return ret;
+    }
+    default: return 0;
+  }
 }
 /* check whether the DB uses logical record numbers, see
  <http://www.sleepycat.com/docs/ref/am_conf/logrec.html> */
 static inline int db_key_type (DB *db, u_int32_t action) {
-  DBTYPE db_type;
-  SYSCALL(db->get_type,(db,&db_type));
-  switch (db_type) {
+  switch (db_get_type(db)) {
     case DB_QUEUE: case DB_RECNO: return -1;
     case DB_BTREE: switch (action) {
       case DB_GET_RECNO: case DB_SET_RECNO: return -1;
@@ -1338,7 +1482,7 @@ static inline int db_key_type (DB *db, u_int32_t action) {
   }
 }
 
-DEFUN(BDB:DB-DEL, dbe key &key :TRANSACTION :AUTO-COMMIT)
+DEFUN(BDB:DB-DEL, dbe key &key TRANSACTION AUTO-COMMIT)
 { /* Delete items from a database */
   u_int32_t flags = bdb_ac_flags();
   DB_TXN *txn = (DB_TXN*)bdb_handle(popSTACK(),`BDB::TXN`,BH_NIL_IS_NULL);
@@ -1360,11 +1504,10 @@ DEFUN(BDB:DB-FD, db)
 
 DEFCHECKER(db_get_action,prefix=DB, default=0, \
            CONSUME CONSUME-WAIT GET-BOTH SET-RECNO)
-DEFFLAGSET(db_get_options, DB_AUTO_COMMIT DB_DEGREE_2 DB_READ_COMMITTED \
-           DB_DIRTY_READ DB_READ_UNCOMMITTED DB_MULTIPLE DB_RMW)
-DEFUN(BDB:DB-GET, db key &key :ACTION :AUTO-COMMIT :DEGREE-2 :READ-COMMITTED \
-      :DIRTY-READ :READ-UNCOMMITTED :MULTIPLE :RMW :TRANSACTION :ERROR :TYPE \
-      :KEY-TYPE)
+DEFFLAGSET(db_get_options, DB_AUTO_COMMIT DB_READ_COMMITTED \
+           DB_READ_UNCOMMITTED DB_MULTIPLE DB_RMW)
+DEFUN(BDB:DB-GET, db key &key ACTION AUTO-COMMIT READ-COMMITTED \
+      READ-UNCOMMITTED MULTIPLE RMW TRANSACTION :ERROR :TYPE :KEY-TYPE)
 { /* Get items from a database */
   dbt_o_t key_type = check_dbt_type(popSTACK());
   dbt_o_t out_type = check_dbt_type(popSTACK());
@@ -1378,9 +1521,9 @@ DEFUN(BDB:DB-GET, db key &key :ACTION :AUTO-COMMIT :DEGREE-2 :READ-COMMITTED \
   fill_dbt(STACK_0,&key,db_key_type(db,action));
   init_dbt(&val,DB_DBT_MALLOC);
   skipSTACK(2);
-  begin_system_call();
+  begin_blocking_system_call();
   status = db->get(db,txn,&key,&val,flags | action);
-  end_system_call();
+  end_blocking_system_call();
   if (status) {
     free_dbt(&key);
     if (no_error) {
@@ -1402,7 +1545,7 @@ DEFUN(BDB:DB-GET, db key &key :ACTION :AUTO-COMMIT :DEGREE-2 :READ-COMMITTED \
 
 DEFCHECKER(check_dbtype,enum=DBTYPE,default=DB_UNKNOWN,prefix=DB, \
            UNKNOWN BTREE HASH QUEUE RECNO)
-DEFUN(BDB:DB-STAT, db &key :FAST-STAT :TRANSACTION)
+DEFUN(BDB:DB-STAT, db &key FAST-STAT TRANSACTION)
 { /* Return database statistics */
   DB_TXN *txn = (DB_TXN*)bdb_handle(popSTACK(),`BDB::TXN`,BH_NIL_IS_NULL);
 #if defined(HAVE_DB_STAT_ACCEPT_TXN)
@@ -1413,9 +1556,8 @@ DEFUN(BDB:DB-STAT, db &key :FAST-STAT :TRANSACTION)
   u_int32_t flags = missingp(STACK_0) ? 0 : DB_FAST_STAT;
   DB *db = (DB*)bdb_handle(STACK_1,`BDB::DB`,BH_VALID);
   int swapped_p;
-  DBTYPE db_type;
+  DBTYPE db_type = db_get_type(db);
   unsigned int count = 0;
-  SYSCALL(db->get_type,(db,&db_type));
   pushSTACK(check_dbtype_reverse(db_type)); count++;
   SYSCALL(db->get_byteswapped,(db,&swapped_p));
   pushSTACK(swapped_p ? T : NIL); count++;
@@ -1493,16 +1635,17 @@ DEFUN(BDB:DB-STAT, db &key :FAST-STAT :TRANSACTION)
   skipSTACK(2);
 }
 
-DEFFLAGSET(db_open_flags, DB_CREATE DB_DIRTY_READ DB_EXCL DB_NOMMAP \
+DEFFLAGSET(db_open_flags, DB_CREATE DB_READ_UNCOMMITTED DB_EXCL DB_NOMMAP \
            DB_RDONLY DB_THREAD DB_TRUNCATE DB_AUTO_COMMIT)
 DEFCHECKER(check_db_open_flags,prefix=DB,default=0,bitmasks=both,type=uint32_t,\
-           CREATE DIRTY-READ EXCL NOMMAP RDONLY THREAD TRUNCATE AUTO-COMMIT)
-DEFUN(BDB:DB-OPEN, db file &key :DATABASE :TYPE :MODE :FLAGS      \
-      :CREATE :DIRTY-READ :EXCL :NOMMAP :RDONLY :THREAD :TRUNCATE \
-      :AUTO-COMMIT :TRANSACTION)
+           :CREATE READ-UNCOMMITTED EXCL NOMMAP RDONLY THREAD TRUNCATE  \
+           AUTO-COMMIT)
+DEFUN(BDB:DB-OPEN, db file &key DATABASE :TYPE MODE FLAGS            \
+      :CREATE READ-UNCOMMITTED EXCL NOMMAP RDONLY THREAD TRUNCATE    \
+      AUTO-COMMIT TRANSACTION)
 { /* Open a database */
   DB_TXN *txn = (DB_TXN*)bdb_handle(popSTACK(),`BDB::TXN`,BH_NIL_IS_NULL);
-  u_int32_t flags = db_open_flags() | check_db_open_flags_from_list(popSTACK());
+  u_int32_t flags = db_open_flags() | check_db_open_flags_of_list(popSTACK());
   int mode = check_uint_defaulted(popSTACK(),0644);
   DBTYPE db_type = check_dbtype(popSTACK());
   DB *db = (DB*)bdb_handle(STACK_2,`BDB::DB`,BH_VALID);
@@ -1528,7 +1671,7 @@ DEFUN(BDB:DB-SYNC, db)
   VALUES0;
 }
 
-DEFUN(BDB:DB-TRUNCATE, db &key :TRANSACTION :AUTO-COMMIT)
+DEFUN(BDB:DB-TRUNCATE, db &key TRANSACTION AUTO-COMMIT)
 { /* Empty a database */
   u_int32_t flags = bdb_ac_flags();
   DB_TXN *txn = (DB_TXN*)bdb_handle(popSTACK(),`BDB::TXN`,BH_NIL_IS_NULL);
@@ -1538,7 +1681,7 @@ DEFUN(BDB:DB-TRUNCATE, db &key :TRANSACTION :AUTO-COMMIT)
   VALUES1(UL_to_I(count));
 }
 
-DEFUN(BDB:DB-UPGRADE, db file &key :DUPSORT)
+DEFUN(BDB:DB-UPGRADE, db file &key DUPSORT)
 { /* Upgrade a database */
   u_int32_t flags = (missingp(STACK_0) ? 0 : DB_DUPSORT);
   DB *db = (DB*)bdb_handle(STACK_2,`BDB::DB`,BH_VALID);
@@ -1575,8 +1718,8 @@ DEFUN(BDB:DB-REMOVE, db file database)
   VALUES0; skipSTACK(3);
 }
 
-DEFCHECKER(db_put_action,prefix=DB, default=0, APPEND NODUPDATA NOOVERWRITE)
-DEFUN(BDB:DB-PUT, db key val &key :AUTO-COMMIT :ACTION :TRANSACTION)
+DEFCHECKER(db_put_action,prefix=DB, default=0, :APPEND NODUPDATA NOOVERWRITE)
+DEFUN(BDB:DB-PUT, db key val &key AUTO-COMMIT ACTION TRANSACTION)
 { /* Store items into a database */
   DB_TXN *txn = (DB_TXN*)bdb_handle(popSTACK(),`BDB::TXN`,BH_NIL_IS_NULL);
   u_int32_t action = db_put_action(popSTACK());
@@ -1593,10 +1736,10 @@ DEFUN(BDB:DB-PUT, db key val &key :AUTO-COMMIT :ACTION :TRANSACTION)
     switch (action) {
       case DB_NODUPDATA: case DB_NOOVERWRITE: {
         int status;
-        begin_system_call();
+        begin_blocking_system_call();
         status = db->put(db,txn,&key,&val,action | flags);
         free(val.data); free(key.data);
-        end_system_call();
+        end_blocking_system_call();
         switch (status) {
           case 0: VALUES0; break;
           case DB_KEYEXIST: VALUES1(`:KEYEXIST`); error_message_reset(); break;
@@ -1614,7 +1757,7 @@ DEFUN(BDB:DB-PUT, db key val &key :AUTO-COMMIT :ACTION :TRANSACTION)
 }
 
 DEFFLAGSET(db_join_flags, DB_JOIN_NOSORT)
-DEFUN(BDB:DB-JOIN, db cursors &key :JOIN-NOSORT)
+DEFUN(BDB:DB-JOIN, db cursors &key JOIN-NOSORT)
 { /* create a specialized join cursor */
   u_int32_t flags = db_join_flags(), length, pos;
   DB *db = (DB*)bdb_handle(STACK_1,`BDB::DB`,BH_VALID);
@@ -1623,7 +1766,7 @@ DEFUN(BDB:DB-JOIN, db cursors &key :JOIN-NOSORT)
   curslist = (DBC**)alloca((1+length)*sizeof(DBC*));
   if (curslist == NULL) {
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(storage_condition,GETTEXT("~S: alloca() failed"));
+    error(storage_condition,GETTEXT("~S: alloca() failed"));
   }
   curslist[length] = 0;
   if (listp(STACK_0)) {         /* list */
@@ -1651,7 +1794,7 @@ DEFUN(BDB:DB-JOIN, db cursors &key :JOIN-NOSORT)
   skipSTACK(2);
 }
 
-DEFUN(BDB:DB-KEY-RANGE, db key &key :TRANSACTION)
+DEFUN(BDB:DB-KEY-RANGE, db key &key TRANSACTION)
 { /* return an estimate of the proportion of keys that are less than,
      equal to, and greater than the specified key. The underlying
      database must be of type Btree. */
@@ -1668,13 +1811,12 @@ DEFUN(BDB:DB-KEY-RANGE, db key &key :TRANSACTION)
 }
 
 DEFFLAGSET(db_verify_flags, DB_AGGRESSIVE DB_PRINTABLE DB_NOORDERCHK)
-DEFUN(BDB:DB-VERIFY, db file &key :DATABASE :SALVAGE :AGGRESSIVE :PRINTABLE \
-      :NOORDERCHK)
+DEFUN(BDB:DB-VERIFY, db file &key DATABASE SALVAGE AGGRESSIVE PRINTABLE \
+      NOORDERCHK)
 { /* Verify/salvage a database */
   u_int32_t flags = db_verify_flags();
   DB *db = (DB*)bdb_handle(STACK_3,`BDB::DB`,BH_VALID);
   FILE *outfile = NULL;
-  int status;
   if (!missingp(STACK_0)) {     /* SALVAGE */
     outfile = my_fopen(STACK_0);
     flags |= DB_SALVAGE;
@@ -1685,21 +1827,15 @@ DEFUN(BDB:DB-VERIFY, db file &key :DATABASE :SALVAGE :AGGRESSIVE :PRINTABLE \
     flags |= DB_ORDERCHKONLY;
   }
   with_string_0(STACK_2,GLO(pathname_encoding),file,{
-      if (!missingp(STACK_1)) {
+      if (!missingp(STACK_1))
         with_string_0(STACK_1,GLO(misc_encoding),database,{
-            begin_system_call();
-            status = db->verify(db,file,database,outfile,flags);
-            if (outfile) fclose(outfile);
-            end_system_call();
+            SYSCALL1(db->verify,(db,file,database,outfile,flags),
+                     { if (outfile) fclose(outfile); });
           });
-      } else {
-        begin_system_call();
-        status = db->verify(db,file,NULL,outfile,flags);
-        if (outfile) fclose(outfile);
-        end_system_call();
-      }
+      else
+        SYSCALL1(db->verify,(db,file,NULL,outfile,flags),
+                 { if (outfile) fclose(outfile); });
     });
-  if (status) error_bdb(status,"db->verify");
   VALUES0; skipSTACK(3);
 }
 
@@ -1718,16 +1854,6 @@ Btree/Recno Configuration
 Hash Configuration
  DB->set_h_hash	Set a hashing function
 */
-
-/* convert a Lisp integer to a pair of (Giga-bytes bytes)
- can trigger GC */
-DEFVAR(giga_byte,`#.(BYTE 30 0)`)
-static void size_to_giga_bytes (object size, u_int32_t *gb, u_int32_t *by) {
-  pushSTACK(size); pushSTACK(negfixnum(-30));
-  pushSTACK(O(giga_byte)); pushSTACK(size);
-  funcall(L(ldb),2); *by = I_to_uint32(value1);
-  funcall(L(ash),2); *gb = I_to_uint32(value1);
-}
 
 /* set the password to perform encryption and decryption.
  can trigger GC */
@@ -1773,13 +1899,14 @@ static object db_get_open_flags (DB *db, int errorp) {
   return check_db_open_flags_to_list(flags);
 }
 
-DEFUN(BDB:DB-SET-OPTIONS, db &key :MSGFILE :ERRFILE :ERRPFX :PASSWORD \
-      :ENCRYPTION :NCACHE :CACHESIZE :CACHE :LORDER :PAGESIZE :BT-MINKEY \
-      :H-FFACTOR :H-NELEM :Q-EXTENTSIZE :RE-DELIM :RE-LEN :RE-PAD :RE-SOURCE \
-      :CHKSUM :DUP :DUPSORT :ENCRYPT :INORDER :RECNUM :RENUMBER         \
-      :REVSPLITOFF :SNAPSHOT :TXN-NOT-DURABLE)
+DEFUN(BDB:DB-SET-OPTIONS, db &key MSGFILE ERRFILE ERRPFX PASSWORD \
+      ENCRYPTION NCACHE CACHESIZE CACHE LORDER PAGESIZE BT-MINKEY \
+      H-FFACTOR H-NELEM Q-EXTENTSIZE RE-DELIM RE-LEN RE-PAD RE-SOURCE \
+      CHKSUM DUP DUPSORT ENCRYPT INORDER RECNUM RENUMBER         \
+      REVSPLITOFF SNAPSHOT TXN-NOT-DURABLE)
 { /* set database options */
   DB *db = (DB*)bdb_handle(STACK_(28),`BDB::DB`,BH_VALID);
+  DB_ENV *dbe = db->get_env(db);
   { /* flags */
     u_int32_t flags_on = 0, flags_off = 0;
     set_flags(popSTACK(),&flags_on,&flags_off,DB_TXN_NOT_DURABLE);
@@ -1870,7 +1997,7 @@ DEFUN(BDB:DB-SET-OPTIONS, db &key :MSGFILE :ERRFILE :ERRPFX :PASSWORD \
     }
   }
   skipSTACK(1);
-  if (!missingp(STACK_0)) {     /* CACHESIZE */
+  if (!missingp(STACK_0)) {     /* CACHESIZE & NCACHE */
     int ncache = check_uint_default0(STACK_1);
     u_int32_t gbytes, bytes;
     size_to_giga_bytes(STACK_0,&gbytes,&bytes);
@@ -1880,32 +2007,32 @@ DEFUN(BDB:DB-SET-OPTIONS, db &key :MSGFILE :ERRFILE :ERRPFX :PASSWORD \
   if (!missingp(STACK_1))       /* PASSWORD */
     db_set_encryption(db,&STACK_0,&STACK_1);
   skipSTACK(2);
-  if (!missingp(STACK_0)) reset_errpfx(db->dbenv);
+  if (!missingp(STACK_0)) reset_errpfx(dbe);
   skipSTACK(1);
-  if (!missingp(STACK_0)) reset_errfile(db->dbenv);
+  if (!missingp(STACK_0)) reset_errfile(dbe);
   skipSTACK(1);
-  if (!missingp(STACK_0)) reset_msgfile(db->dbenv);
+  if (!missingp(STACK_0)) reset_msgfile(dbe);
   skipSTACK(1);
   VALUES0; skipSTACK(1);        /* skip db */
 }
 
-/* get cache size and number of cashes
-   value1 == cashesize, value2 = ncache
+/* get cache size and number of caches
+   value1 == cachesize, value2 = ncache
  can trigger GC */
 static void db_get_cache (DB* db, int errorp) {
-  u_int32_t gbytes, bytes;
-  int ncache, status;
-  begin_system_call();
-  status = db->get_cachesize(db,&gbytes,&bytes,&ncache);
-  end_system_call();
-  if (status) {
-    if (errorp) error_bdb(status,"db->get_cachesize");
-    error_message_reset();
-    value1 = value2 = NIL;
-  } else {
-    pushSTACK(UL_to_I(gbytes)); pushSTACK(fixnum(30)); funcall(L(ash),2);
-    pushSTACK(value1); pushSTACK(UL_to_I(bytes)); funcall(L(plus),2);
-    value2 = fixnum(ncache);
+  DB_ENV *dbe = db->get_env(db);
+  if (dbe) dbe_get_cache(dbe,errorp);
+  else {
+    u_int32_t gbytes, bytes;
+    int ncache, status;
+    begin_system_call();
+    status = db->get_cachesize(db,&gbytes,&bytes,&ncache);
+    end_system_call();
+    if (status) {
+      if (errorp) error_bdb(status,"db->get_cachesize");
+      error_message_reset();
+      value1 = value2 = NIL;
+    } else cache2lisp (gbytes, bytes, ncache);
   }
 }
 /* get file name and database name
@@ -1918,12 +2045,12 @@ static void db_get_dbname (DB* db, int errorp) {
   status = db->get_dbname(db,&fname,&dbname);
   end_system_call();
   if (status) {
-    if (errorp) error_bdb(status,"db->get_cachesize");
+    if (errorp) error_bdb(status,"db->get_dbname");
     error_message_reset();
     value1 = value2 = NIL;
   } else {
     pushSTACK(asciz_to_string0(fname,GLO(pathname_encoding)));
-    value2 = asciz_to_string0(dbname,GLO(misc_encoding));
+    value2 = safe_to_string(dbname);
     value1 = popSTACK();
   }
 }
@@ -1967,28 +2094,41 @@ FLAG_EXTRACTOR(db_get_flags_num,DB*)
 DEFUNR(BDB:DB-GET-OPTIONS, db &optional what)
 { /* retrieve database options */
   DB *db = (DB*)bdb_handle(STACK_1,`BDB::DB`,BH_VALID);
+  DB_ENV *dbe = db->get_env(db);
   object what = STACK_0; skipSTACK(2);
  restart_DB_GET_OPTIONS:
   if (missingp(what)) {         /* get everything */
     uintL count = 0;
+    DBTYPE db_type = db_get_type(db);
     pushSTACK(`:CACHE`); db_get_cache(db,false);
     pushSTACK(value1); pushSTACK(value2); value1 = listof(2);
     pushSTACK(value1); count++;
-    pushSTACK(`:ERRPFX`); pushSTACK(dbe_get_errpfx(db->dbenv)); count++;
-    pushSTACK(`:ERRFILE`); pushSTACK(dbe_get_errfile(db->dbenv)); count++;
-    pushSTACK(`:MSGFILE`); pushSTACK(dbe_get_msgfile(db->dbenv)); count++;
+    pushSTACK(`:ERRPFX`); pushSTACK(dbe_get_errpfx(dbe)); count++;
+    pushSTACK(`:ERRFILE`); pushSTACK(dbe_get_errfile(dbe)); count++;
+    pushSTACK(`:MSGFILE`); pushSTACK(dbe_get_msgfile(dbe)); count++;
     pushSTACK(`:FLAGS`); value1 = db_get_flags_list(db);
     pushSTACK(value1); count++;
     pushSTACK(`:LORDER`); pushSTACK(db_get_lorder(db)); count++;
     pushSTACK(`:PAGESIZE`); pushSTACK(db_get_pagesize(db)); count++;
-    pushSTACK(`:BT-MINKEY`); pushSTACK(db_get_bt_minkey(db,false)); count++;
-    pushSTACK(`:H-FFACTOR`); pushSTACK(db_get_h_ffactor(db,false)); count++;
-    pushSTACK(`:H-NELEM`); pushSTACK(db_get_h_nelem(db,false)); count++;
-    pushSTACK(`:Q-EXTENTSIZE`);pushSTACK(db_get_q_extentsize(db,false));count++;
-    pushSTACK(`:RE-DELIM`); pushSTACK(db_get_re_delim(db,false)); count++;
-    pushSTACK(`:RE-LEN`); pushSTACK(db_get_re_len(db,false)); count++;
-    pushSTACK(`:RE-PAD`); pushSTACK(db_get_re_pad(db,false)); count++;
-    pushSTACK(`:RE-SOURCE`); pushSTACK(db_get_re_source(db,false)); count++;
+    if (db_type == DB_BTREE) {
+      pushSTACK(`:BT-MINKEY`); pushSTACK(db_get_bt_minkey(db,false)); count++;
+    }
+    if (db_type == DB_HASH) {
+      pushSTACK(`:H-FFACTOR`); pushSTACK(db_get_h_ffactor(db,false)); count++;
+      pushSTACK(`:H-NELEM`); pushSTACK(db_get_h_nelem(db,false)); count++;
+    }
+    if (db_type == DB_QUEUE) {
+      pushSTACK(`:Q-EXTENTSIZE`); pushSTACK(db_get_q_extentsize(db,false));
+      count++;
+    }
+    if (db_type == DB_RECNO || db_type == DB_QUEUE) {
+        pushSTACK(`:RE-LEN`); pushSTACK(db_get_re_len(db,false)); count++;
+        pushSTACK(`:RE-PAD`); pushSTACK(db_get_re_pad(db,false)); count++;
+    }
+    if (db_type == DB_RECNO) {
+      pushSTACK(`:RE-DELIM`); pushSTACK(db_get_re_delim(db,false)); count++;
+      pushSTACK(`:RE-SOURCE`); pushSTACK(db_get_re_source(db,false)); count++;
+    }
     pushSTACK(`:TRANSACTIONAL`); pushSTACK(db_get_transactional(db)); count++;
     pushSTACK(`:DBNAME`); db_get_dbname(db,false);
     pushSTACK(value1); pushSTACK(value2); value1 = listof(2);
@@ -2011,11 +2151,11 @@ DEFUNR(BDB:DB-GET-OPTIONS, db &optional what)
       default: NOTREACHED;
     }
   } else if (eq(what,`:ERRFILE`)) {
-    VALUES1(dbe_get_errfile(db->dbenv));
+    VALUES1(dbe_get_errfile(dbe));
   } else if (eq(what,`:MSGFILE`)) {
-    VALUES1(dbe_get_msgfile(db->dbenv));
+    VALUES1(dbe_get_msgfile(dbe));
   } else if (eq(what,`:ERRPFX`)) {
-    VALUES1(dbe_get_errpfx(db->dbenv));
+    VALUES1(dbe_get_errpfx(dbe));
   } else if (eq(what,`:PAGESIZE`)) {
     VALUES1(db_get_pagesize(db));
   } else if (eq(what,`:TRANSACTIONAL`)) {
@@ -2065,17 +2205,16 @@ DEFUNR(BDB:DB-GET-OPTIONS, db &optional what)
   } else {
     pushSTACK(NIL);             /* no PLACE */
     pushSTACK(what); pushSTACK(TheSubr(subr_self)->name);
-    check_value(error,GETTEXT("~S: invalid argument ~S"));
+    check_value(error_condition,GETTEXT("~S: invalid argument ~S"));
     what = value1;
     goto restart_DB_GET_OPTIONS;
   }
 }
 
 /* ===== cursors ===== */
-DEFFLAGSET(make_dbc_flags, DB_DEGREE_2 DB_READ_COMMITTED DB_DIRTY_READ \
-           DB_READ_UNCOMMITTED DB_WRITECURSOR)
-DEFUN(BDB:MAKE-DBC,db &key :TRANSACTION :DEGREE-2 :READ-COMMITTED :DIRTY-READ \
-      :READ-UNCOMMITTED :WRITECURSOR)
+DEFFLAGSET(make_dbc_flags, DB_READ_COMMITTED DB_READ_UNCOMMITTED DB_WRITECURSOR)
+DEFUN(BDB:MAKE-DBC,db &key TRANSACTION READ-COMMITTED \
+      READ-UNCOMMITTED WRITECURSOR)
 { /* create a cursor */
   u_int32_t flags = make_dbc_flags();
   DB_TXN *txn = (DB_TXN*)bdb_handle(STACK_0,`BDB::TXN`,BH_NIL_IS_NULL);
@@ -2108,15 +2247,17 @@ DEFUN(BDB:DBC-COUNT, cursor)
   VALUES1(UL_to_I(count));
 }
 
-DEFUN(BDB:DBC-DEL, cursor)
+DEFFLAGSET(dbc_del_flags, DB_CONSUME)
+DEFUN(BDB:DBC-DEL, cursor &key CONSUME)
 { /* delete the key/data pair to which the cursor refers */
+  u_int32_t flags = dbc_del_flags();
   DBC *cursor = (DBC*)bdb_handle(popSTACK(),`BDB::DBC`,BH_VALID);
-  SYSCALL(cursor->c_del,(cursor,0));
+  SYSCALL(cursor->c_del,(cursor,flags));
   VALUES0;
 }
 
 DEFFLAGSET(dbc_dup_flags, DB_POSITION)
-DEFUN(BDB:DBC-DUP, cursor &key :POSITION)
+DEFUN(BDB:DBC-DUP, cursor &key POSITION)
 { /* create a new cursor that uses the same transaction and locker ID as
      the original cursor */
   u_int32_t flags = dbc_dup_flags();
@@ -2134,12 +2275,12 @@ static dbt_o_t fill_or_init (object datum, DBT *pdbt, int re_len) {
   } else return fill_dbt(datum,pdbt,re_len); /* datum */
 }
 DEFCHECKER(dbc_get_action,prefix=DB,default=DB_CURRENT,                 \
-           CURRENT FIRST GET-BOTH GET-BOTH-RANGE GET-RECNO JOIN-ITEM LAST \
-           NEXT NEXT-DUP NEXT-NODUP PREV PREV-NODUP SET SET-RANGE SET-RECNO)
-DEFFLAGSET(dbc_get_options, DB_DEGREE_2 DB_READ_COMMITTED DB_DIRTY_READ \
+           :CURRENT FIRST GET-BOTH GET-BOTH-RANGE GET-RECNO JOIN-ITEM LAST \
+           :NEXT NEXT-DUP NEXT-NODUP PREV PREV-NODUP SET SET-RANGE SET-RECNO)
+DEFFLAGSET(dbc_get_options, DB_READ_COMMITTED \
            DB_READ_UNCOMMITTED DB_MULTIPLE DB_MULTIPLE_KEY DB_RMW)
-DEFUN(BDB:DBC-GET, cursor key data action &key :DEGREE-2 :DIRTY-READ \
-      :MULTIPLE :MULTIPLE-KEY :RMW :ERROR)
+DEFUN(BDB:DBC-GET, cursor key data action &key READ-COMMITTED \
+      READ-UNCOMMITTED MULTIPLE MULTIPLE-KEY RMW :ERROR)
 { /* retrieve key/data pairs from the database */
   int no_error = nullp(popSTACK());
   u_int32_t flag = dbc_get_options();
@@ -2153,9 +2294,9 @@ DEFUN(BDB:DBC-GET, cursor key data action &key :DEGREE-2 :DIRTY-READ \
   dbt_o_t key_type = fill_or_init(popSTACK(),&key,db_log_key);
   int status;
   skipSTACK(1);                 /* drop cursor */
-  begin_system_call();
+  begin_blocking_system_call();
   status = cursor->c_get(cursor,&key,&val,flag | action);
-  end_system_call();
+  end_blocking_system_call();
   if (status) {
     free_dbt(&key); free_dbt(&val);
     if (no_error) {
@@ -2180,7 +2321,7 @@ DEFUN(BDB:DBC-GET, cursor key data action &key :DEGREE-2 :DIRTY-READ \
 }
 
 DEFCHECKER(dbc_put_flag,prefix=DB, default=DB_CURRENT,          \
-           CURRENT AFTER BEFORE KEYFIRST KEYLAST NODUPDATA)
+           :CURRENT AFTER BEFORE KEYFIRST KEYLAST NODUPDATA OVERWRITE-DUP)
 DEFUN(BDB:DBC-PUT, cursor key data flag)
 { /* retrieve key/data pairs from the database */
   u_int32_t flag = dbc_put_flag(popSTACK());
@@ -2210,9 +2351,9 @@ DEFUN(BDB:LOCK-DETECT, dbe action)
 }
 
 DEFCHECKER(check_lockmode, enum=db_lockmode_t, prefix=DB_LOCK, default=, \
-           NG READ WRITE WAIT IWRITE IREAD IWR DIRTY WWRITE)
+           NG READ WRITE :WAIT IWRITE IREAD IWR READ-UNCOMMITTED WWRITE)
 DEFFLAGSET(lock_get_flags, DB_LOCK_NOWAIT)
-DEFUN(BDB:LOCK-GET, dbe object locker mode &key :NOWAIT)
+DEFUN(BDB:LOCK-GET, dbe object locker mode &key NOWAIT)
 { /* Acquire a lock */
   u_int32_t flags = lock_get_flags();
   db_lockmode_t mode = check_lockmode(popSTACK());
@@ -2222,17 +2363,15 @@ DEFUN(BDB:LOCK-GET, dbe object locker mode &key :NOWAIT)
   DB_LOCK *dblock;
   int status;
   /* fill_dbt() might not return,
-     so my_malloc() must be called after it to avoid a memory leak */
+     so clisp_malloc() must be called after it to avoid a memory leak */
   fill_dbt(STACK_0,&obj,0);
-  dblock = (DB_LOCK*)my_malloc(sizeof(DB_LOCK));
-  begin_system_call();
+  dblock = (DB_LOCK*)clisp_malloc(sizeof(DB_LOCK));
+  begin_blocking_system_call();
   status = dbe->lock_get(dbe,locker,flags,&obj,mode,dblock);
   free(obj.data);
-  if (status) {
-    free(dblock);
-    error_bdb(status,"dbe->lock_get");
-  }
-  end_system_call();
+  if (status) free(dblock);
+  end_blocking_system_call();
+  if (status) error_bdb(status,"dbe->lock_get");
   pushSTACK(allocate_fpointer(dblock)); pushSTACK(STACK_2);
   funcall(`BDB::MKDBLOCK`,2); STACK_0 = STACK_1 = value1;
   pushSTACK(``BDB:LOCK-CLOSE``); funcall(L(finalize),2);
@@ -2270,7 +2409,7 @@ DEFUN(BDB:LOCK-CLOSE, lock)
     DB_ENV *dbe = (DB_ENV*)bdb_handle(parent,`BDB::DBE`,BH_INVALID_IS_NULL);
     if (dbe == NULL) { /* the DBE has been closed */
       pushSTACK(`BDB::BDB-ERROR`);  /* error type */
-      pushSTACK(`:ERRNO`); pushSTACK(Fixnum_0);
+      pushSTACK(S(Kcode)); pushSTACK(NIL);
       pushSTACK(CLSTEXT("~S (~S): cannot close a lock whose environment has been already closed; you must re-open the environment and call ~S"));
       pushSTACK(TheSubr(subr_self)->name);
       pushSTACK(STACK_5);       /* lock */
@@ -2284,7 +2423,7 @@ DEFUN(BDB:LOCK-CLOSE, lock)
 }
 
 DEFFLAGSET(stat_flags, DB_STAT_CLEAR)
-DEFUN(BDB:LOCK-STAT,dbe &key :STAT-CLEAR)
+DEFUN(BDB:LOCK-STAT,dbe &key STAT-CLEAR)
 { /* Return lock subsystem statistics */
   u_int32_t flags = stat_flags();
   DB_ENV *dbe = (DB_ENV*)bdb_handle(popSTACK(),`BDB::DBE`,BH_VALID);
@@ -2334,7 +2473,7 @@ DEFUN(BDB:LOCK-STAT,dbe &key :STAT-CLEAR)
 
 DEFFLAGSET(log_archive_flags,DB_ARCH_ABS DB_ARCH_DATA DB_ARCH_LOG \
            DB_ARCH_REMOVE)
-DEFUN(BDB:LOG-ARCHIVE, dbe &key :ARCH-ABS :ARCH-DATA :ARCH-LOG :ARCH-REMOVE)
+DEFUN(BDB:LOG-ARCHIVE, dbe &key ARCH-ABS ARCH-DATA ARCH-LOG ARCH-REMOVE)
 { /* return a list of log or database filenames. */
   u_int32_t flags = log_archive_flags();
   DB_ENV *dbe = (DB_ENV*)bdb_handle(popSTACK(),`BDB::DBE`,BH_VALID);
@@ -2399,7 +2538,7 @@ DEFUN(BDB:LOG-PUT, dbe data &key FLUSH)
   make_lsn(&lsn);
 }
 
-DEFUN(BDB:LOG-STAT, dbe &key :STAT-CLEAR)
+DEFUN(BDB:LOG-STAT, dbe &key STAT-CLEAR)
 { /* logging subsystem statistics */
   u_int32_t flags = stat_flags();
   DB_ENV *dbe = (DB_ENV*)bdb_handle(popSTACK(),`BDB::DBE`,BH_VALID);
@@ -2449,7 +2588,7 @@ DEFUN(BDB:LOGC-CLOSE, logc)
 }
 
 DEFCHECKER(logc_get_action,prefix=DB,default=DB_CURRENT,        \
-           CURRENT FIRST LAST NEXT PREV)
+           :CURRENT FIRST LAST :NEXT PREV)
 DEFUN(BDB:LOGC-GET, logc action &key :TYPE :ERROR)
 { /* return records from the log. */
   int no_error = nullp(popSTACK());
@@ -2466,16 +2605,16 @@ DEFUN(BDB:LOGC-GET, logc action &key :TYPE :ERROR)
     check_lsn(&STACK_0,&lsn);
   }
   init_dbt(&data,DB_DBT_MALLOC);
-  begin_system_call();
+  begin_blocking_system_call();
   status = logc->get(logc,&lsn,&data,action);
-  end_system_call();
+  end_blocking_system_call();
   if (status) {
     if (no_error) {
       switch (status) {
         case DB_NOTFOUND: VALUES1(`:NOTFOUND`); error_message_reset(); return;
       }
     }
-    error_bdb(status,"dbc->c_get");
+    error_bdb(status,"logc->get");
   }
   if (action == DB_SET) {       /* STACK_0 is the LSN */
   } else STACK_0 = make_lsn(&lsn);
@@ -2497,10 +2636,10 @@ DEFUN(BDB:LOG-COMPARE, lsn1 lsn2)
 
 /* ===== transactions ===== */
 
-DEFFLAGSET(txn_begin_flags, DB_DEGREE_2 DB_READ_COMMITTED DB_DIRTY_READ \
+DEFFLAGSET(txn_begin_flags, DB_READ_COMMITTED                           \
            DB_READ_UNCOMMITTED DB_TXN_NOSYNC DB_TXN_NOWAIT DB_TXN_SYNC)
-DEFUN(BDB:TXN-BEGIN, dbe &key :PARENT :DEGREE-2 :READ-COMMITTED :DIRTY-READ \
-      :READ-UNCOMMITTED :NOSYNC :NOWAIT :SYNC)
+DEFUN(BDB:TXN-BEGIN, dbe &key PARENT READ-COMMITTED   \
+      READ-UNCOMMITTED NOSYNC NOWAIT SYNC)
 { /* create a transaction */
   u_int32_t flags = txn_begin_flags();
   DB_TXN *parent = (DB_TXN*)bdb_handle(STACK_0,`BDB::TXN`,BH_NIL_IS_NULL), *ret;
@@ -2525,7 +2664,7 @@ DEFUN(BDB:TXN-ABORT, txn)
 }
 
 DEFCHECKER(txn_check_sync,prefix=DB_TXN,default=0, NOSYNC SYNC)
-DEFUN(BDB:TXN-COMMIT, txn &key :SYNC)
+DEFUN(BDB:TXN-COMMIT, txn &key SYNC)
 { /* Commit a transaction */
   u_int32_t flags = txn_check_sync(popSTACK());
   DB_TXN *txn = (DB_TXN*)bdb_handle(STACK_0,`BDB::TXN`,BH_INVALIDATE);
@@ -2555,7 +2694,7 @@ DEFUN(BDB:TXN-ID, txn)
 }
 
 DEFFLAGSET(txn_checkpoint_flags, DB_FORCE)
-DEFUN(BDB:TXN-CHECKPOINT, dbe &key :KBYTE :MIN :FORCE)
+DEFUN(BDB:TXN-CHECKPOINT, dbe &key KBYTE MIN FORCE)
 { /* flush the underlying memory pool, write a checkpoint record to the
      log, and then flush the log. */
   u_int32_t flags = txn_checkpoint_flags();
@@ -2567,13 +2706,13 @@ DEFUN(BDB:TXN-CHECKPOINT, dbe &key :KBYTE :MIN :FORCE)
 }
 
 /* return the pointer into the obj (which must be
-   a (vector (unsigned-byte 8) DB_XIDDATASIZE))
+   a (vector (unsigned-byte 8) DB_GID_SIZE))
  can trigger GC, the return value is invalidated by GC */
 static u_int8_t* check_gid (gcv_object_t *obj_) {
   uintL idx = 0;
   object data_vector;
-  *obj_ = check_byte_vector_len(*obj_,DB_XIDDATASIZE);
-  data_vector = array_displace_check(*obj_,DB_XIDDATASIZE,&idx);
+  *obj_ = check_byte_vector_len(*obj_,DB_GID_SIZE);
+  data_vector = array_displace_check(*obj_,DB_GID_SIZE,&idx);
   return TheSbvector(data_vector)->data+idx;
 }
 
@@ -2585,34 +2724,32 @@ DEFUN(BDB:TXN-PREPARE, txn gid)
   VALUES0; skipSTACK(2);
 }
 
-/* allocate a (vector (unsigned-byte 8) DB_XIDDATASIZE) for this gid
+/* allocate a (vector (unsigned-byte 8) DB_GID_SIZE) for this gid
  can trigger GC */
-static object gid_to_vector (u_int8_t gid[DB_XIDDATASIZE]) {
-  object vec = allocate_bit_vector(Atype_8Bit,DB_XIDDATASIZE);
+static object gid_to_vector (u_int8_t gid[DB_GID_SIZE]) {
+  object vec = allocate_bit_vector(Atype_8Bit,DB_GID_SIZE);
   begin_system_call();
-  memcpy(TheSbvector(vec)->data,gid,DB_XIDDATASIZE);
+  memcpy(TheSbvector(vec)->data,gid,DB_GID_SIZE);
   end_system_call();
   return vec;
 }
 
 DEFFLAGSET(txn_recover_flags, DB_FIRST DB_NEXT)
-DEFUN(BDB:TXN-RECOVER, dbe &key :FIRST :NEXT)
+DEFUN(BDB:TXN-RECOVER, dbe &key FIRST :NEXT)
 { /* return a list of prepared but not yet resolved transactions */
   u_int32_t flags = txn_recover_flags();
   DB_ENV *dbe = (DB_ENV*)bdb_handle(popSTACK(),`BDB::DBE`,BH_VALID);
   u_int32_t tx_max;
   DB_PREPLIST *preplist;
   int status, ii;
-  long retnum;
+  u_int32_t retnum;
   SYSCALL(dbe->get_tx_max,(dbe,&tx_max));
-  preplist = (DB_PREPLIST*)my_malloc(tx_max * sizeof(DB_PREPLIST));
-  begin_system_call();
+  preplist = (DB_PREPLIST*)clisp_malloc(tx_max * sizeof(DB_PREPLIST));
+  begin_blocking_system_call();
   status = dbe->txn_recover(dbe,preplist,tx_max,&retnum,flags);
-  if (status) {
-    free(preplist); end_system_call();
-    error_bdb(status,"dbe->txn_recover");
-  }
-  end_system_call();
+  if (status) free(preplist);
+  end_blocking_system_call();
+  if (status) error_bdb(status,"dbe->txn_recover");
   for (ii=0; ii<retnum; ii++) {
     pushSTACK(allocate_fpointer(preplist[ii].txn));
     funcall(`BDB::MKTXN`,1); pushSTACK(value1);
@@ -2636,7 +2773,9 @@ DEFUN(BDB:TXN-SET-TIMEOUT, txn timeout which)
   VALUES0;
 }
 
-DEFUN(BDB:TXN-STAT, dbe &key :STAT-CLEAR)
+DEFCHECKER(txn_status_check,prefix=TXN,default=, \
+           ABORTED COMMITTED PREPARED RUNNING)
+DEFUN(BDB:TXN-STAT, dbe &key STAT-CLEAR)
 { /* transaction subsystem statistics */
   u_int32_t flags = stat_flags();
   DB_ENV *dbe = (DB_ENV*)bdb_handle(popSTACK(),`BDB::DBE`,BH_VALID);
@@ -2658,12 +2797,20 @@ DEFUN(BDB:TXN-STAT, dbe &key :STAT-CLEAR)
   { /* txnarray */
     int ii, size = stat->st_nactive;
     DB_TXN_ACTIVE *txn_active = stat->st_txnarray;
-    for (ii=0; ii<size; ii++) {
+    for (ii=0; ii<size; ii++, txn_active++) {
       pushSTACK(uint32_to_I(txn_active->txnid));
       pushSTACK(uint32_to_I(txn_active->parentid));
       pushSTACK(make_lsn(&(txn_active->lsn)));
+     #if defined(HAVE_DB_TXN_ACTIVE_STATUS) /* 4.7 */
+      pushSTACK(txn_status_check_reverse(txn_active->status));
+     #else
       pushSTACK(uint32_to_I(txn_active->xa_status));
+     #endif
+     #if defined(HAVE_DB_TXN_ACTIVE_GID) /* 4.8 */
+      pushSTACK(gid_to_vector(txn_active->gid));
+     #else
       pushSTACK(gid_to_vector(txn_active->xid));
+     #endif
       funcall(`BDB::MKTXNACTIVE`,5); pushSTACK(value1);
     }
     value1 = vectorof(size); pushSTACK(value1);

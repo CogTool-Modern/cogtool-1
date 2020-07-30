@@ -1,4 +1,4 @@
-;;; Copyright (C) 2000-2005 by Sam Steingold
+;;; Copyright (C) 2000-2008 by Sam Steingold
 ;;; This is Free Software, covered by the GNU GPL (v2)
 ;;; See <http://www.gnu.org/copyleft/gpl.html>
 
@@ -13,10 +13,8 @@
    "WITH-DIR-KEY-SEARCH" "DIR-KEY-CHILDREN" "DIR-KEY-VALUES"
    "DIR-KEY-DUMP-TREE" "DIR-KEY-INFO"))
 
-(setf (package-lock "EXT") nil)
-(use-package '("LDAP") "EXT")
-(ext:re-export "LDAP" "EXT")
 (pushnew :dirkey *features*)
+(provide "dirkey")
 (in-package "LDAP")
 
 (setf (documentation (find-package "LDAP") 'sys::impnotes) "dir-key")
@@ -132,6 +130,5 @@ If collect is non-nil, collect all the keys into an a-list."
         `(progn ,default ,storeform)
         `,storeform)))
 
-;;; restore locks
 (pushnew "LDAP" custom:*system-package-list* :test #'string=)
 (setf (package-lock custom:*system-package-list*) t)

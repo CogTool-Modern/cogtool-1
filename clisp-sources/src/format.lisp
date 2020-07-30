@@ -4,7 +4,8 @@
 ;; Major revision by Bruno Haible  14.02.1990-15.02.1990
 ;; Further revised and wrote FORMATTER 9.4.1995-11.4.1995
 ;; German comments translated into English: Stefan Kain 2001-09-09
-;; pprint-logical-block ~:> support: John Boyland 2003
+;; formatter pprint-logical-block ~:> support: John Boyland 2003
+;; Sam Steingold 1999-2009
 
 ;; FORMAT is a mechanism for producing string output conveniently by,
 ;; basically, taking a pre-determined string with placeholders and
@@ -268,8 +269,7 @@
              (setf (csd-type newcsd) 0)
              (if (csd-colon-p newcsd)
                (if (csd-atsign-p newcsd)
-                 (format-error 'error control-string index
-                   (TEXT "The ~~newline format directive cannot take both modifiers."))
+                 (format-not-both-error "~newline")
                  nil) ; ~:<newline> -> ignore Newline, retain Whitespace
                (progn
                  (when (csd-atsign-p newcsd)
@@ -323,16 +323,21 @@
           (loop
             (setq pos2 (or (position #\Newline control-string :start pos1)
                            (length control-string)))
-            (setq errorstring (string-concat errorstring "~%  ~A"))
+            (setq errorstring (string-concat errorstring "~%~2T~S"))
             (setq arguments
               (nconc arguments (list (substring control-string pos1 pos2))))
             (when (<= pos1 errorpos pos2)
-              (setq errorstring (string-concat errorstring "~%~VT" "|"))
-              (setq arguments (nconc arguments (list (+ (- errorpos pos1) 2)))))
+              (setq errorstring (string-concat errorstring "~%~VT|"))
+              (setq arguments (nconc arguments (list (+ (- errorpos pos1) 3)))))
             (when (= pos2 (length control-string)) (return))
             (setq pos1 (+ pos2 1)))))
       (apply #'error-of-type
              type (nreconc type-initargs (list* errorstring arguments))))))
+
+(defun format-not-both-error (directive)
+  (format-error 'error *FORMAT-CS* nil
+                (TEXT "The ~A format directive cannot take both modifiers.")
+                directive))
 
 ;;; ---------------------------------------------------------------------------
 
@@ -699,51 +704,6 @@
     (format-integer base mincol padchar commachar commainterval
                     colon-modifier atsign-modifier arg stream)))
 
-;; (format-scale-exponent-aux arg zero one ten tenth lg2)
-;; returns two values for the Floating-Point-Number arg >= 0 and
-;; zero = 0.0, one = 1.0, ten = 10.0, tenth = 0.1, lg2 = log(2)/log(10)
-;; (the four in the same floating point precision as arg):
-;; mantissa and n, with n being an integer
-;; and mantissa being a floating-point-number, 0.1 <= mantissa < 1,
-;; arg = mantissa * 10^n (also 10^(n-1) <= arg < 10^n ).
-;; (for arg=zero: zero and n=0.)
-(defun format-scale-exponent-aux (arg zero one ten tenth lg2)
-  (multiple-value-bind (significand expon) (decode-float arg)
-    (declare (ignore significand))
-    (if (zerop arg)
-      (values zero 0)
-      (let* ((expon10a (truncate (* expon lg2))) ; round is not used, in order to avoid overflow
-             (signif10a (/ arg (expt ten expon10a))))
-        (do ((ten-power ten (* ten-power ten))
-             (signif10b signif10a (/ signif10a ten-power))
-             (expon10b expon10a (1+ expon10b)))
-            ((< signif10b one)
-             (do ((ten-power ten (* ten-power ten))
-                  (signif10c signif10b (* signif10b ten-power))
-                  (expon10c expon10b (1- expon10c)))
-                 ((>= signif10c tenth)
-                  (values signif10c expon10c)))))))))
-
-;; (format-scale-exponent arg)
-;; returns two values for floating point number arg >= 0:
-;; mantissa and n, with integer n
-;; and floating-point mantissa, 0.1 <= mantissa < 1,
-;; arg = mantissa * 10^n (also 10^(n-1) <= arg < 10^n ).
-;; (for arg=zero: 0.0 and n=0.)
-(defun format-scale-exponent (arg)
-  (format-scale-exponent-aux arg 0 1 10 1/10 (log 2 (float 10 arg)))
-  #+(or)
-  (cond ((short-float-p arg)
-         (format-scale-exponent-aux arg 0.0s0 1.0s0 10.0s0 0.1s0 0.30103s0))
-        ((single-float-p arg)
-         (format-scale-exponent-aux arg 0.0f0 1.0f0 10.0f0 0.1f0 0.30103s0))
-        ((double-float-p arg)
-         (format-scale-exponent-aux arg 0.0d0 1.0d0 10.0d0 0.1d0 0.30103s0))
-        ((long-float-p arg)
-         (format-scale-exponent-aux arg
-           (float 0 arg) (float 1 arg) (float 10 arg) (float 1/10 arg)
-           0.30102999566d0))))  ; lg2 is needed with 32 Bit-Precision
-
 ;; (format-float-to-string arg width d k dmin)
 ;; returns a String for Floating-point arg:
 ;; it has the value of (* (abs arg) (expt 10 k)), with at least d digits behind
@@ -798,7 +758,6 @@
                            ; = number of digits in front of the decimal point
              (last-pos nil) ; NIL or position of the last significant digit
                             ;  (if d or width were specified)
-             (halbzahlig nil) ; indicates, if 0.50000 can be dropped at the end
              digit              ; the current digit, >=0, <10
              (round-down-p nil) ; T if last digit is to be rounded off
              (round-up-p nil)) ; T if last digit is to be rounded up
@@ -884,8 +843,8 @@
               ;; changed by exactly 1 at the position last-pos
               (setq round-down-1 (max decimal-1 round-down-1))
               (setq round-up-1 (max decimal-1 round-up-1))
-              ;; now rounding my take place by one (half) decimal-1.
-              (when (= round-up-1 decimal-1) (setq halbzahlig T))))
+              ;; now rounding may take place by one (half) decimal-1.
+              ))
           (when (< (+ (ash numerator 1) round-up-1) (ash denominator 1))
             (return)))
         ;; posn = position of the first significant digit + 1
@@ -907,11 +866,8 @@
           (setq round-down-1 (* round-down-1 10))
           (setq round-up-1 (* round-up-1 10))
           (setq round-down-p (< (ash numerator 1) round-down-1))
-          (if halbzahlig
-            (setq round-up-p
-                  (>= (ash numerator 1) (- (ash denominator 1) round-up-1)))
-            (setq round-up-p
-                  (>= (ash numerator 1) (- (ash denominator 1) round-up-1))))
+          (setq round-up-p
+                (>= (ash numerator 1) (- (ash denominator 1) round-up-1)))
           (when (or round-down-p round-up-p
                     (and last-pos (<= posn last-pos)))
             (return))
@@ -980,13 +936,13 @@
 ;; in Exponential representation to stream.
 ;; (compare CLTL p.392-394)
 ;; partitioning of Mantissa:
-;;   if k<=0,    first 1 zero (if fits in width), then the point,
-;;               then |k| zeros, then d-|k| significant digits;
-;;               which is d digits behind the point, altogether.
-;;   Falls k>0,  first k significant digits, then the point,
-;;               then d-k+1 further significant digits;
-;;               which is d+1 significant digits, altogether.
-;;               no zeros in front.
+;;   if k<=0, first 1 zero (if fits in width), then the point,
+;;            then |k| zeros, then d-|k| significant digits;
+;;            which is d digits behind the point, altogether.
+;;   if k>0,  first k significant digits, then the point,
+;;            then d-k+1 further significant digits;
+;;            which is d+1 significant digits, altogether.
+;;            no zeros in front.
 ;;   (The default in FORMAT-EXPONENTIAL-FLOAT is k=1.)
 ;; the sign in front of the Mantissa (a + only if arg>=0 and plus-sign-flag).
 ;; then the Exponent, prefaced by exponentchar, then sign of the
@@ -998,7 +954,7 @@
 ;; as necessary.
 (defun format-float-for-e (w d e k
        overflowchar padchar exponentchar plus-sign-flag arg stream)
-  (multiple-value-bind (mantissa oldexponent) (format-scale-exponent (abs arg))
+  (multiple-value-bind (oldexponent mantissa) (float-scale-exponent (abs arg))
     (let* ((exponent (if (zerop arg) 0 (- oldexponent k))) ; Exponent to be printed
            (expdigits (write-to-string (abs exponent) :base 10.
                                        :radix nil :readably nil))
@@ -1017,21 +973,20 @@
         ;; if Overflowchar and w and e being stated, Exponent needs more room:
         (format-padding w overflowchar stream)
         (progn
-          (if w
-            (if (or plus-sign-flag (minusp arg))
-              (setq mantwidth (1- mantwidth))))
+          (when (and w (or plus-sign-flag (minusp arg)))
+            (setq mantwidth (1- mantwidth)))
           ;; mantwidth = number of available characters (or nil)
           ;;  for the Mantissa (without sign,including point)
           (multiple-value-bind (mantdigits mantdigitslength
-                                leadingpoint trailingpoint)
+                                leadingpoint trailingpoint point-pos)
               (format-float-to-string mantissa mantwidth mantd k dmin)
             (when w
               (setq mantwidth (- mantwidth mantdigitslength))
-              (if trailingpoint
+              (when trailingpoint
                 (if (or (null mantd) (> mantd 0))
                   (setq mantwidth (- mantwidth 1))
                   (setq trailingpoint nil)))
-              (if leadingpoint
+              (when leadingpoint
                 (if (> mantwidth 0)
                   (setq mantwidth (- mantwidth 1))
                   (setq leadingpoint nil))))
@@ -1039,14 +994,37 @@
             (if (and overflowchar w (minusp mantwidth))
               (format-padding w overflowchar stream) ; not enough room -> overflow
               (progn
+                (when (and (plusp k) (< k point-pos))
+                  ;; format-float-to-string rounded the mantissa up above 1
+                  ;; so that all our assumptions are now wrong and we are
+                  ;; about to get (format nil "~8e" .999999d9) => " 10.0d+8"
+                  (let* ((shift (- point-pos 1))
+                         (new-exponent (+ exponent shift))
+                         (new-expdigits
+                          (write-to-string (abs new-exponent) :base 10.
+                                           :radix nil :readably nil)))
+                    ;; shift the decimal point left
+                    (dotimes (i shift)
+                      (rotatef (char mantdigits (- point-pos i))
+                               (char mantdigits (- point-pos i 1))))
+                    ;; update for the the exponent change
+                    (when mantwidth
+                      (incf mantwidth (- (length expdigits)
+                                         (length new-expdigits))))
+                    (setq exponent new-exponent
+                          expdigits new-expdigits)
+                    ;; update for the trailing point change
+                    (when trailingpoint
+                      (setq trailingpoint nil)
+                      (when mantwidth (incf mantwidth)))))
                 (when (and w (> mantwidth 0))
                   (format-padding mantwidth padchar stream))
                 (if (minusp arg)
                   (write-char #\- stream)
                   (if plus-sign-flag (write-char #\+ stream)))
-                (if leadingpoint (write-char #\0 stream))
+                (when leadingpoint (write-char #\0 stream))
                 (write-string mantdigits stream)
-                (if trailingpoint (write-char #\0 stream))
+                (when trailingpoint (write-char #\0 stream))
                 (write-char
                   (cond (exponentchar)
                         ((and (not *PRINT-READABLY*)
@@ -1131,7 +1109,7 @@
       (princ-to-string arg)
       stream)))
 
-;; preliminary, see fill-out.lisp
+;; preliminary, see fill-out.lisp (defgeneric is not yet available)
 (defun stream-start-s-expression (stream)
   (declare (ignore stream)) *print-right-margin*)
 (defun stream-end-s-expression (stream) (declare (ignore stream)))
@@ -1284,8 +1262,7 @@
   (declare (ignore colon-modifier))
   (if (rationalp arg) (setq arg (float arg)))
   (if (floatp arg)
-    (multiple-value-bind (mantissa n) (format-scale-exponent (abs arg))
-      (declare (ignore mantissa))
+    (let ((n (float-scale-exponent (abs arg))))
       (if (null d)
         (setq d
           (multiple-value-bind (digits digitslength)
@@ -1502,7 +1479,7 @@
                            &optional (prefix nil))
   (if colon-modifier
     (if atsign-modifier
-      (format-conditional-error)
+      (format-not-both-error "~[")
       (progn
         (when (next-arg)
           (setq *FORMAT-CSDL* (csd-clause-chain (car *FORMAT-CSDL*))))
@@ -1531,10 +1508,6 @@
           (setq *FORMAT-CSDL* (cdr *FORMAT-CSDL*)))
         (format-interpret stream 'FORMAT-CONDITIONAL-END))))
   (format-skip-to-end)) ; skip to the end of ~[...~]-Directive
-
-(defun format-conditional-error ()
-  (format-error 'error *FORMAT-CS* nil
-    (TEXT "The ~~[ format directive cannot take both modifiers.")))
 
 ; ~{, CLTL p.403-404, CLtL2 p. 602-604
 (defun format-iteration (stream colon-modifier atsign-modifier
@@ -1709,7 +1682,7 @@
                                   (csd-data (car csdl))))
              (pop csdl))
             (t (format-error 'error *FORMAT-CS* (csd-cs-index (car csdl))
-                 (TEXT "Prefix for logical block must be constant")))))
+                 (TEXT "Logical block prefix must be constant")))))
     (setq body-csdl (cdr csdl))
     (setq temp (csd-clause-chain (car csdl)))
     (unless (eq (csd-data (car temp)) 'FORMAT-JUSTIFICATION-END)
@@ -2281,7 +2254,7 @@
                      (FORMAT-CONDITIONAL            ; #\[
                       (if colon-p
                         (if atsign-p
-                          (format-conditional-error)
+                          (format-not-both-error "~[")
                           (progn
                             (simple-arglist 0)
                             (push `(IF (NOT ,(formatter-next-arg))

@@ -44,12 +44,12 @@ to print the corresponding values, or T for all of them.")
 
 (defun apropos (string &optional (package nil))
   (dolist (sym (apropos-list string package))
-    (format t "~&~s~40t" sym)
+    (format t "~&~S~40t" sym)
     (when (fboundp sym)
       #1=(write-string "   ")   ; spacer
       (write-string (fbound-string sym))
       (when (apropos-do-more :function)
-        (format t " [~s]" (fdefinition sym))))
+        (format t " [~S]" (fdefinition sym))))
     (when (symbol-macro-expand sym)
       #1# (write-string (TEXT "symbol-macro")))
     (when (boundp sym)
@@ -57,18 +57,18 @@ to print the corresponding values, or T for all of them.")
             (write-string (TEXT "constant"))
             (write-string (TEXT "variable")))
       (when (apropos-do-more :variable)
-        (format t " [~s]" (symbol-value sym))))
+        (format t " [~S]" (symbol-value sym))))
     (let ((type (or (get sym 'system::type-symbol)
                     (get sym 'system::defstruct-description))))
       (when type
         #1# (write-string (TEXT "type"))
         (when (apropos-do-more :type)
-          (format t " [~s]" type))))
+          (format t " [~S]" type))))
     (let ((class (get sym 'clos::closclass)))
       (when class
         #1# (write-string (TEXT "class"))
         (when (apropos-do-more :class)
-          (format t " [~s]" class))))
+          (format t " [~S]" class))))
     (elastic-newline))
   (values))
 
@@ -101,17 +101,39 @@ to print the corresponding values, or T for all of them.")
         (terpri stream)
         (format stream (TEXT "No slots."))))))
 
-(defun launch-doc (obj type stream name)
+(defun launch-doc (obj type stream name kind)
   (when (zerop *describe-nesting*)
     (let ((doc (documentation obj type)))
       (when doc
         (if *browser*
             (ext::browse-url doc :out stream)
-            (format stream name doc))))))
+            (format stream name kind doc))))))
+
+(defvar *squeeze-string-max* 100)
+(defvar *squeeze-string-section* 10) ; at most half of *squeeze-string-max*
+(defun squeeze-string (string &key (start 0) (end (length string)))
+  (let* ((len (length string))
+         (prefix (if (= start 0) "" "..."))
+         (suffix (if (= end len) "" "...")))
+    (cond ((> *squeeze-string-max* len) string)
+          ((> *squeeze-string-max* (- end start))
+           (string-concat prefix (subseq string start end) suffix))
+          (t (string-concat
+              prefix (subseq string start (+ start *squeeze-string-section*))
+              "..." (subseq string (- end *squeeze-string-section*)) suffix)))))
 
 (clos:defgeneric describe-object (obj stream)
   (:method ((obj t) (stream stream))
     (ecase (type-of obj)
+      #+MT
+      (MT:THREAD
+       (format stream (TEXT "a thread object.")))
+      #+MT
+      (MT:MUTEX
+       (format stream (TEXT "a mutually exclusive thread lock.")))
+      #+MT
+      (MT:EXEMPTION
+       (format stream (TEXT "a thread condition variable.")))
       #+(or UNIX FFI WIN32)
       (EXT::FOREIGN-POINTER
        (format stream (TEXT "a foreign pointer.")))
@@ -121,7 +143,7 @@ to print the corresponding values, or T for all of them.")
       #+FFI
       (FFI::FOREIGN-VARIABLE
        (format stream (TEXT "a foreign variable of foreign type ~S.")
-               (ffi::deparse-c-type (sys::%record-ref obj 3))))
+               (ffi::deparse-c-type (sys::%record-ref obj 4)))) ; fv_type
       #+SOCKETS
       (SOCKET-SERVER
        (format stream (TEXT "a server socket accepting connections.")))
@@ -134,13 +156,15 @@ to print the corresponding values, or T for all of them.")
        (format stream (TEXT "a load-time evaluation promise.")))
       (EXT:SYMBOL-MACRO
        (format stream (TEXT "a symbol macro handler.")))
+      (EXT:GLOBAL-SYMBOL-MACRO
+       (format stream (TEXT "a global symbol macro handler.")))
       (SYS::MACRO
        (format stream (TEXT "a macro expander."))
-       (terpri stream)
-       (format stream (TEXT "For more information, evaluate ~{~S~^ or ~}.")
-               `((DISASSEMBLE (MACRO-FUNCTION
-                               ',(sys::closure-name
-                                  (sys::macro-expander obj)))))))
+       (let ((name (sys::closure-name (sys::macro-expander obj))))
+         (describe-arglist stream name)
+         (terpri stream)
+         (format stream (TEXT "For more information, evaluate ~{~S~^ or ~}.")
+                 `((DISASSEMBLE (MACRO-FUNCTION ',name))))))
       (EXT:FUNCTION-MACRO
        (format stream (TEXT "a function with alternative macro expander.")))
       (EXT:ENCODING
@@ -191,10 +215,10 @@ to print the corresponding values, or T for all of them.")
              (remaining (weak-alist-contents obj)))
          (format stream (TEXT "a weak association list, of type ~S ") type)
          (ecase type
-           (:KEY    (format stream (TEXT "(i.e. a list of EXT:WEAK-MAPPING key/value pairs)")))
-           (:VALUE  (format stream (TEXT "(i.e. a list of EXT:WEAK-MAPPING value/key pairs)")))
-           (:KEY-AND-VALUE (format stream (TEXT "(i.e. a list of (key . value) pairs each combined into a EXT:WEAK-AND-RELATION)")))
-           (:KEY-OR-VALUE  (format stream (TEXT "(i.e. a list of (key . value) pairs each combined into a EXT:WEAK-OR-RELATION)"))))
+           (:KEY    (format stream (TEXT "(i.e. a list of ~S key/value pairs)") 'EXT:WEAK-MAPPING))
+           (:VALUE  (format stream (TEXT "(i.e. a list of ~S value/key pairs)") 'EXT:WEAK-MAPPING))
+           (:KEY-AND-VALUE (format stream (TEXT "(i.e. a list of (key . value) pairs each combined into a ~S)") 'EXT:WEAK-AND-RELATION))
+           (:KEY-OR-VALUE  (format stream (TEXT "(i.e. a list of (key . value) pairs each combined into a ~S)") 'EXT:WEAK-OR-RELATION)))
          (if remaining
            (format stream (TEXT ", containing ~S.") remaining)
            (format stream (TEXT ", no longer referring to any pairs.")))))
@@ -220,7 +244,7 @@ to print the corresponding values, or T for all of them.")
   (:method ((obj structure-object) (stream stream)) ; CLISP specific
     (format stream (TEXT "a structure of type ~S.")
             (type-of obj))
-    (let ((types (butlast (cdr (sys::%record-ref obj 0)))))
+    (let ((types (butlast (cdr (sys::%record-ref obj 0))))) ; structure_types
       (when types
         (terpri stream)
         (format stream (TEXT "As such, it is also a structure of type ~{~S~^, ~}.")
@@ -299,7 +323,7 @@ to print the corresponding values, or T for all of them.")
                        (assoc obj *deprecated-functions-alist* :test #'eq))))
         (let ((dep (get obj 'deprecated)))
           (when dep
-            (format stream (TEXT " (use ~s instead)") dep)))
+            (format stream (TEXT " (use ~S instead)") dep)))
         (pushnew (symbol-function obj) mored))
       (when (or (get obj 'system::type-symbol)
                 (get obj 'system::defstruct-description)
@@ -309,6 +333,14 @@ to print the corresponding values, or T for all of them.")
           (push `(type-expand ',obj t) moree)))
       (when (clos::defined-class-p (get obj 'clos::closclass))
         (format stream (TEXT ", names a class")))
+      #+FFI
+      (multiple-value-bind (expansion found-p)
+          (gethash obj ffi::*c-type-table*)
+        (when found-p
+          (cond ((eq expansion obj)
+                 (format stream (TEXT ", names a built-in foreign type")))
+                (t (format stream (TEXT ", names a foreign type"))
+                   (push `(gethash ',obj ffi::*c-type-table*) moree)))))
       (when (symbol-plist obj)
         (let ((properties
                (do ((l nil) (pl (symbol-plist obj) (cddr pl)))
@@ -322,20 +354,20 @@ to print the corresponding values, or T for all of them.")
         (let ((doc (documentation obj ty)))
           (when doc
             (terpri stream)
-            (format stream (TEXT "Documentation as a ~a:") ty)
+            (format stream (TEXT "Documentation as a ~A:") ty)
             (terpri stream)
             (princ doc stream))))
       (launch-doc obj 'ext::clhs ; change to sys::clhs when ext:clhs is finally removed
-                  stream (TEXT "~%ANSI Documentation is at~% ~S"))
+                  stream (TEXT "~%~A Documentation is at~% ~S") :ansi-cl)
       (launch-doc obj 'sys::impnotes stream
-                  (TEXT "~%CLISP Documentation is at~% ~S"))
+                  (TEXT "~%~A Documentation is at~% ~S") :clisp)
       (when moree
         (terpri stream)
         (format stream (TEXT "For more information, evaluate ~{~S~^ or ~}.")
                 moree))
       (dolist (zz (nreverse mored)) (describe zz stream))))
   (:method ((obj integer) (stream stream))
-    (format stream (TEXT "an integer, uses ~S bit~:p, is represented as a ~:[bignum~;fixnum~].")
+    (format stream (TEXT "an integer, uses ~S bit~:P, is represented as a ~:[bignum~;fixnum~].")
             (integer-length obj) (sys::fixnump obj)))
   (:method ((obj ratio) (stream stream))
     (format stream (TEXT "a rational, not integral number.")))
@@ -375,7 +407,15 @@ to print the corresponding values, or T for all of them.")
   (:method ((obj stream) (stream stream))
     (format stream (TEXT "a~:[~:[ closed ~;n output-~]~;~:[n input-~;n input/output-~]~]stream.")
             (and (input-stream-p obj) (open-stream-p obj))
-            (and (output-stream-p obj) (open-stream-p obj))))
+            (and (output-stream-p obj) (open-stream-p obj)))
+    (when (sys::string-stream-p obj)
+      (multiple-value-bind (string start end) (sys::string-stream-string obj)
+        (if (and start end)     ; STRING-INPUT-STREAM
+            (format stream (TEXT " It reads from ~S from ~:D to ~:D at ~:D.")
+                    (squeeze-string string :start start :end end)
+                    start end (sys::string-input-stream-index obj))
+            (format stream (TEXT " It appends to ~S.")
+                    (squeeze-string string))))))
   (:method ((obj package) (stream stream))
     (if (package-name obj)
       (progn
@@ -383,7 +423,7 @@ to print the corresponding values, or T for all of them.")
                 (package-name obj))
         (let ((nicknames (package-nicknames obj)))
           (when nicknames
-            (format stream (TEXT ". It has ~:d nickname~:p ~{~A~^, ~}")
+            (format stream (TEXT ". It has ~:D nickname~:P ~{~A~^, ~}")
                     (length nicknames) nicknames)))
         (format stream (TEXT "."))
         (let ((use-list (package-use-list obj))
@@ -391,19 +431,19 @@ to print the corresponding values, or T for all of them.")
           (terpri stream)
           (format stream (TEXT "It "))
           (when use-list
-            (format stream (TEXT "imports the external symbols of ~:d package~:p ~{~A~^, ~} and ")
+            (format stream (TEXT "imports the external symbols of ~:D package~:P ~{~A~^, ~} and ")
                     (length use-list)
                     (mapcar #'package-name use-list)))
           (let ((L nil) (count 0)) ; maybe list all exported symbols
             (do-external-symbols (s obj) (push s L) (incf count))
             (format stream
-                    (TEXT "exports ~[no symbols~:;~:*~:d symbol~:p~]")
+                    (TEXT "exports ~[no symbols~:;~:*~:D symbol~:P~]")
                     count)
             (when (zerop *describe-nesting*)
               (format stream (TEXT "~{ ~S~^,~}")
                       (sort L #'string< :key #'symbol-name))))
           (if used-by-list
-            (format stream (TEXT " to ~:d package~:p ~{~A~^, ~}")
+            (format stream (TEXT " to ~:D package~:P ~{~A~^, ~}")
                     (length used-by-list)
                     (mapcar #'package-name used-by-list))
             (format stream (TEXT ", but no package uses these exports")))
@@ -430,11 +470,11 @@ to print the corresponding values, or T for all of them.")
                        (format stream (TEXT "It is a traditional ANSI CL compatible package, but uses the symbols from the modern ~S!")
                                (find-package "CS-COMMON-LISP"))))))))
         (launch-doc obj 'sys::impnotes stream
-                    (TEXT "~%CLISP Documentation is at~% ~S")))
+                    (TEXT "~%~A Documentation is at~% ~S") :clisp))
       (format stream (TEXT "a deleted package."))))
   (:method ((obj hash-table) (stream stream))
     (let ((count (hash-table-count obj)))
-      (format stream (TEXT "an ~s hash table with ~[no entries~:;~:*~:d entr~:*~[~;y~:;ies~]~].")
+      (format stream (TEXT "an ~S hash table with ~[no entries~:;~:*~:D entr~@:P~].")
               (hash-table-test obj) count)))
   (:method ((obj readtable) (stream stream))
     (format stream (TEXT "~:[a~;the Common Lisp~] readtable.")
@@ -487,7 +527,7 @@ to print the corresponding values, or T for all of them.")
     (format stream (TEXT "a generic function."))
     (unless (clos::generic-function-undeterminedp obj)
       (terpri stream)
-      (format stream (TEXT "Argument list: ~A")
+      (format stream (TEXT "Argument list: ~:S")
               (clos:generic-function-lambda-list obj)))
     (let ((mc (clos::method-combination-name (clos:generic-function-method-combination obj))))
       (unless (eq mc 'STANDARD)
@@ -514,44 +554,33 @@ to print the corresponding values, or T for all of them.")
       #+FFI
       (FFI::FOREIGN-FUNCTION
        (format stream (TEXT "a foreign function of foreign type ~S.")
-               (ffi::deparse-c-type (vector 'ffi::c-function
-                                            (sys::%record-ref obj 2)
-                                            (sys::%record-ref obj 3)
-                                            (sys::%record-ref obj 4)))))
+               (ffi::deparse-c-type
+                (vector 'ffi::c-function
+                        (sys::%record-ref obj 3) ; ff_resulttype
+                        (sys::%record-ref obj 4) ; ff_argtypes
+                        (sys::%record-ref obj 5))))) ; ff_flags
       (COMPILED-FUNCTION
-       (multiple-value-bind (name req opt rest-p keywords other-keys)
-           (sys::subr-info obj)
-         (if (and name req)
-           (progn
-             (format stream (TEXT "a built-in system function."))
-             (sys::describe-signature stream req opt rest-p
-                                      keywords keywords other-keys))
-           (progn
-             (format stream (TEXT "a compiled function."))
-             (multiple-value-bind (req opt rest-p key-p keywords other-keys-p)
-                 (sys::signature obj)
-               (sys::describe-signature stream req opt rest-p key-p keywords
-                                        other-keys-p)
-               (let* ((name (sys::closure-name obj))
-                      (funform (cond ((and (symbolp name) (macro-function name))
-                                      `(MACRO-FUNCTION ',name))
-                                     ((fboundp name) `(FUNCTION ,name)))))
-                 (when funform
-                   (terpri stream)
-                   (format stream
-                           (TEXT "For more information, evaluate ~{~S~^ or ~}.")
-                           `((DISASSEMBLE ,funform))))))))))
+       (let ((subrp (sys::subr-info obj)))
+         (format stream (if subrp
+                            (TEXT "a built-in system function.")
+                            (TEXT "a compiled function.")))
+         (describe-arglist stream obj)
+         (describe-documentation stream obj)
+         (let* ((name (sys::function-name obj))
+                (funform (cond ((and (symbolp name) (macro-function name))
+                                `(MACRO-FUNCTION ',name))
+                               ((fboundp name) `(FUNCTION ,name)))))
+           (when funform
+             (terpri stream)
+             (format stream
+                     (TEXT "For more information, evaluate ~{~S~^ or ~}.")
+                     `((DISASSEMBLE ,funform)))))))
       (FUNCTION
        ;; we do not use ETYPECASE here to ensure that if we do get here,
        ;; we are dealing with an Iclosure object
        (format stream (TEXT "an interpreted function."))
-       (let ((doc (sys::%record-ref obj 2)))
-         (terpri stream)
-         (format stream (TEXT "Argument list: ~:S")
-                 (car (sys::%record-ref obj 1)))
-         (when doc
-           (terpri stream)
-           (format stream (TEXT "Documentation: ~A") doc)))))))
+       (describe-arglist stream obj)
+       (describe-documentation stream obj)))))
 
 (defun describe1 (obj stream)
   (let ((objstring (sys::write-to-short-string
@@ -559,10 +588,12 @@ to print the corresponding values, or T for all of them.")
     (fresh-line stream)
     (terpri stream) ; blank line
     (if (memq obj *describe-done*)
-      (format stream (TEXT "~A [see above]") objstring)
+      (with-stream-s-expression (stream)
+        (format stream (TEXT "~A [see above]") objstring))
       (let ((doc (and (symbolp obj) (get obj 'sys::doc))))
         (push obj *describe-done*)
-        (format stream (TEXT "~A is ") objstring)
+        (with-stream-s-expression (stream)
+          (format stream (TEXT "~A is ") objstring))
         (describe-object obj stream)
         (fresh-line stream)
         (when doc
@@ -570,7 +601,7 @@ to print the corresponding values, or T for all of them.")
           (format stream (TEXT "Documentation:"))
           (do ((tail doc (cddr tail)))
               ((endp tail))
-            (format stream "~&~s:~%~s" (car tail) (cadr tail)))
+            (format stream "~&~S:~%~S" (car tail) (cadr tail)))
           (fresh-line stream)))))
   (finish-output stream))
 
@@ -604,20 +635,32 @@ to print the corresponding values, or T for all of them.")
 ;; auxiliary functions for DESCRIBE of FUNCTION
 
 (defun arglist (func)
-  (setq func (coerce func 'function))
-  (if (typep func 'generic-function)
-    ; Generic functions store the lambda-list. It has meaningful variable names.
-    (clos:generic-function-lambda-list func)
-    ; Normal functions store only the signature, no variable names.
-    (sig-to-list (get-signature func))))
+  (cond ((and (symbolp func) (fboundp func)
+              (sys::macrop (symbol-function func)))
+         (sys::macro-lambda-list (symbol-function func)))
+        ((typep (setq func (coerce func 'function)) 'generic-function)
+         ;; Generic functions store the original lambda-list.
+         (clos:generic-function-lambda-list func))
+        ((or (sys::subr-info func) ; built-in
+             #+FFI (eq (type-of func) 'FFI::FOREIGN-FUNCTION))
+         (sig-to-list (get-signature func)))
+        ((sys::%compiled-function-p func) ; compiled closure
+         (or (sys::closure-lambda-list func)
+             (sig-to-list (get-signature func))))
+        ((sys::closurep func) ; interpreted closure?
+         (car (sys::%record-ref func 1))))) ; clos_form
 
-(defun describe-signature (stream req-anz opt-anz rest-p keyword-p keywords
-                           allow-other-keys)
+(defun describe-arglist (stream function)
   (terpri stream)
-  (format stream (TEXT "Argument list: ~A.")
-          (format nil "(~{~A~^ ~})"
-                  (signature-to-list req-anz opt-anz rest-p keyword-p keywords
-                                     allow-other-keys))))
+  (format stream (TEXT "Argument list: ~:S")
+          (handler-case (arglist function)
+            (error (c) (princ-to-string c)))))
+
+(defun describe-documentation (stream function)
+  (let ((doc (clos::function-documentation function)))
+    (when doc
+      (terpri stream)
+      (format stream (TEXT "Documentation: ~A") doc))))
 
 ;;-----------------------------------------------------------------------------
 ;; auxiliary functions for CLISP metadata
@@ -629,7 +672,7 @@ to print the corresponding values, or T for all of them.")
     (assert (probe-file
              (setq path (merge-pathnames
                          name (merge-pathnames data *lib-directory*))))
-            (*lib-directory*) "~s: file ~s does not exist - adjust ~s"
+            (*lib-directory*) (TEXT "~S: file ~S does not exist - adjust ~S")
             'clisp-data-file path '*lib-directory*)
     path))
 

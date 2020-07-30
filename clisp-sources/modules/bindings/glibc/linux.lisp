@@ -1,17 +1,17 @@
 ;; Foreign functions provided by the Linux C library version 6,
 ;; i.e. the GNU C library version 2.0.7.
 ;; Bruno Haible 10.4.1998, 19.4.1998
-;; Sam Steingold 2002-2005
+;; Sam Steingold 2002-2008
 
 (defpackage "LINUX"
   (:modern t)
   (:nicknames "UNIX" "GLIBC")
   (:use "COMMON-LISP" "FFI")
   (:shadowing-import-from "EXPORTING"
-           #:defconstant #:defun #:defmacro #:define-modify-macro
-           #:define-symbol-macro #:defsetf
-           #:def-c-type #:def-c-enum #:def-c-struct #:def-c-var
-           #:def-c-const #:def-call-out)
+    #:defconstant #:defun #:defmacro #:define-modify-macro
+    #:define-symbol-macro #:defsetf
+    #:def-c-type #:def-c-enum #:def-c-struct #:def-c-var
+    #:def-c-const #:def-call-out)
   (:shadow read write random abort abs acos asin atan cos sin tan cosh sinh tanh
            acosh asinh atanh exp log sqrt floor truncate ftruncate open close
            remove sleep))
@@ -31,11 +31,9 @@
 
 (c-lines "#include <stddef.h>~%")
 
-(def-c-type ptrdiff_t long)
+(def-c-type ptrdiff_t)          ; long
 
-(def-c-type size_t uint)  ; uint or ulong, doesn't matter
-
-(def-c-type wchar_t int)
+(def-c-type wchar_t)            ; int
 
 ; =========================== <sys/types.h> ===================================
 
@@ -51,25 +49,25 @@
 (def-c-type __quad_t sint64)
 (def-c-type __qaddr_t (c-ptr __quad_t))
 
-(def-c-type __dev_t __u_quad_t)
-(def-c-type __uid_t __u_int)
-(def-c-type __gid_t __u_int)
-(def-c-type __ino_t __u_long)
-(def-c-type __mode_t __u_int)
-(def-c-type __nlink_t __u_int)
-(def-c-type __off_t long)
-(def-c-type __loff_t __quad_t)
-(def-c-type __pid_t int)
-(def-c-type __ssize_t int)
+(def-c-type __dev_t)            ; __u_quad_t
+(def-c-type __uid_t)            ; __u_int
+(def-c-type __gid_t)            ; __u_int
+(def-c-type __ino_t)            ; __u_long
+(def-c-type __mode_t)           ; __u_int
+(def-c-type __nlink_t)          ; __u_int
+(def-c-type __off_t)            ; long
+(def-c-type __loff_t)           ; __quad_t
+(def-c-type __pid_t)            ; int
+(def-c-type __ssize_t)          ; int
 
 (def-c-struct __fsid_t
   (__val (c-array int 2))
 )
 
-(def-c-type __daddr_t int)
-(def-c-type __caddr_t c-pointer)
-(def-c-type __time_t long)
-(def-c-type __swblk_t long)
+(def-c-type __daddr_t)          ; int
+(def-c-type __caddr_t)          ; c-pointer
+(def-c-type __time_t)           ; long
+(def-c-type __swblk_t)          ; long
 
 (def-c-type __fd_mask ulong)
 (eval-when (load compile eval)
@@ -86,23 +84,24 @@
   (fds_bits (c-array __fd_mask #.(cl:/ __FD_SETSIZE __NFDBITS)))
 )
 
-(def-c-type __key_t int)
+(def-c-type __key_t)            ; int
 
-(def-c-type __ipc_pid_t ushort)
+(c-lines "#include <bits/ipctypes.h>~%")
+(def-c-type __ipc_pid_t)        ; ushort
 
 ; --------------------------- <sys/types.h> -----------------------------------
 
 (def-c-type dev_t __dev_t)
 (def-c-type gid_t __gid_t)
 (def-c-type ino_t __ino_t)
+(def-c-type ino64_t)
 (def-c-type mode_t __mode_t)
 (def-c-type nlink_t __nlink_t)
 (def-c-type off_t __off_t)
+(def-c-type off64_t)
 (def-c-type loff_t __loff_t)
 (def-c-type pid_t __pid_t)
 (def-c-type uid_t __uid_t)
-
-(def-c-type ssize_t __ssize_t)
 
 (def-c-type daddr_t __daddr_t)
 (def-c-type caddr_t __caddr_t)
@@ -110,8 +109,6 @@
 (def-c-type key_t __key_t)
 
 (def-c-type time_t __time_t)   ; in <time.h>
-
-(def-c-type size_t uint)       ; in <stddef.h>
 
 (def-c-type int8_t sint8)
 (def-c-type u_int8_t uint8)
@@ -164,130 +161,138 @@
 
 ; ---------------------------- <asm/errno.h> ----------------------------------
 
-(def-c-const EPERM (:documentation "Operation not permitted"))
-(def-c-const ENOENT (:documentation "No such file or directory"))
-(def-c-const ESRCH (:documentation "No such process"))
-(def-c-const EINTR (:documentation "Interrupted system call"))
-(def-c-const EIO (:documentation "I/O error"))
-(def-c-const ENXIO (:documentation "No such device or address"))
-(def-c-const E2BIG (:documentation "Arg list too long"))
-(def-c-const ENOEXEC (:documentation "Exec format error"))
-(def-c-const EBADF (:documentation "Bad file number"))
-(def-c-const ECHILD (:documentation "No child processes"))
-(def-c-const EAGAIN (:documentation "Try again"))
-(def-c-const ENOMEM (:documentation "Out of memory"))
-(def-c-const EACCES (:documentation "Permission denied"))
-(def-c-const EFAULT (:documentation "Bad address"))
-(def-c-const ENOTBLK (:documentation "Block device required"))
-(def-c-const EBUSY (:documentation "Device or resource busy"))
-(def-c-const EEXIST (:documentation "File exists"))
-(def-c-const EXDEV (:documentation "Cross-device link"))
-(def-c-const ENODEV (:documentation "No such device"))
-(def-c-const ENOTDIR (:documentation "Not a directory"))
-(def-c-const EISDIR (:documentation "Is a directory"))
-(def-c-const EINVAL (:documentation "Invalid argument"))
-(def-c-const ENFILE (:documentation "File table overflow"))
-(def-c-const EMFILE (:documentation "Too many open files"))
-(def-c-const ENOTTY (:documentation "Not a typewriter"))
-(def-c-const ETXTBSY (:documentation "Text file busy"))
-(def-c-const EFBIG (:documentation "File too large"))
-(def-c-const ENOSPC (:documentation "No space left on device"))
-(def-c-const ESPIPE (:documentation "Illegal seek"))
-(def-c-const EROFS (:documentation "Read-only file system"))
-(def-c-const EMLINK (:documentation "Too many links"))
-(def-c-const EPIPE (:documentation "Broken pipe"))
-(def-c-const EDOM (:documentation "Math argument out of domain of func"))
-(def-c-const ERANGE (:documentation "Math result not representable"))
-(def-c-const EDEADLK (:documentation "Resource deadlock would occur"))
-(def-c-const ENAMETOOLONG (:documentation "File name too long"))
-(def-c-const ENOLCK (:documentation "No record locks available"))
-(def-c-const ENOSYS (:documentation "Function not implemented"))
-(def-c-const ENOTEMPTY (:documentation "Directory not empty"))
-(def-c-const ELOOP (:documentation "Too many symbolic links encountered"))
-(def-c-const EWOULDBLOCK (:documentation "Operation would block"))
-(def-c-const ENOMSG (:documentation "No message of desired type"))
-(def-c-const EIDRM (:documentation "Identifier removed"))
-(def-c-const ECHRNG (:documentation "Channel number out of range"))
-(def-c-const EL2NSYNC (:documentation "Level 2 not synchronized"))
-(def-c-const EL3HLT (:documentation "Level 3 halted"))
-(def-c-const EL3RST (:documentation "Level 3 reset"))
-(def-c-const ELNRNG (:documentation "Link number out of range"))
-(def-c-const EUNATCH (:documentation "Protocol driver not attached"))
-(def-c-const ENOCSI (:documentation "No CSI structure available"))
-(def-c-const EL2HLT (:documentation "Level 2 halted"))
-(def-c-const EBADE (:documentation "Invalid exchange"))
-(def-c-const EBADR (:documentation "Invalid request descriptor"))
-(def-c-const EXFULL (:documentation "Exchange full"))
-(def-c-const ENOANO (:documentation "No anode"))
-(def-c-const EBADRQC (:documentation "Invalid request code"))
-(def-c-const EBADSLT (:documentation "Invalid slot"))
-(def-c-const EDEADLOCK (:documentation "File locking deadlock error"))
-(def-c-const EBFONT (:documentation "Bad font file format"))
-(def-c-const ENOSTR (:documentation "Device not a stream"))
-(def-c-const ENODATA (:documentation "No data available"))
-(def-c-const ETIME (:documentation "Timer expired"))
-(def-c-const ENOSR (:documentation "Out of streams resources"))
-(def-c-const ENONET (:documentation "Machine is not on the network"))
-(def-c-const ENOPKG (:documentation "Package not installed"))
-(def-c-const EREMOTE (:documentation "Object is remote"))
-(def-c-const ENOLINK (:documentation "Link has been severed"))
-(def-c-const EADV (:documentation "Advertise error"))
-(def-c-const ESRMNT (:documentation "Srmount error"))
-(def-c-const ECOMM (:documentation "Communication error on send"))
-(def-c-const EPROTO (:documentation "Protocol error"))
-(def-c-const EMULTIHOP (:documentation "Multihop attempted"))
-(def-c-const EDOTDOT (:documentation "RFS specific error"))
-(def-c-const EBADMSG (:documentation "Not a data message"))
-(def-c-const EOVERFLOW (:documentation "Value too large for defined data type"))
-(def-c-const ENOTUNIQ (:documentation "Name not unique on network"))
-(def-c-const EBADFD (:documentation "File descriptor in bad state"))
-(def-c-const EREMCHG (:documentation "Remote address changed"))
-(def-c-const ELIBACC (:documentation "Can not access a needed shared library"))
-(def-c-const ELIBBAD (:documentation "Accessing a corrupted shared library"))
-(def-c-const ELIBSCN (:documentation ".lib section in a.out corrupted"))
-(def-c-const ELIBMAX (:documentation "Attempting to link in too many shared libraries"))
-(def-c-const ELIBEXEC (:documentation "Cannot exec a shared library directly"))
-(def-c-const EILSEQ (:documentation "Illegal byte sequence"))
-(def-c-const ERESTART (:documentation "Interrupted system call should be restarted"))
-(def-c-const ESTRPIPE (:documentation "Streams pipe error"))
-(def-c-const EUSERS (:documentation "Too many users"))
-(def-c-const ENOTSOCK (:documentation "Socket operation on non-socket"))
-(def-c-const EDESTADDRREQ (:documentation "Destination address required"))
-(def-c-const EMSGSIZE (:documentation "Message too long"))
-(def-c-const EPROTOTYPE (:documentation "Protocol wrong type for socket"))
-(def-c-const ENOPROTOOPT (:documentation "Protocol not available"))
-(def-c-const EPROTONOSUPPORT (:documentation "Protocol not supported"))
-(def-c-const ESOCKTNOSUPPORT (:documentation "Socket type not supported"))
-(def-c-const EOPNOTSUPP (:documentation "Operation not supported on transport endpoint"))
-(def-c-const EPFNOSUPPORT (:documentation "Protocol family not supported"))
-(def-c-const EAFNOSUPPORT (:documentation "Address family not supported by protocol"))
-(def-c-const EADDRINUSE (:documentation "Address already in use"))
-(def-c-const EADDRNOTAVAIL (:documentation "Cannot assign requested address"))
-(def-c-const ENETDOWN (:documentation "Network is down"))
-(def-c-const ENETUNREACH (:documentation "Network is unreachable"))
-(def-c-const ENETRESET (:documentation "Network dropped connection because of reset"))
-(def-c-const ECONNABORTED (:documentation "Software caused connection abort"))
-(def-c-const ECONNRESET (:documentation "Connection reset by peer"))
-(def-c-const ENOBUFS (:documentation "No buffer space available"))
-(def-c-const EISCONN (:documentation "Transport endpoint is already connected"))
-(def-c-const ENOTCONN (:documentation "Transport endpoint is not connected"))
-(def-c-const ESHUTDOWN (:documentation "Cannot send after transport endpoint shutdown"))
-(def-c-const ETOOMANYREFS (:documentation "Too many references: cannot splice"))
-(def-c-const ETIMEDOUT (:documentation "Connection timed out"))
-(def-c-const ECONNREFUSED (:documentation "Connection refused"))
-(def-c-const EHOSTDOWN (:documentation "Host is down"))
-(def-c-const EHOSTUNREACH (:documentation "No route to host"))
-(def-c-const EALREADY (:documentation "Operation already in progress"))
-(def-c-const EINPROGRESS (:documentation "Operation now in progress"))
-(def-c-const ESTALE (:documentation "Stale NFS file handle"))
-(def-c-const EUCLEAN (:documentation "Structure needs cleaning"))
-(def-c-const ENOTNAM (:documentation "Not a XENIX named type file"))
-(def-c-const ENAVAIL (:documentation "No XENIX semaphores available"))
-(def-c-const EISNAM (:documentation "Is a named type file"))
-(def-c-const EREMOTEIO (:documentation "Remote I/O error"))
-(def-c-const EDQUOT (:documentation "Quota exceeded"))
-(def-c-const ENOMEDIUM (:documentation "No medium found"))
-(def-c-const EMEDIUMTYPE (:documentation "Wrong medium type"))
+(def-c-const EPERM (:documentation "Operation not permitted"))    ; 1
+(def-c-const ENOENT (:documentation "No such file or directory")) ; 2
+(def-c-const ESRCH (:documentation "No such process"))            ; 3
+(def-c-const EINTR (:documentation "Interrupted system call"))    ; 4
+(def-c-const EIO (:documentation "I/O error"))                    ; 5
+(def-c-const ENXIO (:documentation "No such device or address"))  ; 6
+(def-c-const E2BIG (:documentation "Arg list too long"))          ; 7
+(def-c-const ENOEXEC (:documentation "Exec format error"))        ; 8
+(def-c-const EBADF (:documentation "Bad file number"))            ; 9
+(def-c-const ECHILD (:documentation "No child processes"))        ; 10
+(def-c-const EAGAIN (:documentation "Try again"))                 ; 11
+(def-c-const ENOMEM (:documentation "Out of memory"))             ; 12
+(def-c-const EACCES (:documentation "Permission denied"))         ; 13
+(def-c-const EFAULT (:documentation "Bad address"))               ; 14
+(def-c-const ENOTBLK (:documentation "Block device required"))    ; 15
+(def-c-const EBUSY (:documentation "Device or resource busy"))    ; 16
+(def-c-const EEXIST (:documentation "File exists"))               ; 17
+(def-c-const EXDEV (:documentation "Cross-device link"))          ; 18
+(def-c-const ENODEV (:documentation "No such device"))            ; 19
+(def-c-const ENOTDIR (:documentation "Not a directory"))          ; 20
+(def-c-const EISDIR (:documentation "Is a directory"))            ; 21
+(def-c-const EINVAL (:documentation "Invalid argument"))          ; 22
+(def-c-const ENFILE (:documentation "File table overflow"))       ; 23
+(def-c-const EMFILE (:documentation "Too many open files"))       ; 24
+(def-c-const ENOTTY (:documentation "Not a typewriter"))          ; 25
+(def-c-const ETXTBSY (:documentation "Text file busy"))           ; 26
+(def-c-const EFBIG (:documentation "File too large"))             ; 27
+(def-c-const ENOSPC (:documentation "No space left on device"))   ; 28
+(def-c-const ESPIPE (:documentation "Illegal seek"))              ; 29
+(def-c-const EROFS (:documentation "Read-only file system"))      ; 30
+(def-c-const EMLINK (:documentation "Too many links"))            ; 31
+(def-c-const EPIPE (:documentation "Broken pipe"))                ; 32
+(def-c-const EDOM (:documentation "Math argument out of domain of func")) ; 33
+(def-c-const ERANGE (:documentation "Math result not representable")) ; 34
+(def-c-const EDEADLK (:documentation "Resource deadlock would occur")) ; 35
+(def-c-const ENAMETOOLONG (:documentation "File name too long"))       ; 36
+(def-c-const ENOLCK (:documentation "No record locks available"))      ; 37
+(def-c-const ENOSYS (:documentation "Function not implemented"))       ; 38
+(def-c-const ENOTEMPTY (:documentation "Directory not empty"))         ; 39
+(def-c-const ELOOP (:documentation "Too many symbolic links encountered")) ; 40
+(def-c-const EWOULDBLOCK (:documentation "Operation would block")) ; EAGAIN
+(def-c-const ENOMSG (:documentation "No message of desired type")) ; 42
+(def-c-const EIDRM (:documentation "Identifier removed"))          ; 43
+(def-c-const ECHRNG (:documentation "Channel number out of range")) ; 44
+(def-c-const EL2NSYNC (:documentation "Level 2 not synchronized"))  ; 45
+(def-c-const EL3HLT (:documentation "Level 3 halted"))              ; 46
+(def-c-const EL3RST (:documentation "Level 3 reset"))               ; 47
+(def-c-const ELNRNG (:documentation "Link number out of range"))    ; 48
+(def-c-const EUNATCH (:documentation "Protocol driver not attached")) ; 49
+(def-c-const ENOCSI (:documentation "No CSI structure available"))    ; 50
+(def-c-const EL2HLT (:documentation "Level 2 halted"))                ; 51
+(def-c-const EBADE (:documentation "Invalid exchange"))               ; 52
+(def-c-const EBADR (:documentation "Invalid request descriptor"))     ; 53
+(def-c-const EXFULL (:documentation "Exchange full"))                 ; 54
+(def-c-const ENOANO (:documentation "No anode"))                      ; 55
+(def-c-const EBADRQC (:documentation "Invalid request code"))         ; 56
+(def-c-const EBADSLT (:documentation "Invalid slot"))                 ; 57
+(def-c-const EDEADLOCK (:documentation "File locking deadlock error")) ; EDEADLK
+(def-c-const EBFONT (:documentation "Bad font file format"))           ; 59
+(def-c-const ENOSTR (:documentation "Device not a stream"))            ; 60
+(def-c-const ENODATA (:documentation "No data available"))             ; 61
+(def-c-const ETIME (:documentation "Timer expired"))                   ; 62
+(def-c-const ENOSR (:documentation "Out of streams resources"))        ; 63
+(def-c-const ENONET (:documentation "Machine is not on the network"))  ; 64
+(def-c-const ENOPKG (:documentation "Package not installed"))          ; 65
+(def-c-const EREMOTE (:documentation "Object is remote"))              ; 66
+(def-c-const ENOLINK (:documentation "Link has been severed"))         ; 67
+(def-c-const EADV (:documentation "Advertise error"))                  ; 68
+(def-c-const ESRMNT (:documentation "Srmount error"))                  ; 69
+(def-c-const ECOMM (:documentation "Communication error on send"))     ; 70
+(def-c-const EPROTO (:documentation "Protocol error"))                 ; 71
+(def-c-const EMULTIHOP (:documentation "Multihop attempted"))          ; 72
+(def-c-const EDOTDOT (:documentation "RFS specific error"))            ; 73
+(def-c-const EBADMSG (:documentation "Not a data message"))            ; 74
+(def-c-const EOVERFLOW (:documentation "Value too large for defined data type")) ; 75
+(def-c-const ENOTUNIQ (:documentation "Name not unique on network")) ; 76
+(def-c-const EBADFD (:documentation "File descriptor in bad state")) ; 77
+(def-c-const EREMCHG (:documentation "Remote address changed"))      ; 78
+(def-c-const ELIBACC (:documentation "Can not access a needed shared library")) ; 79
+(def-c-const ELIBBAD (:documentation "Accessing a corrupted shared library")) ; 80
+(def-c-const ELIBSCN (:documentation ".lib section in a.out corrupted")) ; 81
+(def-c-const ELIBMAX (:documentation "Attempting to link in too many shared libraries")) ; 82
+(def-c-const ELIBEXEC (:documentation "Cannot exec a shared library directly")) ; 83
+(def-c-const EILSEQ (:documentation "Illegal byte sequence")) ; 84
+(def-c-const ERESTART (:documentation "Interrupted system call should be restarted")) ; 85
+(def-c-const ESTRPIPE (:documentation "Streams pipe error")) ; 86
+(def-c-const EUSERS (:documentation "Too many users"))       ; 87
+(def-c-const ENOTSOCK (:documentation "Socket operation on non-socket")) ; 88
+(def-c-const EDESTADDRREQ (:documentation "Destination address required")) ; 89
+(def-c-const EMSGSIZE (:documentation "Message too long")) ; 90
+(def-c-const EPROTOTYPE (:documentation "Protocol wrong type for socket")) ; 91
+(def-c-const ENOPROTOOPT (:documentation "Protocol not available")) ; 92
+(def-c-const EPROTONOSUPPORT (:documentation "Protocol not supported")) ; 93
+(def-c-const ESOCKTNOSUPPORT (:documentation "Socket type not supported")) ; 94
+(def-c-const EOPNOTSUPP (:documentation "Operation not supported on transport endpoint")) ; 95
+(def-c-const EPFNOSUPPORT (:documentation "Protocol family not supported")) ; 96
+(def-c-const EAFNOSUPPORT (:documentation "Address family not supported by protocol")) ; 97
+(def-c-const EADDRINUSE (:documentation "Address already in use")) ; 98
+(def-c-const EADDRNOTAVAIL (:documentation "Cannot assign requested address")) ; 99
+(def-c-const ENETDOWN (:documentation "Network is down")) ; 100
+(def-c-const ENETUNREACH (:documentation "Network is unreachable")) ; 101
+(def-c-const ENETRESET (:documentation "Network dropped connection because of reset")) ; 102
+(def-c-const ECONNABORTED (:documentation "Software caused connection abort")) ; 103
+(def-c-const ECONNRESET (:documentation "Connection reset by peer")) ; 104
+(def-c-const ENOBUFS (:documentation "No buffer space available"))   ; 105
+(def-c-const EISCONN (:documentation "Transport endpoint is already connected")) ; 106
+(def-c-const ENOTCONN (:documentation "Transport endpoint is not connected")) ; 107
+(def-c-const ESHUTDOWN (:documentation "Cannot send after transport endpoint shutdown")) ; 108
+(def-c-const ETOOMANYREFS (:documentation "Too many references: cannot splice")) ; 109
+(def-c-const ETIMEDOUT (:documentation "Connection timed out")) ; 110
+(def-c-const ECONNREFUSED (:documentation "Connection refused")) ; 111
+(def-c-const EHOSTDOWN (:documentation "Host is down"))          ; 112
+(def-c-const EHOSTUNREACH (:documentation "No route to host"))   ; 113
+(def-c-const EALREADY (:documentation "Operation already in progress")) ; 114
+(def-c-const EINPROGRESS (:documentation "Operation now in progress")) ; 115
+(def-c-const ESTALE (:documentation "Stale NFS file handle"))          ; 116
+(def-c-const EUCLEAN (:documentation "Structure needs cleaning"))      ; 117
+(def-c-const ENOTNAM (:documentation "Not a XENIX named type file"))   ; 118
+(def-c-const ENAVAIL (:documentation "No XENIX semaphores available")) ; 119
+(def-c-const EISNAM (:documentation "Is a named type file"))           ; 120
+(def-c-const EREMOTEIO (:documentation "Remote I/O error"))            ; 121
+(def-c-const EDQUOT (:documentation "Quota exceeded"))                 ; 122
+(def-c-const ENOMEDIUM (:documentation "No medium found"))             ; 123
+(def-c-const EMEDIUMTYPE (:documentation "Wrong medium type"))         ; 124
+(def-c-const ECANCELED (:documentation "Operation Canceled"))      ; 125
+(def-c-const ENOKEY (:documentation "Required key not available")) ; 126
+(def-c-const EKEYEXPIRED (:documentation "Key has expired"))       ; 127
+(def-c-const EKEYREVOKED (:documentation "Key has been revoked"))  ; 128
+(def-c-const EKEYREJECTED (:documentation "Key was rejected by service")) ; 129
+;; for robust mutexes
+(def-c-const EOWNERDEAD (:documentation "Owner died")) ; 130
+(def-c-const ENOTRECOVERABLE (:documentation "State not recoverable")) ; 131
 
 ; -------------------------- <bits/errno.h> -----------------------------------
 
@@ -1690,72 +1695,72 @@
 (defconstant SEEK_CUR 1)
 (defconstant SEEK_END 2)
 
-(def-c-type FILE (c-struct vector #| components unknown |# ))
+(def-c-type FILE c-pointer)
 
 (def-c-type fpos_t _G_fpos_t)
 
 (defconstant P_tmpdir "/tmp")
 
-(def-c-var stdin (:type c-pointer))
-(def-c-var stdout (:type c-pointer))
-(def-c-var stderr (:type c-pointer))
+(def-c-var stdin (:type FILE))
+(def-c-var stdout (:type FILE))
+(def-c-var stderr (:type FILE))
 
-(def-call-out clearerr (:arguments (fp c-pointer)) (:return-type nil))
-(def-call-out fclose (:arguments (fp c-pointer)) (:return-type int))
-(def-call-out feof (:arguments (fp c-pointer)) (:return-type int))
-(def-call-out ferror (:arguments (fp c-pointer)) (:return-type int))
-(def-call-out fflush (:arguments (fp c-pointer)) (:return-type int))
-(def-call-out fgetc (:arguments (fp c-pointer)) (:return-type int))
-(def-call-out fgetpos (:arguments (fp c-pointer) (pos (c-ptr fpos_t) :out))
+(def-call-out clearerr (:arguments (fp FILE)) (:return-type nil))
+(def-call-out fclose (:arguments (fp FILE)) (:return-type int))
+(def-call-out feof (:arguments (fp FILE)) (:return-type int))
+(def-call-out ferror (:arguments (fp FILE)) (:return-type int))
+(def-call-out fflush (:arguments (fp FILE)) (:return-type int))
+(def-call-out fgetc (:arguments (fp FILE)) (:return-type int))
+(def-call-out fgetpos (:arguments (fp FILE) (pos (c-ptr fpos_t) :out))
   (:return-type int))
-;(def-call-out fgets (:arguments (buf c-pointer) (size int) (fp c-pointer))
+;(def-call-out fgets (:arguments (buf c-pointer) (size int) (fp FILE))
 ;  (:return-type c-string)) ; ??
 (def-call-out fopen (:arguments (path c-string) (mode c-string))
-  (:return-type c-pointer))
+  (:return-type FILE))
 ;; it is pointless to mark (f)printf as (:built-in t)
 ;; because the signature will be different anyway (variadic!)
-(def-call-out fprintf0 (:arguments (fp c-pointer) (format c-string))
+(def-call-out fprintf0 (:arguments (fp FILE) (format c-string))
   (:return-type int) (:name "fprintf"))
-(def-call-out fprintf1i (:arguments (fp c-pointer) (format c-string) (arg int))
+(def-call-out fprintf1i (:arguments (fp FILE) (format c-string) (arg int))
   (:return-type int) (:name "fprintf"))
 (def-call-out fprintf1l
-    (:arguments (fp c-pointer) (format c-string) (arg long))
+    (:arguments (fp FILE) (format c-string) (arg long))
   (:return-type int) (:name "fprintf"))
 (def-call-out fprintf1d
-    (:arguments (fp c-pointer) (format c-string) (arg double-float))
+    (:arguments (fp FILE) (format c-string) (arg double-float))
   (:return-type int) (:name "fprintf"))
-(def-call-out fputc (:arguments (c int) (fp c-pointer))
+(def-call-out fputc (:arguments (c int) (fp FILE))
   (:return-type int))
-(def-call-out fputs (:arguments (str c-string) (fp c-pointer))
+(def-call-out fputs (:arguments (str c-string) (fp FILE))
   (:return-type int))
 ;(def-call-out fread ; ??
-;    (:arguments (ptr c-pointer) (size size_t) (nmemb size_t) (fp c-pointer))
+;    (:arguments (ptr c-pointer) (size size_t) (nmemb size_t) (fp FILE))
 ;  (:return-type size_t))
 ;(def-call-out freopen
-;    (:arguments (path c-string) (mode c-string) (fp c-pointer :in-out)) ; ??
+;    (:arguments (path c-string) (mode c-string) (fp FILE :in-out)) ; ??
 ;  (:return-type c-pointer))
-(def-call-out fscanf0 (:arguments (fp c-pointer) (format c-string))
+(def-call-out fscanf0 (:arguments (fp FILE) (format c-string))
   (:return-type int)
   (:name "fscanf"))
 (def-call-out fscanf1i
-    (:arguments (fp c-pointer) (format c-string) (arg (c-ptr int) :out))
+    (:arguments (fp FILE) (format c-string) (arg (c-ptr int) :out))
   (:return-type int) (:name "fscanf"))
 (def-call-out fscanf1l
-    (:arguments (fp c-pointer) (format c-string) (arg (c-ptr long) :out))
+    (:arguments (fp FILE) (format c-string) (arg (c-ptr long) :out))
   (:return-type int) (:name "fscanf"))
 (def-call-out fscanf1d
-    (:arguments (fp c-pointer) (format c-string)
+    (:arguments (fp FILE) (format c-string)
                 (arg (c-ptr double-float) :out))
   (:return-type int) (:name "fscanf"))
-(def-call-out fseek (:arguments (fp c-pointer) (offset long) (whence int))
+(def-call-out fseek (:arguments (fp FILE) (offset long) (whence int))
   (:return-type int))
-(def-call-out fsetpos (:arguments (fp c-pointer) (pos (c-ptr fpos_t)))
+(def-call-out fsetpos (:arguments (fp FILE) (pos (c-ptr fpos_t)))
   (:return-type int))
-(def-call-out ftell (:arguments (fp c-pointer)) (:return-type long))
+(def-call-out ftell (:arguments (fp FILE)) (:return-type long))
 ;(def-call-out fwrite ; ??
-;    (:arguments (ptr c-pointer) (size size_t) (nmemb size_t) (fp c-pointer))
+;    (:arguments (ptr c-pointer) (size size_t) (nmemb size_t) (fp FILE))
 ;  (:return-type size_t))
-(def-call-out getc (:arguments (fp c-pointer)) (:return-type int))
+(def-call-out getc (:arguments (fp FILE)) (:return-type int))
 (def-call-out getchar (:arguments) (:return-type int))
 ;(def-call-out gets (:arguments (buf c-pointer)) (:return-type c-string)); ??
 (def-call-out perror (:arguments (s c-string)) (:return-type nil))
@@ -1767,13 +1772,13 @@
   (:return-type int) (:name "printf"))
 (def-call-out printf1d (:arguments (format c-string) (arg double-float))
   (:return-type int) (:name "printf"))
-(def-call-out putc (:arguments (c int) (fp c-pointer)) (:return-type int))
+(def-call-out putc (:arguments (c int) (fp FILE)) (:return-type int))
 (def-call-out putchar (:arguments (c int)) (:return-type int))
 (def-call-out puts (:arguments (str c-string)) (:return-type int))
 (def-call-out remove (:arguments (path c-string)) (:return-type int))
 (def-call-out rename (:arguments (old c-string) (new c-string))
   (:return-type int))
-(def-call-out rewind (:arguments (fp c-pointer)) (:return-type nil))
+(def-call-out rewind (:arguments (fp FILE)) (:return-type nil))
 (def-call-out scanf0 (:arguments (format c-string))
   (:return-type int) (:name "scanf"))
 (def-call-out scanf1i (:arguments (format c-string) (arg (c-ptr int) :out))
@@ -1783,13 +1788,13 @@
 (def-call-out scanf1d
     (:arguments (format c-string) (arg (c-ptr double-float) :out))
   (:return-type int) (:name "scanf"))
-(def-call-out setbuf (:arguments (fp c-pointer) (buf c-pointer))
+(def-call-out setbuf (:arguments (fp FILE) (buf c-pointer))
   (:return-type nil))
-(def-call-out setlinebuf (:arguments (fp c-pointer)) (:return-type nil))
-(def-call-out setbuffer (:arguments (fp c-pointer) (buf c-pointer) (size int))
+(def-call-out setlinebuf (:arguments (fp FILE)) (:return-type nil))
+(def-call-out setbuffer (:arguments (fp FILE) (buf c-pointer) (size int))
   (:return-type nil))
 (def-call-out setvbuf
-    (:arguments (fp c-pointer) (buf c-pointer) (mode int) (size size_t))
+    (:arguments (fp FILE) (buf c-pointer) (mode int) (size size_t))
   (:return-type int))
 ;(def-call-out sprintf0 (:arguments (str c-pointer :out) (format c-string))
 ;  (:return-type int) (:name "sprintf")) ; ??
@@ -1812,16 +1817,16 @@
   (:return-type c-string))
 (def-call-out tempnam (:arguments (dir c-string) (prefix c-string))
   (:return-type c-string :malloc-free))
-(def-call-out ungetc (:arguments (c int) (fp c-pointer))
+(def-call-out ungetc (:arguments (c int) (fp FILE))
   (:return-type int))
 ; You can uncomment this if your compiler sets __USE_GNU
 ; (def-call-out fcloseall (:arguments) (:return-type int))
 (def-call-out fdopen (:arguments (fildes int) (mode c-string))
   (:return-type c-pointer))
-(def-call-out fileno (:arguments (fp c-pointer)) (:return-type int))
+(def-call-out fileno (:arguments (fp FILE)) (:return-type int))
 (def-call-out popen (:arguments (command c-string) (mode c-string))
   (:return-type c-pointer))
-(def-call-out pclose (:arguments (fp c-pointer)) (:return-type int))
+(def-call-out pclose (:arguments (fp FILE)) (:return-type int))
 
 (def-call-out ctermid (:arguments (null c-string)) ; ??
   (:return-type c-string))
@@ -1842,26 +1847,44 @@
 ;;; ============================== <dirent.h> ================================
 (c-lines "#include <dirent.h>~%")
 
-;;; ----------------------------- <direntry.h> -------------------------------
+;;; ----------------------------- <bits/dirent.h> ---------------------------
+;; d_type is only in dirent64, not in dirent in <linux/dirent.h>,
+;; but it appears to BE required, and does appear in <bits/dirent.h>
+
+(c-lines "#ifndef __USE_FILE_OFFSET64
+typedef __ino_t clisp_dirent_ino_t;
+typedef __off_t clisp_dirent_off_t;
+#else
+typedef __ino64_t clisp_dirent_ino_t;
+typedef __off64_t clisp_dirent_off_t;
+#endif~%")
+(def-c-type clisp_dirent_ino_t)
+(def-c-type clisp_dirent_off_t)
 
 (def-c-struct dirent
-  (d_ino long)
-  (d_off off_t)
+  (d_ino clisp_dirent_ino_t)
+  (d_off clisp_dirent_off_t)
   (d_reclen ushort)
   (d_type uchar)
-  (d_name (c-array-max character #.(cl:+ NAME_MAX 1)))
-)
+  (d_name (c-array-max character #.(cl:+ NAME_MAX 1))))
+
+(def-c-struct dirent64
+  (d_ino ino64_t)
+  (d_off off64_t)
+  (d_reclen ushort)
+  (d_type uchar)
+  (d_name (c-array-max character #.(cl:+ NAME_MAX 1))))
 
 ;;; ------------------------------ <dirent.h> --------------------------------
 
-(defconstant DT_UNKNOWN 0)
-(defconstant DT_FIFO 1)
-(defconstant DT_CHR 2)
-(defconstant DT_DIR 4)
-(defconstant DT_BLK 6)
-(defconstant DT_REG 8)
-(defconstant DT_LNK 10)
-(defconstant DT_SOCK 12)
+(def-c-const DT_UNKNOWN)
+(def-c-const DT_FIFO)
+(def-c-const DT_CHR)
+(def-c-const DT_DIR)
+(def-c-const DT_BLK)
+(def-c-const DT_REG)
+(def-c-const DT_LNK)
+(def-c-const DT_SOCK)
 
 (defmacro IFTODT (mode) `(ash (logand ,mode #o170000) -12))
 (defmacro DTTOIF (dirtype) `(ash ,dirtype 12))
@@ -1873,21 +1896,27 @@
 (def-call-out closedir (:arguments (dirp c-pointer)) (:return-type int))
 (def-call-out readdir (:arguments (dirp c-pointer))
   (:return-type (c-ptr-null dirent)))
+(def-call-out readdir64 (:arguments (dirp c-pointer))
+  (:return-type (c-ptr-null dirent64)))
 (def-call-out readdir_r
     (:arguments (dirp c-pointer) (entry (c-ptr dirent) :out :alloca)
                 (result (c-ptr (c-ptr dirent)) :out :alloca)) ; ??
+  (:return-type int))
+(def-call-out readdir64_r
+    (:arguments (dirp c-pointer) (entry (c-ptr dirent64) :out :alloca)
+                (result (c-ptr (c-ptr dirent64)) :out :alloca)) ; ??
   (:return-type int))
 
 (def-call-out rewinddir (:arguments (dirp c-pointer)) (:return-type nil))
 
 (def-call-out dirfd (:arguments (dirp c-pointer)) (:return-type int))
 
-(defconstant MAXNAMLEN 255)
+(def-c-const MAXNAMLEN)
 
-(def-call-out seekdir (:arguments (dirp c-pointer) (pos off_t))
+(def-call-out seekdir (:arguments (dirp c-pointer) (pos long))
   (:return-type nil))
 
-(def-call-out telldir (:arguments (dirp c-pointer)) (:return-type off_t))
+(def-call-out telldir (:arguments (dirp c-pointer)) (:return-type long))
 
 (def-call-out scandir
     (:arguments (dir c-string)
@@ -1899,9 +1928,28 @@
                                                 (d2 (c-ptr (c-ptr dirent))))
                                     (:return-type int))))
   (:return-type int))
+(def-call-out scandir64
+    (:arguments (dir c-string)
+                (namelist (c-ptr (c-ptr (c-ptr dirent64))) :out)
+                ;; select may also be NULL/NIL, which c-function accepts
+                (select (c-function (:arguments (d c-string))
+                                    (:return-type boolean)))
+                (compar (c-function (:arguments (d1 (c-ptr (c-ptr dirent64)))
+                                                (d2 (c-ptr (c-ptr dirent64))))
+                                    (:return-type int))))
+  (:return-type int))
 
 (def-call-out alphasort
     (:arguments (d1 (c-ptr (c-ptr dirent))) (d2 (c-ptr (c-ptr dirent))))
+  (:return-type int))
+(def-call-out alphasort64
+    (:arguments (d1 (c-ptr (c-ptr dirent64))) (d2 (c-ptr (c-ptr dirent64))))
+  (:return-type int))
+(def-call-out versionsort
+    (:arguments (d1 (c-ptr (c-ptr dirent))) (d2 (c-ptr (c-ptr dirent))))
+  (:return-type int))
+(def-call-out versionsort64
+    (:arguments (d1 (c-ptr (c-ptr dirent64))) (d2 (c-ptr (c-ptr dirent64))))
   (:return-type int))
 
 ;(def-call-out getdirentries
@@ -2027,9 +2075,9 @@
 
 ;;; ----------------------------- <termbits.h> -------------------------------
 
-(def-c-type cc_t uchar)
-(def-c-type speed_t uint)
-(def-c-type tcflag_t uint)
+(def-c-type cc_t)               ; uchar
+(def-c-type speed_t)            ; uint
+(def-c-type tcflag_t)           ; uint
 
 (eval-when (load compile eval)
   (defconstant NCCS 32)
@@ -2237,6 +2285,7 @@
 (c-lines "#include <string.h>~%")
 
 (def-call-out strerror (:arguments (errnum int)) (:return-type c-string :none))
+(def-call-out strsignal (:arguments (sig int)) (:return-type c-string :none))
 
 ;;; ============================= <sys/ioctl.h> ==============================
 (c-lines "#include <sys/ioctl.h>~%")
@@ -2303,41 +2352,44 @@
 ;;;  --- Posix sigaction ---
 ;;;  Peter Wood 2002
 
-(defconstant SIGHUP             1) ; Hangup (POSIX).
-(defconstant SIGINT             2) ; Interrupt (ANSI).
-(defconstant SIGQUIT            3) ; quit (POSIX).
-(defconstant SIGILL             4) ; Illegal instruction (ANSI).
-(defconstant SIGTRAP            5) ; Trace trap (POSIX).
-(defconstant SIGABRT            6) ; Abort (ANSI).
-(defconstant SIGIOT             6) ; IOT trap (4.2 BSD).
-(defconstant SIGBUS             7) ; BUS error (4.2 BSD).
-(defconstant SIGFPE             8) ; Floating-point exception (ANSI).
-(defconstant SIGKILL            9) ; Kill, unblockable (POSIX).
-(defconstant SIGUSR1            10) ; User-defined signal 1 (POSIX).
-(defconstant SIGSEGV            11) ; Segmentation violation (ANSI).
-(defconstant SIGUSR2            12) ; User-defined signal 2 (POSIX).
-(defconstant SIGPIPE            13) ; Broken pipe (POSIX).
-(defconstant SIGALRM            14) ; Alarm clock (POSIX).
-(defconstant SIGTERM            15) ; Termination (ANSI).
-(defconstant SIGSTKFLT          16) ; Stack fault.
-(defconstant SIGCHLD            17) ; Child status has changed (POSIX).
-(defconstant SIGCLD             SIGCHLD) ; Same as SIGCHLD (System V).
-(defconstant SIGCONT            18) ; Continue (POSIX).
-(defconstant SIGSTOP            19) ; Stop, unblockable (POSIX).
-(defconstant SIGTSTP            20) ; Keyboard stop (POSIX).
-(defconstant SIGTTIN            21) ; Background read from tty (POSIX).
-(defconstant SIGTTOU            22) ; Background write to tty (POSIX).
-(defconstant SIGURG             23) ; Urgent condition on socket (4.2 BSD).
-(defconstant SIGXCPU            24) ; CPU limit exceeded (4.2 BSD).
-(defconstant SIGXFSZ            25) ; File size limit exceeded (4.2 BSD).
-(defconstant SIGVTALRM          26) ; Virtual alarm clock (4.2 BSD).
-(defconstant SIGPROF            27) ; Profiling alarm clock (4.2 BSD).
-(defconstant SIGWINCH           28) ; Window size change (4.3 BSD, Sun).
-(defconstant SIGIO              29) ; I/O now possible (4.2 BSD).
-(defconstant SIGPOLL            SIGIO) ; Pollable event occurred (System V).
-(defconstant SIGPWR             30) ; Power failure restart (System V).
-(defconstant SIGSYS             31) ; Bad system call.
-(defconstant SIGUNUSED          31)
+(def-c-const SIGHUP (:documentation "Hangup (POSIX).")) ; 1
+(def-c-const SIGINT (:documentation "Interrupt (ANSI).")) ; 2
+(def-c-const SIGQUIT (:documentation "quit (POSIX)."))    ; 3
+(def-c-const SIGILL (:documentation "Illegal instruction (ANSI).")) ; 4
+(def-c-const SIGTRAP (:documentation "Trace trap (POSIX)."))        ; 5
+(def-c-const SIGABRT (:documentation "Abort (ANSI)."))              ; 6
+(def-c-const SIGIOT (:documentation "IOT trap (4.2 BSD)."))         ; 6
+(def-c-const SIGBUS (:documentation "BUS error (4.2 BSD)."))        ; 7
+(def-c-const SIGFPE (:documentation "Floating-point exception (ANSI).")) ; 8
+(def-c-const SIGKILL (:documentation "Kill, unblockable (POSIX).")) ; 9
+(def-c-const SIGUSR1 (:documentation "User-defined signal 1 (POSIX).")) ; 10
+(def-c-const SIGSEGV (:documentation "Segmentation violation (ANSI).")) ; 11
+(def-c-const SIGUSR2 (:documentation "User-defined signal 2 (POSIX).")) ; 12
+(def-c-const SIGPIPE (:documentation "Broken pipe (POSIX).")) ; 13
+(def-c-const SIGALRM (:documentation "Alarm clock (POSIX).")) ; 14
+(def-c-const SIGTERM (:documentation "Termination (ANSI)."))  ; 15
+(def-c-const SIGSTKFLT (:documentation "Stack fault."))       ; 16
+(def-c-const SIGCHLD (:documentation "Child status has changed (POSIX).")) ; 17
+(def-c-const SIGCLD (:documentation "Same as SIGCHLD (System V).")) ; SIGCHLD
+(def-c-const SIGCONT (:documentation "Continue (POSIX)."))          ; 18
+(def-c-const SIGSTOP (:documentation "Stop, unblockable (POSIX).")) ; 19
+(def-c-const SIGTSTP (:documentation "Keyboard stop (POSIX)."))     ; 20
+(def-c-const SIGTTIN (:documentation "Background read from tty (POSIX).")) ; 21
+(def-c-const SIGTTOU (:documentation "Background write to tty (POSIX).")) ; 22
+(def-c-const SIGURG (:documentation "Urgent condition on socket (4.2 BSD).")) ; 23
+(def-c-const SIGXCPU (:documentation "CPU limit exceeded (4.2 BSD).")) ; 24
+(def-c-const SIGXFSZ (:documentation "File size limit exceeded (4.2 BSD).")) ; 25
+(def-c-const SIGVTALRM (:documentation "Virtual alarm clock (4.2 BSD).")) ; 26
+(def-c-const SIGPROF (:documentation "Profiling alarm clock (4.2 BSD).")) ; 27
+(def-c-const SIGWINCH (:documentation "Window size change (4.3 BSD, Sun).")) ; 28
+(def-c-const SIGIO (:documentation "I/O now possible (4.2 BSD).")) ; 29
+(def-c-const SIGPOLL (:documentation "Pollable event occurred (System V).")) ; SIGIO
+(def-c-const SIGPWR (:documentation "Power failure restart (System V).")) ; 30
+(def-c-const SIGSYS (:documentation "Bad system call.")) ; 31
+(def-c-const SIGUNUSED)                                  ; 31
+
+(def-c-const _NSIG ; 65
+  (:documentation "Biggest signal number + 1 (including real-time signals)."))
 
 #|
 ;pseudo sigs :-(
@@ -2356,11 +2408,11 @@ and SIG_IGN do anyway, by other means ... They are just sugar, really.
 ;;; --------------------------------- <bits/sigset.h> -----------------------
 (eval-when (load compile eval)
   (defconstant SIGSET_NWORDS
-    ;; #.(cl:/ 1024 #.(cl:* 8 (ffi:sizeof 'ffi:uint)))
-    32))
+    ;; 32 on 32-bit platforms, 16 on 64-bit platforms
+    #.(cl:/ 1024 #.(cl:* 8 (ffi:sizeof 'ffi:ulong)))))
 
 (def-c-struct sigset_t
-  (val (c-array-max uint #.SIGSET_NWORDS)))
+  (val (c-array-max ulong #.SIGSET_NWORDS)))
 ;;; --------------------------------- <bits/sigaction.h> ---------------------
 
 (def-c-type sighandler_t (c-function (:arguments (sig int)) ;from signal.h
@@ -2369,8 +2421,19 @@ and SIG_IGN do anyway, by other means ... They are just sugar, really.
 (def-c-struct sigaction
   (sa_handler sighandler_t)
   (sa_mask sigset_t)
-  (sa_flags uint32) ; actually int but otherwise CLISP can't coerce SA_RESETHAND?!
-  (sa_restorer (c-function (:arguments) (:return-type nil))))
+  (sa_flags uint32) ; actually int but otherwise CLISP can't coerce SA_RESETHAND
+  ;; The sa_restorer element is obsolete and should not be used.
+  ;; POSIX does not specify a sa_restorer element.
+  (sa_restorer c-pointer))      ; (c-function (:arguments) (:return-type nil))
+
+#+(or)(progn ;; DEBUG
+(def-c-const sigaction-size (:name "sizeof(struct sigaction)") (:guard nil))
+(def-c-const sigset-size (:name "sizeof(sigset_t)") (:guard nil))
+(def-c-const _SIGSET_NWORDS)
+(assert (= (sizeof 'sigaction) sigaction-size))
+(assert (= (sizeof 'sigset_t) sigset-size))
+(assert (= SIGSET_NWORDS _SIGSET_NWORDS))
+)
 
 (defconstant SA_NOCLDSTOP  1)   ; Don't send SIGCHLD when children stop.
 (defconstant SA_NOCLDWAIT  2)   ; Don't create zombie on child death.

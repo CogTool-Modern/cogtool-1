@@ -4,8 +4,8 @@
 # - eine Kettenbruchapproximation num/den von intDsize*log(2)/log(b)
 #   (num/den >= intDsize*log(2)/log(b), mit num <= 2^10)
 # - k-1 und b^k mit b^k < 2^intDsize, k maximal.
-  typedef struct { /* uintW num,den; */ uintC k_1; uintD b_hoch_k; } power_table_entry;
-  local const power_table_entry table [36-2+1] = {
+typedef struct { /* uintW num,den; */ uintC k_1; uintD b_hoch_k; } power_table_entry_t;
+local const power_table_entry_t table [36-2+1] = {
     #if (intDsize==8)
       { /*    8,  1, */ 7-1, 2*2*2*2*2*2*2},
       { /*  106, 21, */ 5-1, 3*3*3*3*3},
@@ -170,14 +170,14 @@
   }
 
 # Wandelt eine UDS in ein Stellensystem um.
-# UDS_to_DIGITS(MSDptr,len,base, &ergebnis);
+# UDS_to_digits(MSDptr,len,base, &result);
 # > MSDptr/len/..: eine UDS
 # > base: Stellensystem-Basis, 2 <= base <= 36.
-# > ergebnis.LSBptr: darunter ist mindestens digits_need(len) Zeichen Platz
-# < ergebnis: fertige Folge MSBptr/len/LSBptr von Ziffern
+# > result.LSBptr: darunter ist mindestens digits_need(len) Zeichen Platz
+# < result: fertige Folge MSBptr/len/LSBptr von Ziffern
 # Die UDS MSDptr/len/.. wird zerstört.
-  typedef struct { chart* MSBptr; uintL len; chart* LSBptr; } DIGITS;
-  local void UDS_to_DIGITS (uintD* MSDptr, uintC len, uintD base, DIGITS* erg);
+typedef struct { chart* MSBptr; uintL len; chart* LSBptr; } digits_t;
+local void UDS_to_digits (uintD* MSDptr, uintC len, uintD base, digits_t* erg);
 # Methode:
 # Umwandlung ins Stellensystem der Basis b geht durch Umwandlung ins Stellen-
 # system der Basis b^k (k>=1, b^k<2^intDsize, k maximal) vor sich.
@@ -192,32 +192,32 @@
 #       j:=j-1, r:=r*beta+X[j], X[j]:=floor(r/b^k), r:=r-b^k*q[j].
 #     r=Rest.)
 #   zerlege den Rest (mit k-1 Divisionen durch b) in k Ziffern, wandle diese
-#   Ziffern einzeln in Ascii um und lege sie an die DIGITS an.
+#   Ziffern einzeln in Ascii um und lege sie an die digits_t an.
 #   Teste auf Speicherüberlauf.
 #   X := Quotient.
 #   Mache aus X wieder eine NUDS (maximal 1 Nulldigit streichen).
 #   Dies solange bis X=0.
 #   Streiche die führenden Nullen.
-  local void UDS_to_DIGITS (uintD* MSDptr, uintC len, uintD base, DIGITS* erg)
+local void UDS_to_digits (uintD* MSDptr, uintC len, uintD base, digits_t* erg)
   {
     # Aufsuchen von k-1 und b^k aus der Tabelle:
-    var const power_table_entry * tableptr = &table[base-2];
+    var const power_table_entry_t * tableptr = &table[base-2];
     var uintC k_1 = tableptr->k_1; # k-1
     var uintD b_hoch_k = tableptr->b_hoch_k; # b^k
     var chart* erg_ptr = erg->LSBptr;
     begin_arith_call();
     #define next_digit(d)  { *--erg_ptr = ascii(d<10 ? '0'+d : 'A'-10+d); }
     # normalisiere zu einer NUDS:
-    loop {
+    while (1) {
       if (len==0) { # 0 -> eine Ziffer '0'
-        next_digit(0); goto fertig;
+        next_digit(0); goto done;
       }
       if (MSDptr[0]==0) {
         MSDptr++; len--;
       } else
         break;
     }
-    loop {
+    while (1) {
       # Noch die NUDS MSDptr/len/.. mit len>0 abzuarbeiten.
       # Single-Precision-Division durch b^k:
       var uintD rest = divu_loop_up(b_hoch_k,MSDptr,len);
@@ -234,7 +234,7 @@
             divuD(0,rest,base,rest=,d=);
           #endif
           next_digit(d);
-        } until (--count == 0);
+        } while (--count != 0);
       next_digit(rest); # letzte der k Ziffern ablegen
       # Quotienten normalisieren (max. 1 Digit streichen):
       if (MSDptr[0]==0) {
@@ -248,7 +248,7 @@
     while (chareq(*erg_ptr,ascii('0'))) {
       erg_ptr++;
     }
-   fertig:
+   done:
     erg->MSBptr = erg_ptr;
     erg->len = erg->LSBptr - erg_ptr;
     end_arith_call();

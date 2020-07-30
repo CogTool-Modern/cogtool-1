@@ -1,19 +1,19 @@
 ;;;; Generic documentation
-;;;; Sam Steingold 2002 - 2005
+;;;; Sam Steingold 2002 - 2006, 2008
 ;;;; Bruno Haible 2004
 
 (in-package "CLOS")
 
-(defun function-documentation (x)
-  (if (typep-class x <standard-generic-function>)
-      (std-gf-documentation x)
-      (or (and (eq (type-of x) 'FUNCTION) ; interpreted function?
-               (sys::%record-ref x 2))
-          (let ((name (sys::function-name x)))
-            (and (sys::function-name-p name)
-                 (fboundp name) (eq x (sys::unwrapped-fdefinition name))
-                 (getf (get (sys::get-funname-symbol name) 'sys::doc)
-                       'function))))))
+(defun function-documentation (x &aux name)
+  (cond ((typep-class x <standard-generic-function>)
+         (std-gf-documentation x))
+        ((eq (type-of x) 'FUNCTION) ; interpreted function?
+         (sys::%record-ref x 2))    ; clos_docstring
+        #+FFI ((eq (type-of x) 'ffi::foreign-function)
+               (getf (sys::%record-ref x 6) :documentation)) ; ff_properties
+        ((sys::closurep x) (sys::closure-documentation x))
+        ((setq name (sys::subr-info x)) (get :documentation name)) ; subr
+        (t (get :documentation (sys::%record-ref x 0))))) ; clos_name
 
 ;;; documentation
 (defgeneric documentation (x doc-type)
@@ -24,25 +24,14 @@
     (function-documentation x))
   (:method ((x cons) (doc-type (eql 'function)))
     (setq x (check-function-name x 'documentation))
-    (if (symbolp x)
-      (documentation x 'function)
-      (if (and (fboundp x) (typep-class (sys::unwrapped-fdefinition x)
-                                        <standard-generic-function>))
-        (std-gf-documentation (sys::unwrapped-fdefinition x))
-        (documentation (second x) 'function))))
+    (and (fboundp x) (function-documentation (sys::unwrapped-fdefinition x))))
   (:method ((x cons) (doc-type (eql 'compiler-macro)))
     (setq x (check-function-name x 'documentation))
     (if (symbolp x)
       (documentation x 'compiler-macro)
       (documentation (second x) 'setf-compiler-macro)))
   (:method ((x symbol) (doc-type (eql 'function)))
-    (if (and (fboundp x) (typep-class (sys::unwrapped-fdefinition x) <standard-generic-function>))
-      (std-gf-documentation (sys::unwrapped-fdefinition x))
-      (or (and (fboundp x)
-               (let ((f (sys::unwrapped-fdefinition x)))
-                 (and (eq (type-of f) 'FUNCTION) ; interpreted function?
-                      (sys::%record-ref f 2))))
-          (getf (get x 'sys::doc) doc-type))))
+    (and (fboundp x) (function-documentation (sys::unwrapped-fdefinition x))))
   (:method ((x symbol) (doc-type symbol))
     ;; doc-type = `compiler-macro', `setf', `variable', `type',
     ;; `setf-compiler-macro'
@@ -91,17 +80,20 @@
   (:method ((x slot-definition) (doc-type (eql 't)))
     (slot-definition-documentation x)))
 
-(defun set-function-documentation (x new-value)
-  (if (typep-class x <standard-generic-function>)
-      (setf (std-gf-documentation x) new-value)
-      (let ((name (sys::function-name x)))
-        (when (eq (type-of x) 'FUNCTION) ; interpreted function?
-          (setf (sys::%record-ref x 2) new-value))
-        (when (and (sys::function-name-p name)
-                   (fboundp name) (eq x (sys::unwrapped-fdefinition name)))
-          (sys::%set-documentation (sys::get-funname-symbol name)
-                                   'function new-value))
-        new-value)))
+(defun set-function-documentation (x new-value &aux name)
+  (cond ((typep-class x <standard-generic-function>)
+         (setf (std-gf-documentation x) new-value))
+        ((eq (type-of x) 'FUNCTION) ; interpreted function?
+         (setf (sys::%record-ref x 2) new-value)) ; clos_docstring
+        #+FFI ((eq (type-of x) 'ffi::foreign-function)
+               (setf (getf (sys::%record-ref x 6) ; ff_properties
+			   :documentation) new-value))
+        ((sys::closurep x) (sys::closure-set-documentation x new-value))
+        ((setq name (sys::subr-info x)) ; subr
+         (setf (get :documentation name) new-value))
+        (t                      ; fsubr
+         (setf (get :documentation (sys::%record-ref x 0)) ; clos_name
+	       new-value))))
 
 (defgeneric (setf documentation) (new-value x doc-type)
   (:argument-precedence-order doc-type x new-value)
@@ -111,28 +103,16 @@
     (set-function-documentation x new-value))
   (:method (new-value (x cons) (doc-type (eql 'function)))
     (setq x (check-function-name x '(setf documentation)))
-    (if (symbolp x)
-      (sys::%set-documentation x 'function new-value)
-      (if (and (fboundp x) (typep-class (sys::unwrapped-fdefinition x)
-                                        <standard-generic-function>))
-        (setf (std-gf-documentation (sys::unwrapped-fdefinition x)) new-value)
-        (sys::%set-documentation (second x) 'setf new-value))))
+    (and (fboundp x)
+         (set-function-documentation (sys::unwrapped-fdefinition x) new-value)))
   (:method (new-value (x cons) (doc-type (eql 'compiler-macro)))
     (setq x (check-function-name x '(setf documentation)))
     (if (symbolp x)
       (sys::%set-documentation x 'compiler-macro new-value)
       (sys::%set-documentation (second x) 'setf-compiler-macro new-value)))
   (:method (new-value (x symbol) (doc-type (eql 'function)))
-    (if (and (fboundp x) (typep-class (sys::unwrapped-fdefinition x)
-                                      <standard-generic-function>))
-      (setf (std-gf-documentation (sys::unwrapped-fdefinition x)) new-value)
-      (progn
-        (when (fboundp x)
-          (let ((f (sys::unwrapped-fdefinition x)))
-            (when (eq (type-of f) 'FUNCTION) ; interpreted function?
-              (setf (sys::%record-ref f 2) new-value))))
-        (sys::%set-documentation x 'function new-value)
-        new-value)))
+    (and (fboundp x)
+         (set-function-documentation (sys::unwrapped-fdefinition x) new-value)))
   (:method (new-value (x symbol) (doc-type symbol))
     ;; doc-type = `compiler-macro', `setf', `variable', `type',
     ;; `setf-compiler-macro'

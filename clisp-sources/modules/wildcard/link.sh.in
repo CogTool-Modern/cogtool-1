@@ -1,16 +1,7 @@
-file_list=''
-mod_list=''
-if test -r wildcard.c; then
-  file_list="$file_list"' wildcard.o'
-  mod_list="$mod_list"' wildcard'
-fi
-if test -z "@FNMATCH_O@"; then
-  rm -f fnmatch.*; # use system-wide fnmatch implementation
-fi
-make clisp-module \
-     CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}" \
-     INCLUDES="$absolute_linkkitdir"
-NEW_FILES="$file_list @FNMATCH_O@ wildcard.dvi"
-NEW_LIBS="$file_list @FNMATCH_O@"
-NEW_MODULES="$mod_list"
+${MAKE-make} clisp-module \
+  CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}" \
+  CLISP_LINKKIT="$absolute_linkkitdir" CLISP="${CLISP}"
+NEW_FILES='wildcard.o libgnu_wc.a'
+NEW_LIBS="${NEW_FILES}"
+NEW_MODULES="wildcard"
 TO_LOAD='wildcard'

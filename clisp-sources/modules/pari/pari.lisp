@@ -1,7 +1,7 @@
 ;; CLISP interface to PARI <http://pari.math.u-bordeaux.fr/>
 ;; Copyright (C) 1995 Michael Stoll
-;; Copyright (C) 2004-2005 Sam Steingold
-;; This is free software, distributed under the GNU GPL
+;; Copyright (C) 2004-2010 Sam Steingold
+;; This is free software, distributed under the GNU GPL (v2+)
 
 (defpackage "PARI"
   (:modern t)
@@ -14,40 +14,87 @@
 (default-foreign-language :stdc)
 
 (pushnew :pari *features*)
+(provide "pari")
+
+;; capture error output:
+;; + the PARI error message goes though the CLCS instead of directly
+;;   to *error-output*.
+;; - PARI syntax errors are multiline and exquisitely aligned line-by-line
+;;   so going through CLCS will make the printed messages less useful.
+;; (defvar *pari-error-output* (make-string-output-stream))
+;; (defun pari-err-putc (c) (write-char c *pari-error-output*))
+;; (defun pari-err-puts (s) (write-string s *pari-error-output*))
+;; (defun pari-err-flush ()
+;;   (write-string (get-output-stream-string *pari-error-output*) *error-output*))
+;; (defun pari-err-die ()
+;;   (error "PARI ~A" (get-output-stream-string *pari-error-output*)))
+;; (def-call-in pari-err-putc (:name "clispErrPutc")
+;;   (:return-type nil) (:arguments (c character)))
+;; (def-call-in pari-err-puts (:name "clispErrPuts")
+;;   (:return-type nil) (:arguments (s c-string :in :malloc-free)))
+;; (def-call-in pari-err-flush (:name "clispErrFlush")
+;;   (:return-type nil) (:arguments))
+;; (def-call-in pari-err-die (:name "clispErrDie")
+;;   (:return-type nil) (:arguments))
 
 ;;; Declare all the pari types, variables, functions, ...
 (c-lines "#undef T~%#include <pari/pari.h>~%")
 
-;; #ifdef LONG_IS_32BIT
-;; #define SIGNBITS 0xff000000L
-;; #define SIGNSHIFT 24
-(defconstant pari-sign-byte (byte 8 24))
-;; #define TYPBITS 0xff000000L
-;; #define TYPSHIFT 24
-(defconstant pari-type-byte (byte 8 24))
-;; #define LGBITS 0xffffL
-(defconstant pari-length-byte (byte 16 0))
-;; #define LGEFBITS 0xffffL
-(defconstant pari-effective-length-byte (byte 16 0))
-;; #define EXPOBITS 0xffffffL
-(defconstant pari-exponent-byte (byte 24 0))
-;; #define HIGHEXPOBIT 0x800000L
-(defconstant pari-exponent-offset #x800000)
-;; #define VALPBITS 0xffffL
-(defconstant pari-valuation-byte (byte 16 0))
-;; #define HIGHVALPBIT 0x8000L
-(defconstant pari-valuation-offset #x8000)
-;; #define PRECPBITS 0xffff0000L
-;; #define PRECPSHIFT 16
-(defconstant pari-precision-byte (byte 16 16))
-;; #define VARNBITS 0xff0000L
-;; #define VARNSHIFT 16
-(defconstant pari-varno-byte (byte 8 16))
-;; #endif
+(defun pari-byte (bits shift)
+  (byte (integer-length (ash bits (- shift))) shift))
+(def-c-const SIGNBITS (:type ulong))  ; 0xff000000L or 0xC000000000000000UL
+(def-c-const SIGNSHIFT (:type ulong)) ; 24 or 62
+(defconstant pari-sign-byte           ; (byte 8 24) or (byte 2 62)
+  (pari-byte SIGNBITS SIGNSHIFT))
+(def-c-const TYPBITS (:type ulong))  ; 0xff000000L or 0xFE00000000000000UL
+(def-c-const TYPSHIFT (:type ulong)) ; 24 or 57
+(defconstant pari-type-byte          ; (byte 8 24) or (byte 7 57)
+  (pari-byte TYPBITS TYPSHIFT))
+(def-c-const LGBITS (:type ulong)) ; 0xffffL or 0xFFFFFFFFFFFFFFUL
+(defconstant pari-length-byte      ; (byte 16 0) or (byte 56 0)
+  (pari-byte LGBITS 0))
+(def-c-const EXPOBITS (:type ulong)) ; 0xffffffL or 0x3FFFFFFFFFFFFFFFUL
+(defconstant pari-exponent-byte ; (byte 24 0) or (byte 62 0)
+  (pari-byte EXPOBITS 0))
+(def-c-const HIGHEXPOBIT (:type ulong)) ; 0x800000L or 0x2000000000000000UL
+(defconstant pari-exponent-offset HIGHEXPOBIT)
+(def-c-const VALPBITS (:type ulong)) ; 0xffffL or 0x3FFFFFFFFFFFUL
+(defconstant pari-valuation-byte     ; (byte 16 0) or (byte 46 0)
+  (pari-byte VALPBITS 0))
+(def-c-const HIGHVALPBIT (:type ulong)) ; 0x8000L or 0x200000000000UL
+(defconstant pari-valuation-offset HIGHVALPBIT)
+(def-c-const PRECPBITS (:type ulong))  ; 0xffff0000L or 0xFFFFC00000000000UL
+(def-c-const PRECPSHIFT (:type ulong)) ; 16 or 46
+(defconstant pari-precision-byte ; (byte 16 16) or (byte 18 46)
+  (pari-byte PRECPBITS PRECPSHIFT))
+(def-c-const VARNBITS (:type ulong))  ; 0xff0000L or 0x3FFFC00000000000UL
+(def-c-const VARNSHIFT (:type ulong)) ; 16 or 46
+(defconstant pari-varno-byte          ; (byte 8 16) or (byte 16 46)
+  (pari-byte VARNBITS VARNSHIFT))
+(def-c-const CLONEBIT (:type ulong)) ; ??? or 0x100000000000000UL
 
-;; #ifdef LONG_IS_64BIT
-;; ...
-;; #endif
+;; <paritype.h>
+
+(exporting:def-c-enum pari-typecode
+  (INT 1)
+  (REAL 2)
+  (INTMOD 3)
+  (FRAC 4)
+  (COMPLEX 6)
+  (PADIC 7)
+  (QUAD 8)
+  (POLMOD 9)
+  (POL 10)
+  (SER 11)
+  (RFRAC 13)
+  (QFR 15)
+  (QFI 16)
+  (VEC 17)
+  (COL 18)
+  (MAT 19)
+  (LIST 20)
+  (STR 21)
+  (VECSMALL 22))
 
 ;; <parigen.h>
 
@@ -88,34 +135,28 @@
 ;; typedef ulong pari_sp;
 (def-c-type pari_sp ulong)
 
+(defun bits2digits (bits) (values (floor (* #.(log 2 10) bits))))
+(defun digits2bits (digits) (values (ceiling (* #.(log 10 2) digits))))
+(defvar pari-real-precision-words
+  (+ 2 (ceiling (ext:long-float-digits) #,(bitsizeof 'ulong)))
+  "The default precision argument for PARI functions which accept it.
+This is always equal to (+ 2 (length (pari-mantissa (%foo PRPD)))),
+t.e., this is the memory size for the real return value in ulong words.")
+(defun pari-real-precision-words (digits)
+  (+ 2 (ceiling (digits2bits digits) #,(bitsizeof 'ulong))))
+(defun pari-real-precision (&optional (words pari-real-precision-words))
+  "The real PARI precision in decimal digits."
+  (bits2digits (* #,(bitsizeof 'ulong) (- words 2))))
+(defun (setf pari-real-precision) (digits)
+  (let ((bits (digits2bits digits)))
+    (setf (ext:long-float-digits) bits
+          pari-real-precision-words (+ 2 (ceiling bits #,(bitsizeof 'ulong)))))
+  digits)
+(define-symbol-macro pari-real-precision (pari-real-precision))
 (def-c-var pari-series-precision (:name "precdl") (:type ulong))
+(export '(pari-series-precision pari-real-precision))
 
-;; there is no global prec in PARI 2
-(c-lines "ulong clisp_get_prec (void);~%") ; prototype
-(c-lines "ulong clisp_get_prec (void) { return /*prec*/ 64; }~%")
-(c-lines "void clisp_set_prec (ulong p);~%") ; prototype
-(c-lines "void clisp_set_prec (ulong p) { /*prec=*/(void)p; }~%")
-
-(def-call-out pari-get-real-prec-raw (:name "clisp_get_prec")
-  (:arguments) (:return-type ulong))
-(def-call-out pari-set-real-prec-raw (:name "clisp_set_prec")
-  (:arguments (p ulong)) (:return-type nil))
-
-(export '(pari-real-precision pari-series-precision))
-(define-symbol-macro pari-real-precision (pari-get-real-prec-digits))
-(defun pari-get-real-prec-digits ()
-  (values (floor (* #.(* 32 (log 2 10)) (- (pari-get-real-prec-raw) 2)))))
-(defun (setf pari-get-real-prec-digits) (digits)
-  (let ((bits (ceiling (* #.(log 10 2) digits))))
-    (setf (ext:long-float-digits) bits)
-    (pari-set-real-prec-raw (+ (ceiling bits 32) 2))
-    digits))
-
-;; a scratch variable for CLISP: (defined in clisp-interface.c)
-(c-lines "extern void* clispTemp;~%")
-(def-c-var temp (:name "clispTemp") (:type c-pointer))
-
-;; extern  long    lontyp[],lontyp2[];
+;; extern  long    lontyp[];
 
 ;; extern  long    quitting_pari;
 ;; extern  jmp_buf environnement;
@@ -139,9 +180,9 @@
 (def-c-var pari--1   (:name "gen_m1") (:type pari-gen) (:read-only t))
 (def-c-var pari-nil  (:name "gnil")  (:type pari-gen) (:read-only t))
 
-;; extern  GEN *polun,*polx;
-(def-c-var pari-poly-1 (:name "polun") (:type (c-ptr pari-gen)) (:read-only t))
-(def-c-var pari-poly-x (:name "polx")  (:type (c-ptr pari-gen)) (:read-only t))
+;; extern  GEN *pol_1,*pol_x;
+(def-c-var pari-poly-1 (:name "pol_1") (:type (c-ptr pari-gen)) (:read-only t))
+(def-c-var pari-poly-x (:name "pol_x")  (:type (c-ptr pari-gen)) (:read-only t))
 ;; extern  GEN primetab;
 (def-c-var primetab (:type pari-gen) (:read-only t))
 ;; extern  long *ordvar;
@@ -152,32 +193,36 @@
 ;; extern  byteptr diffptr;
 (def-c-var diffptr (:type byteptr) (:read-only t))
 
-(c-lines "const unsigned long maxvarn = MAXVARN;~%")
-(def-c-var maxvarn (:type ulong) (:read-only t))
+(def-c-const MAXVARN)
 ;; extern entree **varentries;
 (def-c-var varentries (:type (c-pointer (c-ptr-null entree))) (:read-only t))
 (defun varentry (i)
-  (assert (< i maxvarn) (i)
-          "~S: index ~:D is too large (max ~:D)" 'varentry i maxvarn)
+  (assert (< i MAXVARN) (i)
+          "~S: index ~:D is too large (max ~:D)" 'varentry i MAXVARN)
   (let ((e (offset varentries (* i #.(sizeof '(c-pointer (c-ptr-null entree))))
                    '(c-pointer (c-ptr-null entree)))))
     (and e (foreign-value e))))
 
 ;; extern int new_galois_format;
-(def-c-var new_galois_format (:type (c-ptr int)))
+(def-c-var new_galois_format (:type int))
 ;; extern int factor_add_primes;
-(def-c-var factor_add_primes (:type (c-ptr int)))
+(def-c-var factor_add_primes (:type int))
 
 ;; extern ulong DEBUGFILES, DEBUGLEVEL, DEBUGMEM
 (def-c-var debugfiles (:name "DEBUGFILES") (:type ulong))
 (def-c-var debuglevel (:name "DEBUGLEVEL") (:type ulong))
 (def-c-var debugmem (:name "DEBUGMEM") (:type ulong))
 
+(def-c-const VERYBIGINT)
+(def-c-const BIGINT)
+
 ;; entree *is_entry(char *s);
 (def-call-out is_entry (:arguments (s c-string))
   (:return-type (c-ptr-null entree)))
 
-;; this optimization is not necessary, it just saves some memory
+;; this optimization is not necessary, it just saves some memory.
+;; also, get_entry_doc is called while loading pari.fas,
+;; so it cannot be moved to cpari.c
 (c-lines "char* get_entry_doc (char* s);~%") ; prototype
 (c-lines "char* get_entry_doc (char* s) { entree *e = is_entry(s); return e==NULL?NULL:e->help; }~%")
 (def-call-out get_entry_doc (:arguments (s c-string)) (:return-type c-string))
@@ -191,31 +236,33 @@
 (def-c-const PARIVERSION (:type c-string))
 (def-c-const PARI_VERSION_CODE)
 (def-c-const PARI_VERSION_SHIFT)
+(def-c-const PARIINFO (:type c-string))
 (defconstant pari-version
   (list PARIVERSION
         (ldb (byte PARI_VERSION_SHIFT (* 2 PARI_VERSION_SHIFT))
              PARI_VERSION_CODE)
         (ldb (byte PARI_VERSION_SHIFT PARI_VERSION_SHIFT) PARI_VERSION_CODE)
-        (ldb (byte PARI_VERSION_SHIFT 0) PARI_VERSION_CODE)))
+        (ldb (byte PARI_VERSION_SHIFT 0) PARI_VERSION_CODE)
+        PARIINFO))
 (export 'pari-version)
 
 ;;; /* init.c */
 
 ;; long allocatemoremem(size_t newsize);
-(def-call-out allocatemoremem (:arguments (newsize ulong)) (:return-type long))
+(def-call-out allocatemoremem (:arguments (newsize size_t)) (:return-type long))
 (defun allocatemem (&optional (newsize 0)) (allocatemoremem newsize))
 
 (c-lines "#include \"cpari.h\"~%")
 (def-call-out pari-init (:name "init_for_clisp")
   (:arguments (parisize long) (maxprime long)) (:return-type nil))
-(def-call-out pari-fini (:name "fini_for_clisp")
-  (:arguments (leaving int)) (:return-type nil))
+(def-call-out pari-fini (:name "pari_close")
+  (:arguments) (:return-type nil))
 (export '(pari-init pari-fini allocatemem))
 (c-lines :init-always "init_for_clisp(4000000,500000);~%")
-(c-lines :fini "fini_for_clisp(1);~%")
+(c-lines :fini "pari_close();~%")
 
 
-;; #define gval(x,v) ggval(x,polx[v])
+;; #define gval(x,v) ggval(x,pol_x[v])
 ;; #define gvar9(x) ((typ(x)==9)?gvar2(x):gvar(x))
 
 ;; #define coeff(a,i,j)      (*((long*)(*(a+(j)))+(i)))
@@ -227,47 +274,53 @@
     (if (symbolp arg)
       `(,arg pari-gen :in :none)
       (case (length arg)
-	(1 `(,@arg pari-gen :in :none))
-	(2 `(,@arg :in :none))
-	(3 `(,@arg :none))
-	(4 arg)
-	(t `(,(first arg) ,(second arg) ,(third arg) ,(fourth arg))))))
+        (1 `(,@arg pari-gen :in :none))
+        (2 `(,@arg :in :none))
+        (3 `(,@arg :none))
+        (4 arg)
+        (t `(,(first arg) ,(second arg) ,(third arg) ,(fourth arg))))))
   (defun make-pari-name (sym)
     (intern (ext:string-concat "%" (symbol-name sym)) (find-package "PARI")))
   (defun convert-to-lambdalist (args)
     (let ((flag nil))
       (mapcan #'(lambda (arg)
                   (if (symbolp arg)
-		    (list arg)
-		    (case (length arg)
-		      ((1 2) (list (first arg)))
-		      ((3 4) (if (eq (third arg) :out) '() (list (first arg))))
-		      (t `(,@(if flag '() (progn (setq flag t) '(&key)))
-		           (,(first arg) ,(fifth arg)))))))
-	      args)))
+                    (list arg)
+                    (case (length arg)
+                      ((1 2) (list (first arg)))
+                      ((3 4) (if (eq (third arg) :out) '() (list (first arg))))
+                      (t `(,@(if flag '() (progn (setq flag t) '(&key)))
+                           (,(first arg) ,(fifth arg)
+                            ,@(and (sixth arg) `(,(sixth arg)))))))))
+              args)))
+  (defun arg-preprocessing (args)
+    (mapcan (lambda (arg)
+              (let ((p (and (consp arg) (seventh arg))))
+                (and p (list p))))
+            args))
   (defun convert-to-arglist (args)
     (mapcan #'(lambda (arg)
                 (if (symbolp arg)
-		  `((convert-to-pari ,arg))
-		  (case (length arg)
-		    (1 `((convert-to-pari ,(first arg))))
-		    (2 (if (eq (second arg) 'pari-gen)
-		         `((convert-to-pari ,(first arg)))
-			 `(,(first arg))))
-		    (t (if (eq (third arg) :out) '()
-			 (if (eq (second arg) 'pari-gen)
- 			   `((convert-to-pari ,(first arg)))
- 			   `(,(first arg))))))))
-	    args))
+                  `((convert-to-pari ,arg))
+                  (case (length arg)
+                    (1 `((convert-to-pari ,(first arg))))
+                    (2 (if (eq (second arg) 'pari-gen)
+                         `((convert-to-pari ,(first arg)))
+                         `(,(first arg))))
+                    (t (if (eq (third arg) :out) '()
+                         (if (eq (second arg) 'pari-gen)
+                           `((convert-to-pari ,(first arg)))
+                           `(,(first arg))))))))
+            args))
   (defun get-additional-return-spec (args)
     (mapcan #'(lambda (arg)
                 (if (and (listp arg) (eq (third arg) :out))
-		  (if (and (consp (second arg))
-		           (eq (first (second arg)) 'c-ptr))
-		    `((,(first arg) ,(second (second arg))))
-		    (error "~S: :OUT parameter in ~S is not a pointer."
-		           'get-additional-return-spec arg))
-		  '()))
+                  (if (and (consp (second arg))
+                           (eq (first (second arg)) 'c-ptr))
+                    `((,(first arg) ,(second (second arg))))
+                    (error "~S: :OUT parameter in ~S is not a pointer."
+                           'get-additional-return-spec arg))
+                  '()))
             args))
   (defun make-defun (name pari-name type args)
     (let ((add-values (get-additional-return-spec args)))
@@ -275,33 +328,35 @@
         `(progn
            (export ',name)
            (defun ,name ,(convert-to-lambdalist args)
+             ,@(arg-preprocessing args)
              ,(case type
                 (pari-gen
                    `(make-internal-pari-object
                       (,pari-name ,@(convert-to-arglist args))))
-	        (pari-bool
-	           `(convert-to-boolean
-	              (,pari-name ,@(convert-to-arglist args))))
-	        (t `(,pari-name ,@(convert-to-arglist args))))))
-	(let* ((all-values (cons (list name type) add-values))
-	       (temp-vars (mapcar #'(lambda (v) (declare (ignore v)) (gensym))
-	                          all-values)))
-	  `(progn
-	     (export ',name)
-	     (defun ,name ,(convert-to-lambdalist args)
-	       (multiple-value-bind ,temp-vars
-	           (,pari-name ,@(convert-to-arglist args))
-		 (values
-		   ,@(mapcar #'(lambda (vs tv)
-		                 (case (second vs)
-				   (pari-gen `(make-internal-pari-object ,tv))
-				   (pari-bool `(convert-to-boolean ,tv))
-				   (t tv)))
-			     all-values temp-vars)))))))))
+                (pari-bool
+                   `(convert-to-boolean
+                      (,pari-name ,@(convert-to-arglist args))))
+                (t `(,pari-name ,@(convert-to-arglist args))))))
+        (let* ((all-values (cons (list name type) add-values))
+               (temp-vars (mapcar #'(lambda (v) (declare (ignore v)) (gensym))
+                                  all-values)))
+          `(progn
+             (export ',name)
+             (defun ,name ,(convert-to-lambdalist args)
+               ,@(arg-preprocessing args)
+               (multiple-value-bind ,temp-vars
+                   (,pari-name ,@(convert-to-arglist args))
+                 (values
+                   ,@(mapcar #'(lambda (vs tv)
+                                 (case (second vs)
+                                   (pari-gen `(make-internal-pari-object ,tv))
+                                   (pari-bool `(convert-to-boolean ,tv))
+                                   (t tv)))
+                             all-values temp-vars)))))))))
   (defun make-documentation (name gp-name args)
     `(let ((docstring (get-pari-docstring ,gp-name ',name))
            (docstr2 ,(format nil "Syntax: (~S~{ ~S~})~%"
-	                     name (convert-to-lambdalist args))))
+                             name (convert-to-lambdalist args))))
        (setf (documentation ',name 'function)
              (if docstring
                  (format nil "~A~%~A" docstring docstr2)
@@ -335,26 +390,28 @@
 (defmacro pari-call-out (fun lib-name args &optional (gp-name lib-name))
   (let* ((name (if (symbolp fun) fun (first fun)))
          (type (if (symbolp fun) 'pari-gen (second fun)))
-	 (rtype-spec (if (or (symbolp fun) (eq type 'pari-bool))
-	              '(pari-gen)
-		       (rest fun)))
-	 (pari-name (make-pari-name name)))
+         (rtype-spec (if (or (symbolp fun) (eq type 'pari-bool))
+                      '(pari-gen)
+                       (rest fun)))
+         (pari-name (make-pari-name name)))
     `(progn
        (def-call-out ,pari-name
-	 (:name ,lib-name)
-	 (:return-type ,@rtype-spec)
-	 (:arguments ,@(mapcar #'make-arg-spec args))
-	 (:language :stdc))
+         (:name ,lib-name)
+         (:return-type ,@rtype-spec)
+         (:arguments ,@(mapcar #'make-arg-spec args))
+         (:language :stdc))
        ,@(when gp-name
            `(,(make-defun name pari-name type args)
-	     ,(make-documentation name gp-name args)))
+             ,(make-documentation name gp-name args)))
        ',pari-name)))
 
 ;;; pari-call-out-prec has the same syntax as pari-call-out; it additionally
-;;; provides a keyword argument prec defaulting to pari-get-real-prec-raw.
+;;; provides a keyword argument prec defaulting to pari-real-precision-words.
 (defmacro pari-call-out-prec (fun lib-name args &optional (gp-name lib-name))
   `(pari-call-out ,fun ,lib-name
-     (,@args (prec long :in :none (pari-get-real-prec-raw))) ,gp-name))
+     (,@args (prec long :in :none pari-real-precision-words prec-p
+                   (when prec-p (setq prec (pari-real-precision-words prec)))))
+     ,gp-name))
 
 
 ;;; /* alglin.c */
@@ -425,8 +482,8 @@
 (pari-call-out pari-conjugate "gconj" (x) "conj")
 ;; GEN conjvec(GEN x,long prec);
 (pari-call-out-prec vector-of-conjugates "conjvec" (x))
-;; GEN idmat(long n);
-(pari-call-out identity-matrix "idmat" ((n long)))
+;; GEN matid(long n);
+(pari-call-out identity-matrix "matid" ((n long)))
 ;; GEN concat(GEN x, GEN y);
 (pari-call-out pari-concatenate "concat" (x y))
 
@@ -482,24 +539,22 @@
 ;; long    rank(GEN x);
 (pari-call-out (matrix-rank long) "rank" (x))
 ;; GEN perf(GEN a);
-(pari-call-out (symmetric-matrix-perfection) "perf" (a))
+(pari-call-out symmetric-matrix-perfection "perf" (a))
 
 ;;; /* anal.c */
 
 ;; GEN readexpr(char *t);
-;; GEN readexpr(char **c);
-;; GEN readseq(char *t);
-(pari-call-out read-from-string "readseq" ((str c-string :in :alloca)) nil)
+;; GEN gp_read_str(char *t);
+(def-call-out %read-from-string (:name "gp_read_str")
+  (:return-type pari-gen) (:arguments (str c-string)))
 
 ;; void switchin(char *name);
-;; GEN switchout(char *name);
-;; GEN fliplog(void);
+;; void switchout(char *name);
 
 ;;; /* arith.c */
 
 ;; GEN racine(GEN a);
 (pari-call-out pari-isqrt "racine" (a) "isqrt")
-;; GEN mppgcd(GEN a, GEN b);
 ;; GEN mpfact(long n);
 (pari-call-out factorial-integer "mpfact" ((n long)) "!")
 ;; GEN mpfactr(long n, long prec);
@@ -521,7 +576,9 @@
 ;; GEN addprimes(GEN primes);
 (pari-call-out add-primes "addprimes" (primes) "addprimes")
 
-;; GEN bezout(GEN a, GEN b, GEN *u, GEN *v);
+;; GEN bezout(GEN a, GEN b, GEN *u, GEN *v); -- ext:xgcd is better!
+;; (pari-call-out bezout "bezout" (a b (u (c-ptr pari-gen) :out :alloca)
+;;                                   (v (c-ptr pari-gen) :out :alloca)))
 ;; GEN chinese(GEN x, GEN y);
 (pari-call-out chinese-lift "chinese" (x y))
 ;; GEN Fp_inv(GEN a, GEN m);
@@ -537,7 +594,7 @@
 (pari-call-out first-n-primes "primes" ((n long)))
 ;; GEN phi(GEN n);
 (pari-call-out euler-phi "phi" (n))
-;; GEN decomp(GEN n);
+;; GEN Z_factor(GEN n);
 ;; GEN auxdecomp(GEN n, long all);
 ;; GEN smallfact(GEN n);
 (pari-call-out factor-small "smallfact" (n))
@@ -572,7 +629,6 @@
 
 ;; GEN compimag(GEN x, GEN y);
 (pari-call-out compose-imag-qf "compimag" (x y))
-;; GEN sqcomp(GEN x);
 ;; GEN qfi(GEN x, GEN y, GEN z);
 (pari-call-out make-imag-qf "qfi" (x y z))
 ;; GEN qfr(GEN x, GEN y, GEN z, GEN d);
@@ -581,6 +637,9 @@
 ;; GEN redreal(GEN x);
 (pari-call-out reduce-real-qf "redreal" (x))
 ;; GEN sqcompreal(GEN x);
+(pari-call-out qfr-composition "sqcompreal" (x))
+;; GEN sqcompimag(GEN x);
+(pari-call-out qfi-composition "sqcompimag" (x))
 
 ;; GEN rhoreal(GEN x);
 (pari-call-out reduce-real-qf-one-step "rhoreal" (x))
@@ -603,30 +662,30 @@
 
 ;; GEN comprealraw(GEN x, GEN y);
 (pari-call-out compose-real-qf-raw "comprealraw" (x y))
-;; GEN sqcomprealraw(GEN x);
 ;; GEN powrealraw(GEN x, long n, long prec);
 (pari-call-out-prec power-real-qf-raw "powrealraw" (x (n long)))
 
 ;; GEN gkronecker(GEN x, GEN y);
 ;; GEN gkrogs(GEN x, long y);
-;; GEN gcarreparfait(GEN x);
-;; GEN gcarrecomplet(GEN x, GEN *pt);
+;; GEN gissquare(GEN x);
+(pari-call-out (square? pari-bool) "gissquare" (x) "issquare")
+;; GEN gissquarerem(GEN x, GEN *pt);
 
-;; GEN gisprime(GEN x);
-(pari-call-out (prime? pari-bool) "gisprime" (x) "isprime")
-;; GEN gispsp(GEN x);
-(pari-call-out (pseudo-prime? pari-bool) "gispsp" (x) "ispsp")
+;; GEN gisprime(GEN x, long flag);
+(pari-call-out (prime? pari-bool) "gisprime" (x (flag long)) "isprime")
+;; GEN gispseudoprime(GEN x);
+(pari-call-out (pseudo-prime? pari-bool) "gispseudoprime" (x (flag long)) "ispsp")
 ;; GEN gissquarefree(GEN x);
 (pari-call-out (square-free? pari-bool) "gissquarefree" (x) "issqfree")
 ;; GEN gisfundamental(GEN x);
 (pari-call-out (fundamental-discriminant? pari-bool) "gisfundamental"
   (x) "isfund")
 ;; GEN gbittest(GEN x, GEN n);
-(pari-call-out (square? pari-bool) "gcarreparfait" (x) "issquare")
 
 ;; GEN gpseudopremier(GEN n, GEN a);
 ;; GEN gmillerrabin(GEN n, long k);
 ;; GEN gmu(GEN n);
+
 ;; GEN gomega(GEN n);
 ;; GEN gbigomega(GEN n);
 
@@ -639,9 +698,9 @@
 
 ;; long mu(GEN n);
 (pari-call-out (moebius-mu long) "mu" (n))
-;; GEN omega(GEN n);
+;; long omega(GEN n);
 (pari-call-out (omega long) "omega" (n))
-;; GEN bigomega(GEN n);
+;; long bigomega(GEN n);
 (pari-call-out (bigomega long) "bigomega" (n))
 ;; GEN hil(GEN x, GEN y, GEN p);
 (pari-call-out (hilbert-symbol long) "hil" (x y p) "hil")
@@ -650,7 +709,7 @@
 ;; GEN carrecomplet(GEN x, GEN *pt);
 ;; GEN bittest(GEN x, long n);
 
-;; int isprime(GEN x);
+;; long isprime(GEN x);
 ;; GEN ispsp(GEN x);
 ;; GEN issquarefree(GEN x);
 ;; GEN isfundamental(GEN x);
@@ -661,6 +720,9 @@
 ;; GEN inversemodulo(GEN a, GEN b, GEN *res);
 
 ;; byteptr initprimes(long maxnum);
+
+;; ulong maxprime(void);
+(pari-call-out (maxprime ulong) "maxprime" ())
 
 ;; void lucas(long n, GEN *ln, GEN *ln1);
 
@@ -872,8 +934,8 @@
 (pari-call-out rnf-steinitz-class "rnfsteinitz" (nf order))
 ;; GEN rnfbasis(GEN bnf, GEN order);
 (pari-call-out rnf-basis "rnfbasis" (bnf order))
-;; GEN rnfhermitebasis(GEN bnf, GEN order);
-(pari-call-out rnf-hermite-basis "rnfhermitebasis" (bnf order))
+;; GEN rnfhnfbasis(GEN bnf, GEN order);
+(pari-call-out rnf-hermite-basis "rnfhnfbasis" (bnf order))
 
 ;; GEN bsrch(GEN p, GEN fa, long Ka, GEN eta, long Ma);
 ;; GEN setup(GEN p,GEN f,GEN theta,GEN nut);
@@ -909,14 +971,16 @@
   (x (varno long :in :none (get-varno x))
      (precdl long :in :none pari-series-precision))
   "taylor")
-;; GEN legendre(long n);
-(pari-call-out legendre-polynomial "legendre" ((n long)))
-;; GEN tchebi(long n);
-(pari-call-out tchebychev-polynomial "tchebi" ((n long)))
-;; GEN hilb(long n);
-;;(pari-call-out hilbert-matrix "hilb" ((n long)) "hilb")
-;; GEN pasc(long n);
-;;(pari-call-out pascal-triangle "pasc" ((n long)) "pascal")
+;; GEN legendre(long n, long v);
+(pari-call-out legendre-polynomial "legendre"
+  ((n long) (varno long :in :none (get-varno n))))
+;; GEN tchebi(long n, long v);
+(pari-call-out tchebychev-polynomial "tchebi"
+  ((n long) (varno long :in :none (get-varno n))))
+;; GEN mathilbert(long n);
+(pari-call-out hilbert-matrix "mathilbert" ((n long)) "mathilbert")
+;; GEN matqpascal(long n, GEN q);
+(pari-call-out pascal-triangle "matqpascal" ((n long) q) "matqpascal")
 ;; GEN laplace(GEN x);
 (pari-call-out laplace-transform "laplace" (x))
 
@@ -958,7 +1022,7 @@
 ;; GEN lllgramallgen(GEN x, long all);
 
 ;; GEN binomial(GEN x, long k);
-(pari-call-out binomial-coefficient "binomial" (x k))
+(pari-call-out binomial-coefficient "binomial" (x (k long)))
 ;; GEN gscal(GEN x, GEN y);
 ;; GEN cyclo(long n);
 (pari-call-out cyclotomic-polynomial "cyclo" ((n long)) "polcyclo")
@@ -981,12 +1045,15 @@
 ;; GEN polrecip(GEN x);
 (pari-call-out reciprocal-polynomial "polrecip" (x) "recip")
 ;; GEN reorder(GEN x);
+(pari-call-out variable-order "reorder" (x))
+
 ;; GEN sort(GEN x);
 (pari-call-out vector-sort "sort" (x))
 ;; GEN lexsort(GEN x);
 (pari-call-out vector-lexsort "lexsort" (x))
 ;; GEN indexsort(GEN x);
 (pari-call-out vector-index-sort "indexsort" (x) "indsort")
+
 ;; GEN polsym(GEN x, long n);
 (pari-call-out symmetric-powers "polsym" (x (n long)))
 
@@ -1012,32 +1079,28 @@
 ;; GEN allpolred(GEN x, GEN *pta, long code, long prec);
 ;; GEN polymodrecip(GEN x);
 (pari-call-out polymod-reverse "polymodrecip" (x) "modreverse")
-;; GEN genrand(void);
-(pari-call-out pari-random "genrand" () "random")
+;; GEN genrand(GEN x);
+(pari-call-out pari-random "genrand" (x) "random")
 ;; GEN numtoperm(long n, GEN x);
 (pari-call-out permutation "numtoperm" ((n long) x))
 ;; GEN permtonum(GEN x);
 (pari-call-out permutation-number "permtonum" (x))
 
-;; long mymyrand();
-
 ;; long setprecr(long n);
 ;(pari-call-out (set-real-precision long) "setprecr" ((n long)) "setprecision")
 ;; GEN setserieslength(long n);
 ;(pari-call-out (set-series-precision long) "setserieslength" ((n long)))
-;; GEN ccontent(long* x,long n);
 
-;; GEN setrand(long seed);
-(pari-call-out setrand "setrand" ((seed long)))
-;; GEN getrand(void);
-(pari-call-out getrand "getrand" ())
-;; GEN getstack(void);
-(pari-call-out getstack "getstack" ())
-;; GEN gettime(void);
+;; long setrand(long seed);
+(pari-call-out (set-random-seed long) "setrand" ((seed long)))
+;; long getrand(void);
+(pari-call-out (get-random-seed long) "getrand" ())
+;; long getstack(void);
+(pari-call-out (getstack long) "getstack" ())
+;; long gettime(void);
+(pari-call-out (gettime long) "gettime" ())
 ;; GEN getheap(void);
 (pari-call-out getheap "getheap" ())
-
-;; void getheapaux(long* nombre, long* espace);
 
 ;;; /* bibli2.c */
 
@@ -1141,15 +1204,14 @@
 (defmacro def-buch-variant (name flun gp-name)
   (let* ((pari-name (make-pari-name 'nf-buchall))
          (type 'pari-gen)
-	 (args `(p (c pari-gen :in :none 0.3) (c2 pari-gen :in :none c)
-	           (nrel pari-gen :in :none 5) (borne pari-gen :in :none 1)
-		   (nrpid long :in :none 4) (minsfb long :in :none 3)
-		   (flun long :in :none ,flun)
-		   (prec log :in :none (pari-get-real-prec-raw)))))
+         (args `(p (c pari-gen :in :none 0.3) (c2 pari-gen :in :none c)
+                   (nrel pari-gen :in :none 5) (borne pari-gen :in :none 1)
+                   (nrpid long :in :none 4) (minsfb long :in :none 3)
+                   (flun long :in :none ,flun)
+                   (prec log :in :none pari-real-precision-words))))
     `(progn
        ,(make-defun name pari-name type args)
        ,(make-documentation name gp-name args))))
-
 ;; #define buchgen(P,gcbach,gcbach2,prec) buchall(P,gcbach,gcbach2,stoi(5);
 ;; GEN gzero,4,3,0,prec)
 (def-buch-variant nf-buchgen 0 "buchgen")
@@ -1231,8 +1293,8 @@
 ;; GEN ellglobalred(GEN e1);
 (pari-call-out ell-global-reduction "ellglobalred" (e1))
 
-;; GEN lseriesell(GEN e, GEN s, GEN N, GEN A, long prec);
-(pari-call-out-prec ell-l-series-value "lseriesell" (e s N A))
+;; GEN elllseries(GEN e, GEN s, GEN N, GEN A, long prec);
+(pari-call-out-prec ell-l-series-value "elllseries" (e s N A))
 
 ;; GEN pointell(GEN e, GEN z, long prec);
 (pari-call-out-prec ell-z-to-xy "pointell" (e z))
@@ -1299,16 +1361,14 @@
 
 ;; GEN gcopy(GEN x);
 ;(pari-call-out copy "gcopy" (x) nil)
-;; GEN forcecopy(GEN x);
+;; GEN gcopy(GEN x);
 ;; GEN gclone(GEN x);
 ;; GEN cgetp(GEN x);
 ;; GEN gaddpex(GEN x, GEN y);
 
 ;; GEN greffe(GEN x, long l);
-;; GEN gopsg2(GEN (*f) (GEN, GEN);
-;; GEN long s, GEN y);
-;; GEN gopgs2(GEN (*f) (GEN, GEN);
-;; GEN GEN y, long s);
+;; GEN gopsg2(GEN (*f) (GEN, GEN), long s, GEN y);
+;; GEN gopgs2(GEN (*f) (GEN, GEN), GEN y, long s);
 ;; GEN co8(GEN x, long l);
 ;; GEN cvtop(GEN x, GEN p, long l);
 ;; GEN compo(GEN x, long n);
@@ -1348,8 +1408,7 @@
 ;; GEN gmulsg(long s, GEN y);
 ;; GEN gdivgs(GEN x, long s);
 ;; GEN gmodulo(GEN x, GEN y);
-;; GEN gmodulcp(GEN x, GEN y);
-(pari-call-out make-mod "gmodulcp" (x y) "mod")
+(pari-call-out make-mod "gmodulo" (x y) "mod")
 ;; GEN simplify(GEN x);
 (pari-call-out simplify "simplify" (x))
 
@@ -1434,27 +1493,16 @@
 (pari-call-out pari-round2 "gdivround" (x y) "\\/")
 ;; GEN gpolvar(GEN y);
 
-;; void    gop0z(GEN (*f) (void);
-;; GEN GEN x);
-;; GEN gop1z(GEN (*f) (GEN);
-;; GEN GEN x, GEN y);
-;; GEN gop2z(GEN (*f) (GEN, GEN);
-;; GEN GEN x, GEN y, GEN z);
-;; GEN gops2gsz(GEN (*f) (GEN, long);
-;; GEN GEN x, long s, GEN z);
-;; GEN gops2sgz(GEN (*f) (long, GEN);
-;; GEN long s, GEN y, GEN z);
-;; GEN gops2ssz(GEN (*f) (long, long);
-;; GEN long s, long y, GEN z);
-
-;; void    gop3z(GEN (*f) (GEN, GEN, GEN);
-;; GEN GEN x, GEN y, GEN z, GEN t);
-;; GEN gops1z(GEN (*f) (long);
-;; GEN long s, GEN y);
-;; GEN gopsg2z(GEN (*f) (GEN, GEN);
-;; GEN long s, GEN y, GEN z);
-;; GEN gopgs2z(GEN (*f) (GEN, GEN);
-;; GEN GEN y, long s, GEN z);
+;; void    gop0z(GEN (*f) (void), GEN x);
+;; GEN gop1z(GEN (*f) (GEN), GEN x, GEN y);
+;; GEN gop2z(GEN (*f) (GEN, GEN), GEN x, GEN y, GEN z);
+;; GEN gops2gsz(GEN (*f) (GEN, long), GEN x, long s, GEN z);
+;; GEN gops2sgz(GEN (*f) (long, GEN), long s, GEN y, GEN z);
+;; GEN gops2ssz(GEN (*f) (long, long), long s, long y, GEN z);
+;; void    gop3z(GEN (*f) (GEN, GEN, GEN), GEN x, GEN y, GEN z, GEN t);
+;; GEN gops1z(GEN (*f) (long), long s, GEN y);
+;; GEN gopsg2z(GEN (*f) (GEN, GEN), long s, GEN y, GEN z);
+;; GEN gopgs2z(GEN (*f) (GEN, GEN), GEN y, long s, GEN z);
 ;; GEN gaffsg(long s, GEN x);
 ;; GEN gaffect(GEN x, GEN y);
 
@@ -1475,14 +1523,15 @@
 (pari-call-out (equal? boolean) "gequal" (x y) "==")
 ;; GEN polegal(GEN x, GEN y);
 ;; GEN vecegal(GEN x, GEN y);
-;; GEN gsigne(GEN x);
+;; int gsigne(GEN x);
 (pari-call-out (pari-sign int) "gsigne" (x) "sign")
 
 ;; int gvar(GEN x);
 (pari-call-out (varno int) "gvar" (x) "?")
 ;; GEN gvar2(GEN x);
 ;; GEN tdeg(GEN x);
-;; GEN precision(GEN x);
+;; long precision(GEN x);
+(pari-call-out (precision long) "precision" (x))
 ;; GEN gprecision(GEN x);
 ;; GEN ismonome(GEN x);
 ;; GEN iscomplex(GEN x);
@@ -1491,13 +1540,12 @@
 
 (defun get-varno (x)
   (let ((vn (%varno (convert-to-pari x))))
-    (if (< vn 256) vn 0)))
+    (if (= vn BIGINT) 0 vn)))
 
 ;; long padicprec(GEN x, GEN p);
 (pari-call-out (get-padic-precision long) "padicprec" (x p))
 
-;; long opgs2(int (*f) (GEN, GEN);
-;; GEN GEN y, long s);
+;; long opgs2(int (*f) (GEN, GEN), GEN y, long s);
 
 ;; long taille(GEN x);
 ;; GEN taille2(GEN x);
@@ -1537,7 +1585,10 @@
 (pari-call-out pari-lcm "glcm" (x y) "lcm")
 
 ;; GEN subresext(GEN x, GEN y, GEN *U, GEN *V);
+;; (pari-call-out xresultant "subresext"
+;;   (x y (u (c-ptr pari-gen) :out :alloca) (v (c-ptr pari-gen) :out :alloca)))
 ;; GEN vecbezoutres(GEN x, GEN y);
+(pari-call-out resultant-vector "vecbezoutres" (x y))
 
 ;; GEN polgcd(GEN x, GEN y);
 ;; GEN srgcd(GEN x, GEN y);
@@ -1545,6 +1596,10 @@
 ;; GEN content(GEN x);
 (pari-call-out content "content" (x))
 ;; GEN primpart(GEN x);
+(pari-call-out primpart "primpart" (x))
+;; GEN primitive_part (GEN x, GEN *c);
+(pari-call-out primitive-part "primitive_part"
+  (x (c (c-ptr pari-gen) :out :alloca)))
 ;; GEN psres(GEN x, GEN y);
 ;; GEN factorff(GEN f, GEN p, GEN a);
 (pari-call-out factor-in-fq "factorff" (f p a))
@@ -1727,10 +1782,10 @@
 (pari-call-out-prec dedekind-eta "eta" (x))
 ;; GEN jell(GEN x, long prec);
 (pari-call-out-prec elliptic-j "jell" (x))
-;; GEN wf2(GEN x, long prec);
-(pari-call-out-prec weber-f2 "wf2" (x))
-;; GEN wf(GEN x, long prec);
-(pari-call-out-prec weber-f "wf" (x))
+;; GEN weberf2(GEN x, long prec);
+(pari-call-out-prec weber-f2 "weberf2" (x))
+;; GEN weberf(GEN x, long prec);
+(pari-call-out-prec weber-f "weberf" (x))
 
 ;; GEN incgam(GEN a, GEN x, long prec);
 (pari-call-out-prec incomplete-gamma "incgam" (a x))
@@ -1757,8 +1812,6 @@
 ;; GEN mppi(long prec);
 (pari-call-out-prec pari-pi "mppi" () "pi")
 
-(define-symbol-macro pari-pi (pari-pi))
-
 ;; GEN mpeuler(long prec);
 (pari-call-out-prec euler "mpeuler" () "euler")
 ;; GEN polylog(long m, GEN x, long prec);
@@ -1772,8 +1825,6 @@
 ;; GEN polylogp(long m, GEN x, long prec);
 (pari-call-out-prec polylog-p "polylogp" ((m long) x))
 ;; GEN gpolylog(long m, GEN x, long prec);
-
-(define-symbol-macro euler (euler))
 
 ;; GEN theta(GEN q, GEN z, long prec);
 ;; GEN thetanullk(GEN q, long k, long prec);
@@ -1821,28 +1872,26 @@
 
 ;; GEN gerepilc(GEN l, GEN p, GEN q);
 ;; void gerepilemany(long ltop, GEN* const gptr[], long nptr);
-;; void printversion(void);
-;; GEN printversionno(void);
 
 ;;; mpdefs.h
 
 (defmacro extract0 ((var x) &body body)
-  `(progn
-     (setf temp ,x)
-     (symbol-macrolet ((,var (deref (cast temp '(c-ptr ulong)))))
-       ,@body)))
+  (let ((fvar (gensym "EXTRACT0")))
+    `(with-c-var (,fvar 'c-pointer ,x)
+       (symbol-macrolet ((,var (deref (cast ,fvar '(c-ptr ulong)))))
+         ,@body))))
 (defmacro extract1 ((var x) &body body)
-  `(progn
-     (setf temp ,x)
-     (symbol-macrolet
-       ((,var (element (deref (cast temp '(c-ptr (c-array ulong 2)))) 1)))
-       ,@body)))
+  (let ((fvar (gensym "EXTRACT1")))
+    `(with-c-var (,fvar 'c-pointer ,x)
+       (symbol-macrolet
+           ((,var (element (deref (cast ,fvar '(c-ptr (c-array ulong 2)))) 1)))
+         ,@body))))
 
 ;; #define signe(x)          (((long)((GEN)(x))[1])>>SIGNSHIFT)
 (defun pari-sign-raw (x)
   (extract1 (elt1 x)
     (ecase (ldb pari-sign-byte elt1)
-      (0 0) (1 1) (255 -1))))
+      (0 0) (1 1) (#,(ash SIGNBITS (- SIGNSHIFT)) -1))))
 
 ;; #define setsigne(x,s)     (((GEN)(x))[1]=(((GEN)(x))[1]&(~SIGNBITS))+(((long)(s))<<SIGNSHIFT))
 (defun (setf pari-sign-raw) (x s)
@@ -1859,20 +1908,18 @@
   (extract0 (elt0 x)
     (dpb s pari-type-byte elt0)))
 
-  ;; #define pere(x)           ((ulong)(((GEN)(x))[0]&PEREBITS)>>PERESHIFT)
-  ;; #define setpere(x,s)      (((GEN)(x))[0]=(((GEN)(x))[0]&(~PEREBITS))+(((ulong)(s))<<PERESHIFT))
 ;; #define lg(x)             ((long)(((GEN)(x))[0]&LGBITS))
 (defun pari-length-raw (x)
   (extract0 (elt0 x)
     (ldb pari-length-byte elt0)))
 
-  ;; #define setlg(x,s)        (((GEN)(x))[0]=(((GEN)(x))[0]&(~LGBITS))+(s))
-;; #define lgef(x)           ((long)(((GEN)(x))[1]&LGEFBITS))
+;; #define setlg(x,s)        (((GEN)(x))[0]=(((GEN)(x))[0]&(~LGBITS))+(s))
+;; #define lgefint(x)        ((long)(((ulong*)(x))[1]&LGBITS))
 (defun pari-effective-length-raw (x)
   (extract1 (elt1 x)
-    (ldb pari-effective-length-byte elt1)))
+    (ldb pari-length-byte elt1)))
 
-  ;; #define setlgef(x,s)      (((GEN)(x))[1]=(((GEN)(x))[1]&(~LGEFBITS))+(s))
+;; #define setlgef(x,s)      (((GEN)(x))[1]=(((GEN)(x))[1]&(~LGBITS))+(s))
 ;; #define expo(x)           ((long)((((GEN)(x))[1]&EXPOBITS)-HIGHEXPOBIT))
 (defun pari-exponent-raw (x)
   (extract1 (elt1 x)
@@ -1896,7 +1943,7 @@
 ;; #define precp(x)          ((long)(((ulong)((GEN)(x))[1])>>PRECPSHIFT))
 (defun pari-precision-raw (x)
   (extract1 (elt1 x)
-    (ldb  pari-precision-byte elt1)))
+    (ldb pari-precision-byte elt1)))
 
 ;; #define setprecp(x,s)     (((GEN)(x))[1]=(((GEN)(x))[1]&(~PRECPBITS))+(((long)(s))<<PRECPSHIFT))
 
@@ -1912,24 +1959,53 @@
     (dpb s pari-varno-byte elt1)))
 
 ;; #define mant(x,i)         ((((GEN)(x))[1]&SIGNBITS)?((GEN)(x))[i+1]:0)
-(defun pari-mantissa-eff (x)
-  (let ((len (pari-effective-length-raw x)))
-    ;; x is still in temp here
-    (incf (cast temp 'ulong) 8)
-    (deref (cast temp `(c-ptr (c-array ulong ,(- len 2)))))))
-
 (defun pari-mantissa (x)
-  (let ((len (pari-length-raw x)))
-    ;; x is still in temp here
-    (incf (cast temp 'ulong) 8)
-    (deref (cast temp `(c-ptr (c-array ulong ,(- len 2)))))))
+  (with-c-var (v 'c-pointer x)
+    (let ((len (ldb pari-length-byte (deref (cast v '(c-ptr ulong))))))
+      (incf (cast v 'ulong) #,(* 2 (sizeof 'c-pointer)))
+      (deref (cast v `(c-ptr (c-array ulong ,(- len 2))))))))
+
+;; life sucks: the order of words in the data segment of integers depend on
+;; whether pari is build with gmp (low bytes first) or not (high bytes first).
+;; <http://article.gmane.org/gmane.comp.mathematics.pari.user/1574>
+;; <http://pari.math.u-bordeaux.fr/archives/pari-users-1005/msg00008.html>
+(c-lines "
+void get_integer_data (GEN x, ulong len, ulong *data);
+void get_integer_data (GEN x, ulong len, ulong *data)
+{ ulong i; for (i=0; i < len; i++) data[len-i-1] = *int_W(x,i); }
+void set_integer_data (GEN x, ulong len, ulong *data);
+void set_integer_data (GEN x, ulong len, ulong *data) {
+  /* 1st data element is the header, skip it */
+  ulong i; len--; data++;
+  for (i=0; i < len; i++) *int_W(x,i) = data[len-i-1];
+}~%")
+(def-call-out get_integer_data (:return-type nil)
+  (:arguments (x pari-gen) (len ulong) (data c-pointer)))
+(defun pari-get-integer-data (x)
+  (let ((len (- (pari-effective-length-raw x) 2)))
+    (with-foreign-object (data `(c-array ulong ,len))
+      (get_integer_data x len data)
+      (foreign-value data))))
+(def-call-out set_integer_data (:return-type nil)
+  (:arguments (x pari-gen) (len ulong) (data c-pointer)))
+(defun pari-set-integer-data (x data)
+  (let ((len (length data)))
+    (with-foreign-object (data `(c-array ulong ,len) data)
+      (set_integer_data x len data))))
+
+(defun pari-mantissa-eff (x)    ; do we really need this?
+  (with-c-var (v 'c-pointer x)
+    (incf (cast v 'ulong) #,(sizeof 'c-pointer))
+    (let ((len (ldb pari-length-byte (deref (cast v '(c-ptr ulong))))))
+      (incf (cast v 'ulong) #,(sizeof 'c-pointer))
+      (deref (cast v `(c-ptr (c-array ulong ,(- len 2))))))))
 
 ;; #define setmant(x,i,s)    (((GEN)(x))[i+1]=s)
 
 (defun pari-set-component (obj i ptr)
-  (setf temp obj)
-  (incf (cast temp 'ulong) (* 4 i))
-  (setf (deref (cast temp '(c-ptr pari-gen))) ptr))
+  (with-c-var (v 'c-pointer obj)
+    (incf (cast v 'ulong) (* #,(sizeof 'c-pointer) i))
+    (setf (deref (cast v '(c-ptr pari-gen))) ptr)))
 
 ;;; mpansi.h
 
@@ -1962,39 +2038,40 @@
 ;;;; Conversion CLISP --> pari and pari --> CLISP
 
 ;; Make a vector of ulongs into a pari object (including the second codeword,
-;; which is element 0 of the vector). type is the pari type code.
-(defun pari-make-object (vec type)
-  (let ((obj (pari-cgetg (1+ (length vec)) type)))
-    (setf temp obj)
-    (incf (cast temp 'ulong) 4)
-    (setf (deref (cast temp `(c-ptr (c-array ulong ,(length vec))))) vec)
+;; which is element 0 of the vector). typecode is the pari type code.
+(defun pari-make-object (vec typecode)
+  (let ((obj (pari-cgetg (1+ (length vec)) typecode)))
+    (with-c-var (v 'c-pointer obj)
+      (incf (cast v 'ulong) #,(sizeof 'c-pointer))
+      (setf (deref (cast v `(c-ptr (c-array ulong ,(length vec))))) vec))
     obj))
 
 ;;; Define some CLISP analogs for pari types
 
-(export '(pari-object internal-pari-object))
+(export '(pari-object pari-object-internal))
 
-(defclass pari-object () ()
-  (:documentation "An abstract class for CLISP equivalents of pari objects"))
+(defstruct pari-object
+  "An abstract class for CLISP equivalents of pari objects")
 
 (defgeneric convert-to-pari (x)
   (:documentation
-    "Converts suitable CLISP objects into internal pari objects"))
+   "Converts suitable CLISP objects into internal pari objects")
+  (:method ((x null)) nil))
 
-(defclass internal-pari-object (pari-object)
-  ((pointer :accessor pari-class-pointer :initarg :pointer))
-  (:documentation "Pari object as a pointer into the pari stack"))
+(defstruct (pari-object-internal (:include pari-object))
+  "Pari object as a pointer into the pari stack"
+  pointer)
 
 (defun make-internal-pari-object (ptr)
-  (make-instance 'internal-pari-object :pointer ptr))
+  (and ptr (make-pari-object-internal :pointer ptr)))
 
-(defmethod convert-to-pari ((x internal-pari-object))
-  (pari-class-pointer x))
+(defmethod convert-to-pari ((x pari-object-internal))
+  (pari-object-internal-pointer x))
 
 ;;; Make internal pari objects printable and readable
 
-(defmethod print-object ((x internal-pari-object) stream)
-  (format stream "#Z\"~A\"" (%write-to-string (pari-class-pointer x)))
+(defmethod print-object ((x pari-object-internal) stream)
+  (format stream "#Z\"~A\"" (%write-to-string (pari-object-internal-pointer x)))
   x)
 
 (defun pari-reader (stream subchar arg)
@@ -2003,76 +2080,42 @@
   (let ((str (read stream t nil t)))
     (unless (stringp str)
       (error "~S: After #Z a string must follow." 'read))
-    (make-instance 'internal-pari-object
-      :pointer (%read-from-string (remove-if #'sys::whitespacep str)))))
+    (make-internal-pari-object (%read-from-string str))))
 
 (set-dispatch-macro-character #\# #\Z #'pari-reader)
 
 ;;; Some helper macros for defining classes for pari objects
 
-(eval-when (compile load eval)
-  (defun make-accessors (slots)
-    (let ((pari-package (find-package "PARI")))
-      (mapcar #'(lambda (slot)
-		  (intern (format nil "pari-class-~A" slot) pari-package))
-	      slots)))
-  (defun make-initargs (slots)
-    (let ((keyword-package (find-package "KEYWORD")))
-      (mapcar #'(lambda (slot)
-		  (intern (string-upcase (symbol-name slot)) keyword-package))
-	      slots)))
-  (defun dpc-class (name slots accessors initargs)
+(defmacro define-pari-class (name slots)
+  `(exporting:defstruct (,name (:include pari-object)) ,@slots))
+
+(defmacro define-pari-converters (typecode name)
+  (let ((readers (mapcar #'mop:slot-definition-readers
+                         (ext:structure-direct-slots name))))
     `(progn
-       (export '(,name ,@accessors))
-       (defclass ,name (pari-object)
-	         ,(mapcar #'(lambda (slot accessor initarg)
-			      `(,slot :accessor ,accessor :initarg ,initarg))
-			  slots accessors initargs))
-       (defmethod print-object ((x ,name) stream)
-         (if *print-readably*
-	   (format stream ,(format nil "#.(~~S '~~S~{ ~S '~~S~})" initargs)
-	           'make-instance ',name
-		   ,@(mapcar #'(lambda (acc) `(,acc x)) accessors))
-	   (format stream ,(format nil "#<~~S~{ ~S ~~S~}>" initargs)
-	           ',name
-		   ,@(mapcar #'(lambda (acc) `(,acc x)) accessors))))))
-  (defun dpc-to-pari (typecode name slots accessors)
-    `(defmethod convert-to-pari ((x ,name))
-	(let ((obj (pari-cgetg ,(+ 1 (length slots)) ,typecode)))
-	  ,@(let ((count 0))
-	      (mapcar #'(lambda (accessor)
-			  `(pari-set-component obj ,(incf count)
-			    (convert-to-pari (,accessor x))))
-		      accessors))
-	  obj)))
-  (defun dpc-from-pari (typecode name initargs)
-    `(defun ,(intern (format nil "convert-from-pari-~D" typecode) "PARI") (ptr)
-	(make-instance ',name
-	  ,@(let ((count 0))
-	      (mapcan #'(lambda (initarg)
-			  `(,initarg (convert-from-pari
-				      (%component ptr ,(incf count)))))
-		      initargs))))))
+       (defmethod convert-to-pari ((x ,name))
+         (let ((obj (pari-cgetg ,(+ 1 (length readers)) ,typecode)))
+           ,@(let ((count 0))
+                (mapcar (lambda (readerl)
+                          `(pari-set-component obj ,(incf count)
+                             (convert-to-pari (,(first readerl) x))))
+                        readers))
+           obj))
+       (defun ,(intern (ext:string-concat "convert-from-pari-"
+                                          (symbol-name typecode)) "PARI") (ptr)
+         (,(ext:structure-keyword-constructor name)
+           ,@(let ((count 0))
+               (mapcan #'(lambda (dsd)
+                           `(,(car (mop:slot-definition-initargs dsd))
+                              (convert-from-pari
+                               (%component ptr ,(incf count)))))
+                       (ext:structure-direct-slots name))))))))
 
-(defmacro define-pari-class-only (name slots)
-  (dpc-class name slots (make-accessors slots) (make-initargs slots)))
+(defmacro define-pari (typecode name slots)
+  `(progn (define-pari-class ,name ,slots)
+          (define-pari-converters ,typecode ,name)))
 
-(defmacro define-pari-class-0 (typecode name slots)
-  (let ((accessors (make-accessors slots))
-	(initargs (make-initargs slots)))
-    `(progn
-       ,(dpc-class name slots accessors initargs)
-       ,(dpc-to-pari typecode name slots accessors))))
-
-(defmacro define-pari-class (typecode name slots)
-  (let ((accessors (make-accessors slots))
-	(initargs (make-initargs slots)))
-    `(progn
-       ,(dpc-class name slots accessors initargs)
-       ,(dpc-to-pari typecode name slots accessors)
-       ,(dpc-from-pari typecode name initargs))))
-
-;; Type 1: integers -- represented by CLISP integers
+;; INT=1: integers -- represented by CLISP integers
 
 (defmethod convert-to-pari ((x (eql 0)))
   pari-0)
@@ -2086,277 +2129,272 @@
 (defmethod convert-to-pari ((x (eql -1)))
   pari--1)
 
+(defun extract-mantissa (vec len val)
+  (do ((i len (1- i))
+       (y val (ash y #,(- (bitsizeof 'ulong)))))
+      ((eql i 0))
+    (setf (svref vec i) (logand y #,(1- (ash 1 (bitsizeof 'ulong)))))))
+
 (defmethod convert-to-pari ((x integer))
   (let* ((sign (signum x))
          (val (abs x))
-	 (len (ceiling (integer-length val) 32))
-	 (vec (make-array (1+ len))))
+         (len (ceiling (integer-length val) #,(bitsizeof 'ulong)))
+         (vec (make-array (1+ len))))
     (setf (svref vec 0)
           (dpb sign pari-sign-byte
-	       (dpb (+ len 2) pari-effective-length-byte 0)))
-    (do ((i len (1- i))
-         (y val (ash y -32)))
-        ((eql i 0))
-      (setf (svref vec i) (logand y #xFFFFFFFF)))
-    (pari-make-object vec 1)))
+               (dpb (+ len 2) pari-length-byte 0)))
+    (extract-mantissa vec len val)
+    (let ((ptr (pari-make-object vec 1)))
+      (pari-set-integer-data ptr vec)
+      ptr)))
 
-(defun convert-from-pari-1 (ptr)
-  (let* ((sign (pari-sign-raw ptr))
-	 (mant (pari-mantissa-eff ptr))
-	 (result 0))
-    (dotimes (i (length mant) (* sign result))
-      (setq result (+ (* result #x100000000) (svref mant i))))))
+(defun collect-mantissa (mantissa)
+  (let ((result 0))
+    (dotimes (i (length mantissa) result)
+      (setq result (+ (ash result #,(bitsizeof 'ulong)) (svref mantissa i))))))
 
-;; Type 2: real numbers -- represented by CLISP floats
+(defun convert-from-pari-INT (ptr)
+  (* (pari-sign-raw ptr) (collect-mantissa (pari-get-integer-data ptr))))
+
+;; REAL=2: real numbers -- represented by CLISP floats
 
 (defmethod convert-to-pari ((x float))
   (if (= x 0)
     (pari-make-object
-      (vector (- pari-exponent-offset (* 32 (pari-get-real-prec-raw)) -61) 0) 2)
+      (vector (- pari-exponent-offset (* #,(bitsizeof 'ulong)
+                                         pari-real-precision-words) -61) 0) 2)
     (multiple-value-bind (signif expo sign) (integer-decode-float x)
       (let ((pr (float-precision x)))
         ;; need ceil(pr/32) mantissa words,
-	;; signif has to be scaled by 2^(32*ceil(pr/32)-pr)
-	;; and the exponent will be pr+expo-1
-	(multiple-value-bind (q r) (ceiling pr 32)
-	  (setq signif (ash signif (- r)))
-	  (let ((vec (make-array (1+ q))))
-	    (setf (svref vec 0)
-	      (dpb sign pari-sign-byte
-	           (dpb (+ pari-exponent-offset pr expo -1)
-		        pari-exponent-byte 0)))
-	    (do ((i q (1- i))
-	         (y signif (ash y -32)))
-		((eql i 0))
-	      (setf (svref vec i) (logand y #xFFFFFFFF)))
-	    (pari-make-object vec 2)))))))
+        ;; signif has to be scaled by 2^(32*ceil(pr/32)-pr)
+        ;; and the exponent will be pr+expo-1  (32 <-> (bitsizeof 'ulong))
+        (multiple-value-bind (q r) (ceiling pr #,(bitsizeof 'ulong))
+          (setq signif (ash signif (- r)))
+          (let ((vec (make-array (1+ q))))
+            (setf (svref vec 0)
+              (dpb sign pari-sign-byte
+                   (dpb (+ pari-exponent-offset pr expo -1)
+                        pari-exponent-byte 0)))
+            (extract-mantissa vec q signif)
+            (pari-make-object vec 2)))))))
 
-(defun convert-from-pari-2 (ptr)
+(defun convert-from-pari-REAL (ptr)
   (let* ((sign (pari-sign-raw ptr))
          (expo (pari-exponent-raw ptr))
-	 (mant (pari-mantissa ptr))
-	 (signif 0))
-    (dotimes (i (length mant))
-      (setq signif (+ (* signif #x100000000) (svref mant i))))
-    (* sign (scale-float (float signif (float-digits 1 (* 32 (length mant))))
-                         (- expo (* 32 (length mant)) -1)))))
+         (mant (pari-mantissa ptr))
+         (signif (collect-mantissa mant))
+         (mant-bits (* #,(bitsizeof 'ulong) (length mant))))
+    (* sign (if (zerop mant-bits) 0 ; no signed 0 in CLISP
+                (scale-float (float signif (float-digits 1 mant-bits))
+                             (- expo mant-bits -1))))))
 
-;; Type 3: integermods
+;; INTMOD=3: integermods
 
-(define-pari-class 3 pari-integermod (modulus rep))
+(define-pari INTMOD pari-integermod (modulus rep))
 
-;; Type 4,5: rational numbers -- represented by CLISP ratios
+;; FRAC=4: rational numbers -- represented by CLISP ratios
 
 (defmethod convert-to-pari ((x (eql 1/2)))
   pari-1/2)
 
 (defmethod convert-to-pari ((x ratio))
-  (let ((obj (pari-cgetg 3 4)))
+  (let ((obj (pari-cgetg 3 FRAC)))
     (pari-set-component obj 1 (convert-to-pari (numerator x)))
     (pari-set-component obj 2 (convert-to-pari (denominator x)))
     obj))
 
-(defun convert-from-pari-4 (ptr)
+(defun convert-from-pari-FRAC (ptr)
   (/ (convert-from-pari (%component ptr 1))
      (convert-from-pari (%component ptr 2))))
 
-;; Type 6: complex numbers -- represented by CLISP complex if possible
+;; COMPLEX=6: complex numbers -- represented by CLISP complex if possible
 
-(define-pari-class-0 6 pari-complex (realpart imagpart))
+(define-pari-class pari-complex (realpart imagpart))
 
 (defmethod convert-to-pari ((x (eql #C(0 1))))
   pari-i)
 
 (defmethod convert-to-pari ((x complex))
-  (let ((obj (pari-cgetg 3 6)))
+  (let ((obj (pari-cgetg 3 COMPLEX)))
     (pari-set-component obj 1 (convert-to-pari (realpart x)))
     (pari-set-component obj 2 (convert-to-pari (imagpart x)))
     obj))
 
-(defun convert-from-pari-6 (ptr)
+(defun convert-from-pari-COMPLEX (ptr)
   (if (and (member (pari-type-raw (%component ptr 1)) '(1 2 4 5))
            (member (pari-type-raw (%component ptr 2)) '(1 2 4 5)))
     ;; CLISP complex is possible
     (complex (convert-from-pari (%component ptr 1))
              (convert-from-pari (%component ptr 2)))
     ;; must construct pari-complex
-    (make-instance 'pari-complex
-      :realpart (convert-from-pari (%component ptr 1))
-      :imagpart (convert-from-pari (%component ptr 2)))))
+    (make-pari-complex
+     :realpart (convert-from-pari (%component ptr 1))
+     :imagpart (convert-from-pari (%component ptr 2)))))
 
-;; Type 7: p-adic numbers
+;; PADIC=7: p-adic numbers
 
-(define-pari-class-only pari-padic (precp valp prime prpow rep))
+(define-pari-class pari-padic (precp valp prime prpow rep))
 
 (defmethod convert-to-pari ((x pari-padic))
-  (let ((obj (pari-cgetg 5 7)))
+  (let ((obj (pari-cgetg 5 PADIC)))
     (extract1 (elt1 obj)
-      (setf elt1 (dpb (pari-class-precp x) pari-precision-byte
-                      (dpb (+ (pari-class-valp x) pari-valuation-offset)
-		           pari-valuation-byte 0))))
-    (pari-set-component obj 2 (convert-to-pari (pari-class-prime x)))
-    (pari-set-component obj 3 (convert-to-pari (pari-class-prpow x)))
-    (pari-set-component obj 4 (convert-to-pari (pari-class-rep x)))
+      (setf elt1 (dpb (pari-padic-precp x) pari-precision-byte
+                      (dpb (+ (pari-padic-valp x) pari-valuation-offset)
+                           pari-valuation-byte 0))))
+    (pari-set-component obj 2 (convert-to-pari (pari-padic-prime x)))
+    (pari-set-component obj 3 (convert-to-pari (pari-padic-prpow x)))
+    (pari-set-component obj 4 (convert-to-pari (pari-padic-rep x)))
     obj))
 
-(defun convert-from-pari-7 (ptr)
-  (make-instance 'pari-padic
-    :precp (pari-precision-raw ptr)
-    :valp  (pari-valuation-raw ptr)
-    :prime (convert-from-pari (%component ptr 1))
-    :prpow (convert-from-pari (%component ptr 2))
-    :rep   (convert-from-pari (%component ptr 3))))
+(defun convert-from-pari-PADIC (ptr)
+  (make-pari-padic
+   :precp (pari-precision-raw ptr)
+   :valp  (pari-valuation-raw ptr)
+   :prime (convert-from-pari (%component ptr 1))
+   :prpow (convert-from-pari (%component ptr 2))
+   :rep   (convert-from-pari (%component ptr 3))))
 
-;; Type 8: quadratic numbers
+;; QUAD=8: quadratic numbers
 
-(define-pari-class 8 pari-quadratic (poly realpart imagpart))
+(define-pari QUAD pari-quadratic (poly realpart imagpart))
 
-;; Type 9: polymods
+;; POLMOD=9: polymods
 
-(define-pari-class 9 pari-polymod (modulus rep))
+(define-pari POLMOD pari-polymod (modulus rep))
 
-;; Type 10: polynomials
+;; POL=10: polynomials
 
-(define-pari-class-only pari-poly (s varno coeffs))
+(define-pari-class pari-poly (s varno coeffs))
 
 (defmethod convert-to-pari ((x pari-poly))
-  (let* ((coeffs (pari-class-coeffs x))
-         (obj (pari-cgetg (+ 2 (length coeffs)) 10)))
+  (let* ((coeffs (pari-poly-coeffs x))
+         (obj (pari-cgetg (+ 2 (length coeffs)) POL)))
     (extract1 (elt1 obj)
       (setf elt1
-            (dpb (pari-class-s x) pari-sign-byte
-                 (dpb (pari-class-varno x) pari-varno-byte
+            (dpb (pari-poly-s x) pari-sign-byte
+                 (dpb (pari-poly-varno x) pari-varno-byte
                       (dpb (+ 2 (length coeffs))
-		           pari-effective-length-byte 0)))))
+                           pari-length-byte 0)))))
     (dotimes (i (length coeffs) obj)
       (pari-set-component obj (+ i 2) (convert-to-pari (svref coeffs i))))))
 
-(defun convert-from-pari-10 (ptr)
-  (let ((s (pari-sign-raw ptr))
-        (varno (pari-varno-raw ptr))
-	(coeffs (pari-mantissa-eff ptr)))
-    (dotimes (i (length coeffs))
-      (setf (cast temp 'ulong) (svref coeffs i))
-      (setf (svref coeffs i) (convert-from-pari temp)))
-    (make-instance 'pari-poly :s s :varno varno :coeffs coeffs)))
+(defun convert-from-pari-POL (ptr)
+  (let* ((s (pari-sign-raw ptr))
+         (varno (pari-varno-raw ptr))
+         (len (- (pari-length-raw ptr) 2))
+         (coeffs (make-array len)))
+    (dotimes (i len)
+      (setf (svref coeffs i) (convert-from-pari (%component ptr (1+ i)))))
+    (make-pari-poly :s s :varno varno :coeffs coeffs)))
 
-;; Type 11: power series
-
-(define-pari-class-only pari-pws (s varno expo coeffs))
+;; SER=11: power series
+(define-pari-class pari-pws (s varno expo coeffs))
 
 (defmethod convert-to-pari ((x pari-pws))
-  (let* ((coeffs (pari-class-coeffs x))
-         (obj (pari-cgetg (+ 2 (length coeffs)) 11)))
+  (let* ((coeffs (pari-pws-coeffs x))
+         (obj (pari-cgetg (+ 2 (length coeffs)) SER)))
     (extract1 (elt1 obj)
       (setf elt1
-            (dpb (pari-class-s x) pari-sign-byte
-                 (dpb (pari-class-varno x) pari-varno-byte
-                      (dpb (+ (pari-class-expo x) pari-valuation-offset)
-		           pari-valuation-byte 0)))))
+            (dpb (pari-pws-s x) pari-sign-byte
+                 (dpb (pari-pws-varno x) pari-varno-byte
+                      (dpb (+ (pari-pws-expo x) pari-valuation-offset)
+                           pari-valuation-byte 0)))))
     (dotimes (i (length coeffs) obj)
       (pari-set-component obj (+ i 2) (convert-to-pari (svref coeffs i))))))
 
-(defun convert-from-pari-11 (ptr)
-  (let ((s (pari-sign-raw ptr))
-        (varno (pari-varno-raw ptr))
-	(expo (pari-valuation-raw ptr))
-	(coeffs (pari-mantissa ptr)))
-    (dotimes (i (length coeffs))
-      (setf (cast temp 'ulong) (svref coeffs i))
-      (setf (svref coeffs i) (convert-from-pari temp)))
-    (make-instance 'pari-pws :s s :varno varno :expo expo :coeffs coeffs)))
+(defun convert-from-pari-SER (ptr)
+  (let* ((s (pari-sign-raw ptr))
+         (varno (pari-varno-raw ptr))
+         (expo (pari-valuation-raw ptr))
+         (len (- (pari-length-raw ptr) 2))
+         (coeffs (make-array len)))
+    (dotimes (i len)
+      (setf (svref coeffs i) (convert-from-pari (%component ptr (1+ i)))))
+    (make-pari-pws :s s :varno varno :expo expo :coeffs coeffs)))
 
-;; Type 13,14: rational functions
+;; RFRAC=13: rational functions
+(define-pari RFRAC pari-ratfun (numer denom))
 
-(define-pari-class 13 pari-ratfun (numer denom))
+;; QFR=15: indefinite binary quadratic forms
 
-;; Type 15: indefinite binary quadratic forms
+(define-pari QFR pari-real-qf (a b c d))
 
-(define-pari-class 15 pari-real-qf (a b c))
+;; QFI=16: definite binary quadratic forms
 
-;; Type 16: definite binary quadratic forms
+(define-pari QFI pari-imag-qf (a b c))
 
-(define-pari-class 16 pari-imag-qf (a b c))
-
-;; Type 17,18: (row and column) vectors -- represented by CLISP vectors
+;; VEC=17, COL=18: (row and column) vectors -- represented by CLISP vectors
 ;; #(:row v1 v2 ... vn) <---> row vector
 ;; #(:col v1 v2 ... vn) <---> column vector
 ;; #(v1 v2 ... vn)       ---> row vector
 (defmethod convert-to-pari ((x vector))
-  (if (and (plusp (length x)) (member (svref x 0) '(:row :col) :test #'eq))
-    (let ((obj (pari-cgetg (length x) (case (svref x 0) (:row 17) (:col 18)))))
-      (do ((i (1- (length x)) (1- i)))
-          ((eql i 0) obj)
-        (pari-set-component obj i (convert-to-pari (svref x i)))))
-    (let ((obj (pari-cgetg (1+ (length x)) 17)))
-      (dotimes (i (length x) obj)
-        (pari-set-component obj (1+ i) (convert-to-pari (svref x i)))))))
+  (let (shift typecode)
+    (case (or (zerop (length x)) (svref x 0))
+      (:row (setq shift 0 typecode VEC))
+      (:col (setq shift 0 typecode COL))
+      (t (setq shift 1 typecode VEC)))
+    (do* ((length (length x)) (obj (pari-cgetg (+ length shift) typecode))
+          (i (- 1 shift) (1+ i)))
+         ((= i length) obj)
+      (pari-set-component obj (+ i shift) (convert-to-pari (svref x i))))))
 
-(defun convert-from-pari-17 (ptr)
+(defun convert-from-pari-vector (ptr type)
   (let* ((len (1- (pari-length-raw ptr)))
          (vec (make-array (1+ len))))
-    (setf (svref vec 0) :row)
+    (setf (svref vec 0) type)
     (do ((i len (1- i)))
         ((eql i 0) vec)
       (setf (svref vec i) (convert-from-pari (%component ptr i))))))
 
-(defun convert-from-pari-18 (ptr)
-  (let* ((len (1- (pari-length-raw ptr)))
-         (vec (make-array (1+ len))))
-    (setf (svref vec 0) :col)
-    (do ((i len (1- i)))
-        ((eql i 0) vec)
-      (setf (svref vec i) (convert-from-pari (%component ptr i))))))
-
-;; Type 19: matrices -- represented by CLISP 2-dim arrays
+;; MAT=19: matrices -- represented by CLISP 2-dim arrays
 
 (defmethod convert-to-pari ((x array))
   (unless (eql (array-rank x) 2)
     (error "~S: Array ~S is not 2-dimensional." 'convert-to-pari x))
-  (let ((obj (pari-cgetg (1+ (array-dimension x 1)) 19)))
+  (let ((obj (pari-cgetg (1+ (array-dimension x 1)) MAT)))
     (dotimes (j (array-dimension x 1) obj)
-      (let ((col (pari-cgetg (1+ (array-dimension x 0)) 18)))
+      (let ((col (pari-cgetg (1+ (array-dimension x 0)) COL)))
         (dotimes (i (array-dimension x 0))
-	  (pari-set-component col (1+ i) (convert-to-pari (aref x i j))))
-	(pari-set-component obj (1+ j) col)))))
+          (pari-set-component col (1+ i) (convert-to-pari (aref x i j))))
+        (pari-set-component obj (1+ j) col)))))
 
-(defun convert-from-pari-19 (ptr)
+(defun convert-from-pari-MAT (ptr)
   (let ((cols (1- (pari-length-raw ptr))))
     (if (eql cols 0)
       (make-array '()) ; probably shouldn't happen...
       (let* ((rows (1- (pari-length-raw (%component ptr 1))))
              (arr (make-array (list rows cols))))
-	(dotimes (j cols arr)
-	  (let ((col (%component ptr (1+ j))))
-	    (unless (eql (1- (pari-length-raw col)) rows)
-	      (error "~S: Pari matrix has columns of unequal length."
-	             'convert-from-pari))
-	    (dotimes (i rows)
-	      (setf (aref arr i j)
-	            (convert-from-pari (%component col (1+ i)))))))))))
+        (dotimes (j cols arr)
+          (let ((col (%component ptr (1+ j))))
+            (unless (eql (1- (pari-length-raw col)) rows)
+              (error "~S: Pari matrix has columns of unequal length."
+                     'convert-from-pari))
+            (dotimes (i rows)
+              (setf (aref arr i j)
+                    (convert-from-pari (%component col (1+ i)))))))))))
 
 ;;; Conversion from pari -- dispatch
 
 (defun convert-from-pari (ptr)
-    "Converts an internal pari object to a CLISP object"
+  "Converts an internal pari object to a CLISP object"
   (case (pari-type-raw ptr)
-    (1 (convert-from-pari-1 ptr))
-    (2 (convert-from-pari-2 ptr))
-    (3 (convert-from-pari-3 ptr))
-    ((4 5) (convert-from-pari-4 ptr))
-    (6 (convert-from-pari-6 ptr))
-    (7 (convert-from-pari-7 ptr))
-    (8 (convert-from-pari-8 ptr))
-    (9 (convert-from-pari-9 ptr))
-    (10 (convert-from-pari-10 ptr))
-    (11 (convert-from-pari-11 ptr))
-    ((13 14) (convert-from-pari-13 ptr))
-    (15 (convert-from-pari-15 ptr))
-    (16 (convert-from-pari-16 ptr))
-    (17 (convert-from-pari-17 ptr))
-    (18 (convert-from-pari-18 ptr))
-    (19 (convert-from-pari-19 ptr))
-    (t (error "~S: Pari type ~D not yet implemented as a CLISP type."
+    (1 (convert-from-pari-INT ptr))
+    (2 (convert-from-pari-REAL ptr))
+    (3 (convert-from-pari-INTMOD ptr))
+    (4 (convert-from-pari-FRAC ptr))
+    (6 (convert-from-pari-COMPLEX ptr))
+    (7 (convert-from-pari-PADIC ptr))
+    (8 (convert-from-pari-QUAD ptr))
+    (9 (convert-from-pari-POLMOD ptr))
+    (10 (convert-from-pari-POL ptr))
+    (11 (convert-from-pari-SER ptr))
+    (13 (convert-from-pari-RFRAC ptr))
+    (15 (convert-from-pari-QFR ptr))
+    (16 (convert-from-pari-QFI ptr))
+    (17 (convert-from-pari-vector ptr :row))
+    (18 (convert-from-pari-vector ptr :col))
+    (19 (convert-from-pari-MAT ptr))
+    (t (error "~S: Pari type ~D is not yet implemented as a CLISP type."
               'convert-from-pari (pari-type-raw ptr)))))
 
 (defun convert-to-boolean (ptr)
@@ -2370,10 +2408,11 @@
 (defgeneric pari-to-lisp (x))
 
 (defmethod pari-to-lisp ((x pari-object)) x)
-(defmethod pari-to-lisp ((x internal-pari-object))
-  (convert-from-pari (pari-class-pointer x)))
+(defmethod pari-to-lisp ((x pari-object-internal))
+  (convert-from-pari (pari-object-internal-pointer x)))
 (defmethod pari-to-lisp ((x number)) x)
 (defmethod pari-to-lisp ((x array)) x)
+(defmethod pari-to-lisp ((x null)) x)
 
 ;; local variables:
 ;; eval: (put 'pari-call-out 'common-lisp-indent-function 'defun)

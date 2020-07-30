@@ -1,22 +1,24 @@
-dnl AUTOCONF configuration for RAWSOCK
-dnl Sam Steingold 2004-2005
+dnl AUTOCONF configuration for Rawsock
+dnl Sam Steingold 2004-2010
 
 AC_PREREQ(2.57)
 AC_INIT(rawsock, 1.0, clisp-list)
 AC_CONFIG_SRCDIR(sock.lisp)
 AC_CONFIG_HEADERS(config.h)
 
-AC_MSG_NOTICE([* RAWSOCK (Tools)])
-AC_PROG_CC
-AC_PROG_CPP
+RSE_BOLD
+BOLD_MSG([Rawsock (Common)])
+CL_MODULE_COMMON_CHECKS()
 
-AC_MSG_NOTICE([* RAWSOCK (Headers)])
-AC_HEADER_STDC
-AC_HEADER_TIME
+BOLD_MSG([Rawsock (Headers)])
 CL_TCPCONN
 AC_CHECK_HEADERS([sys/socket.h linux/if_packet.h netdb.h sys/uio.h \
-sys/types.h sys/ioctl.h errno.h stropts.h poll.h sys/un.h])
+asm/types.h \
+sys/types.h sys/ioctl.h errno.h stropts.h poll.h sys/un.h ifaddrs.h unistd.h])
 AC_CHECK_HEADERS([net/if.h],[],[],[
+#if defined(HAVE_SYS_TYPES_H)
+# include <sys/types.h> /* for u_long on *BSD */
+#endif
 #if HAVE_SYS_SOCKET_H
 # include <sys/socket.h>
 #endif
@@ -29,23 +31,31 @@ AC_CHECK_HEADERS([netinet/if_ether.h],[],[],[
 # include <net/if.h>
 #endif
 ])
+AC_CHECK_HEADERS([linux/netlink.h],[],[],[
+#if defined(HAVE_ASM_TYPES_H)
+# include <asm/types.h>
+#endif
+])
 if test "$ac_cv_header_sys_socket_h" = "no"; then
 AC_CHECK_HEADERS([winsock2.h ws2tcpip.h])dnl windows
 else AC_CHECK_MEMBERS([struct msghdr.msg_flags, struct msghdr.msg_control],,,
 [#include <sys/socket.h>])
 fi
-AC_CHECK_SIZEOF(ssize_t)
-AC_CHECK_SIZEOF(size_t)
 AC_CHECK_TYPES(struct iovec,,,[
 #if defined(HAVE_SYS_TYPES_H)
-#include <sys/types.h> /* for size_t */
+# include <sys/types.h> /* for size_t */
 #endif
 #if defined(HAVE_SYS_UIO_H)
-#include <sys/uio.h>
+# include <sys/uio.h>
+#endif
+])
+AC_CHECK_TYPES(struct if_nameindex,,,[
+#if HAVE_NET_IF_H
+# include <net/if.h>
 #endif
 ])
 
-AC_MSG_NOTICE([* RAWSOCK (Functions)])
+BOLD_MSG([Rawsock (Functions)])
 if test "$ac_cv_header_winsock2_h" = "yes"; then
   dnl this is windows, we know that socket() is in ws2_32
   dnl note that AC_SEARCH_LIBS will not work because linking with ws2_32
@@ -64,15 +74,16 @@ if test "$ac_cv_search_socket" = "no"; then
   AC_MSG_FAILURE([cannot find SOCKET library])
 fi
 AC_CHECK_FUNCS(socketpair sockatmark recvmsg sendmsg htonl htons ntohl ntohs dnl
-readv writev getnameinfo getaddrinfo freeaddrinfo dnl
+readv writev getnameinfo getaddrinfo freeaddrinfo gai_strerror dnl
 endprotoent getprotobyname getprotobynumber getprotoent setprotoent dnl
-endnetent getnetbyaddr getnetbyname getnetent setnetent)
+if_nametoindex if_indextoname if_nameindex if_freenameindex dnl
+endnetent getnetbyaddr getnetbyname getnetent setnetent getifaddrs freeifaddrs)
 dnl AC_CHECK_FUNCS(inet_pton inet_ntop inet_addr inet_ntoa)
 dnl CL_POLL
 dnl CL_SELECT
 
-AC_MSG_NOTICE([* RAWSOCK (Output)])
+BOLD_MSG([Rawsock (Output)])
 AC_CONFIG_FILES(Makefile link.sh)
 AC_OUTPUT
 
-AC_MSG_NOTICE([* RAWSOCK (Done)])
+BOLD_MSG([Rawsock (Done)])

@@ -6,61 +6,6 @@ URGENT PROBLEMS
 Should handle these soon.
 
 
-bind-eval.tst failure on Linux/amd64 [bruno]
-
-
-regression: [bruno]
-=============== script.lisp ==================
-(print (list 'script-args *args*))
-(print (list '*standard-input* *standard-input*))
-(print (list '*standard-output* *standard-output*))
-(print (list '*error-output* *error-output*))
-(print (list '*terminal-io* *terminal-io*))
-(print (list '*debug-io* *debug-io*))
-(print "tell me something...")
-(print (read-line *standard-input*))
-"first"
-(with-open-stream (in (make-stream :input))
-  (print in)
-  (print "tell me something else...")
-  (print (read-line in)))
-"second"
-(setf (stream-element-type *standard-input*) '(unsigned-byte 8))
-(print (list '*standard-input* *standard-input*))
-=============== script.lisp ==================
-$ cat script.lisp | clisp
-*** - (SETF STREAM-ELEMENT-TYPE) on #<IO TERMINAL-STREAM> is illegal
-$ clisp < script.lisp
-same + hangs instead of terminating.
-$ clisp script.lisp
-works fine.
-
-
-Readline interface problem:
-[2]> (macroexü
-*** - AREF: Index 9 für "(macroexü" ist zu groß.
-this appears to be a readline bug:
-Breakpoint 15, lisp_completion_matches (text=0x822c1d8 "macroexü", start=1,
-    end=10) at stream.d:9309
-(gdb) p strlen(text)
-$1 = 9
-
-
-Many pretty-printer ansi test failures.
-(sds - but bruno has to fix the risky-test in iofkts.tst first)
-
-
-<http://article.gmane.org/gmane.lisp.clisp.general:9893>:
-DIRECTORY, *PATHNAME-ENCODING*, and Denial-Of-Service attack
-I would call this an error in clisp: if it lists a directory
-over which a user has no control (e.g., /tmp), then it is trivial for
-an adversary to create a denial-of-service attack.
-Unix pathnames are not strictly in any particular character encoding:
-they are merely byte strings in which only slash and NUL have special
-significance.
-Should *PATHNAME-ENCODING* be 1:1?
-
-
 Inefficiency of class redefinition when old or new class is unfinalizable
 
 
@@ -68,35 +13,45 @@ support perseverances also on write side
 change wr_by_array_iau8_buffered to use persev instead of persev_full
 
 
-binary stdio
-<http://article.gmane.org/gmane.lisp.clisp.devel:12268>
-one of the common issues with CLISP is
-*** - (SETF STREAM-ELEMENT-TYPE) on #<IO TERMINAL-STREAM> is illegal
-i.e., inability to use binary IO in stdio.
-it all boils down to regular_handle_p(FD):
-when the handle is found to be "regular", the appropriate
-*STANDARD-*PUT* stream becomes a handle stream whose element type can be
-changed, otherwise a TERMINAL-STREAM is used.
-Right now, `regular' means "file on disk", as in
-[unix] (S_ISREG(statbuf.st_mode) || S_ISBLK(statbuf.st_mode))
-[win32] (filetype == FILE_TYPE_DISK)
-what about pipes?
-while MAKE-STREAM should provide a universal solution to these issues,
-it still might make sense to change regular_handle_p().
-Note that this runs into the FRESH-LINE/same_handle_p issues.
-Maybe (SETF STREAM-ELEMENT-TYPE) should work on TERMINAL-STREAMs?
-Maybe all streams should be bivalent?
-Related issue: LISTEN works on binary streams in all Lisps except CLISP.
-LISTEN should work on all streams and READ-CHAR-WILL-HANG-P should be
-merged with READ-BYTE-WILL-HANG-P into WILL-HANG-P.
+Changes to Unicode standard
+(Bruno and Jörg discussing issues Nov. 2006)
+Eliminate surrogates D800-DFFF from characters
+"Surrogates do not represent characters"
+"there are not and will never be *surrogate characters* (i.e. encoded
+characters represented with a single surrogate code point)"
+Change: (code-char #xD800) -> NIL, and #\uD800 becomes illegal
+This is to be consistent and avoid problems with embedded string constants
+ in .fas files, e.g. (defvar foo #.(string (code-char #xD800))) ; error
+Goal: CLISP shall never generate an illegal UTF sequence (unlike
+ versions <= 2.41). Similarly, CLISP shall not construct a
+ weird string e.g. by reading an illegal sequence.
+Conversion to and from binary signals error.
+Affects: UTF-8, UTF-7, UCS2, UCS4 and likely others.
+Unpaired surrogates shall signal error when reading (like iconv does).
+CODE-CHAR-LIMIT is preserved, but CODE-CHAR yields NIL for all
+surrogates because they don't stand on their own (they are considered
+an artefact of the days when 16 bit where hoped sufficient).
+Of course, valid sequences are not affected.  Code #x10400 is represented as
+F0 90 90 80 in UTF-8 and as 01 D8 00 DC or D8 01 DC 00 in UTF-16.
+
+Not adressed here: "The two values FFFE and FFFF as well as the 32
+values from FDD0 to FDEF represent noncharacters."
 
 
-Embeddability: additional API in spvw.d; example.
-<https://sourceforge.net/tracker/index.php?func=detail&aid=423264&group_id=1355&atid=351355>
+Reading illegal UTF byte sequences
+Markus Kuhn has some recommendations
+http://www.cl.cam.ac.uk/~mgk25/ucs/examples/UTF-8-test.txt
+CLISP currently differs from these, c.f. bug#1575569
+Should we follow these more closely?
+(ext:convert-string-from-bytes #(65 #xB5 66)
+ (ext:make-encoding :charset "utf-8" :input-error-action #\Z))
+"AB" (clisp src/encoding.d)
+(ext:convert-string-from-bytes #(65 #xB5 66)
+ (ext:make-encoding :charset "\\utf-8" :input-error-action #\Z))
+"AZB" (iconv)
 
 
-Update PARI module: there is no global precision variable anymore.
-Many functions have been added since the module has been written.
+Embeddability: additional API in spvw.d; example. RFE#423264
 
 
 nested REQUIRE is broken
@@ -123,14 +78,11 @@ to fix this we need to, first, replace LOAD with REQUIRE in foo.lisp,
 and, second, change c-REQUIRE to write the REQUIRE form into *.lib.
 unfortunately, this means that each foo?.lisp must PROVIDE "foo?" which
 is quite ugly.
+Alternatively, c-LOAD could write (LOAD "*.lib") into the LIB file.
 
 
 Review all macros and tighten the runtime interface of the macros.
   check-redefinition
-
-
-(format nil "~G" 1d23) => "099999999999999990000000.0    "
-http://sourceforge.net/tracker/index.php?func=detail&aid=1389060&group_id=1355&atid=101355
 
 
 contagion warnings: engineering vs portability
@@ -151,111 +103,27 @@ initially, *warn-on-floating-point-contagion* and *enable-portability-warnings*
 should be T.
 
 
-Cannot remove symbolic links to directories
-with either DELETE-FILE or DELETE-DIR.
-<http://article.gmane.org/gmane.lisp.clisp.devel:13452>
-the case of symlinks to directories, there is absolutely no way out.
-you cannot get the name of the link,
-you cannot delete it (with either delete-file or delete-dir),
-and you cannot even probe it! (with either probe-file or probe-directory)
-(note BTW a naming inconsistency between probe-directory and delete-dir).
-
-
---with-dynamic-modules ==> link errors:
-gcc -I. -fPIC -x none -Wl,-export-dynamic -shared -o dynmod/lib-i18n.dll gettext.o
-gettext.o(.text+0x7f):i18n/gettext.c:2296: undefined reference to `_I_to_L'
-gettext.o(.text+0xcb):i18n/gettext.c:2301: undefined reference to `_STACK'
-gettext.o(.text+0xd2):i18n/gettext.c:2301: undefined reference to `_symbol_tab_data'
-These errors mean that the lisp run time must be compiled into lisp.so,
-not lisp.a, and dynmod/lib-i18n.dll should be linked against it.
-So, this all goes in the same direction as embeddability
-and elimination of lisp.run in favor of a driver launching the right dll.
-Also, --with-dynamic-modules should _NOT_ make BASE_MODULES dynamic.
-
-
-CLISP_LANGUAGE=german LC_ALL=C clisp -q
-> (/ 0)
-=> endless loop
-*** - Character #\u00F6 cannot be represented in the character set
-      CHARSET:ASCII
-
-
-Fix unintuitive behaviour of REPL introduced on 2003-01-21:
-[1]> (read-char)
-abcdef
-#\a
-[2]>
-*** - EVAL: variable BCDEF has no value
-Mögliche Optionen:
-USE-VALUE      :R1      Sie dürfen einen Ersatzwertfür BDEF eingeben.
-STORE-VALUE    :R2      Sie dürfen einen neuen Wert für BDEF eingeben.
-ABORT          :R3      ABORT
-
-Break 1 [3]>
-
-
-Make the *KEYBOARD-STREAM* recognize all kinds of function keys in Linux
-console and xterm again.
-
-
-Reentrancy: remove the static filestatus variable from pathname.d.
+libopen should DWIM -- include libltdl and use lt_dlopenext().
+Note: including libltdl is non-trivial and libtoolize requires configure.ac
 
 
 Better error checking in get-setf-expansion for long defsetf
 
 
-Better error report when calling a foreign function with not enough
-arguments. So far, it says it needs one more argument than it
-was given, instead of telling the precise number the function wants.
-E.g. > (linux:qsort)
-*** - FFI::FOREIGN-CALL-OUT: Too few arguments (0 instead of at least 1) given
-      to #<FOREIGN-FUNCTION "qsort" #x080511C8>
-A solution might involve moving the count-inarguments code from *.lisp
-to foreign.d, see
-http://sourceforge.net/tracker/index.php?func=detail&aid=654718&group_id=1355&atid=101355
+FFI: passing structs by value:
+http://clisp.cons.org/impnotes/dffi.html#ffi-struct-arg
+foreign.d should signal an error when a struct is passed by value
+foreign1.lisp should emit C code for a wrapper function
+ that passes the struct by pointer
+http://article.gmane.org/gmane.lisp.clisp.general:11075
+RFE#1486583
 
 
 for Emacs: GC root macro, YETANOTHER macro
            [sds: what does this mean?]
 
 
-(directory "/proc/self/*" :full t )
-((#P"/proc/self/status" #P"/proc/self/status" (6 44 0 1 4 1999) 0)
-  (#P"/proc/self/mem" #P"/proc/self/mem" (6 44 0 1 4 1999) 0)
-  (#P"/proc/self/environ" #P"/proc/self/environ" (6 44 0 1 4 1999) 0)
-  (#P"/proc/self/cmdline" #P"/proc/self/cmdline" (6 44 0 1 4 1999) 0)
-  (#P"/proc/self/stat" #P"/proc/self/stat" (6 44 0 1 4 1999) 0)
-  (#P"/proc/self/statm" #P"/proc/self/statm" (6 44 0 1 4 1999) 0)
-  (#P"/proc/self/maps" #P"/proc/self/maps" (6 44 0 1 4 1999) 0)
-
-
-(directory "/proc/self/fd/*")
-
-stat("/proc", {st_mode=S_IFDIR|0555, st_size=0, ...}) = 0
-stat("/proc/self", {st_mode=S_IFDIR|0555, st_size=0, ...}) = 0
-stat("/proc/self/fd", {st_mode=S_IFDIR|0500, st_size=0, ...}) = 0
-stat("/proc/self/fd/.", {st_mode=S_IFDIR|0500, st_size=0, ...}) = 0
-open("/proc/self/fd/.", O_RDONLY)       = 6
-fcntl(6, F_SETFD, FD_CLOEXEC)           = 0
-getdents(6, /* 9 entries */, 1024)      = 112
-stat("/proc/self/fd/0", {st_mode=S_IFCHR|0620, st_rdev=makedev(3, 2), ...}) = 0
-lstat("/proc/self/fd/0", {st_mode=S_IFLNK|0700, st_size=64, ...}) = 0
-readlink("/proc/self/fd/0", "[0303]:39982", 64) = 12
-readlink("/proc/self/fd/0", "[0303]:39982", 12) = 12
-readlink("/proc", 0xbfffd498, 4094)     = -1 EINVAL (Invalid argument)
-readlink("/proc/self", "1108", 4094)    = 5
-lstat("/proc/1108/fd/[0303]:39982", 0x8138260) = -1 ENOENT (No such file or directory)
-
-
-Problem is the call to assure_dir_exists(TRUE,FALSE); where in fact not
-all links are resolved in the directory!
-
-
 print-readably for interpreted closures and #<specdecl> ?
-
-
-parse_namestring: split_name_type(1), und bei make_pathname
-Klein->Großschreibung umwandeln, so dass (make-pathname :type "fas") immer geht.
 
 
 Should reject invalid format string:
@@ -289,7 +157,7 @@ etc. that are ported to ACL can be ported to clisp with minimal effort.
 <http://www.franz.com/support/documentation/6.2/doc/fwrappers-and-advice.htm>
 
 
-clean up and modularize spvw.d
+clean up and modularize spvw.d (hasn't this been done already in 1998-07?)
 
 
 Add fast unicode attribute accessors (like CHAR-NUMERIC-P and CHAR-DECOMPOSE)
@@ -306,8 +174,7 @@ and augment the reader to return 168 from
         behaviour in this area can lead to security issues.)
 
 
-error recovery
-<https://sourceforge.net/tracker/index.php?func=detail&aid=946463&group_id=1355&atid=351355>
+error recovery RFE#946463
 The ability not to lose the computation on error is
 crucial for any serious task.
 Therefore, we need to be able to recover from ALL errors.
@@ -321,20 +188,19 @@ also have it in compiled functions.
 <http://thread.gmane.org/gmane.lisp.clisp.devel/11448>
 
 
-GENERATIONAL_GC on Cygwin
-<http://sourceforge.net/tracker/index.php?func=detail&aid=1104677&group_id=1355&atid=101355>
+GENERATIONAL_GC on Cygwin bug#1104677
 the mmap() autoconf test fails but maybe one can work around it?
 
 
 GC/Memory Management:
-1. Better post-mortem on segfault
+1. Better post-mortem on segfault RFE#1565790
    <http://article.gmane.org/gmane.lisp.clisp.devel:13211>
-2. More GC generations as a build-time option
-3. Better TIME/ROOM GC statistics reporting (per generation stats)
+2. More GC generations as a build-time option RFE#1565794
+3. Better TIME/ROOM GC statistics reporting (per generation stats) RFE#1565795
    <http://article.gmane.org/gmane.lisp.clisp.devel:13207>
    <http://article.gmane.org/gmane.lisp.clisp.devel:13209>
    <http://article.gmane.org/gmane.lisp.clisp.devel:13212>
-4. Ability to "tenure" a specific object (with all its references!)
+4. Ability to "tenure" a specific object (with all its references!) RFE#1565801
    or the whole current heap (also untenure the object).
 
 
@@ -391,8 +257,7 @@ Still have to think about these, whether they are good ideas or not.
 Try to increase the string size limit, to get rid of
 "*** - string too long: desired length 6553600 exceeds the supported maximum
        length" errors
-instead, the string size limit just went down!
-http://sourceforge.net/tracker/index.php?func=detail&aid=1308440&group_id=1355&atid=101355
+instead, the string size limit just went down! bug#1308440
 
 
 Add highlight/underline/etc. capability to the output side of *terminal-io*.
@@ -410,57 +275,13 @@ directly through tast_break(), bypassing ERROR and SIGNAL) is horrible.
 Introduce a class of SERIOUS-CONDITION and then remove BATCHMODE-BREAK-DRIVER.
 
 
-Distribute impnotes.html in the form of CLAHS, as an annotation against
-Harlequin's HyperSpec. See http://clisp.cons.org/~haible/clahs/.
-
-
 FFI: Actually support :language :cc/:gcc by passing appropriate flags
 to the avcall/vacall macros. The default should be the same compiler
 as the one used to compile clisp.
 
 
-(read-char *keyboard-input*) is still not perfect. Under Linux, it
-returns the following key sequences for some keystrokes:
-
-Under xterm:
-Shift F1 --> F11
-Shift F2 --> F12
-Shift F3 --> Escape [ 2 5 ~
-Shift F4 --> Escape [ 2 6 ~
-Shift F5 --> Escape [ 2 8 ~
-Shift F6 --> Escape [ 2 9 ~
-Shift F7 --> Escape [ 3 1 ~
-Shift F8 --> Escape [ 3 2 ~
-Shift F9 --> F9
-Shift F10 --> F10
-Shift F11 --> F11
-Shift F12 --> F12
-
-Under console:
-Shift F1 --> F11
-Shift F2 --> F12
-Shift F3 --> Escape [ 2 5 ~
-Shift F4 --> Escape [ 2 6 ~
-Shift F5 --> Escape [ 2 8 ~
-Shift F6 --> Escape [ 2 9 ~
-Shift F7 --> Escape [ 3 1 ~
-Shift F8 --> Escape [ 3 2 ~
-Shift F9 --> Escape [ 3 3 ~
-Shift F10 --> Escape [ 3 4 ~
-Shift F11 --> F11
-Shift F12 --> F12
-Ctrl-Alt-Q --> nothing at all
-
-
 Looks at GCL CLCS (debugger.lsp top-patches.lsp condition-definitions.lsp)
 whether it contains something clisp could profit from.
-
-
-Debugger (reploop.lisp, debug.d): Implement backtrace-? commands with a limit,
-such that  BACKTRACE-1 20  will show the 20 newest frames. Good for people
-without an xterm with logging. sys::debug-backtrace already takes a limit
-as optional argument; the hard part is to make the debugger accept commands
-with arguments, instead of just single-word commands.
 
 
 More CLtL2 compliance:
@@ -472,7 +293,6 @@ More CLtL2 compliance:
 ;
 ; Number Title                               Status          Files affected
 ;
-;  <24>  compiler diagnostics                no              compiler.lisp
 ;  <85>  FORMAT & pretty print               yes             format.lisp
 ;                                            no: ~E, ~F, ~G, ~$ also bind *PRINT-BASE* to 10 and *PRINT-RADIX* to NIL
 ; <110>  LOAD & objects                      no              loadform.lisp
@@ -568,3 +388,7 @@ is more confusing when expressed as REMOVE of COMPLEMENT. Also, COMPLEMENT
 is harder to understand than XXX-IF-NOT because COMPLEMENT is a function
 returning a function.
 
+;; Local Variables:
+;; mode: bug-reference
+;; bug-reference-url-format: clisp-bug-reference-url-format
+;; End:

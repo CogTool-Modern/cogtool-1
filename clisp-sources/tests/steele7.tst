@@ -1,4 +1,4 @@
-;;; -*- lisp -*-
+;;; -*- Lisp -*- vim:filetype=lisp
 ;;; test file of examples from Steele
 ;;;
 

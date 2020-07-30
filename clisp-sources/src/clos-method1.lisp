@@ -1,6 +1,6 @@
 ;;;; Common Lisp Object System for CLISP: Methods
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2004
+;;;; Sam Steingold 1998 - 2004, 2007, 2010
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -137,11 +137,11 @@
     (error (TEXT "(~S ~S): Missing ~S argument.")
            'initialize-instance 'standard-method ':lambda-list))
   (let ((sig (method-lambda-list-to-signature lambda-list
-               #'(lambda (detail errorstring &rest arguments)
-                   (declare (ignore detail))
-                   (error (TEXT "(~S ~S): Invalid ~S argument: ~A")
-                          'initialize-instance 'standard-method ':lambda-list
-                          (apply #'format nil errorstring arguments))))))
+               #'(lambda (form detail errorstring &rest arguments)
+                   (sys::lambda-list-error form detail
+                     (TEXT "(~S ~S): Invalid ~S argument: ~A")
+                     'initialize-instance 'standard-method ':lambda-list
+                     (apply #'format nil errorstring arguments))))))
     ; Check the signature argument. It is optional; specifying it only has
     ; the purpose of saving memory allocation (by sharing the same signature
     ; for all reader methods and the same signature for all writer methods).
@@ -216,8 +216,8 @@
 
 (defun print-object-<standard-method> (method stream)
   (print-unreadable-object (method stream :type t)
-    (if (and (not (eq (std-method-qualifiers method) (sys::%unbound)))
-             (not (eq (std-method-specializers method) (sys::%unbound))))
+    (if (and (not (eq (sys::%unbound) (std-method-qualifiers method)))
+             (not (eq (sys::%unbound) (std-method-specializers method))))
       (progn
         (dolist (q (std-method-qualifiers method))
           (write q :stream stream)
@@ -231,19 +231,19 @@
 (defun make-method-instance (class &rest args ; ABI
                              &key &allow-other-keys)
   (apply #'make-instance-<standard-method> class args))
-(defun method-function (method)
+(predefun method-function (method)
   (std-method-function-or-substitute method))
-(defun method-qualifiers (method)
+(predefun method-qualifiers (method)
   (std-method-qualifiers method))
-(defun method-lambda-list (method)
+(predefun method-lambda-list (method)
   (std-method-lambda-list method))
-(defun method-signature (method)
+(predefun method-signature (method)
   (std-method-signature method))
-(defun method-specializers (method)
+(predefun method-specializers (method)
   (std-method-specializers method))
-(defun method-generic-function (method)
+(predefun method-generic-function (method)
   (std-method-generic-function method))
-(defun (setf method-generic-function) (new-gf method)
+(predefun (setf method-generic-function) (new-gf method)
   (setf (std-method-generic-function method) new-gf))
 
 ;;; ---------------------------------------------------------------------------
@@ -265,8 +265,9 @@
     (error (TEXT "(~S ~S): Missing ~S argument.")
            'initialize-instance 'standard-accessor-method ':slot-definition))
   (unless (typep slot-definition 'direct-slot-definition)
-    (error (TEXT "(~S ~S): The slot-definition argument is not of type ~S.")
-           'initialize-instance 'standard-accessor-method 'direct-slot-definition))
+    (error (TEXT "(~S ~S): Argument ~S is not of type ~S.")
+           'initialize-instance 'standard-accessor-method ':slot-definition
+           'direct-slot-definition))
   ; Fill the slots.
   (setf (%accessor-method-slot-definition method) slot-definition)
   method)

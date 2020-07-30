@@ -1,137 +1,140 @@
 /*
  * Streams for CLISP
- * Bruno Haible 1990-2005
- * Sam Steingold 1998-2006
+ * Bruno Haible 1990-2008
+ * Sam Steingold 1998-2010
  * Generic Streams: Marcus Daniels 8.4.1994
  * SCREEN package for Win32: Arseny Slobodjuck 2001-02-14
  * German comments translated into English: Stefan Kain 2001-11-02
  */
 
 #include "lispbibl.c"
-#include "arilev0.c" # for R_sign
+#include "arilev0.c"            /* for R_sign */
+
+#if 0
+  #define DEBUG_OUT(x)  do { printf x; fflush(stdout); } while(0)
+#else
+  #define DEBUG_OUT(x)
+#endif
 
 #ifdef GNU_READLINE
   #include <readline/readline.h>
   #include <readline/history.h>
 #endif
-#ifdef STDC_HEADERS
-  #include <string.h>  # declares strcpy(), strcat()
-#endif
+#include <string.h>           /* declares strcpy(), strcat() */
 
-# off_t is a signed type, defined in <sys/types.h> and <fcntl.h>, denoting
-# the a file descriptor's position. Here we also need the unsigned equivalent.
+/* off_t is a signed type, defined in <sys/types.h> and <fcntl.h>, denoting
+ a file descriptor's position. Here we also need the unsigned equivalent. */
 #if SIZEOF_OFF_T > 4
   typedef uint64 uoff_t;
 #else
   typedef uint32 uoff_t;
 #endif
 
-# Converts an uoff_t value into an Integer >=0.
-# uoff_t_to_I(wert)
-# > wert: value in the range of uoff_t
-# < result: Integer with that value.
-# can trigger GC
+/* Converts an uoff_t value into an Integer >=0.
+ uoff_t_to_I(value)
+ > value: value in the range of uoff_t
+ < result: Integer with that value.
+ can trigger GC */
 #if SIZEOF_OFF_T > 4
   #define uoff_to_I UQ_to_I
 #else
   #define uoff_to_I UL_to_I
 #endif
 
-# Converts an Integer >=0 into an uoff_t value.
-# I_to_uoff_t(obj)
-# > obj: an object, should be an Integer >=0, <= ~(uoff_t)0
-# < result: the Integer's value as an uoff_t
+/* Converts an Integer >=0 into an uoff_t value.
+ I_to_uoff_t(obj)
+ > obj: an object, should be an Integer >=0, <= ~(uoff_t)0
+ < result: the Integer's value as an uoff_t */
 #if SIZEOF_OFF_T > 4
   #define I_to_uoff_t I_to_UQ
 #else
   #define I_to_uoff_t I_to_UL
 #endif
 
-# Test for an Integer that fits into an uoff_t.
-# uoff_t_p(obj)
-# > obj: an object
-# < result: true if it's an integer >=0, <= ~(uoff_t)0
+/* Test for an Integer that fits into an uoff_t.
+ uoff_t_p(obj)
+ > obj: an object
+ < result: true if it's an integer >=0, <= ~(uoff_t)0 */
 #if SIZEOF_OFF_T > 4
   #define uoff_t_p uint64_p
 #else
   #define uoff_t_p uint32_p
 #endif
 
-# once again the structure of Streams:
-# strmflags = Flags
-  # Bits in the Flags:
-  # define strmflags_open_bit_B  0  # set, if the Stream is open
-  # define strmflags_immut_bit_B 1  # set if read literals are immutable
-  # define strmflags_reval_bit_B 2  # set if Read-Eval is allowed
-  #define strmflags_unread_bit_B 3  # set while strm_rd_ch_last is back
-  # define strmflags_rd_by_bit_B 4  # set if READ-BYTE is possible
-  # define strmflags_wr_by_bit_B 5  # set if WRITE-BYTE is possible
-  # define strmflags_rd_ch_bit_B 6  # set if READ-CHAR is possible
-  # define strmflags_wr_ch_bit_B 7  # set if WRITE-CHAR is possible
-  # Bitmasks in the Flags:
-  # define strmflags_open_B  bit(strmflags_open_bit_B)
+/* once again the structure of Streams:
+ strmflags = Flags
+ Bits in the Flags:
+   define strmflags_open_bit_B  0  - set, if the Stream is open
+   define strmflags_immut_bit_B 1  - set if read literals are immutable
+   define strmflags_fasl_bit_B  2  - Read-Eval is allowed, \r=#\Return */
+  #define strmflags_unread_bit_B 3  /* set while strm_rd_ch_last is back */
+/* define strmflags_rd_by_bit_B 4  - set if READ-BYTE is possible
+   define strmflags_wr_by_bit_B 5  - set if WRITE-BYTE is possible
+   define strmflags_rd_ch_bit_B 6  - set if READ-CHAR is possible
+   define strmflags_wr_ch_bit_B 7  - set if WRITE-CHAR is possible
+ Bitmasks in the Flags:
+   define strmflags_open_B  bit(strmflags_open_bit_B) */
   #define strmflags_immut_B  bit(strmflags_immut_bit_B)
-  #define strmflags_reval_B  bit(strmflags_reval_bit_B)
+  #define strmflags_fasl_B   bit(strmflags_fasl_bit_B)
   #define strmflags_unread_B bit(strmflags_unread_bit_B)
-  # define strmflags_rd_by_B bit(strmflags_rd_by_bit_B)
-  # define strmflags_wr_by_B bit(strmflags_wr_by_bit_B)
-  # define strmflags_rd_ch_B bit(strmflags_rd_ch_bit_B)
-  # define strmflags_wr_ch_B bit(strmflags_wr_ch_bit_B)
-  # define strmflags_rd_B  (strmflags_rd_by_B | strmflags_rd_ch_B)
-  # define strmflags_wr_B  (strmflags_wr_by_B | strmflags_wr_ch_B)
+/* define strmflags_rd_by_B bit(strmflags_rd_by_bit_B)
+   define strmflags_wr_by_B bit(strmflags_wr_by_bit_B)
+   define strmflags_rd_ch_B bit(strmflags_rd_ch_bit_B)
+   define strmflags_wr_ch_B bit(strmflags_wr_ch_bit_B)
+   define strmflags_rd_B  (strmflags_rd_by_B | strmflags_rd_ch_B)
+   define strmflags_wr_B  (strmflags_wr_by_B | strmflags_wr_ch_B) */
   #define strmflags_by_B  (strmflags_rd_by_B | strmflags_wr_by_B)
   #define strmflags_ch_B  (strmflags_rd_ch_B | strmflags_wr_ch_B)
   #define strmflags_rdwr_B (strmflags_rd_B | strmflags_wr_B)
-# strmtype = further Typinfo. See LISPBIBL.D.
+/* strmtype = further Typinfo. See LISPBIBL.D. */
 
-# individual fields:
-  # strm_rd_by         pseudofunction for READ-BYTE
-  # strm_rd_by_array   pseudofunction for READ-BYTE-SEQUENCE
-  # strm_wr_by         pseudofunction for WRITE-BYTE
-  # strm_wr_by_array   pseudofunction for WRITE-BYTE-SEQUENCE
-  # strm_rd_ch         pseudofunction for READ-CHAR
-  # strm_pk_ch         pseudofunction for PEEK-CHAR
-  # strm_rd_ch_array   pseudofunction for READ-CHAR-SEQUENCE
-  # strm_rd_ch_last    last character read by READ-CHAR, NIL if none has been
-  #                    read upto now, eof_value after EOF has been seen.
-  #                    After UNREAD-CHAR, additionally the bit
-  #                    strmflags_unread_bit_B is set.
-  # strm_wr_ch         pseudofunction for WRITE-CHAR
-  # strm_wr_ch_array   pseudofunction for WRITE-CHAR-SEQUENCE
-  # strm_wr_ch_npnl        pseudofunction for WRITE-CHAR, when
-  #                        no pending newline
-  # strm_wr_ch_array_npnl  pseudofunction for WRITE-CHAR-SEQUENCE, when
-  #                        no pending newline
-  # strm_wr_ch_lpos    line-position in the current line after last WRITE-CHAR,
-  #                    a fixnum >=0
-# further (type-specific) components:
-  # See in LISPBIBL.D and at the Stream-Types.
+/* individual fields:
+   strm_rd_by         pseudofunction for READ-BYTE
+   strm_rd_by_array   pseudofunction for READ-BYTE-SEQUENCE
+   strm_wr_by         pseudofunction for WRITE-BYTE
+   strm_wr_by_array   pseudofunction for WRITE-BYTE-SEQUENCE
+   strm_rd_ch         pseudofunction for READ-CHAR
+   strm_pk_ch         pseudofunction for PEEK-CHAR
+   strm_rd_ch_array   pseudofunction for READ-CHAR-SEQUENCE
+   strm_rd_ch_last    last character read by READ-CHAR, NIL if none has been
+                      read upto now, eof_value after EOF has been seen.
+                      After UNREAD-CHAR, additionally the bit
+                      strmflags_unread_bit_B is set.
+   strm_wr_ch         pseudofunction for WRITE-CHAR
+   strm_wr_ch_array   pseudofunction for WRITE-CHAR-SEQUENCE
+   strm_wr_ch_npnl        pseudofunction for WRITE-CHAR, when
+                          no pending newline
+   strm_wr_ch_array_npnl  pseudofunction for WRITE-CHAR-SEQUENCE, when
+                          no pending newline
+   strm_wr_ch_lpos    line-position in the current line after last WRITE-CHAR,
+                      a fixnum >=0
+ further (type-specific) components:
+  See in LISPBIBL.D and at the Stream-Types.
 
+ =============================================================================
+                           S T R E A M S
 
-# =============================================================================
-#                           S T R E A M S
+ Since MAKE-TWO-WAY-STREAM possibly can return a Stream that is, e.g.,
+ Character-Input and Byte-Output, and therewith in particular all
+ READ-/WRITE-Operations must run efficiently, Streams are built up
+ as follows:
+    - Type of the Stream,
+    - Components for READ-BYTE, READ-BYTE-SEQUENCE,
+    - Components for WRITE-BYTE, WRITE-BYTE-SEQUENCE,
+    - Components for READ-CHAR, READ-CHAR-SEQUENCE,
+    - Components for WRITE-CHAR, WRITE-CHAR-SEQUENCE,
+    - Components, depending on the Type of the Stream.
 
-# Since MAKE-TWO-WAY-STREAM possibly can return a Stream that is, e.g.,
-# Character-Input and Byte-Output, and therewith in particular all
-# READ-/WRITE-Operations must run efficiently, Streams are built up
-# as follows:
-#    - Type of the Stream,
-#    - Components for READ-BYTE, READ-BYTE-SEQUENCE,
-#    - Components for WRITE-BYTE, WRITE-BYTE-SEQUENCE,
-#    - Components for READ-CHAR, READ-CHAR-SEQUENCE,
-#    - Components for WRITE-CHAR, WRITE-CHAR-SEQUENCE,
-#    - Components, depending on the Type of the Stream.
+ Specification of the nine Types of Pseudo-Functions:
 
-# Specification of the nine Types of Pseudo-Functions:
+ Specification for READ-BYTE - Pseudo-Function:
+ fun(stream)
+ > stream: Stream
+ < result: read Integer (eof_value at EOF)
+ can trigger GC */
+typedef maygc object (* rd_by_Pseudofun) (object stream);
 
-  # Specification for READ-BYTE - Pseudo-Function:
-  # fun(stream)
-  # > stream: Stream
-  # < result: read Integer (eof_value at EOF)
-  # can trigger GC
-    typedef maygc object (* rd_by_Pseudofun) (object stream);
-
-  /* Specification for READ-BYTE-ARRAY - Pseudo-Function:
+/* Specification for READ-BYTE-ARRAY - Pseudo-Function:
    fun(&stream,&bytearray,start,len,persev)
    > stream: stream
    > object bytearray: simple-8bit-vector
@@ -139,71 +142,71 @@
    > uintL len: length of byte sequence to be filled, >0
    > perseverance_t persev: how to react on incomplete I/O
    < uintL result: number of bytes that have been filled
-   can trigger GC */
-  typedef maygc uintL (* rd_by_array_Pseudofun) (const gcv_object_t* stream_, const gcv_object_t* bytearray_, uintL start, uintL len, perseverance_t persev);
+ can trigger GC */
+typedef maygc uintL (* rd_by_array_Pseudofun) (const gcv_object_t* stream_, const gcv_object_t* bytearray_, uintL start, uintL len, perseverance_t persev);
 
-  # Specification for WRITE-BYTE - Pseudo-Function:
-  # fun(stream,obj)
-  # > stream: Stream
-  # > obj: Integer to be written
-  # can trigger GC
-    typedef maygc void (* wr_by_Pseudofun) (object stream, object obj);
+/* Specification for WRITE-BYTE - Pseudo-Function:
+ fun(stream,obj)
+ > stream: Stream
+ > obj: Integer to be written
+ can trigger GC */
+typedef maygc void (* wr_by_Pseudofun) (object stream, object obj);
 
-  # Specification for WRITE-BYTE-ARRAY - Pseudo-Function:
-  # fun(&stream,&bytearray,start,len,persev)
-  # > stream: stream
-  # > object bytearray: simple-8bit-vector
-  # > uintL start: start index of byte sequence to be written
-  # > uintL len: length of byte sequence to be written, >0
-  # > perseverance_t persev: how to react on incomplete I/O
-  # can trigger GC
-    typedef maygc uintL (* wr_by_array_Pseudofun) (const gcv_object_t* stream_, const gcv_object_t* bytearray_, uintL start, uintL len, perseverance_t persev);
+/* Specification for WRITE-BYTE-ARRAY - Pseudo-Function:
+ fun(&stream,&bytearray,start,len,persev)
+ > stream: stream
+ > object bytearray: simple-8bit-vector
+ > uintL start: start index of byte sequence to be written
+ > uintL len: length of byte sequence to be written, >0
+ > perseverance_t persev: how to react on incomplete I/O
+ can trigger GC */
+typedef maygc uintL (* wr_by_array_Pseudofun) (const gcv_object_t* stream_, const gcv_object_t* bytearray_, uintL start, uintL len, perseverance_t persev);
 
-  # Specification for READ-CHAR - Pseudo-Function:
-  # fun(&stream)
-  # > stream: Stream
-  # < stream: Stream
-  # < result: read Character (eof_value at EOF)
-  # can trigger GC
-    typedef maygc object (* rd_ch_Pseudofun) (const gcv_object_t* stream_);
+/* Specification for READ-CHAR - Pseudo-Function:
+ fun(&stream)
+ > stream: Stream
+ < stream: Stream
+ < result: read Character (eof_value at EOF)
+ can trigger GC */
+typedef maygc object (* rd_ch_Pseudofun) (const gcv_object_t* stream_);
 
-  # Specification for PEEK-CHAR - Pseudo-Function:
-  # fun(&stream)
-  # Like READ-CHAR with sequencing UNREAD-CHAR. Only side-effects up
-  # to the next real READ-CHAR are retarded (if possible).
-  # > stream: Stream (with strmflags_unread_bit_B deleted)
-  # < stream: Stream
-  # < result: read Character (eof_value at EOF)
-  # can trigger GC
-    typedef maygc object (* pk_ch_Pseudofun) (const gcv_object_t* stream_);
+/* Specification for PEEK-CHAR - Pseudo-Function:
+ fun(&stream)
+ Like READ-CHAR with sequencing UNREAD-CHAR. Only side-effects up
+ to the next real READ-CHAR are retarded (if possible).
+ > stream: Stream (with strmflags_unread_bit_B deleted)
+ < stream: Stream
+ < result: read Character (eof_value at EOF)
+ can trigger GC */
+typedef maygc object (* pk_ch_Pseudofun) (const gcv_object_t* stream_);
 
-  # Specification for READ-CHAR-ARRAY - Pseudo-Function:
-  # fun(&stream,&chararray,start,len)
-  # > stream: stream
-  # > object chararray: a mutable string that is or was simple
-  # > uintL start: start index of character sequence to be filled
-  # > uintL len: length of character sequence to be filled, >0
-  # < uintL result: number of characters that have been filled
-  # can trigger GC
-    typedef maygc uintL (* rd_ch_array_Pseudofun) (const gcv_object_t* stream_, const gcv_object_t* chararray_, uintL start, uintL len);
+/* Specification for READ-CHAR-ARRAY - Pseudo-Function:
+ fun(&stream,&chararray,start,len)
+ > stream: stream
+ > object chararray: a mutable string that is or was simple
+ > uintL start: start index of character sequence to be filled
+ > uintL len: length of character sequence to be filled, >0
+ < uintL result: number of characters that have been filled
+ can trigger GC */
+typedef maygc uintL (* rd_ch_array_Pseudofun) (const gcv_object_t* stream_, const gcv_object_t* chararray_, uintL start, uintL len);
 
-  # Specification for WRITE-CHAR - Pseudo-Function:
-  # fun(&stream,obj)
-  # > stream: Stream
-  # < stream: Stream
-  # > obj: Character to be written
-  # can trigger GC
-    typedef maygc void (* wr_ch_Pseudofun) (const gcv_object_t* stream_, object obj);
+/* Specification for WRITE-CHAR - Pseudo-Function:
+ fun(&stream,obj)
+ > stream: Stream
+ < stream: Stream
+ > obj: Character to be written
+ can trigger GC */
+typedef maygc void (* wr_ch_Pseudofun) (const gcv_object_t* stream_, object obj);
 
-  # Specification for WRITE-CHAR-ARRAY - Pseudo-Function:
-  # fun(&stream,&chararray,start,len)
-  # > stream: stream
-  # > object chararray: not-reallocated simple-string
-  # > uintL start: start index of character sequence to be written
-  # > uintL len: length of character sequence to be written, >0
-    typedef maygc void (* wr_ch_array_Pseudofun) (const gcv_object_t* stream_, const gcv_object_t* chararray_, uintL start, uintL len);
+/* Specification for WRITE-CHAR-ARRAY - Pseudo-Function:
+   fun(&stream,&chararray,start,len)
+   > stream: stream
+   > object chararray: not-reallocated simple-string
+   > uintL start: start index of character sequence to be written
+   > uintL len: length of character sequence to be written, >0 */
+typedef maygc void (* wr_ch_array_Pseudofun) (const gcv_object_t* stream_, const gcv_object_t* chararray_, uintL start, uintL len);
 
-# extract Pseudo-Functions out of a Stream:
+/* extract Pseudo-Functions out of a Stream: */
 #define rd_by(strm)       \
         (*(rd_by_Pseudofun)(ThePseudofun(TheStream(strm)->strm_rd_by)))
 #define rd_by_array(strm) \
@@ -223,78 +226,75 @@
 #define wr_ch_array(strm) \
   (*(wr_ch_array_Pseudofun)(ThePseudofun(TheStream(strm)->strm_wr_ch_array)))
 
-#  Possible Types of Streams               Additional Components
-#  -------------------------               ---------------------
-
-#  Synonym-Stream                          Symbol
-#  Broadcast-(Output-)Stream               list of streams
-#  Concatenated-(Input-)Stream             list of streams
-#  Two-Way-Stream                          Stream for Input, Stream for Output
-#  Echo-Stream                             Stream for Input, Stream for Output
-#  String-Input-Stream                     total string, character counter
-#  String-Output-Stream                    Buffer (Semi-Simple-String)
-#  String-Push-Stream                      String with Fill-Pointer
-#  Pretty-Printer-Helper-Stream            List of Buffers, Mode
-#  Buffered-Input-Stream                   fun, mode, String, character counter
-#  Buffered-Output-Stream                  fun, Buffer (Semi-Simple-String)
+/*Possible Types of Streams               Additional Components
+  -------------------------               ---------------------
+  Synonym-Stream                          Symbol
+  Broadcast-(Output-)Stream               list of streams
+  Concatenated-(Input-)Stream             list of streams
+  Two-Way-Stream                          Stream for Input, Stream for Output
+  Echo-Stream                             Stream for Input, Stream for Output
+  String-Input-Stream                     total string, character counter
+  String-Output-Stream                    Buffer (Semi-Simple-String)
+  String-Push-Stream                      String with Fill-Pointer
+  Pretty-Printer-Helper-Stream            List of Buffers, Mode
+  Buffered-Input-Stream                   fun, mode, String, character counter
+  Buffered-Output-Stream                  fun, Buffer (Semi-Simple-String)
 #ifdef GENERIC_STREAMS
-#  Generic-Stream                          Private Controller Object
+  Generic-Stream                          Private Controller Object
 #endif
-#
-#  Keyboard-Stream
-#  Interactive Terminal Stream             input-buffer, character counter
-#  File-Stream                             Handle, Pathname, File-Position,
-#  (Input, Output, I/O, Closed=Probe)      Buffer, [Bit-Buffer]
-#  Window-Stream                           ---
+  Keyboard-Stream
+  Interactive Terminal Stream             input-buffer, character counter
+  File-Stream                             Handle, Pathname, File-Position,
+  (Input, Output, I/O, Closed=Probe)      Buffer, [Bit-Buffer]
+  Window-Stream                           ---
 #ifdef PRINTER
-#  Printer-Stream
+  Printer-Stream
 #endif
-#  File-Handle-Stream                      Handle, Pathname
+  File-Handle-Stream                      Handle, Pathname
 #ifdef PIPES
-#  Pipe-Input-Stream                       Pid, Handle
-#  Pipe-Output-Stream                      Pid, Handle
+  Pipe-Input-Stream                       Pid, Handle
+  Pipe-Output-Stream                      Pid, Handle
 #endif
 #ifdef X11SOCKETS
-#  X11-Socket-Stream                       Info, Handle
+  X11-Socket-Stream                       Info, Handle
 #endif
 #ifdef SOCKET_STREAMS
-#  Socket-Stream                           Host, Port
+  Socket-Stream                           Host, Port
 #endif
 
-# Additionally a list of all open File-Streams is maintained (for safety).
+Additionally a list of all open File-Streams is maintained (for safety). */
 
-# error-message, if a Stream-Operation on a Stream is not allowed.
-# fehler_illegal_streamop(caller,stream);
-# > caller: Caller (a Symbol)
-# > stream: Stream
-nonreturning_function(global, fehler_illegal_streamop,
+/* error-message, if a Stream-Operation on a Stream is not allowed.
+ error_illegal_streamop(caller,stream);
+ > caller: Caller (a Symbol)
+ > stream: Stream */
+nonreturning_function(global, error_illegal_streamop,
                       (object caller, object stream)) {
-  pushSTACK(stream); # STREAM-ERROR slot STREAM
+  pushSTACK(stream); /* STREAM-ERROR slot STREAM */
   pushSTACK(stream);
   pushSTACK(caller);
-  fehler(stream_error,GETTEXT("~S on ~S is illegal"));
+  error(stream_error,GETTEXT("~S on ~S is illegal"));
 }
 
-# Dummy-Pseudo-Functions, that signal errors:
-local object rd_by_error (object stream) {
-  fehler_illegal_streamop(S(read_byte),stream);
-}
+/* Dummy-Pseudo-Functions, that signal errors: */
+local object rd_by_error (object stream)
+{ error_illegal_streamop(S(read_byte),stream); }
 
 local uintL rd_by_array_error (const gcv_object_t* stream_,
                                const gcv_object_t* bytearray_,
-                               uintL start, uintL len, perseverance_t persev) {
-  fehler_illegal_streamop(S(read_byte),*stream_);
-}
+                               uintL start, uintL len, perseverance_t persev)
+{ error_illegal_streamop(S(read_byte),*stream_); }
 
-local uintL rd_by_array_dummy (const gcv_object_t* stream_,
-                               const gcv_object_t* bytearray_,
-                               uintL start, uintL len, perseverance_t persev) {
+local maygc uintL rd_by_array_dummy (const gcv_object_t* stream_,
+                                     const gcv_object_t* bytearray_,
+                                     uintL start, uintL len,
+                                     perseverance_t persev) {
   var uintL end = start + len;
   var uintL index = start;
   do {
     var object stream = *stream_;
     if ((persev == persev_immediate || persev == persev_bonus)
-        && !ls_avail_p(listen_byte(stream)))
+        && LISTEN_AVAIL != listen_byte(stream))
       break;
     var object obj = rd_by(stream)(stream);
     if (eq(obj,eof_value))
@@ -309,15 +309,13 @@ local uintL rd_by_array_dummy (const gcv_object_t* stream_,
   return index - start;
 }
 
-local void wr_by_error (object stream, object obj) {
-  fehler_illegal_streamop(S(write_byte),stream);
-}
+local void wr_by_error (object stream, object obj)
+{ error_illegal_streamop(S(write_byte),stream); }
 
 local void wr_by_array_error (const gcv_object_t* stream_,
                               const gcv_object_t* bytearray_,
-                              uintL start, uintL len, perseverance_t persev) {
-  fehler_illegal_streamop(S(write_byte),*stream_);
-}
+                              uintL start, uintL len, perseverance_t persev)
+{ error_illegal_streamop(S(write_byte),*stream_); }
 
 local uintL wr_by_array_dummy (const gcv_object_t* stream_,
                               const gcv_object_t* bytearray_,
@@ -325,7 +323,7 @@ local uintL wr_by_array_dummy (const gcv_object_t* stream_,
   var uintL end = start + len;
   var uintL index = start;
   if (persev != persev_full) /* FIXME: need write_byte_will_hang_p() */
-    fehler_illegal_streamop(S(write_byte_sequence),*stream_);
+    error_illegal_streamop(S(write_byte_sequence),*stream_);
   do {
     var object stream = *stream_;
     wr_by(stream)(stream,fixnum(TheSbvector(*bytearray_)->data[index]));
@@ -334,9 +332,8 @@ local uintL wr_by_array_dummy (const gcv_object_t* stream_,
   return len;
 }
 
-local object rd_ch_error (const gcv_object_t* stream_) {
-  fehler_illegal_streamop(S(read_char),*stream_);
-}
+local object rd_ch_error (const gcv_object_t* stream_)
+{ error_illegal_streamop(S(read_char),*stream_); }
 
 local object pk_ch_dummy (const gcv_object_t* stream_) {
   var object newch = rd_ch(*stream_)(stream_);
@@ -348,9 +345,8 @@ local object pk_ch_dummy (const gcv_object_t* stream_) {
 
 local uintL rd_ch_array_error (const gcv_object_t* stream_,
                                const gcv_object_t* chararray_,
-                               uintL start, uintL len) {
-  fehler_illegal_streamop(S(read_char),*stream_);
-}
+                               uintL start, uintL len)
+{ error_illegal_streamop(S(read_char),*stream_); }
 
 local uintL rd_ch_array_dummy (const gcv_object_t* stream_,
                                const gcv_object_t* chararray_,
@@ -362,22 +358,20 @@ local uintL rd_ch_array_dummy (const gcv_object_t* stream_,
     if (eq(obj,eof_value))
       break;
     if (!charp(obj))
-      fehler_char(obj);
+      error_char(obj);
     sstring_store(*chararray_,index,char_code(obj));
     index++;
   } while (index < end);
   return index - start;
 }
 
-local void wr_ch_error (const gcv_object_t* stream_, object obj) {
-  fehler_illegal_streamop(S(write_char),*stream_);
-}
+local void wr_ch_error (const gcv_object_t* stream_, object obj)
+{ error_illegal_streamop(S(write_char),*stream_); }
 
 local void wr_ch_array_error (const gcv_object_t* stream_,
                               const gcv_object_t* chararray_,
-                              uintL start, uintL len) {
-  fehler_illegal_streamop(S(write_char),*stream_);
-}
+                              uintL start, uintL len)
+{ error_illegal_streamop(S(write_char),*stream_); }
 
 local maygc void wr_ch_array_dummy (const gcv_object_t* stream_,
                                     const gcv_object_t* chararray_,
@@ -392,41 +386,44 @@ local maygc void wr_ch_array_dummy (const gcv_object_t* stream_,
   });
 }
 
-# check whether the stream is a terminal stream
+/* check whether the stream is a terminal stream */
 global bool terminal_stream_p (object stream) {
   if (!streamp(stream)) return false;
   if (eq(stream,Symbol_value(S(terminal_read_stream)))) return true;
   if (!builtin_stream_p(stream)) return false;
   if (TheStream(stream)->strmtype == strmtype_terminal) return true;
   if (TheStream(stream)->strmtype == strmtype_synonym)
-    return terminal_stream_p(Symbol_value # get_synonym_stream
+    return terminal_stream_p(Symbol_value /* get_synonym_stream */
                              (TheStream(stream)->strm_synonym_symbol));
-  # if (TheStream(stream)->strmtype == strmtype_concat) {
-  #  # this is a gross hack for the CLISP kludge
-  #  # of reading the first line with READ-LINE for *KEY-BINDINGS*
-  #  # and then concatenating the line with the terminal stream
-  #  object list = TheStream(stream)->strm_concat_list;
-  #  while (consp(list)) {
-  #    if (terminal_stream_p(Car(list)))
-  #      return true;
-  #    list = Cdr(list);
-  #  }
-  #  return false;
+ #if 0
+  if (TheStream(stream)->strmtype == strmtype_concat) {
+    /* this is a gross hack for the CLISP kludge
+     of reading the first line with READ-LINE for *KEY-BINDINGS*
+     and then concatenating the line with the terminal stream */
+    object list = TheStream(stream)->strm_concat_list;
+    while (consp(list)) {
+      if (terminal_stream_p(Car(list)))
+        return true;
+      list = Cdr(list);
+    }
+    return false;
+  }
+ #endif
   return false;
 }
 
-# At the end of a wr_ch_array, update the Line-Position:
-# wr_ss_lpos(stream,ptr,len);
-# > stream: Builtin-Stream, not the Terminal-Stream
-# > ptr: Pointer to the End(!) of the already written characters to the Stream
-# > len: number of characters, >0
-# < result: true, if a NL is among the characters, else false
+/* At the end of a wr_ch_array, update the Line-Position:
+ wr_ss_lpos(stream,ptr,len);
+ > stream: Builtin-Stream, not the Terminal-Stream
+ > ptr: Pointer to the End(!) of the already written characters to the Stream
+ > len: number of characters, >0
+ < result: true, if a NL is among the characters, else false */
 local bool wr_ss_lpos (object stream, const chart* ptr, uintL len) {
  #ifdef TERMINAL_USES_KEYBOARD
   if (TheStream(stream)->strmtype == strmtype_terminal)
-    return false; # On the Atari wr_ch_terminal() would do this.
+    return false; /* On the Atari wr_ch_terminal() would do this. */
  #endif
-  # Add together the widths of the characters since the last NL:
+  /* Add together the widths of the characters since the last NL: */
   var bool result;
   var uintV pos = 0;
   var uintL count;
@@ -436,12 +433,12 @@ local bool wr_ss_lpos (object stream, const chart* ptr, uintL len) {
     pos++;
   });
   if (false) {
-  found_NL: # pos characters since the last NL
+  found_NL: /* pos characters since the last NL */
     ptr++; len = pos; pos = 0; result = true;
-  } else { # pos==len
+  } else { /* pos==len */
     pos = posfixnum_to_V(TheStream(stream)->strm_wr_ch_lpos); result = false;
   }
-  # There were len characters starting from ptr, pos is the Position there.
+  /* There were len characters starting from ptr, pos is the Position there. */
  #ifdef TERMINAL_USES_KEYBOARD
   pos += len;
  #else
@@ -449,18 +446,25 @@ local bool wr_ss_lpos (object stream, const chart* ptr, uintL len) {
     if (TheStream(stream)->strmtype == strmtype_terminal) {
       dotimespL(count,len, {
         var chart c = *ptr++;
-        # How do the control characters effect at that Position?
+        /* How do the control characters effect at that Position? */
         if (chareq(c,ascii(BS))) {
-          # Backspace ==> decrement Line Position, if possible:
+          /* Backspace ==> decrement Line Position, if possible: */
           if (pos > 0)
             pos--;
+        } else if (chareq(c,ascii(TAB))) {
+          /* Tabs have width 8 in Unix culture. */
+          pos = (pos | (8 - 1)) + 1;
         } else
           pos += char_width(c);
       });
     } else {
       dotimespL(count,len, {
         var chart c = *ptr++;
-        pos += char_width(c);
+        if (chareq(c,ascii(TAB))) {
+          /* Tabs have width 8 in Unix culture. */
+          pos = (pos | (8 - 1)) + 1;
+        } else
+          pos += char_width(c);
       });
     }
   }
@@ -469,16 +473,16 @@ local bool wr_ss_lpos (object stream, const chart* ptr, uintL len) {
   return result;
 }
 
-# Function: Returns the last character read (and not yet unread) from a stream.
-# stream_get_lastchar(stream)
-# > stream: a stream
-# < result: the last character read, or NIL
-# can trigger GC
+/* Function: Returns the last character read (and not yet unread) from a stream.
+ stream_get_lastchar(stream)
+ > stream: a stream
+ < result: the last character read, or NIL
+ can trigger GC */
 global maygc object stream_get_lastchar (object stream) {
   if (builtin_stream_p(stream)) {
     return TheStream(stream)->strm_rd_ch_last;
   } else {
-    # (SLOT-VALUE stream '$lastchar):
+    /* (SLOT-VALUE stream '$lastchar): */
     var object stream_forwarded = stream;
     instance_un_realloc(stream_forwarded);
     instance_update(stream,stream_forwarded);
@@ -492,14 +496,14 @@ global maygc object stream_get_lastchar (object stream) {
   }
 }
 
-# Function: Sets the last character read (and not yet unread) of a stream.
-# stream_set_lastchar(stream,ch);
-# > stream: a non-builtin stream
-# > ch: an object (usually a character or NIL)
-# can trigger GC
+/* Function: Sets the last character read (and not yet unread) of a stream.
+ stream_set_lastchar(stream,ch);
+ > stream: a non-builtin stream
+ > ch: an object (usually a character or NIL)
+ can trigger GC */
 local maygc void stream_set_lastchar (object stream, object ch) {
   ASSERT(!builtin_stream_p(stream));
-  # (SETF (SLOT-VALUE stream '$lastchar) ch):
+  /* (SETF (SLOT-VALUE stream '$lastchar) ch): */
   pushSTACK(ch);
   var object stream_forwarded = stream;
   instance_un_realloc(stream_forwarded);
@@ -512,39 +516,39 @@ local maygc void stream_set_lastchar (object stream, object ch) {
     TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)] = ch;
 }
 
-# Reads a Byte from a Stream.
-# read_byte(stream)
-# > stream: Stream
-# < result: read Integer (eof_value at EOF)
-# can trigger GC
+/* Reads a Byte from a Stream.
+ read_byte(stream)
+ > stream: Stream
+ < result: read Integer (eof_value at EOF)
+ can trigger GC */
 global maygc object read_byte (object stream) {
   if (builtin_stream_p(stream)) {
     if (TheStream(stream)->strmflags & strmflags_unread_B) {
-      # UNREAD-CHAR was followed by a (SETF STREAM-ELEMENT-TYPE)
-      # thus we _know_ that the stream element type is ([UN]SIGNED-BYTE 8)
-     #ifdef UNICODE
+      /* UNREAD-CHAR was followed by a (SETF STREAM-ELEMENT-TYPE)
+       thus we _know_ that the stream element type is ([UN]SIGNED-BYTE 8) */
+     #ifdef ENABLE_UNICODE
       var object enc = TheStream(stream)->strm_encoding;
       var chart ch = char_code(TheStream(stream)->strm_rd_ch_last);
-      var uintB buf[4]; # are there characters longer than 4 bytes?!
+      var uintB buf[4]; /* are there characters longer than 4 bytes?! */
       var uintL char_len = cslen(enc,&ch,1);
       ASSERT(char_len <= sizeof(buf));
-      if (char_len == 0) { # the char corresponds to no bytes at all
+      if (char_len == 0) { /* the char corresponds to no bytes at all */
         TheStream(stream)->strmflags &= ~strmflags_unread_B;
         TheStream(stream)->strm_rd_ch_last = NIL;
         goto do_read_byte;
       }
       cstombs(enc,&ch,1,buf,char_len);
       var uint8 code = buf[0];
-      if (char_len == 1) { # the char was just one byte
+      if (char_len == 1) { /* the char was just one byte */
         TheStream(stream)->strmflags &= ~strmflags_unread_B;
         TheStream(stream)->strm_rd_ch_last = NIL;
-      } else { # encode the rest
-        var const uintB* cbuf = buf+1; # skip the first byte
+      } else { /* encode the rest */
+        var const uintB* cbuf = buf+1; /* skip the first byte */
         var chart* cptr = &ch;
         Encoding_mbstowcs(enc)(enc,stream,&cbuf,buf+char_len,&cptr,cptr+1);
         TheStream(stream)->strm_rd_ch_last = code_char(*cptr);
       }
-     #else # no UNICODE
+     #else /* no ENABLE_UNICODE */
       var uint8 code = as_cint(char_code(TheStream(stream)->strm_rd_ch_last));
       TheStream(stream)->strmflags &= ~strmflags_unread_B;
       TheStream(stream)->strm_rd_ch_last = NIL;
@@ -560,7 +564,7 @@ global maygc object read_byte (object stream) {
       return rd_by(stream)(stream);
     }
   } else {
-    # Call the generic function (STREAM-READ-BYTE stream):
+    /* Call the generic function (STREAM-READ-BYTE stream): */
     pushSTACK(stream); funcall(S(stream_read_byte),1);
     var object result = value1;
     if (eq(result,S(Keof)))
@@ -570,121 +574,124 @@ global maygc object read_byte (object stream) {
   }
 }
 
-# Function: Reads several bytes from a stream.
-# read_byte_array(&stream,&bytearray,start,len,persev)
-# > stream: stream (on the STACK)
-# > object bytearray: simple-8bit-vector (on the STACK)
-# > uintL start: start index of byte sequence to be filled
-# > uintL len: length of byte sequence to be filled
-# > perseverance_t persev: how to react on incomplete I/O
-# < uintL result: number of bytes that have been filled
-# can trigger GC
-global maygc uintL read_byte_array (const gcv_object_t* stream_,
-                                    const gcv_object_t* bytearray_,
-                                    uintL start, uintL len, perseverance_t persev) {
+/* UP: check that the return value of STREAM-READ-BYTE-SEQUENCE et al
+ > value: the value to be checked
+ > caller: the function which returned the value
+ > minval, maxval: the permissible range
+ < an integer in [minval;maxval]
+ can trigger GC */
+local maygc uintL check_value_range (object value, object caller,
+                                     uintL minval, uintL maxval) {
+  uintV result;
+  if (posfixnump(value)
+      && (result = posfixnum_to_V(value),
+          result >= minval && result <= maxval))
+    return result;
+  /* should we make this continuable? continue == return maxval */
+  pushSTACK(fixnum(maxval));
+  pushSTACK(fixnum(minval));
+  pushSTACK(caller);
+  pushSTACK(value);
+  error(error_condition,GETTEXT("Return value ~S of call to ~S should be an integer between ~S and ~S."));
+}
+
+/* Function: Reads several bytes from a stream.
+ read_byte_array(&stream,&bytearray,start,len,persev)
+ > stream: stream (on the STACK)
+ > object bytearray: simple-8bit-vector (on the STACK)
+ > uintL start: start index of byte sequence to be filled
+ > uintL len: length of byte sequence to be filled
+ > perseverance_t persev: how to react on incomplete I/O
+ < uintL result: number of bytes that have been filled
+ can trigger GC */
+modexp maygc uintL read_byte_array
+(const gcv_object_t* stream_, const gcv_object_t* bytearray_,
+ uintL start, uintL len, perseverance_t persev) {
   if (len==0)
     return 0;
   var object stream = *stream_;
   if (builtin_stream_p(stream)) {
     return rd_by_array(stream)(stream_,bytearray_,start,len,persev);
   } else {
-    # Call the generic function
-    # (STREAM-READ-BYTE-SEQUENCE stream bytearray start start+len no-hang interactive):
+    /* Call the generic function
+     (STREAM-READ-BYTE-SEQUENCE stream bytearray start start+len no-hang interactive): */
     pushSTACK(stream); pushSTACK(*bytearray_);
     pushSTACK(fixnum(start)); pushSTACK(fixnum(start+len));
     pushSTACK(persev == persev_immediate || persev == persev_bonus ? T : NIL);
     pushSTACK(persev == persev_partial ? T : NIL);
     funcall(S(stream_read_byte_sequence),6);
-    var uintV result;
-    if (!(posfixnump(value1)
-          && (result = posfixnum_to_V(value1),
-              result >= start && result <= start+len))) {
-      pushSTACK(fixnum(start+len));
-      pushSTACK(fixnum(start));
-      pushSTACK(S(stream_read_byte_sequence));
-      pushSTACK(value1);
-      fehler(error,GETTEXT("Return value ~S of call to ~S should be an integer between ~S and ~S."));
-    }
-    return result-start;
+    return check_value_range(value1,S(stream_read_byte_sequence),
+                             start,start+len) - start;
   }
 }
 
-# Writes a Byte to a Stream.
-# write_byte(stream,byte);
-# > stream: Stream
-# > byte: Integer to be written
-# can trigger GC
+/* Writes a Byte to a Stream.
+ write_byte(stream,byte);
+ > stream: Stream
+ > byte: Integer to be written
+ can trigger GC */
 global maygc void write_byte (object stream, object byte) {
   if (builtin_stream_p(stream)) {
     wr_by(stream)(stream,byte);
   } else {
-    # Call the generic function (STREAM-WRITE-BYTE stream byte):
+    /* Call the generic function (STREAM-WRITE-BYTE stream byte): */
     pushSTACK(stream); pushSTACK(byte); funcall(S(stream_write_byte),2);
   }
 }
 
-# Function: Writes several bytes to a stream.
-# write_byte_array(&stream,&bytearray,start,len,persev)
-# > stream: Stream (on the STACK)
-# > object bytearray: simple-8bit-vector (on the STACK)
-# > uintL start: start index of byte sequence to be written
-# > uintL len: length of byte sequence to be written
-# > perseverance_t persev: how to react on incomplete I/O
-# < uintL result: number of bytes that have been written
-# can trigger GC
-global maygc uintL write_byte_array (const gcv_object_t* stream_,
-                                     const gcv_object_t* bytearray_,
-                                     uintL start, uintL len, perseverance_t persev) {
+/* Function: Writes several bytes to a stream.
+ write_byte_array(&stream,&bytearray,start,len,persev)
+ > stream: Stream (on the STACK)
+ > object bytearray: simple-8bit-vector (on the STACK)
+ > uintL start: start index of byte sequence to be written
+ > uintL len: length of byte sequence to be written
+ > perseverance_t persev: how to react on incomplete I/O
+ < uintL result: number of bytes that have been written
+ can trigger GC */
+modexp maygc uintL write_byte_array
+(const gcv_object_t* stream_, const gcv_object_t* bytearray_,
+ uintL start, uintL len, perseverance_t persev) {
   if (len==0)
     return 0;
   var object stream = *stream_;
   if (builtin_stream_p(stream)) {
     return wr_by_array(stream)(stream_,bytearray_,start,len,persev);
   } else {
-    # Call the generic function
-    # (STREAM-WRITE-BYTE-SEQUENCE stream bytearray start start+len no-hang interactive):
+    /* Call the generic function
+     (STREAM-WRITE-BYTE-SEQUENCE stream bytearray start start+len no-hang interactive): */
     pushSTACK(stream); pushSTACK(*bytearray_);
     pushSTACK(fixnum(start)); pushSTACK(fixnum(start+len));
     pushSTACK(persev == persev_immediate || persev == persev_bonus ? T : NIL);
     pushSTACK(persev == persev_partial ? T : NIL);
     funcall(S(stream_write_byte_sequence),6);
-    if (mv_count >= 2) {
+    if (mv_count >= 2)
       /* second return value is index of first unwritten byte
          have to change that here into #bytes written */
-      var uintV result;
-      if (!(posfixnump(value2)
-            && (result = posfixnum_to_V(value2),
-                result >= start && result <= start+len))) {
-        pushSTACK(fixnum(start+len));
-        pushSTACK(fixnum(start));
-        pushSTACK(S(stream_write_byte_sequence));
-        pushSTACK(value2);
-        fehler(error,GETTEXT("Return value ~S of call to ~S should be an integer between ~S and ~S."));
-      }
-      return result-start;
-    }
-    return len;
+      return check_value_range(value2,S(stream_write_byte_sequence),
+                               start,start+len) - start;
+    else
+      return len;
   }
 }
 
-# Reads a Character from a Stream.
-# read_char(&stream)
-# > stream: Stream
-# < stream: Stream
-# < result: read Character (eof_value at EOF)
-# can trigger GC
+/* Reads a Character from a Stream.
+ read_char(&stream)
+ > stream: Stream
+ < stream: Stream
+ < result: read Character (eof_value at EOF)
+ can trigger GC */
 global maygc object read_char (const gcv_object_t* stream_) {
   var object stream = *stream_;
   if (builtin_stream_p(stream)) {
-    if (!(TheStream(stream)->strmflags & strmflags_unread_B)) { # Char after UNREAD ?
-      # no -> fetch next character:
+    if (!(TheStream(stream)->strmflags & strmflags_unread_B)) { /* Char after UNREAD ? */
+      /* no -> fetch next character: */
       var object newch = rd_ch(stream)(stream_);
       stream = *stream_;
-      TheStream(stream)->strm_rd_ch_last = newch; # and store
+      TheStream(stream)->strm_rd_ch_last = newch; /* and store */
       TheStream(stream)->strmflags &= ~strmflags_unread_B;
       return newch;
     } else {
-      # yes -> deleteFlagbit and fetch last character:
+      /* yes -> deleteFlagbit and fetch last character: */
       var object ret = TheStream(stream)->strm_rd_ch_last; /* immediate */
       TheStream(stream)->strmflags &= ~strmflags_unread_B;
       switch (TheStream(stream)->strmtype) {
@@ -705,24 +712,24 @@ global maygc object read_char (const gcv_object_t* stream_) {
     }
   } else {
     pushSTACK(stream);
-    # Call the generic function (STREAM-READ-CHAR stream):
+    /* Call the generic function (STREAM-READ-CHAR stream): */
     pushSTACK(stream); funcall(S(stream_read_char),1);
     var object result = value1;
     if (eq(result,S(Keof)))
       result = eof_value;
-    # Store the result as slot $lastchar:
+    /* Store the result as slot $lastchar: */
     stream = STACK_0; STACK_0 = result;
     stream_set_lastchar(stream,result);
     return popSTACK();
   }
 }
 
-# pushes the last read Character back to the Stream.
-# unread_char(&stream,ch);
-# > ch: last read Character
-# > stream: Stream
-# < stream: Stream
-# can trigger GC
+/* pushes the last read Character back to the Stream.
+ unread_char(&stream,ch);
+ > ch: last read Character
+ > stream: Stream
+ < stream: Stream
+ can trigger GC */
 global maygc void unread_char (const gcv_object_t* stream_, object ch) {
   var object stream = *stream_;
   if (builtin_stream_p(stream)) {
@@ -748,45 +755,45 @@ global maygc void unread_char (const gcv_object_t* stream_, object ch) {
     } else {
       if (!nullp(TheStream(stream)->strm_rd_ch_last)
           && !(TheStream(stream)->strmflags & strmflags_unread_B)) {
-        pushSTACK(stream); # STREAM-ERROR slot STREAM
+        pushSTACK(stream); /* STREAM-ERROR slot STREAM */
         pushSTACK(ch);
         pushSTACK(stream);
         pushSTACK(S(unread_char));
-        fehler(stream_error,GETTEXT("~S: the last character read from ~S was not ~S"));
+        error(stream_error,GETTEXT("~S: the last character read from ~S was not ~S"));
       } else {
-        pushSTACK(stream); # STREAM-ERROR slot STREAM
+        pushSTACK(stream); /* STREAM-ERROR slot STREAM */
         pushSTACK(S(read_char));
         pushSTACK(stream);
         pushSTACK(S(unread_char));
-        fehler(stream_error,GETTEXT("~S from ~S without ~S before it"));
+        error(stream_error,GETTEXT("~S from ~S without ~S before it"));
       }
     }
   } else {
     pushSTACK(stream);
-    # Call the generic function (STREAM-UNREAD-CHAR stream ch):
+    /* Call the generic function (STREAM-UNREAD-CHAR stream ch): */
     pushSTACK(stream); pushSTACK(ch); funcall(S(stream_unread_char),2);
-    # Set $lastchar := NIL:
+    /* Set $lastchar := NIL: */
     stream_set_lastchar(popSTACK(),NIL);
   }
 }
 
-# Reads a Character from a Stream, without consuming it.
-# peek_char(&stream)
-# > stream: Stream
-# < stream: Stream
-# < result: read Character (eof_value at EOF)
-# can trigger GC
+/* Reads a Character from a Stream, without consuming it.
+ peek_char(&stream)
+ > stream: Stream
+ < stream: Stream
+ < result: read Character (eof_value at EOF)
+ can trigger GC */
 global maygc object peek_char (const gcv_object_t* stream_) {
   var object stream = *stream_;
   if (builtin_stream_p(stream)) {
-    if (!(TheStream(stream)->strmflags & strmflags_unread_B)) # Char after UNREAD ?
-      # no -> fetch new character:
+    if (!(TheStream(stream)->strmflags & strmflags_unread_B)) /* Char after UNREAD ? */
+      /* no -> fetch new character: */
       return pk_ch(stream)(stream_);
     else
-      # yes -> fetch last character:
+      /* yes -> fetch last character: */
       return TheStream(stream)->strm_rd_ch_last;
   } else {
-    # Call the generic function (STREAM-PEEK-CHAR stream):
+    /* Call the generic function (STREAM-PEEK-CHAR stream): */
     pushSTACK(stream); funcall(S(stream_peek_char),1);
     var object result = value1;
     if (eq(result,S(Keof)))
@@ -796,14 +803,14 @@ global maygc object peek_char (const gcv_object_t* stream_) {
   }
 }
 
-# Function: Reads several characters from a stream.
-# read_char_array(&stream,&chararray,start,len)
-# > stream: stream (on the STACK)
-# > object chararray: a mutable string that is or was simple (on the STACK)
-# > uintL start: start index of character sequence to be filled
-# > uintL len: length of character sequence to be filled
-# < uintL result: number of characters that have been filled
-# can trigger GC
+/* Function: Reads several characters from a stream.
+ read_char_array(&stream,&chararray,start,len)
+ > stream: stream (on the STACK)
+ > object chararray: a mutable string that is or was simple (on the STACK)
+ > uintL start: start index of character sequence to be filled
+ > uintL len: length of character sequence to be filled
+ < uintL result: number of characters that have been filled
+ can trigger GC */
 global maygc uintL read_char_array (const gcv_object_t* stream_,
                                     const gcv_object_t* chararray_,
                                     uintL start, uintL len) {
@@ -812,12 +819,12 @@ global maygc uintL read_char_array (const gcv_object_t* stream_,
   var object stream = *stream_;
   if (builtin_stream_p(stream)) {
     var object lastchar = TheStream(stream)->strm_rd_ch_last;
-    if (eq(lastchar,eof_value)) # EOF ?
+    if (eq(lastchar,eof_value)) /* EOF ? */
       return 0;
     var uintL index = start;
     if (TheStream(stream)->strmflags & strmflags_unread_B) {
       if (!charp(lastchar))
-        fehler_char(lastchar);
+        error_char(lastchar);
       sstring_store(*chararray_,index++,char_code(lastchar));
       stream = *stream_;
       len--;
@@ -840,22 +847,14 @@ global maygc uintL read_char_array (const gcv_object_t* stream_,
     return index - start;
   } else {
     pushSTACK(stream);
-    # Call the generic function
-    # (STREAM-READ-CHAR-SEQUENCE stream chararray start start+len):
+    /* Call the generic function
+     (STREAM-READ-CHAR-SEQUENCE stream chararray start start+len): */
     pushSTACK(stream); pushSTACK(*chararray_);
     pushSTACK(fixnum(start)); pushSTACK(fixnum(start+len));
     funcall(S(stream_read_char_sequence),4);
-    var uintV result;
-    if (!(posfixnump(value1)
-          && (result = posfixnum_to_V(value1),
-              result >= start && result <= start+len))) {
-      pushSTACK(fixnum(start+len));
-      pushSTACK(fixnum(start));
-      pushSTACK(S(stream_read_char_sequence));
-      pushSTACK(value1);
-      fehler(error,GETTEXT("Return value ~S of call to ~S should be an integer between ~S and ~S."));
-    }
-    # Set the stream's $lastchar := last char or #<EOF>:
+    var uintV result =
+      check_value_range(value1,S(stream_read_char_sequence),start,start+len);
+    /* Set the stream's $lastchar := last char or #<EOF>: */
     var object lastchar;
     if (result-start == len) {
       var object chararray = *chararray_;
@@ -868,8 +867,9 @@ global maygc uintL read_char_array (const gcv_object_t* stream_,
   }
 }
 
-# Function that handles the pending newline before doing the real job.
-local maygc void wr_ch_pending_newline (const gcv_object_t* stream_, object obj) {
+/* Function that handles the pending newline before doing the real job. */
+local maygc void wr_ch_pending_newline (const gcv_object_t* stream_, object obj)
+{
   var object stream = *stream_;
   TheStream(stream)->strm_wr_ch = TheStream(stream)->strm_wr_ch_npnl;
   TheStream(stream)->strm_wr_ch_array = TheStream(stream)->strm_wr_ch_array_npnl;
@@ -881,47 +881,55 @@ local maygc void wr_ch_pending_newline (const gcv_object_t* stream_, object obj)
   write_char(stream_,obj);
 }
 
-# writes a Character to a Stream.
-# write_char(&stream,ch);
-# > ch: Character to be written
-# > stream: Stream
-# < stream: Stream
-# can trigger GC
+/* writes a Character to a Stream.
+ write_char(&stream,ch);
+ > ch: Character to be written
+ > stream: Stream
+ < stream: Stream
+ can trigger GC */
 global maygc void write_char (const gcv_object_t* stream_, object ch) {
   var object stream = *stream_;
   if (builtin_stream_p(stream)) {
     var chart c = char_code(ch);
-    # write Char:
+    /* write Char: */
     wr_ch(stream)(stream_,ch);
-    # update Line Position:
+    /* update Line Position: */
     var object stream = *stream_;
     if (!(TheStream(stream)->strmtype == strmtype_terminal)) {
-      # not the Terminal-Stream
-      if (chareq(c,ascii(NL))) # After Newline: Line Position := 0
+      /* not the Terminal-Stream */
+      if (chareq(c,ascii(NL))) /* After Newline: Line Position := 0 */
         TheStream(stream)->strm_wr_ch_lpos = Fixnum_0;
-      else # increment line position
+      else if (chareq(c,ascii(TAB))) /* Tab width is 8 in Unix culture. */
+        TheStream(stream)->strm_wr_ch_lpos =
+          fixnum_inc(TheStream(stream)->strm_wr_ch_lpos,
+                     8 - fixnum_to_V(TheStream(stream)->strm_wr_ch_lpos) % 8);
+      else /* increment line position */
         TheStream(stream)->strm_wr_ch_lpos =
           fixnum_inc(TheStream(stream)->strm_wr_ch_lpos,char_width(c));
-    } else { # it is the Terminal-Stream
+    } else { /* it is the Terminal-Stream */
      #ifdef TERMINAL_USES_KEYBOARD
-      # On the Atari, wr_ch_terminal() would do this.
+      /* On the Atari, wr_ch_terminal() would do this. */
      #else
-      # How do the control-characters effect in that Position?
-      if (chareq(c,ascii(NL))) { # Newline -> Line Position := 0
+      /* How do the control-characters effect in that Position? */
+      if (chareq(c,ascii(NL))) { /* Newline -> Line Position := 0 */
         TheStream(stream)->strm_wr_ch_lpos = Fixnum_0;
       } else if (chareq(c,ascii(BS))) {
-        # Backspace -> Line Position, if possible, decrement:
+        /* Backspace -> Line Position, if possible, decrement: */
         if (!eq(TheStream(stream)->strm_wr_ch_lpos,Fixnum_0))
           TheStream(stream)->strm_wr_ch_lpos =
             fixnum_inc(TheStream(stream)->strm_wr_ch_lpos,-1);
-      } else # increment line position
+      } else if (chareq(c,ascii(TAB))) /* Tab width is 8 in Unix culture. */
+        TheStream(stream)->strm_wr_ch_lpos =
+          fixnum_inc(TheStream(stream)->strm_wr_ch_lpos,
+                     8 - fixnum_to_V(TheStream(stream)->strm_wr_ch_lpos) % 8);
+      else /* increment line position */
         TheStream(stream)->strm_wr_ch_lpos =
           fixnum_inc(TheStream(stream)->strm_wr_ch_lpos,char_width(c));
      #endif
     }
   } else {
     pushSTACK(stream); pushSTACK(ch);
-    # Test (SLOT-VALUE stream '$penl):
+    /* Test (SLOT-VALUE stream '$penl): */
     var object stream_forwarded = stream;
     instance_un_realloc(stream_forwarded);
     instance_update(stream,stream_forwarded);
@@ -931,17 +939,17 @@ global maygc void write_char (const gcv_object_t* stream_, object ch) {
     if (!nullp(TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)])) {
       TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)] = NIL;
       if (!eq(STACK_0,ascii_char(NL))) {
-        # Call the generic function (STREAM-WRITE-CHAR stream #\Newline):
+        /* Call the generic function (STREAM-WRITE-CHAR stream #\Newline): */
         pushSTACK(STACK_1); pushSTACK(ascii_char(NL));
         funcall(S(stream_write_char),2);
       }
     }
-    # Call the generic function (STREAM-WRITE-CHAR stream ch):
+    /* Call the generic function (STREAM-WRITE-CHAR stream ch): */
     funcall(S(stream_write_char),2);
   }
 }
 
-# Function that handles the pending newline before doing the real job.
+/* Function that handles the pending newline before doing the real job. */
 local maygc void wr_ch_array_pending_newline (const gcv_object_t* stream_,
                                               const gcv_object_t* chararray_,
                                               uintL start, uintL len) {
@@ -957,13 +965,13 @@ local maygc void wr_ch_array_pending_newline (const gcv_object_t* stream_,
   write_char_array(stream_,chararray_,start,len);
 }
 
-# Function: Writes several characters to a stream.
-# write_char_array(&stream,&chararray,start,len)
-# > stream: stream (on the STACK)
-# > object chararray: not-reallocated simple-string (on the STACK)
-# > uintL start: start index of character sequence to be written
-# > uintL len: length of character sequence to be written
-# can trigger GC
+/* Function: Writes several characters to a stream.
+ write_char_array(&stream,&chararray,start,len)
+ > stream: stream (on the STACK)
+ > object chararray: not-reallocated simple-string (on the STACK)
+ > uintL start: start index of character sequence to be written
+ > uintL len: length of character sequence to be written
+ can trigger GC */
 global maygc void write_char_array (const gcv_object_t* stream_,
                                     const gcv_object_t* chararray_,
                                     uintL start, uintL len) {
@@ -973,7 +981,7 @@ global maygc void write_char_array (const gcv_object_t* stream_,
   if (builtin_stream_p(stream)) {
     wr_ch_array(stream)(stream_,chararray_,start,len);
   } else {
-    # Test (SLOT-VALUE stream '$penl):
+    /* Test (SLOT-VALUE stream '$penl): */
     var object stream_forwarded = stream;
     instance_un_realloc(stream_forwarded);
     instance_update(stream,stream_forwarded);
@@ -987,24 +995,24 @@ global maygc void write_char_array (const gcv_object_t* stream_,
         next_is_NL = chareq(as_chart(((SstringX)TheVarobject(*chararray_))->data[start]),ascii(NL));
       });
       if (!next_is_NL) {
-        # Call the generic function (STREAM-WRITE-CHAR stream #\Newline):
+        /* Call the generic function (STREAM-WRITE-CHAR stream #\Newline): */
         pushSTACK(*stream_); pushSTACK(ascii_char(NL));
         funcall(S(stream_write_char),2);
       }
     }
-    # Call the generic function
-    # (STREAM-WRITE-CHAR-SEQUENCE stream chararray start start+len):
+    /* Call the generic function
+     (STREAM-WRITE-CHAR-SEQUENCE stream chararray start start+len): */
     pushSTACK(*stream_); pushSTACK(*chararray_);
     pushSTACK(fixnum(start)); pushSTACK(fixnum(start+len));
     funcall(S(stream_write_char_sequence),4);
   }
 }
 
-# Outputs a real newline if an elastic newline is pending on the stream.
-# harden_elastic_newline(&stream);
-# > stream: Stream
-# < stream: Stream
-# can trigger GC
+/* Outputs a real newline if an elastic newline is pending on the stream.
+ harden_elastic_newline(&stream);
+ > stream: Stream
+ < stream: Stream
+ can trigger GC */
 local maygc void harden_elastic_newline (const gcv_object_t* stream_) {
   var object stream = *stream_;
   if (builtin_stream_p(stream)) {
@@ -1014,7 +1022,7 @@ local maygc void harden_elastic_newline (const gcv_object_t* stream_) {
       write_char(stream_,ascii_char(NL));
     }
   } else {
-    # Test (SLOT-VALUE stream '$penl):
+    /* Test (SLOT-VALUE stream '$penl): */
     var object stream_forwarded = stream;
     instance_un_realloc(stream_forwarded);
     instance_update(stream,stream_forwarded);
@@ -1022,23 +1030,23 @@ local maygc void harden_elastic_newline (const gcv_object_t* stream_) {
     var object clas = TheClassVersion(cv)->cv_class;
     var object slotinfo = gethash(S(penl),TheClass(clas)->slot_location_table,false);
     if (!nullp(TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)])) {
-      # (SETF (SLOT-VALUE stream '$penl) NIL):
+      /* (SETF (SLOT-VALUE stream '$penl) NIL): */
       TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)] = NIL;
       write_char(stream_,ascii_char(NL));
     }
   }
 }
 
-# UP: when closing, fill the stream with the dummy pseudo-functions
-#     and remove the capability flags
-# close_dummys(stream);
-# > stream: Stream
+/* UP: when closing, fill the stream with the dummy pseudo-functions
+     and remove the capability flags
+ close_dummys(stream);
+ > stream: Stream */
 #define close_dummys(s)                                                 \
   stream_dummy_fill(s);                                                 \
-  # delete capability flags                                             \
+  /* delete capability flags                                              */\
   TheStream(s)->strmflags &= ~(strmflags_open_B|strmflags_unread_B)
 
-# fill the stream with dummy pseudo-functions
+/* fill the stream with dummy pseudo-functions */
 local void stream_dummy_fill (object stream) {
   var Stream s = TheStream(stream);
   s->strm_rd_by = P(rd_by_error);
@@ -1048,49 +1056,49 @@ local void stream_dummy_fill (object stream) {
   s->strm_rd_ch = P(rd_ch_error);
   s->strm_pk_ch = P(pk_ch_dummy);
   s->strm_rd_ch_array = P(rd_ch_array_error);
-  s->strm_rd_ch_last = NIL; # Lastchar := NIL
+  s->strm_rd_ch_last = NIL; /* Lastchar := NIL */
   s->strm_wr_ch_lpos = Fixnum_0;
   s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_error);
   s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_error);
 }
 
-# returns error-message, if the value of the Symbol sym is not a Stream.
-nonreturning_function(local, fehler_value_stream, (object sym));
-# see below
+/* returns error-message, if the value of the Symbol sym is not a Stream. */
+nonreturning_function(local, error_value_stream, (object sym));
+/* see below */
 
-# UP: Returns the Stream, that is the value of a Variable.
-# var_stream(sym,strmflags)
-# > sym: Variable (Symbol)
-# > strmflags: set of Operations, that are to be possible on the Stream
-# < result: Stream
+/* UP: Returns the Stream, that is the value of a Variable.
+ var_stream(sym,strmflags)
+ > sym: Variable (Symbol)
+ > strmflags: set of Operations, that are to be possible on the Stream
+ < result: Stream */
 global object var_stream (object sym, uintB strmflags) {
   var object stream;
  recurse:
   stream = Symbol_value(sym);
   if (builtin_stream_p(stream)) {
     if ((strmflags | strmflags_open_B) & ~ TheStream(stream)->strmflags)
-      fehler_value_stream(sym);
+      error_value_stream(sym);
     if (TheStream(stream)->strmtype == strmtype_synonym) {
       sym = TheStream(stream)->strm_synonym_symbol;
       goto recurse;
     }
   } else if (instanceof(stream,O(class_fundamental_stream))) {
-    # Among instances of FUNDAMENTAL-STREAM:
-    # Only instances of FUNDAMENTAL-INPUT-STREAM can do input.
-    # Only instances of FUNDAMENTAL-OUTPUT-STREAM can do output.
+    /* Among instances of FUNDAMENTAL-STREAM:
+     Only instances of FUNDAMENTAL-INPUT-STREAM can do input.
+     Only instances of FUNDAMENTAL-OUTPUT-STREAM can do output. */
     if (((strmflags & strmflags_rd_B)
          && !instanceof(stream,O(class_fundamental_input_stream)))
         || ((strmflags & strmflags_wr_B)
             && !instanceof(stream,O(class_fundamental_output_stream))))
-      fehler_value_stream(sym);
+      error_value_stream(sym);
   } else
-    fehler_value_stream(sym);
+    error_value_stream(sym);
   return stream;
 }
 
-# (SYSTEM::SYMBOL-STREAM symbol [direction])
-# returns the Stream, that is the value of the Symbol, and checks, if it is an
-# open Stream with Direction direction (:PROBE, :INPUT, :OUTPUT or :IO) .
+/* (SYSTEM::SYMBOL-STREAM symbol [direction])
+ returns the Stream, that is the value of the Symbol, and checks, if it is an
+ open Stream with Direction direction (:PROBE, :INPUT, :OUTPUT or :IO) . */
 LISPFUN(symbol_stream,seclass_read,1,1,norest,nokey,0,NIL) {
   var object symbol = check_symbol(STACK_1);
   var object direction = STACK_0; skipSTACK(2);
@@ -1098,34 +1106,34 @@ LISPFUN(symbol_stream,seclass_read,1,1,norest,nokey,0,NIL) {
        eq(direction,S(Kinput)) ? strmflags_rd_ch_B : /* :INPUT */
        eq(direction,S(Koutput)) ? strmflags_wr_ch_B : /* :OUTPUT */
        eq(direction,S(Kio)) ?
-       strmflags_rd_ch_B | strmflags_wr_ch_B : # :IO
+       strmflags_rd_ch_B | strmflags_wr_ch_B : /* :IO */
        0))); /* :PROBE or not given */
 }
 
-# signal an error if for some obscure reason a WRITE should not work:
-nonreturning_function(local, fehler_unwritable, (object caller, object stream))
+/* signal an error if for some obscure reason a WRITE should not work: */
+nonreturning_function(local, error_unwritable, (object caller, object stream))
 {
-  pushSTACK(stream); # FILE-ERROR slot PATHNAME
+  pushSTACK(stream); /* FILE-ERROR slot PATHNAME */
   pushSTACK(stream);
   pushSTACK(caller);
-  fehler(file_error,GETTEXT("~S: cannot output to ~S"));
+  error(file_error,GETTEXT("~S: cannot output to ~S"));
 }
 
 /* signal an error if an Object is not the needed type:
- fehler_write(stream,obj,type); */
-nonreturning_function(local, fehler_write, (object stream, object obj,
-                                            object type)) {
+ error_write(stream,obj,type); */
+nonreturning_function(local, error_write, (object stream, object obj,
+                                           object type)) {
   pushSTACK(obj);               /* TYPE-ERROR slot DATUM */
   pushSTACK(type);              /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(type); pushSTACK(stream); pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: cannot output ~S into ~S, not of type ~S"));
+  error(type_error,GETTEXT("~S: cannot output ~S into ~S, not of type ~S"));
 }
 
 /* WRITE-CHAR pseudo-function for output streams of element type NIL */
 local maygc void wr_ch_forbidden (const gcv_object_t* stream_, object ch)
 {
-  fehler_write(*stream_,ch,NIL);
+  error_write(*stream_,ch,NIL);
 }
 
 /* WRITE-CHAR-ARRAY pseudo-function for output streams of element type NIL */
@@ -1135,17 +1143,17 @@ local maygc void wr_ch_array_forbidden (const gcv_object_t* stream_,
 {
   unused start;
   unused len;
-  fehler_write(*stream_,*chararray_,NIL);
+  error_write(*stream_,*chararray_,NIL);
 }
 
-#define check_wr_char(s,c)  if(!charp(c)) fehler_write(s,c,S(character))
+#define check_wr_char(s,c)  if(!charp(c)) error_write(s,c,S(character))
 
-# signal an error if an Integer is out of range:
-# fehler_bad_integer(stream,obj);
-nonreturning_function(local, fehler_bad_integer, (object stream, object obj)) {
-  pushSTACK(stream); # STREAM-ERROR slot STREAM
+/* signal an error if an Integer is out of range:
+ error_bad_integer(stream,obj); */
+nonreturning_function(local, error_bad_integer, (object stream, object obj)) {
+  pushSTACK(stream); /* STREAM-ERROR slot STREAM */
   pushSTACK(stream); pushSTACK(obj);
-  fehler(stream_error,GETTEXT("integer ~S is out of range, cannot be output onto ~S"));
+  error(stream_error,GETTEXT("integer ~S is out of range, cannot be output onto ~S"));
 }
 
 /* Error message and get a replacement for an argument
@@ -1171,7 +1179,7 @@ local maygc object get_streamtype_replacement (object obj, object type) {
   CHECK_streamtype(obj,O(type_builtin_stream),(builtin_stream_p(obj)))
 /* barf of the object is not an integer */
 #define ASSERT_wr_int(stream,obj)                               \
-  if (!integerp(obj)) fehler_write(stream,obj,S(integer))
+  if (!integerp(obj)) error_write(stream,obj,S(integer))
 
 /* UP: checks, if Arguments are Streams.
  check_stream_args(args_pointer,argcount);
@@ -1188,9 +1196,9 @@ local maygc void check_stream_args (gcv_object_t* args_pointer, uintC argcount) 
 /* forward declaration */
 local object resolve_synonym_stream (object stream);
 
-# Function: Tests whether an object is an input-stream.
-# input_stream_p(stream)
-# > stream: object
+/* Function: Tests whether an object is an input-stream.
+ input_stream_p(stream)
+ > stream: object */
 local bool input_stream_p (object stream) {
   stream = resolve_synonym_stream(stream);
   return (builtin_stream_p(stream) ?
@@ -1198,9 +1206,9 @@ local bool input_stream_p (object stream) {
           : instanceof(stream,O(class_fundamental_input_stream)));
 }
 
-# Function: Tests whether an object is an output-stream.
-# output_stream_p(stream)
-# > stream: object
+/* Function: Tests whether an object is an output-stream.
+ output_stream_p(stream)
+ > stream: object */
 local bool output_stream_p (object stream) {
   stream = resolve_synonym_stream(stream);
   return (builtin_stream_p(stream) ?
@@ -1208,34 +1216,34 @@ local bool output_stream_p (object stream) {
           : instanceof(stream,O(class_fundamental_output_stream)));
 }
 
-# UP: checks an Input-Stream.
-# test_input_stream(stream);
-# > stream: Stream
+/* UP: checks an Input-Stream.
+ test_input_stream(stream);
+ > stream: Stream */
 #define test_input_stream(stream)  \
-    if (!input_stream_p(stream)) fehler_input_stream(stream);
-nonreturning_function(local, fehler_input_stream, (object stream)) {
-  pushSTACK(stream);               # TYPE-ERROR slot DATUM
-  pushSTACK(O(type_input_stream)); # TYPE-ERROR slot EXPECTED-TYPE
+    if (!input_stream_p(stream)) error_input_stream(stream);
+nonreturning_function(local, error_input_stream, (object stream)) {
+  pushSTACK(stream);               /* TYPE-ERROR slot DATUM */
+  pushSTACK(O(type_input_stream)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(stream); pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S should be an input stream"));
+  error(type_error,GETTEXT("~S: argument ~S should be an input stream"));
 }
 
-# UP: checks an Output-Stream.
-# test_output_stream(stream);
-# > stream: Stream
+/* UP: checks an Output-Stream.
+ test_output_stream(stream);
+ > stream: Stream */
 #define test_output_stream(stream)  \
-    if (!output_stream_p(stream)) fehler_output_stream(stream);
-nonreturning_function(local, fehler_output_stream, (object stream)) {
-  pushSTACK(stream);                # TYPE-ERROR slot DATUM
-  pushSTACK(O(type_output_stream)); # TYPE-ERROR slot EXPECTED-TYPE
+    if (!output_stream_p(stream)) error_output_stream(stream);
+nonreturning_function(local, error_output_stream, (object stream)) {
+  pushSTACK(stream);                /* TYPE-ERROR slot DATUM */
+  pushSTACK(O(type_output_stream)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(stream); pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S should be an output stream"));
+  error(type_error,GETTEXT("~S: argument ~S should be an output stream"));
 }
 
-# UP: checks, if Arguments are Input-Streams.
-# test_input_stream_args(args_pointer,argcount);
-# > args_pointer: Pointer to the Arguments
-# > argcount: number of Arguments
+/* UP: checks, if Arguments are Input-Streams.
+ test_input_stream_args(args_pointer,argcount);
+ > args_pointer: Pointer to the Arguments
+ > argcount: number of Arguments */
 #define test_input_stream_args(args_pointer,argcount)   \
     if (argcount > 0) {                                 \
       var gcv_object_t* pointer = (args_pointer);       \
@@ -1247,10 +1255,10 @@ nonreturning_function(local, fehler_output_stream, (object stream)) {
       });                                               \
     }
 
-# UP: checks, if Arguments are Output-Streams.
-# test_output_stream_args(args_pointer,argcount);
-# > args_pointer: Pointer to the Arguments
-# > argcount: number of Arguments
+/* UP: checks, if Arguments are Output-Streams.
+ test_output_stream_args(args_pointer,argcount);
+ > args_pointer: Pointer to the Arguments
+ > argcount: number of Arguments */
 #define test_output_stream_args(args_pointer,argcount)  \
     if (argcount > 0) {                                 \
       var gcv_object_t* pointer = (args_pointer);       \
@@ -1263,27 +1271,27 @@ nonreturning_function(local, fehler_output_stream, (object stream)) {
     }
 
 
-# Synonym-Stream
-# ==============
+/* Synonym-Stream
+   ==============
 
-# Additional Components:
-  # define strm_synonym_symbol  strm_other[0]  # Symbol, whose value is referred to
+ Additional Components:
+ define strm_synonym_symbol  strm_other[0]  - Symbol, whose value is referred to
 
-# Macro: Returns the value of a Symbol, a Stream.
-# get_synonym_stream(sym)
-# > sym: Symbol, a variable
-# < result: its value, a Stream
+ Macro: Returns the value of a Symbol, a Stream.
+ get_synonym_stream(sym)
+ > sym: Symbol, a variable
+ < result: its value, a Stream */
 #define get_synonym_stream(sym)                 \
     (!streamp(Symbol_value(sym))                \
-     ? (fehler_value_stream(sym), unbound)      \
+     ? (error_value_stream(sym), unbound)      \
      : (object)Symbol_value(sym))
 
-# Macro: resolve the synonym stream
+/* Macro: resolve the synonym stream */
 #define resolve_as_synonym(stream)                              \
   do { object symbol = TheStream(stream)->strm_synonym_symbol;  \
        stream = get_synonym_stream(symbol); } while (0)
 
-# Function: resolve the synonym stream
+/* Function: resolve the synonym stream */
 local object resolve_synonym_stream (object stream) {
   while (builtin_stream_p(stream)
          && TheStream(stream)->strmtype == strmtype_synonym) {
@@ -1293,17 +1301,18 @@ local object resolve_synonym_stream (object stream) {
   return stream;
 }
 
-# READ-BYTE - Pseudo-Function for Synonym-Streams:
+/* READ-BYTE - Pseudo-Function for Synonym-Streams: */
 local maygc object rd_by_synonym (object stream) {
   check_SP();
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   return read_byte(get_synonym_stream(symbol));
 }
 
-# READ-BYTE-ARRAY - Pseudo-Function for Synonym-Streams:
+/* READ-BYTE-ARRAY - Pseudo-Function for Synonym-Streams: */
 local maygc uintL rd_by_array_synonym (const gcv_object_t* stream_,
                                        const gcv_object_t* bytearray_,
-                                       uintL start, uintL len, perseverance_t persev) {
+                                       uintL start, uintL len,
+                                       perseverance_t persev) {
   check_SP(); check_STACK();
   var object symbol = TheStream(*stream_)->strm_synonym_symbol;
   pushSTACK(get_synonym_stream(symbol));
@@ -1312,17 +1321,18 @@ local maygc uintL rd_by_array_synonym (const gcv_object_t* stream_,
   return result;
 }
 
-# WRITE-BYTE - Pseudo-Function for Synonym-Streams:
+/* WRITE-BYTE - Pseudo-Function for Synonym-Streams: */
 local maygc void wr_by_synonym (object stream, object obj) {
   check_SP();
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   write_byte(get_synonym_stream(symbol),obj);
 }
 
-# WRITE-BYTE-ARRAY - Pseudo-Function for Synonym-Streams:
+/* WRITE-BYTE-ARRAY - Pseudo-Function for Synonym-Streams: */
 local maygc uintL wr_by_array_synonym (const gcv_object_t* stream_,
                                        const gcv_object_t* bytearray_,
-                                       uintL start, uintL len, perseverance_t persev) {
+                                       uintL start, uintL len,
+                                       perseverance_t persev) {
   check_SP(); check_STACK();
   var object symbol = TheStream(*stream_)->strm_synonym_symbol;
   pushSTACK(get_synonym_stream(symbol));
@@ -1331,29 +1341,29 @@ local maygc uintL wr_by_array_synonym (const gcv_object_t* stream_,
   return result;
 }
 
-# READ-CHAR - Pseudo-Function for Synonym-Streams:
+/* READ-CHAR - Pseudo-Function for Synonym-Streams: */
 local maygc object rd_ch_synonym (const gcv_object_t* stream_) {
   check_SP(); check_STACK();
   var object stream = *stream_;
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   pushSTACK(get_synonym_stream(symbol));
-  var object ergebnis = read_char(&STACK_0);
+  var object result = read_char(&STACK_0);
   skipSTACK(1);
-  return ergebnis;
+  return result;
 }
 
-# PEEK-CHAR - Pseudo-Function for Synonym-Streams:
+/* PEEK-CHAR - Pseudo-Function for Synonym-Streams: */
 local maygc object pk_ch_synonym (const gcv_object_t* stream_) {
   check_SP(); check_STACK();
   var object stream = *stream_;
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   pushSTACK(get_synonym_stream(symbol));
-  var object ergebnis = peek_char(&STACK_0);
+  var object result = peek_char(&STACK_0);
   skipSTACK(1);
-  return ergebnis;
+  return result;
 }
 
-# READ-CHAR-ARRAY - Pseudo-Function for Synonym-Streams:
+/* READ-CHAR-ARRAY - Pseudo-Function for Synonym-Streams: */
 local maygc uintL rd_ch_array_synonym (const gcv_object_t* stream_,
                                        const gcv_object_t* chararray_,
                                        uintL start, uintL len) {
@@ -1365,7 +1375,7 @@ local maygc uintL rd_ch_array_synonym (const gcv_object_t* stream_,
   return result;
 }
 
-# WRITE-CHAR - Pseudo-Function for Synonym-Streams:
+/* WRITE-CHAR - Pseudo-Function for Synonym-Streams: */
 local maygc void wr_ch_synonym (const gcv_object_t* stream_, object obj) {
   check_SP(); check_STACK();
   var object stream = *stream_;
@@ -1375,7 +1385,7 @@ local maygc void wr_ch_synonym (const gcv_object_t* stream_, object obj) {
   skipSTACK(1);
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for Synonym-Streams:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for Synonym-Streams: */
 local maygc void wr_ch_array_synonym (const gcv_object_t* stream_,
                                       const gcv_object_t* chararray_,
                                       uintL start, uintL len) {
@@ -1384,11 +1394,11 @@ local maygc void wr_ch_array_synonym (const gcv_object_t* stream_,
   pushSTACK(get_synonym_stream(symbol));
   write_char_array(&STACK_0,chararray_,start,len);
   skipSTACK(1);
-  # No need to update wr_ch_lpos here. (See get_line_position().)
+  /* No need to update wr_ch_lpos here. (See get_line_position().) */
 }
 
 /* Closes a Synonym-Stream.
- close_synonym(stream);
+ close_synonym(stream, abort);
  > stream : Synonym-Stream
  > abort: flag: non-0 => ignore errors */
 #ifdef X3J13_014
@@ -1404,14 +1414,15 @@ local maygc void wr_ch_array_synonym (const gcv_object_t* stream_,
   }
 #endif
 
-# Reads a line of characters from a synonym-stream.
-# read_line_synonym(stream,&buffer)
-# > stream: synonym-stream
-# > buffer: a semi-simple string
-# < buffer: contains the read characters, excluding the terminating #\Newline
-# < result: true if EOF was seen before newline, else false
-# can trigger GC
-local maygc bool read_line_synonym (object stream, const gcv_object_t* buffer_) {
+/* Reads a line of characters from a synonym-stream.
+ read_line_synonym(stream,&buffer)
+ > stream: synonym-stream
+ > buffer: a semi-simple string
+ < buffer: contains the read characters, excluding the terminating #\Newline
+ < result: true if EOF was seen before newline, else false
+ can trigger GC */
+local maygc bool read_line_synonym (object stream, const gcv_object_t* buffer_)
+{
   check_SP(); check_STACK();
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   pushSTACK(get_synonym_stream(symbol));
@@ -1420,81 +1431,77 @@ local maygc bool read_line_synonym (object stream, const gcv_object_t* buffer_) 
   return eofp;
 }
 
-# Determines, if a character is available on the Synonym-Stream.
-# listen_char_synonym(stream)
-# > stream : Synonym-Stream
-# < result:  ls_avail if a character is available,
-#            ls_eof   if EOF is reached,
-#            ls_wait  if no character is available, but not because of EOF
-# can trigger GC
-local maygc signean listen_char_synonym (object stream) {
+/* Determines, if a character is available on the Synonym-Stream.
+ listen_char_synonym(stream)
+ > stream : Synonym-Stream
+ < result: input availability
+ can trigger GC */
+local maygc listen_t listen_char_synonym (object stream) {
   check_SP();
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   return listen_char(get_synonym_stream(symbol));
 }
 
-# UP: Deletes already entered interactive Input from a Synonym-Stream.
-# clear_input_synonym(stream)
-# > stream: Synonym-Stream
-# < result: true if Input was deleted
-# can trigger GC
+/* UP: Deletes already entered interactive Input from a Synonym-Stream.
+ clear_input_synonym(stream)
+ > stream: Synonym-Stream
+ < result: true if Input was deleted
+ can trigger GC */
 local maygc bool clear_input_synonym (object stream) {
   check_SP();
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   return clear_input(get_synonym_stream(symbol));
 }
 
-# Determines, if a Byte is available on a Synonym-Stream.
-# listen_byte_synonym(stream)
-# > stream : Synonym-Stream
-# < result:  ls_avail if a byte is available,
-#            ls_eof   if EOF is reached,
-#            ls_wait  if no byte is available, but not because of EOF
-# can trigger GC
-local maygc signean listen_byte_synonym (object stream) {
+/* Determines, if a Byte is available on a Synonym-Stream.
+ listen_byte_synonym(stream)
+ > stream : Synonym-Stream
+ < result: input availability
+ can trigger GC */
+local maygc listen_t listen_byte_synonym (object stream) {
   check_SP();
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   return listen_byte(get_synonym_stream(symbol));
 }
 
-# UP: bring pending Output of a Synonym-Stream to the destination.
-# finish_output_synonym(stream);
-# > stream: Synonym-Stream
-# can trigger GC
+/* UP: bring pending Output of a Synonym-Stream to the destination.
+ finish_output_synonym(stream);
+ > stream: Synonym-Stream
+ can trigger GC */
 local maygc void finish_output_synonym (object stream) {
   check_SP();
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   finish_output(get_synonym_stream(symbol));
 }
 
-# UP: bring pending Output of a Synonym-Stream to the destination.
-# force_output_synonym(stream);
-# > stream: Synonym-Stream
-# can trigger GC
+/* UP: bring pending Output of a Synonym-Stream to the destination.
+ force_output_synonym(stream);
+ > stream: Synonym-Stream
+ can trigger GC */
 local maygc void force_output_synonym (object stream) {
   check_SP();
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   force_output(get_synonym_stream(symbol));
 }
 
-# UP: delete the pending Output of a Synonym-Stream.
-# clear_output_synonym(stream);
-# > stream: Synonym-Stream
-# can trigger GC
+/* UP: delete the pending Output of a Synonym-Stream.
+ clear_output_synonym(stream);
+ > stream: Synonym-Stream
+ can trigger GC */
 local maygc void clear_output_synonym (object stream) {
   check_SP();
   var object symbol = TheStream(stream)->strm_synonym_symbol;
   clear_output(get_synonym_stream(symbol));
 }
 
-# Returns a Synonym-Stream for a Symbol.
-# make_synonym_stream(symbol)
-# > symbol : Symbol
-# < result : new Synonym-Stream
-# can trigger GC
+/* Returns a Synonym-Stream for a Symbol.
+ make_synonym_stream(symbol)
+ > symbol : Symbol
+ < result : new Synonym-Stream
+ can trigger GC */
 local maygc object make_synonym_stream (object symbol) {
-  pushSTACK(symbol); # save Symbol
-  var object stream = # new Stream, all Operations permitted
+  pushSTACK(symbol); /* save Symbol */
+  var object stream = /* new Stream, all Operations permitted */
     allocate_stream(strmflags_rdwr_B,strmtype_synonym,strm_len+1,0);
   TheStream(stream)->strm_rd_by = P(rd_by_synonym);
   TheStream(stream)->strm_rd_by_array = P(rd_by_array_synonym);
@@ -1517,10 +1524,10 @@ LISPFUNNR(make_synonym_stream,1)
 { /* (MAKE-SYNONYM-STREAM symbol), CLTL p. 329 */
   var object arg = popSTACK();
   if (!symbolp(arg)) {
-    pushSTACK(arg);       # TYPE-ERROR slot DATUM
-    pushSTACK(S(symbol)); # TYPE-ERROR slot EXPECTED-TYPE
+    pushSTACK(arg);       /* TYPE-ERROR slot DATUM */
+    pushSTACK(S(symbol)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(arg); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: argument should be a symbol, not ~S"));
+    error(type_error,GETTEXT("~S: argument should be a symbol, not ~S"));
   }
   VALUES1(make_synonym_stream(arg));
 }
@@ -1542,38 +1549,40 @@ LISPFUNNR(synonym_stream_symbol,1)
 }
 
 
-# Broadcast-Stream
-# ================
+/* Broadcast-Stream
+   ================
 
-# Additional Components:
-  # define strm_broad_list  strm_other[0] # list of streams
+ Additional Components:
+  define strm_broad_list  strm_other[0] - list of streams
 
-# WRITE-BYTE - Pseudo-Function for Broadcast-Streams:
+ WRITE-BYTE - Pseudo-Function for Broadcast-Streams: */
 local maygc void wr_by_broad (object stream, object obj) {
   check_SP(); check_STACK();
   pushSTACK(obj);
-  { # list of streams
+  { /* list of streams */
     var object streamlist = TheStream(stream)->strm_broad_list;
-    # write obj to each Stream on the List:
+    /* write obj to each Stream on the List: */
     while (consp(streamlist)) {
-      pushSTACK(Cdr(streamlist)); # remaining Streams
-      write_byte(Car(streamlist),STACK_1); # write obj
+      pushSTACK(Cdr(streamlist)); /* remaining Streams */
+      write_byte(Car(streamlist),STACK_1); /* write obj */
       streamlist = popSTACK();
     }
   }
   skipSTACK(1);
 }
 
-# WRITE-BYTE-ARRAY - Pseudo-Function for Broadcast-Streams:
-local maygc uintL wr_by_array_broad (const gcv_object_t* stream_, const gcv_object_t* bytearray_,
-                                     uintL start, uintL len, perseverance_t persev) {
+/* WRITE-BYTE-ARRAY - Pseudo-Function for Broadcast-Streams: */
+local maygc uintL wr_by_array_broad (const gcv_object_t* stream_,
+                                     const gcv_object_t* bytearray_,
+                                     uintL start, uintL len,
+                                     perseverance_t persev) {
   /* what happens if different streams write different amounts?
      Only persev_full is supported for broadcast streams. */
   if (persev != persev_full) {
-    fehler_illegal_streamop(S(write_byte_sequence),*stream_);
+    error_illegal_streamop(S(write_byte_sequence),*stream_);
   }
   check_SP(); check_STACK();
-  pushSTACK(TheStream(*stream_)->strm_broad_list); # list of streams
+  pushSTACK(TheStream(*stream_)->strm_broad_list); /* list of streams */
   var object streamlist;
   while (streamlist = STACK_0, consp(streamlist)) {
     STACK_0 = Cdr(streamlist);
@@ -1585,28 +1594,29 @@ local maygc uintL wr_by_array_broad (const gcv_object_t* stream_, const gcv_obje
   return len;
 }
 
-# WRITE-CHAR - Pseudo-Function for Broadcast-Streams:
+/* WRITE-CHAR - Pseudo-Function for Broadcast-Streams: */
 local maygc void wr_ch_broad (const gcv_object_t* stream_, object obj) {
   check_SP(); check_STACK();
   pushSTACK(obj);
-  pushSTACK(NIL); # dummy
-  pushSTACK(TheStream(*stream_)->strm_broad_list); # list of streams
-  # write obj to each Stream on the List:
+  pushSTACK(NIL); /* dummy */
+  pushSTACK(TheStream(*stream_)->strm_broad_list); /* list of streams */
+  /* write obj to each Stream on the List: */
   while (mconsp(STACK_0)) {
-    # Stack Layout: obj, dummy, streamlistr.
-    STACK_1 = Car(STACK_0); # a Stream from the Liste
-    write_char(&STACK_1,STACK_2); # write obj
+    /* Stack Layout: obj, dummy, streamlistr. */
+    STACK_1 = Car(STACK_0); /* a Stream from the Liste */
+    write_char(&STACK_1,STACK_2); /* write obj */
     STACK_0 = Cdr(STACK_0);
   }
   skipSTACK(3);
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for Broadcast-Streams:
-local maygc void wr_ch_array_broad (const gcv_object_t* stream_, const gcv_object_t* chararray_,
+/* WRITE-CHAR-ARRAY - Pseudo-Function for Broadcast-Streams: */
+local maygc void wr_ch_array_broad (const gcv_object_t* stream_,
+                                    const gcv_object_t* chararray_,
                                     uintL start, uintL len) {
   check_SP(); check_STACK();
-  pushSTACK(TheStream(*stream_)->strm_broad_list); # list of streams
-  pushSTACK(NIL); # dummy
+  pushSTACK(TheStream(*stream_)->strm_broad_list); /* list of streams */
+  pushSTACK(NIL); /* dummy */
   var object streamlist;
   while (streamlist = STACK_1, consp(streamlist)) {
     STACK_1 = Cdr(streamlist);
@@ -1614,63 +1624,63 @@ local maygc void wr_ch_array_broad (const gcv_object_t* stream_, const gcv_objec
     write_char_array(&STACK_0,chararray_,start,len);
   }
   skipSTACK(2);
-  # No need to update wr_ch_lpos here. (See get_line_position().)
+  /* No need to update wr_ch_lpos here. (See get_line_position().) */
 }
 
-# UP: Moves the pending Output of a Broadcast-Stream to the destination.
-# finish_output_broad(stream);
-# > stream: Broadcast-Stream
-# can trigger GC
+/* UP: Moves the pending Output of a Broadcast-Stream to the destination.
+ finish_output_broad(stream);
+ > stream: Broadcast-Stream
+ can trigger GC */
 local maygc void finish_output_broad (object stream) {
   check_SP(); check_STACK();
-  var object streamlist = TheStream(stream)->strm_broad_list; # list of streams
-  # treat each Stream from the List separately:
+  var object streamlist = TheStream(stream)->strm_broad_list;
+  /* treat each Stream from the List separately: */
   while (consp(streamlist)) {
-    pushSTACK(Cdr(streamlist)); # remaining Streams
+    pushSTACK(Cdr(streamlist)); /* remaining Streams */
     finish_output(Car(streamlist));
     streamlist = popSTACK();
   }
 }
 
-# UP: Moves the pending Output of a Broadcast-Stream to the destination.
-# force_output_broad(stream);
-# > stream: Broadcast-Stream
-# can trigger GC
+/* UP: Moves the pending Output of a Broadcast-Stream to the destination.
+ force_output_broad(stream);
+ > stream: Broadcast-Stream
+ can trigger GC */
 local maygc void force_output_broad (object stream) {
   check_SP(); check_STACK();
-  var object streamlist = TheStream(stream)->strm_broad_list; # list of streams
-  # treat each Stream from the List separately:
+  var object streamlist = TheStream(stream)->strm_broad_list;
+  /* treat each Stream from the List separately: */
   while (consp(streamlist)) {
-    pushSTACK(Cdr(streamlist)); # remaining Streams
+    pushSTACK(Cdr(streamlist)); /* remaining Streams */
     force_output(Car(streamlist));
     streamlist = popSTACK();
   }
 }
 
-# UP: Deletes the pending Output of a Broadcast-Stream.
-# clear_output_broad(stream);
-# > stream: Broadcast-Stream
-# can trigger GC
+/* UP: Deletes the pending Output of a Broadcast-Stream.
+ clear_output_broad(stream);
+ > stream: Broadcast-Stream
+ can trigger GC */
 local maygc void clear_output_broad (object stream) {
   check_SP(); check_STACK();
-  var object streamlist = TheStream(stream)->strm_broad_list; # list of streams
-  # treat each Stream from the List separately:
+  var object streamlist = TheStream(stream)->strm_broad_list;
+  /* treat each Stream from the List separately: */
   while (consp(streamlist)) {
-    pushSTACK(Cdr(streamlist)); # remaining Streams
+    pushSTACK(Cdr(streamlist)); /* remaining Streams */
     clear_output(Car(streamlist));
     streamlist = popSTACK();
   }
 }
 
-# Returns a Broadcast-Stream for a list of Streams.
-# make_broadcast_stream(list)
-# > list : list of streams
-# < result : Broadcast-Stream
-# Thereby the List list is destroyed.
-# can trigger GC
+/* Returns a Broadcast-Stream for a list of Streams.
+ make_broadcast_stream(list)
+ > list : list of streams
+ < result : Broadcast-Stream
+ Thereby the List list is destroyed.
+ can trigger GC */
 local maygc object make_broadcast_stream (object list) {
-  pushSTACK(list); # save list
-  var object stream = # new Stream, only WRITEs allowed
+  pushSTACK(list); /* save list */
+  var object stream = /* new Stream, only WRITEs allowed */
     allocate_stream(strmflags_wr_B,strmtype_broad,strm_len+1,0);
   list = popSTACK();
   stream_dummy_fill(stream);
@@ -1684,30 +1694,30 @@ local maygc object make_broadcast_stream (object list) {
   return stream;
 }
 
-# returns a Broadcast-Stream for Stream stream.
-# make_broadcast1_stream(stream)
-# > stream : Stream
-# < result : Broadcast-Stream
-# can trigger GC
+/* returns a Broadcast-Stream for Stream stream.
+ make_broadcast1_stream(stream)
+ > stream : Stream
+ < result : Broadcast-Stream
+ can trigger GC */
 global maygc object make_broadcast1_stream (object oldstream) {
   pushSTACK(oldstream);
-  # pack oldstream in a one-element List:
+  /* pack oldstream in a one-element List: */
   var object new_cons = allocate_cons();
   Car(new_cons) = STACK_0;
-  var object stream = make_broadcast_stream(new_cons); # new Stream
+  var object stream = make_broadcast_stream(new_cons); /* new Stream */
   oldstream = popSTACK();
-  # take over Line-Position:
+  /* take over Line-Position: */
   TheStream(stream)->strm_wr_ch_lpos = TheStream(oldstream)->strm_wr_ch_lpos;
   return stream;
 }
 
 LISPFUN(make_broadcast_stream,seclass_read,0,0,rest,nokey,0,NIL)
 { /* (MAKE-BROADCAST-STREAM {stream}), CLTL p. 329 */
-  # check that all Arguments are Streams:
+  /* check that all Arguments are Streams: */
   test_output_stream_args(rest_args_pointer,argcount);
-  # collect to one List:
+  /* collect to one List: */
   var object list = listof(argcount);
-  # build Stream:
+  /* build Stream: */
   VALUES1(make_broadcast_stream(list));
 }
 
@@ -1724,7 +1734,7 @@ LISPFUNNR(broadcast_stream_streams,1)
   CHECK_streamtype(stream,S(broadcast_stream),
                    (builtin_stream_p(stream)
                     && (TheStream(stream)->strmtype == strmtype_broad)));
-  # copy List of Streams as a precaution
+  /* copy List of Streams as a precaution */
   VALUES1(copy_list(TheStream(stream)->strm_broad_list));
 }
 
@@ -1742,39 +1752,40 @@ local object broadcast_stream_last (object stream)
   } else return nullobj;
 }
 
-# Concatenated-Stream
-# ===================
+/* Concatenated-Stream
+   ===================
 
-# Additional Components:
-  # define strm_concat_list      strm_other[0]  # list of not exhausted streams
-  #define strm_concat_totallist  strm_other[1]  # list of all streams
+ Additional Components:
+ define strm_concat_list       strm_other[0]  - list of not exhausted streams */
+#define strm_concat_totallist  strm_other[1]  /* list of all streams */
 
-# READ-BYTE - Pseudo-Function for Concatenated-Streams:
+/* READ-BYTE - Pseudo-Function for Concatenated-Streams: */
 local maygc object rd_by_concat (object stream) {
   check_SP(); check_STACK();
   pushSTACK(stream);
-  var object streamlist = TheStream(stream)->strm_concat_list; # list of streams
+  var object streamlist = TheStream(stream)->strm_concat_list;
   var object result;
   while (consp(streamlist)) {
-    result = read_byte(Car(streamlist)); # read Integer
-    if (!eq(result,eof_value)) # not EOF ?
+    result = read_byte(Car(streamlist)); /* read Integer */
+    if (!eq(result,eof_value)) /* not EOF ? */
       goto OK;
-    # EOF reached -> remove emptied Stream from the List:
+    /* EOF reached -> remove emptied Stream from the List: */
     stream = STACK_0;
     streamlist = TheStream(stream)->strm_concat_list =
              Cdr(TheStream(stream)->strm_concat_list);
   }
-  # all Streams emptied -> return EOF:
-  result = eof_value;
+  /* all Streams emptied -> return EOF: */
+  { result = eof_value; }
  OK:
   skipSTACK(1);
   return result;
 }
 
-# READ-BYTE-ARRAY - Pseudo-Function for Concatenated-Streams:
+/* READ-BYTE-ARRAY - Pseudo-Function for Concatenated-Streams: */
 local maygc uintL rd_by_array_concat (const gcv_object_t* stream_,
                                       const gcv_object_t* bytearray_,
-                                      uintL start, uintL len, perseverance_t persev) {
+                                      uintL start, uintL len,
+                                      perseverance_t persev) {
   check_SP(); check_STACK();
   var uintL result = 0;
   var object stream = *stream_;
@@ -1787,7 +1798,7 @@ local maygc uintL rd_by_array_concat (const gcv_object_t* stream_,
     start += count; len -= count;
     if (len == 0)
       break;
-    # EOF reached -> remove emptied stream from the list:
+    /* EOF reached -> remove emptied stream from the list: */
     stream = *stream_;
     streamlist = TheStream(stream)->strm_concat_list =
              Cdr(TheStream(stream)->strm_concat_list);
@@ -1797,45 +1808,45 @@ local maygc uintL rd_by_array_concat (const gcv_object_t* stream_,
   return result;
 }
 
-# READ-CHAR - Pseudo-Function for Concatenated-Streams:
+/* READ-CHAR - Pseudo-Function for Concatenated-Streams: */
 local maygc object rd_ch_concat (const gcv_object_t* stream_) {
   check_SP(); check_STACK();
-  var object streamlist = TheStream(*stream_)->strm_concat_list; # list of streams
+  var object streamlist = TheStream(*stream_)->strm_concat_list;
   while (consp(streamlist)) {
     pushSTACK(Car(streamlist));
-    var object result = read_char(&STACK_0); # read Character
+    var object result = read_char(&STACK_0); /* read Character */
     skipSTACK(1);
     if (!eq(result,eof_value))
       return result;
-    # EOF reached -> remove emptied stream from the list:
+    /* EOF reached -> remove emptied stream from the list: */
     var object stream = *stream_;
     streamlist = TheStream(stream)->strm_concat_list =
              Cdr(TheStream(stream)->strm_concat_list);
   }
-  # all Streams emptied -> return EOF:
+  /* all Streams emptied -> return EOF: */
   return eof_value;
 }
 
-# PEEK-CHAR - Pseudo-Function for Concatenated-Streams:
+/* PEEK-CHAR - Pseudo-Function for Concatenated-Streams: */
 local maygc object pk_ch_concat (const gcv_object_t* stream_) {
   check_SP(); check_STACK();
-  var object streamlist = TheStream(*stream_)->strm_concat_list; # list of streams
+  var object streamlist = TheStream(*stream_)->strm_concat_list;
   while (consp(streamlist)) {
     pushSTACK(Car(streamlist));
-    var object result = peek_char(&STACK_0); # read Character
+    var object result = peek_char(&STACK_0); /* read Character */
     skipSTACK(1);
     if (!eq(result,eof_value))
       return result;
-    # EOF reached -> remove emptied stream from the list:
+    /* EOF reached -> remove emptied stream from the list: */
     var object stream = *stream_;
     streamlist = TheStream(stream)->strm_concat_list =
              Cdr(TheStream(stream)->strm_concat_list);
   }
-  # all Streams emptied -> return EOF:
+  /* all Streams emptied -> return EOF: */
   return eof_value;
 }
 
-# READ-CHAR-ARRAY - Pseudo-Function for Concatenated-Streams:
+/* READ-CHAR-ARRAY - Pseudo-Function for Concatenated-Streams: */
 local maygc uintL rd_ch_array_concat (const gcv_object_t* stream_,
                                       const gcv_object_t* chararray_,
                                       uintL start, uintL len) {
@@ -1851,7 +1862,7 @@ local maygc uintL rd_ch_array_concat (const gcv_object_t* stream_,
     start += count; len -= count;
     if (len == 0)
       break;
-    # EOF reached -> remove emptied stream from the list:
+    /* EOF reached -> remove emptied stream from the list: */
     stream = *stream_;
     streamlist = TheStream(stream)->strm_concat_list =
              Cdr(TheStream(stream)->strm_concat_list);
@@ -1859,87 +1870,83 @@ local maygc uintL rd_ch_array_concat (const gcv_object_t* stream_,
   return result;
 }
 
-# Determines, if a character is available on the Concatenated-Stream.
-# listen_char_concat(stream)
-# > stream : Concatenated-Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
-# can trigger GC
-local maygc signean listen_char_concat (object stream) {
+/* Determines, if a character is available on the Concatenated-Stream.
+ listen_char_concat(stream)
+ > stream : Concatenated-Stream
+ < result: input availability
+ can trigger GC */
+local maygc listen_t listen_char_concat (object stream) {
   pushSTACK(stream);
-  var object streamlist = TheStream(stream)->strm_concat_list; # list of streams
-  var signean result;
+  var object streamlist = TheStream(stream)->strm_concat_list;
+  var listen_t result;
   while (consp(streamlist)) {
     result = listen_char(Car(streamlist));
-    if (!ls_eof_p(result)) # not EOF ?
+    if (result != LISTEN_EOF) /* not EOF ? */
       goto OK;
-    # EOF reached -> remove emptied stream from the list:
+    /* EOF reached -> remove emptied stream from the list: */
     stream = STACK_0;
     streamlist = TheStream(stream)->strm_concat_list =
              Cdr(TheStream(stream)->strm_concat_list);
   }
-  # all Streams emptied -> return EOF:
-  result = ls_eof;
+  /* all Streams emptied -> return EOF: */
+  result = LISTEN_EOF;
  OK:
   skipSTACK(1);
   return result;
 }
 
-# UP: Deletes already entered interactive Input from a
-# Concatenated-Stream.
-# clear_input_concat(stream)
-# > stream: Concatenated-Stream
-# < result: true if Input was deleted
-# can trigger GC
+/* UP: Deletes already entered interactive Input from a
+ Concatenated-Stream.
+ clear_input_concat(stream)
+ > stream: Concatenated-Stream
+ < result: true if Input was deleted
+ can trigger GC */
 local maygc bool clear_input_concat (object stream) {
-  var bool result = false; # no Input deleted yet
-  # treat all Streams separately:
-  var object streamlist = TheStream(stream)->strm_concat_list; # list of streams
+  var bool result = false; /* no Input deleted yet */
+  /* treat all Streams separately: */
+  var object streamlist = TheStream(stream)->strm_concat_list;
   while (consp(streamlist)) {
-    pushSTACK(Cdr(streamlist)); # remaining list ofStreams
-    result |= clear_input(Car(streamlist)); # delete all Input of the sub-streams
+    pushSTACK(Cdr(streamlist)); /* remaining list ofStreams */
+    result |= clear_input(Car(streamlist)); /* delete all Input of the sub-streams */
     streamlist = popSTACK();
   }
   return result;
 }
 
-# Determines, if a Byte is available on the Concatenated-Stream.
-# listen_byte_concat(stream)
-# > stream : Concatenated-Stream
-# < result:   ls_avail if a byte is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no byte is available, but not because of EOF
-# can trigger GC
-local maygc signean listen_byte_concat (object stream) {
+/* Determines, if a Byte is available on the Concatenated-Stream.
+ listen_byte_concat(stream)
+ > stream : Concatenated-Stream
+ < result: input availability
+ can trigger GC */
+local maygc listen_t listen_byte_concat (object stream) {
   pushSTACK(stream);
-  var object streamlist = TheStream(stream)->strm_concat_list; # list of streams
-  var signean result;
+  var object streamlist = TheStream(stream)->strm_concat_list;
+  var listen_t result;
   while (consp(streamlist)) {
     result = listen_byte(Car(streamlist));
-    if (!ls_eof_p(result)) # not EOF ?
+    if (result != LISTEN_EOF) /* not EOF ? */
       goto OK;
-    # EOF reached -> remove emptied stream from the list:
+    /* EOF reached -> remove emptied stream from the list: */
     stream = STACK_0;
     streamlist = TheStream(stream)->strm_concat_list =
              Cdr(TheStream(stream)->strm_concat_list);
   }
-  # all Streams emptied -> return EOF:
-  result = ls_eof;
+  /* all Streams emptied -> return EOF: */
+  result = LISTEN_EOF;
  OK:
   skipSTACK(1);
   return result;
 }
 
-# Returns a Concatenated-Stream for a list of Stream.
-# make_concatenated_stream(list)
-# > list : list of streams
-# < result : Concatenated-Stream
-# Thereby the List list is destroyed.
-# can trigger GC
+/* Returns a Concatenated-Stream for a list of Stream.
+ make_concatenated_stream(list)
+ > list : list of streams
+ < result : Concatenated-Stream
+ Thereby the List list is destroyed.
+ can trigger GC */
 local maygc object make_concatenated_stream (object list) {
-  pushSTACK(list); # save list
-  var object stream = # new Stream, only READs allowed
+  pushSTACK(list); /* save list */
+  var object stream = /* new Stream, only READs allowed */
     allocate_stream(strmflags_rd_B,strmtype_concat,strm_len+2,0);
   stream_dummy_fill(stream);
   TheStream(stream)->strm_rd_by = P(rd_by_concat);
@@ -1954,11 +1961,11 @@ local maygc object make_concatenated_stream (object list) {
 
 LISPFUN(make_concatenated_stream,seclass_read,0,0,rest,nokey,0,NIL)
 { /* (MAKE-CONCATENATED-STREAM {stream}), CLTL p. 329 */
-  # check that all Arguments are Streams:
+  /* check that all Arguments are Streams: */
   test_input_stream_args(rest_args_pointer,argcount);
-  # collect to one List:
+  /* collect to one List: */
   var object list = listof(argcount);
-  # build Stream:
+  /* build Stream: */
   VALUES1(make_concatenated_stream(list));
 }
 
@@ -1976,28 +1983,29 @@ LISPFUNNR(concatenated_stream_streams,1)
   CHECK_streamtype(stream,S(concatenated_stream),
                    (builtin_stream_p(stream)
                     && (TheStream(stream)->strmtype == strmtype_concat)));
-  # copy List of Streams as a precaution
+  /* copy List of Streams as a precaution */
   VALUES1(copy_list(TheStream(stream)->strm_concat_list));
 }
 
 
-# Two-Way-Stream, Echo-Stream
-# ===========================
+/* Two-Way-Stream, Echo-Stream
+   ===========================
 
-# Additional Components:
-  # define strm_twoway_input   strm_other[0]  # Stream for Input
-  # define strm_twoway_output  strm_other[1]  # Stream for Output
+ Additional Components:
+   define strm_twoway_input   strm_other[0]  - Stream for Input
+   define strm_twoway_output  strm_other[1]  - Stream for Output
 
-# WRITE-BYTE - Pseudo-Function for Two-Way- and Echo-Streams:
+ WRITE-BYTE - Pseudo-Function for Two-Way- and Echo-Streams: */
 local maygc void wr_by_twoway (object stream, object obj) {
   check_SP();
   write_byte(TheStream(stream)->strm_twoway_output,obj);
 }
 
-# WRITE-BYTE-ARRAY - Pseudo-Function for Two-Way- and Echo-Streams:
+/* WRITE-BYTE-ARRAY - Pseudo-Function for Two-Way- and Echo-Streams: */
 local maygc uintL wr_by_array_twoway (const gcv_object_t* stream_,
                                       const gcv_object_t* bytearray_,
-                                      uintL start, uintL len, perseverance_t persev) {
+                                      uintL start, uintL len,
+                                      perseverance_t persev) {
   check_SP(); check_STACK();
   pushSTACK(TheStream(*stream_)->strm_twoway_output);
   var uintL result = write_byte_array(&STACK_0,bytearray_,start,len,persev);
@@ -2005,7 +2013,7 @@ local maygc uintL wr_by_array_twoway (const gcv_object_t* stream_,
   return result;
 }
 
-# WRITE-CHAR - Pseudo-Function for Two-Way- and Echo-Streams:
+/* WRITE-CHAR - Pseudo-Function for Two-Way- and Echo-Streams: */
 local maygc void wr_ch_twoway (const gcv_object_t* stream_, object obj) {
   check_SP(); check_STACK();
   pushSTACK(TheStream(*stream_)->strm_twoway_output);
@@ -2013,7 +2021,7 @@ local maygc void wr_ch_twoway (const gcv_object_t* stream_, object obj) {
   skipSTACK(1);
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for Two-Way- and Echo-Streams:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for Two-Way- and Echo-Streams: */
 local maygc void wr_ch_array_twoway (const gcv_object_t* stream_,
                                      const gcv_object_t* chararray_,
                                      uintL start, uintL len) {
@@ -2021,84 +2029,81 @@ local maygc void wr_ch_array_twoway (const gcv_object_t* stream_,
   pushSTACK(TheStream(*stream_)->strm_twoway_output);
   write_char_array(&STACK_0,chararray_,start,len);
   skipSTACK(1);
-  # No need to update wr_ch_lpos here. (See get_line_position().)
+  /* No need to update wr_ch_lpos here. (See get_line_position().) */
 }
 
-# Determines, if a Character is available on a Two-Way- or Echo-Stream.
-# listen_char_twoway(stream)
-# > stream : Two-Way- or Echo-Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
-# can trigger GC
-local maygc signean listen_char_twoway (object stream) {
+/* Determines, if a Character is available on a Two-Way- or Echo-Stream.
+ listen_char_twoway(stream)
+ > stream : Two-Way- or Echo-Stream
+ < result: input availability
+ can trigger GC */
+local maygc listen_t listen_char_twoway (object stream) {
   check_SP();
   return listen_char(TheStream(stream)->strm_twoway_input);
 }
 
-# UP: Deletes already entered interactive Input from a Two-Way-
-# or Echo-Stream.
-# clear_input_twoway(stream)
-# > stream: Two-Way- or Echo-Stream
-# < result: true if Input was deleted
-# can trigger GC
+/* UP: Deletes already entered interactive Input from a Two-Way-
+ or Echo-Stream.
+ clear_input_twoway(stream)
+ > stream: Two-Way- or Echo-Stream
+ < result: true if Input was deleted
+ can trigger GC */
 local maygc bool clear_input_twoway (object stream) {
   check_SP();
   return clear_input(TheStream(stream)->strm_twoway_input);
 }
 
-# Determines, if a Byte is available on a Two-Way- or Echo-Stream.
-# listen_byte_twoway(stream)
-# > stream : Two-Way- or Echo-Stream
-# < result:   ls_avail if a byte is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no byte is available, but not because of EOF
-# can trigger GC
-local maygc signean listen_byte_twoway (object stream) {
+/* Determines, if a Byte is available on a Two-Way- or Echo-Stream.
+ listen_byte_twoway(stream)
+ > stream : Two-Way- or Echo-Stream
+ < result: input availability
+ can trigger GC */
+local maygc listen_t listen_byte_twoway (object stream) {
   check_SP();
   return listen_byte(TheStream(stream)->strm_twoway_input);
 }
 
-# UP: Moves the pending Output of a Two-Way- or Echo-Stream to the destination.
-# finish_output_twoway(stream);
-# > stream: Two-Way- or Echo-Stream
-# can trigger GC
+/* UP: Moves the pending Output of a Two-Way- or Echo-Stream to the destination.
+ finish_output_twoway(stream);
+ > stream: Two-Way- or Echo-Stream
+ can trigger GC */
 local maygc void finish_output_twoway (object stream) {
   check_SP();
   finish_output(TheStream(stream)->strm_twoway_output);
 }
 
-# UP: Moves the pending Output of a Two-Way- or Echo-Stream to the destination.
-# force_output_twoway(stream);
-# > stream: Two-Way- or Echo-Stream
-# can trigger GC
+/* UP: Moves the pending Output of a Two-Way- or Echo-Stream to the destination.
+ force_output_twoway(stream);
+ > stream: Two-Way- or Echo-Stream
+ can trigger GC */
 local maygc void force_output_twoway (object stream) {
   check_SP();
   force_output(TheStream(stream)->strm_twoway_output);
 }
 
-# UP: Deletes the pending Output of a Two-Way- or Echo-Stream.
-# clear_output_twoway(stream);
-# > stream: Two-Way- or Echo-Stream
-# can trigger GC
+/* UP: Deletes the pending Output of a Two-Way- or Echo-Stream.
+ clear_output_twoway(stream);
+ > stream: Two-Way- or Echo-Stream
+ can trigger GC */
 local maygc void clear_output_twoway (object stream) {
   check_SP();
   clear_output(TheStream(stream)->strm_twoway_output);
 }
 
-# Two-Way-Stream
-# ==============
+/* Two-Way-Stream
+   ==============
 
-# READ-BYTE - Pseudo-Function for Two-Way-Streams:
+ READ-BYTE - Pseudo-Function for Two-Way-Streams: */
 local maygc object rd_by_twoway (object stream) {
   check_SP();
   return read_byte(TheStream(stream)->strm_twoway_input);
 }
 
-# READ-BYTE-ARRAY - Pseudo-Function for Two-Way-Streams:
+/* READ-BYTE-ARRAY - Pseudo-Function for Two-Way-Streams: */
 local maygc uintL rd_by_array_twoway (const gcv_object_t* stream_,
                                       const gcv_object_t* bytearray_,
-                                      uintL start, uintL len, perseverance_t persev) {
+                                      uintL start, uintL len,
+                                      perseverance_t persev) {
   check_SP(); check_STACK();
   pushSTACK(TheStream(*stream_)->strm_twoway_input);
   var uintL result = read_byte_array(&STACK_0,bytearray_,start,len,persev);
@@ -2106,7 +2111,7 @@ local maygc uintL rd_by_array_twoway (const gcv_object_t* stream_,
   return result;
 }
 
-# READ-CHAR - Pseudo-Function for Two-Way-Streams:
+/* READ-CHAR - Pseudo-Function for Two-Way-Streams: */
 local maygc object rd_ch_twoway (const gcv_object_t* stream_) {
   check_SP(); check_STACK();
   pushSTACK(TheStream(*stream_)->strm_twoway_input);
@@ -2115,7 +2120,7 @@ local maygc object rd_ch_twoway (const gcv_object_t* stream_) {
   return result;
 }
 
-# PEEK-CHAR - Pseudo-Function for Two-Way-Streams:
+/* PEEK-CHAR - Pseudo-Function for Two-Way-Streams: */
 local maygc object pk_ch_twoway (const gcv_object_t* stream_) {
   check_SP(); check_STACK();
   pushSTACK(TheStream(*stream_)->strm_twoway_input);
@@ -2124,7 +2129,7 @@ local maygc object pk_ch_twoway (const gcv_object_t* stream_) {
   return result;
 }
 
-# READ-CHAR-ARRAY - Pseudo-Function for Two-Way-Streams:
+/* READ-CHAR-ARRAY - Pseudo-Function for Two-Way-Streams: */
 local maygc uintL rd_ch_array_twoway (const gcv_object_t* stream_,
                                       const gcv_object_t* chararray_,
                                       uintL start, uintL len) {
@@ -2135,13 +2140,13 @@ local maygc uintL rd_ch_array_twoway (const gcv_object_t* stream_,
   return result;
 }
 
-# Reads a line of characters from a two-way-stream.
-# read_line_twoway(stream,&buffer)
-# > stream: two-way-stream
-# > buffer: a semi-simple string
-# < buffer: contains the read characters, excluding the terminating #\Newline
-# < result: true if EOF was seen before newline, else false
-# can trigger GC
+/* Reads a line of characters from a two-way-stream.
+ read_line_twoway(stream,&buffer)
+ > stream: two-way-stream
+ > buffer: a semi-simple string
+ < buffer: contains the read characters, excluding the terminating #\Newline
+ < result: true if EOF was seen before newline, else false
+ can trigger GC */
 local maygc bool read_line_twoway (object stream, const gcv_object_t* buffer_) {
   check_SP(); check_STACK();
   pushSTACK(TheStream(stream)->strm_twoway_input);
@@ -2150,17 +2155,18 @@ local maygc bool read_line_twoway (object stream, const gcv_object_t* buffer_) {
   return eofp;
 }
 
-# Returns a Two-Way-Stream for an Input-Stream and an Output-Stream.
-# make_twoway_stream(input_stream,output_stream)
-# > input_stream : Input-Stream
-# > output_stream : Output-Stream
-# < result : Two-Way-Stream
-# can trigger GC
-global maygc object make_twoway_stream (object input_stream, object output_stream) {
-  pushSTACK(input_stream); pushSTACK(output_stream); # save Streams
+/* Returns a Two-Way-Stream for an Input-Stream and an Output-Stream.
+ make_twoway_stream(input_stream,output_stream)
+ > input_stream : Input-Stream
+ > output_stream : Output-Stream
+ < result : Two-Way-Stream
+ can trigger GC */
+global maygc object make_twoway_stream (object input_stream,
+                                        object output_stream) {
+  pushSTACK(input_stream); pushSTACK(output_stream); /* save Streams */
   var uintB flags = strmflags_rdwr_B
     | (TheStream(input_stream)->strmflags & strmflags_immut_B);
-  var object stream = # new Stream, all Operations allowed
+  var object stream = /* new Stream, all Operations allowed */
     allocate_stream(flags,strmtype_twoway,strm_len+2,0);
   TheStream(stream)->strm_rd_by = P(rd_by_twoway);
   TheStream(stream)->strm_rd_by_array = P(rd_by_array_twoway);
@@ -2174,7 +2180,7 @@ global maygc object make_twoway_stream (object input_stream, object output_strea
     TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_twoway);
   TheStream(stream)->strm_wr_ch_array =
     TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_twoway);
-  output_stream = popSTACK(); input_stream = popSTACK(); # put back Streams
+  output_stream = popSTACK(); input_stream = popSTACK(); /* put back Streams */
   TheStream(stream)->strm_wr_ch_lpos =
     TheStream(output_stream)->strm_wr_ch_lpos;
   TheStream(stream)->strm_twoway_input = input_stream;
@@ -2184,17 +2190,17 @@ global maygc object make_twoway_stream (object input_stream, object output_strea
 
 LISPFUNNR(make_two_way_stream,2)
 { /* (MAKE-TWO-WAY-STREAM input-stream output-stream), CLTL p. 329 */
-  # check that both are Streams:
+  /* check that both are Streams: */
   check_stream_args(args_end_pointer STACKop 2, 2);
   var object output_stream = popSTACK();
   var object input_stream = popSTACK();
   test_input_stream(input_stream);
   test_output_stream(output_stream);
-  # build Stream:
+  /* build Stream: */
   VALUES1(make_twoway_stream(input_stream,output_stream));
 }
 
-# check whether the stream S is a two-way-stream
+/* check whether the stream S is a two-way-stream */
 #define stream_twoway_p(s)                                              \
   (builtin_stream_p(s) && (TheStream(s)->strmtype == strmtype_twoway))
 
@@ -2219,10 +2225,10 @@ LISPFUNNR(two_way_stream_output_stream,1)
 }
 
 
-# Echo-Stream
-# ===========
+/* Echo-Stream
+   ===========
 
-# READ-BYTE - Pseudo-Function for Echo-Streams:
+ READ-BYTE - Pseudo-Function for Echo-Streams: */
 local maygc object rd_by_echo (object stream) {
   check_SP(); check_STACK();
   pushSTACK(stream);
@@ -2236,10 +2242,11 @@ local maygc object rd_by_echo (object stream) {
   return obj;
 }
 
-# READ-BYTE-ARRAY - Pseudo-Function for Echo-Streams:
+/* READ-BYTE-ARRAY - Pseudo-Function for Echo-Streams: */
 local maygc uintL rd_by_array_echo (const gcv_object_t* stream_,
                                     const gcv_object_t* bytearray_,
-                                    uintL start, uintL len, perseverance_t persev) {
+                                    uintL start, uintL len,
+                                    perseverance_t persev) {
   check_SP(); check_STACK();
   pushSTACK(TheStream(*stream_)->strm_twoway_input);
   var uintL result = read_byte_array(&STACK_0,bytearray_,start,len,persev);
@@ -2249,7 +2256,7 @@ local maygc uintL rd_by_array_echo (const gcv_object_t* stream_,
   return result;
 }
 
-# READ-CHAR - Pseudo-Function for Echo-Streams:
+/* READ-CHAR - Pseudo-Function for Echo-Streams: */
 local maygc object rd_ch_echo (const gcv_object_t* stream_) {
   check_SP(); check_STACK();
   pushSTACK(TheStream(*stream_)->strm_twoway_input);
@@ -2264,7 +2271,7 @@ local maygc object rd_ch_echo (const gcv_object_t* stream_) {
   return obj;
 }
 
-# READ-CHAR-ARRAY - Pseudo-Function for Echo-Streams:
+/* READ-CHAR-ARRAY - Pseudo-Function for Echo-Streams: */
 local maygc uintL rd_ch_array_echo (const gcv_object_t* stream_,
                                     const gcv_object_t* chararray_,
                                     uintL start, uintL len) {
@@ -2277,17 +2284,18 @@ local maygc uintL rd_ch_array_echo (const gcv_object_t* stream_,
   return result;
 }
 
-# returns an Echo-Stream for an Input-Stream and an Output-Stream.
-# make_echo_stream(input_stream,output_stream)
-# > input_stream : Input-Stream
-# > output_stream : Output-Stream
-# < result : Echo-Stream
-# can trigger GC
-local maygc object make_echo_stream (object input_stream, object output_stream) {
-  pushSTACK(input_stream); pushSTACK(output_stream); # save Streams
+/* returns an Echo-Stream for an Input-Stream and an Output-Stream.
+ make_echo_stream(input_stream,output_stream)
+ > input_stream : Input-Stream
+ > output_stream : Output-Stream
+ < result : Echo-Stream
+ can trigger GC */
+local maygc object make_echo_stream (object input_stream, object output_stream)
+{
+  pushSTACK(input_stream); pushSTACK(output_stream); /* save Streams */
   var uintB flags = strmflags_rdwr_B
     | (TheStream(input_stream)->strmflags & strmflags_immut_B);
-  var object stream = # new Stream, all Operations allowed
+  var object stream = /* new Stream, all Operations allowed */
     allocate_stream(flags,strmtype_echo,strm_len+2,0);
   TheStream(stream)->strm_rd_by = P(rd_by_echo);
   TheStream(stream)->strm_rd_by_array = P(rd_by_array_echo);
@@ -2301,7 +2309,7 @@ local maygc object make_echo_stream (object input_stream, object output_stream) 
     TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_twoway);
   TheStream(stream)->strm_wr_ch_array =
     TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_twoway);
-  output_stream = popSTACK(); input_stream = popSTACK(); # put back Streams
+  output_stream = popSTACK(); input_stream = popSTACK(); /* put back Streams */
   TheStream(stream)->strm_wr_ch_lpos =
     TheStream(output_stream)->strm_wr_ch_lpos;
   TheStream(stream)->strm_twoway_input = input_stream;
@@ -2311,17 +2319,17 @@ local maygc object make_echo_stream (object input_stream, object output_stream) 
 
 LISPFUNNR(make_echo_stream,2)
 { /* (MAKE-ECHO-STREAM input-stream output-stream), CLTL p. 330 */
-  # check that both are Streams:
+  /* check that both are Streams: */
   check_stream_args(args_end_pointer STACKop 2, 2);
   var object output_stream = popSTACK();
   var object input_stream = popSTACK();
   test_input_stream(input_stream);
   test_output_stream(output_stream);
-  # build Stream:
+  /* build Stream: */
   VALUES1(make_echo_stream(input_stream,output_stream));
 }
 
-# check whether the stream S is a two-way-stream
+/* check whether the stream S is a two-way-stream */
 #define stream_echo_p(s)                                                 \
   (builtin_stream_p(s) && (TheStream(s)->strmtype == strmtype_echo))
 
@@ -2346,48 +2354,49 @@ LISPFUNNR(echo_stream_output_stream,1)
 }
 
 
-# String-Input-Stream
-# ===================
+/* String-Input-Stream
+   ===================
 
-# Additional Components:
+ Additional Components: */
 #define strm_str_in_string   strm_other[0] /* String for Input */
 #define strm_str_in_index    strm_other[1] /* Index in the String (Fixnum>=0)*/
 #define strm_str_in_begindex strm_other[2] /* Begindex (Fixnum >= index >=0) */
 #define strm_str_in_endindex strm_other[3] /* Endindex (Fixnum >= index >=0) */
 
-# error-message, if index >= length(string):
-# fehler_str_in_adjusted(stream);
-# > stream: problematic String-Input-Stream
-nonreturning_function(local, fehler_str_in_adjusted, (object stream)) {
-  pushSTACK(stream); # STREAM-ERROR slot STREAM
+/* error-message, if index >= length(string):
+ error_str_in_adjusted(stream);
+ > stream: problematic String-Input-Stream */
+nonreturning_function(local, error_str_in_adjusted, (object stream)) {
+  pushSTACK(stream); /* STREAM-ERROR slot STREAM */
   pushSTACK(TheStream(stream)->strm_str_in_string);
   pushSTACK(stream);
-  fehler(stream_error,GETTEXT("~S is beyond the end because the string ~S has been adjusted"));
+  error(stream_error,GETTEXT("~S is beyond the end because the string ~S has been adjusted"));
 }
 
-# READ-CHAR - Pseudo-Function for String-Input-Streams:
+/* READ-CHAR - Pseudo-Function for String-Input-Streams: */
 local maygc object rd_ch_str_in (const gcv_object_t* stream_) {
   var object stream = *stream_;
   var uintV index = posfixnum_to_V(TheStream(stream)->strm_str_in_index);
   var uintV endindex = posfixnum_to_V(TheStream(stream)->strm_str_in_endindex);
   if (index >= endindex) {
-    return eof_value; # EOF reached
-  } else { # index < endvalid
+    return eof_value; /* EOF reached */
+  } else { /* index < endvalid */
     var uintL len;
     var uintL offset;
-    var object string = unpack_string_ro(TheStream(stream)->strm_str_in_string,&len,&offset);
-    if (index >= len) # Index too big?
-      fehler_str_in_adjusted(stream);
+    var object string =
+      unpack_string_ro(TheStream(stream)->strm_str_in_string,&len,&offset);
+    if (index >= len) /* Index too big? */
+      error_str_in_adjusted(stream);
     /* fetch character from String */
     var object ch = code_char(schar(string,offset+index));
-    # increase Index:
+    /* increase Index: */
     TheStream(stream)->strm_str_in_index =
       fixnum_inc(TheStream(stream)->strm_str_in_index,1);
     return ch;
   }
 }
 
-# READ-CHAR-ARRAY - Pseudo-Function for String-Input-Streams:
+/* READ-CHAR-ARRAY - Pseudo-Function for String-Input-Streams: */
 local maygc uintL rd_ch_array_str_in (const gcv_object_t* stream_,
                                       const gcv_object_t* chararray_,
                                       uintL start, uintL len) {
@@ -2397,18 +2406,20 @@ local maygc uintL rd_ch_array_str_in (const gcv_object_t* stream_,
   if (index < endindex) {
     var uintL srclen;
     var uintL srcoffset;
-    var object string = unpack_string_ro(TheStream(stream)->strm_str_in_string,&srclen,&srcoffset);
+    var object string = unpack_string_ro(TheStream(stream)->strm_str_in_string,
+                                         &srclen,&srcoffset);
     if (srclen < endindex)
-      fehler_str_in_adjusted(stream);
+      error_str_in_adjusted(stream);
     var uintL count = endindex - index;
     if (count > len)
       count = len;
-    # count = min(len,endindex-index) > 0.
+    /* count = min(len,endindex-index) > 0. */
     var object chararray = *chararray_;
     sstring_un_realloc(chararray);
     elt_copy(string,srcoffset+index,chararray,start,count);
     stream = *stream_;
-    TheStream(stream)->strm_str_in_index = fixnum_inc(TheStream(stream)->strm_str_in_index,count);
+    TheStream(stream)->strm_str_in_index =
+      fixnum_inc(TheStream(stream)->strm_str_in_index,count);
     return count;
   } else {
     return 0;
@@ -2416,47 +2427,53 @@ local maygc uintL rd_ch_array_str_in (const gcv_object_t* stream_,
 }
 
 /* Closes a String-Input-Stream.
- close_str_in(stream);
- > stream : String-Input-Stream
- > abort: flag: non-0 => ignore errors */
-local maygc void close_str_in (object stream, uintB abort) {
-  TheStream(stream)->strm_str_in_string = NIL; # String := NIL
+ close_str_in(stream, abort);
+ > stream : String-Input-Stream */
+local maygc void close_str_in (object stream) {
+  TheStream(stream)->strm_str_in_string = NIL; /* String := NIL */
 }
 
-# Determines, if a character is available on a String-Input-Stream.
-# listen_char_str_in(stream)
-# > stream : String-Input-Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
-# can trigger GC
-local maygc signean listen_char_str_in (object stream) {
+/* Determines, if a character is available on a String-Input-Stream.
+ listen_char_str_in(stream)
+ > stream : String-Input-Stream
+ < result: input availability
+ can trigger GC */
+local maygc listen_t listen_char_str_in (object stream) {
   var uintV index = posfixnum_to_V(TheStream(stream)->strm_str_in_index);
   var uintV endindex = posfixnum_to_V(TheStream(stream)->strm_str_in_endindex);
   if (index >= endindex)
-    return ls_eof; # EOF reached
+    return LISTEN_EOF; /* EOF reached */
   else
-    return ls_avail;
+    return LISTEN_AVAIL;
 }
 
 LISPFUN(make_string_input_stream,seclass_read,1,2,norest,nokey,0,NIL)
 { /* (MAKE-STRING-INPUT-STREAM string [start [end]]), CLTL p. 330 */
-  # fetch String and check range:
+  /* fetch String and check range: */
   var stringarg arg;
   var object string = test_string_limits_ro(&arg);
   var object start_arg = fixnum(arg.index); /* start-Argument (Fixnum >=0) */
-  var object end_arg = fixnum_inc(start_arg,arg.len); # end-Argument (Fixnum >=0)
-  pushSTACK(string); # save String
-  var object stream = # new Stream, only READ-CHAR allowed
+  var object end_arg = fixnum_inc(start_arg,arg.len); /* end-Argument (Fixnum >=0) */
+  pushSTACK(string); /* save String */
+  var object stream = /* new Stream, only READ-CHAR allowed */
     allocate_stream(strmflags_rd_ch_B,strmtype_str_in,strm_len+4,0);
   stream_dummy_fill(stream);
   TheStream(stream)->strm_rd_ch = P(rd_ch_str_in);
   TheStream(stream)->strm_rd_ch_array = P(rd_ch_array_str_in);
   TheStream(stream)->strm_str_in_string = popSTACK();
-  TheStream(stream)->strm_str_in_index = # (Beg)Index := start-Argument
+  TheStream(stream)->strm_str_in_index = /* (Beg)Index := start-Argument */
     TheStream(stream)->strm_str_in_begindex = start_arg;
-  TheStream(stream)->strm_str_in_endindex = end_arg; # Endindex := end-Argument
-  VALUES1(stream); # stream as value
+  TheStream(stream)->strm_str_in_endindex = end_arg; /* Endindex := end-Argument */
+  VALUES1(stream); /* stream as value */
+}
+
+nonreturning_function(local, error_string_stream,
+                      (object stream, const char *message)) {
+  pushSTACK(stream);           /* TYPE-ERROR slot DATUM */
+  pushSTACK(S(string_stream)); /* TYPE-ERROR slot EXPECTED-TYPE */
+  pushSTACK(stream);
+  pushSTACK(TheSubr(subr_self)->name);
+  error(type_error,message);
 }
 
 LISPFUNNR(string_input_stream_index,1)
@@ -2464,13 +2481,8 @@ LISPFUNNR(string_input_stream_index,1)
   var object stream = popSTACK(); /* Argument */
   /* must be a String-Input-Stream: */
   if (!(builtin_stream_p(stream)
-        && (TheStream(stream)->strmtype == strmtype_str_in))) {
-    pushSTACK(stream);           /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(string_stream)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(stream);
-    pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: ~S is not a string input stream"));
-  }
+        && (TheStream(stream)->strmtype == strmtype_str_in)))
+    error_string_stream(stream,GETTEXT("~S: ~S is not a string input stream"));
   var object index = TheStream(stream)->strm_str_in_index;
   /* if a Character was pushed back with UNREAD-CHAR,
    use (1- index), a Fixnum >=0, as value: */
@@ -2480,42 +2492,42 @@ LISPFUNNR(string_input_stream_index,1)
 }
 
 
-# String-Output-Stream
-# ====================
+/* String-Output-Stream
+   ====================
 
-# Additional Components:
-  #define strm_str_out_string  strm_other[0]  # Semi-Simple-String for Output
+ Additional Components: */
+#define strm_str_out_string  strm_other[0]  /* Semi-Simple-String for Output */
 
-# WRITE-CHAR - Pseudo-Function for String-Output-Streams:
+/* WRITE-CHAR - Pseudo-Function for String-Output-Streams: */
 local maygc void wr_ch_str_out (const gcv_object_t* stream_, object ch) {
   var object stream = *stream_;
   check_wr_char(stream,ch);
-  # push Character in the String:
+  /* push Character in the String: */
   ssstring_push_extend(TheStream(stream)->strm_str_out_string,char_code(ch));
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for String-Output-Streams:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for String-Output-Streams: */
 local maygc void wr_ch_array_str_out (const gcv_object_t* stream_,
                                       const gcv_object_t* chararray_,
                                       uintL start, uintL len) {
-  var object ssstring = TheStream(*stream_)->strm_str_out_string; # Semi-Simple-String
+  var object ssstring = TheStream(*stream_)->strm_str_out_string; /* Semi-Simple-String */
   ssstring = ssstring_append_extend(ssstring,*chararray_,start,len);
-  wr_ss_lpos(*stream_,&TheSnstring(TheIarray(ssstring)->data)->data[TheIarray(ssstring)->dims[1]],len); # update Line-Position
+  wr_ss_lpos(*stream_,&TheSnstring(TheIarray(ssstring)->data)->data[TheIarray(ssstring)->dims[1]],len); /* update Line-Position */
 }
 
-# Returns a String-Output-Stream.
-# make_string_output_stream()
-# can trigger GC
+/* Returns a String-Output-Stream.
+ make_string_output_stream()
+ can trigger GC */
 global maygc object make_string_output_stream (void) {
   pushSTACK(make_ssstring(SEMI_SIMPLE_DEFAULT_SIZE));
-  var object stream = # new Stream, only WRITE-CHAR allowed
+  var object stream = /* new Stream, only WRITE-CHAR allowed */
     allocate_stream(strmflags_wr_ch_B,strmtype_str_out,strm_len+1,0);
   stream_dummy_fill(stream);
   TheStream(stream)->strm_wr_ch =
     TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_str_out);
   TheStream(stream)->strm_wr_ch_array =
     TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_str_out);
-  TheStream(stream)->strm_str_out_string = popSTACK(); # enter the String
+  TheStream(stream)->strm_str_out_string = popSTACK(); /* enter the String */
   return stream;
 }
 
@@ -2578,14 +2590,14 @@ LISPFUN(make_string_output_stream,seclass_read,0,0,norest,key,2,
  can trigger GC */
 global maygc object get_output_stream_string (const gcv_object_t* stream_) {
   harden_elastic_newline(stream_);
-  var object string = TheStream(*stream_)->strm_str_out_string; # old String
+  var object string = TheStream(*stream_)->strm_str_out_string; /* old String */
   if ((Iarray_flags(string) & arrayflags_atype_mask) == Atype_NIL) {
     /* Return the encapsulated (VECTOR NIL). It is an immutable object, since
        it is not adjustable and its fill-pointer is constrained to remain 0.
        Therefore no need to copy it into a string without fill-pointer. */
   } else {
-    string = coerce_ss(string); # convert to Simple-String (enforces copying)
-    # empty old String by Fill-Pointer:=0 :
+    string = coerce_ss(string); /* convert to Simple-String (enforces copying) */
+    /* empty old String by Fill-Pointer:=0 : */
     TheIarray(TheStream(*stream_)->strm_str_out_string)->dims[1] = 0;
   }
   return string;
@@ -2596,72 +2608,67 @@ LISPFUNN(get_output_stream_string,1)
   var object stream = STACK_0;  /* Argument */
   /* must be a String-Output-Stream: */
   if (!(builtin_stream_p(stream)
-        && (TheStream(stream)->strmtype == strmtype_str_out))) {
-    /* stream in STACK_0 -- TYPE-ERROR slot DATUM */
-    pushSTACK(S(string_stream)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(S(string_stream)); pushSTACK(STACK_2);
-    pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: ~S is not a string output stream"));
-  }
+        && (TheStream(stream)->strmtype == strmtype_str_out)))
+    error_string_stream(stream,GETTEXT("~S: ~S is not a string output stream"));
   /* the collected stuff is the value */
   VALUES1(get_output_stream_string(&STACK_0));
   skipSTACK(1);
 }
 
 
-# String-Push-Stream
-# ==================
+/* String-Push-Stream
+   ==================
 
-# Additional Components:
-  #define strm_str_push_string  strm_other[0]  # String with Fill-Pointer for Output
+ Additional Components: */
+#define strm_str_push_string  strm_other[0]  /* String with Fill-Pointer for Output */
 
-# WRITE-CHAR - Pseudo-Function for String-Push-Streams:
+/* WRITE-CHAR - Pseudo-Function for String-Push-Streams: */
 local maygc void wr_ch_str_push (const gcv_object_t* stream_, object ch) {
   var object stream = *stream_;
   check_wr_char(stream,ch);
-  # push Character in the String:
+  /* push Character in the String: */
   pushSTACK(ch); pushSTACK(TheStream(stream)->strm_str_push_string);
-  funcall(L(vector_push_extend),2); # (VECTOR-PUSH-EXTEND ch string)
+  funcall(L(vector_push_extend),2); /* (VECTOR-PUSH-EXTEND ch string) */
 }
 
-# (SYSTEM::MAKE-STRING-PUSH-STREAM string) returns a Stream, whose
-# WRITE-CHAR operation is equivalent to a VECTOR-PUSH-EXTEND
-# on the given String.
+/* (SYSTEM::MAKE-STRING-PUSH-STREAM string) returns a Stream, whose
+ WRITE-CHAR operation is equivalent to a VECTOR-PUSH-EXTEND
+ on the given String. */
 LISPFUNNR(make_string_push_stream,1) {
   {
-    var object arg = STACK_0; # Argument
-    # must be a String with Fill-Pointer:
+    var object arg = STACK_0; /* Argument */
+    /* must be a String with Fill-Pointer: */
     if (!(stringp(arg) && array_has_fill_pointer_p(arg))) {
-      pushSTACK(arg);                              # TYPE-ERROR slot DATUM
-      pushSTACK(O(type_string_with_fill_pointer)); # TYPE-ERROR slot EXPECTED-TYPE
+      pushSTACK(arg);                              /* TYPE-ERROR slot DATUM */
+      pushSTACK(O(type_string_with_fill_pointer)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(arg); pushSTACK(S(with_output_to_string));
-      fehler(type_error,
-             GETTEXT("~S: argument ~S should be a string with fill pointer"));
+      error(type_error,
+            GETTEXT("~S: argument ~S should be a string with fill pointer"));
     }
   }
-  var object stream = # new Stream, only WRITE-CHAR allowed
+  var object stream = /* new Stream, only WRITE-CHAR allowed */
     allocate_stream(strmflags_wr_ch_B,strmtype_str_push,strm_len+1,0);
   stream_dummy_fill(stream);
   TheStream(stream)->strm_wr_ch =
     TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_str_push);
   TheStream(stream)->strm_wr_ch_array =
     TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_dummy);
-  TheStream(stream)->strm_str_push_string = popSTACK(); # enter String
+  TheStream(stream)->strm_str_push_string = popSTACK(); /* enter String */
   VALUES1(stream); /* return stream */
 }
 
 
-# String-Stream in general
-# =======================
+/* String-Stream in general
+   ======================= */
 
 LISPFUNNF(string_stream_p,1)
 { /* (SYS::STRING-STREAM-P stream) == (TYPEP stream 'STRING-STREAM) */
   var object arg = popSTACK();
   if (builtin_stream_p(arg)) {
     switch (TheStream(arg)->strmtype) {
-      case strmtype_str_in:   # String-Input-Stream
-      case strmtype_str_out:  # String-Output-Stream
-      case strmtype_str_push: # String-Push-Stream
+      case strmtype_str_in:   /* String-Input-Stream */
+      case strmtype_str_out:  /* String-Output-Stream */
+      case strmtype_str_push: /* String-Push-Stream */
         VALUES1(T); break;
       default:
         VALUES1(NIL); break;
@@ -2670,20 +2677,40 @@ LISPFUNNF(string_stream_p,1)
     VALUES1(NIL);
 }
 
+LISPFUNNR(string_stream_string,1)
+{ /* (SYSTEM::STRING-STREAM-STRING string-stream) ==> String [beg end] */
+  var object stream = popSTACK();
+  if (builtin_stream_p(stream))
+    switch (TheStream(stream)->strmtype) {
+      case strmtype_str_in:   /* String-Input-Stream */
+        VALUES3(TheStream(stream)->strm_str_in_string,
+                TheStream(stream)->strm_str_in_begindex,
+                TheStream(stream)->strm_str_in_endindex);
+        return;
+      case strmtype_str_out:  /* String-Output-Stream */
+        VALUES1(TheStream(stream)->strm_str_out_string);
+        return;
+      case strmtype_str_push: /* String-Push-Stream */
+        VALUES1(TheStream(stream)->strm_str_push_string);
+        return;
+    }
+  error_string_stream(stream,GETTEXT("~S: ~S is not a string stream"));
+}
 
-# Pretty-Printer-Help-Stream
-# ==========================
 
-# Additional Components:
-  # define strm_pphelp_strings  strm_other[0]   # Semi-Simple-Strings for Output
-  # define strm_pphelp_modus    strm_other[1]   # Mode (NIL=single-liner, T=multi-liner)
+/* Pretty-Printer-Help-Stream
+   ==========================
 
-# WRITE-CHAR - Pseudo-Function for Pretty-Printer-Auxiliary-Streams:
+ Additional Components:
+ define strm_pphelp_strings  strm_other[0]   - Semi-Simple-Strings for Output
+ define strm_pphelp_modus    strm_other[1]   - Mode (NIL=single-liner, T=multi-liner)
+
+ WRITE-CHAR - Pseudo-Function for Pretty-Printer-Auxiliary-Streams: */
 local maygc void wr_ch_pphelp (const gcv_object_t* stream_, object ch) {
   var object stream = *stream_;
   check_wr_char(stream,ch);
-  var chart c = char_code(ch); # Character
-  # At NL: Now  Mode := Multi-liner
+  var chart c = char_code(ch); /* Character */
+  /* At NL: Now  Mode := Multi-liner */
   if (chareq(c,ascii(NL))) {
     TheStream(stream)->strm_pphelp_modus = T;
     cons_ssstring(stream_,NIL);
@@ -2693,44 +2720,43 @@ local maygc void wr_ch_pphelp (const gcv_object_t* stream_, object ch) {
     if (!(vector_length(Car(list)) == 0 && mconsp(Cdr(list))
           && mconsp(Car(Cdr(list))) && eq(S(Kfill),Car(Car(Cdr(list)))))) {
       ssstring_push_extend(Car(list),c);
-      # spaces right after a :FILL newline or multiple spaces are ignored
+      /* spaces right after a :FILL newline or multiple spaces are ignored */
       cons_ssstring(stream_,S(Kfill));
     }
   } else
-    # push Character in the first String:
+    /* push Character in the first String: */
     ssstring_push_extend(Car(TheStream(stream)->strm_pphelp_strings),c);
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for Pretty-Printer-Auxiliary-Streams:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for Pretty-Printer-Auxiliary-Streams: */
 local maygc void wr_ch_array_pphelp (const gcv_object_t* stream_,
                                      const gcv_object_t* chararray_,
                                      uintL start, uintL len) {
   var bool filling = !nullpSv(print_pretty_fill);
   var uintL beg = start;
-  # if (start) sstring_printf(*chararray_,start+len,0);
-  # sstring_printf(*chararray_,start+len,start);
-  loop {
+  DEBUG_OUT(("s=%d l=%d",start,len));
+  while (1) {
     var uintL end = beg;
     var object nl_type = NIL;
-    # printf(" [%d/",beg);
+    DEBUG_OUT((" [%d/",beg));
     while (end < start+len) {
       var chart ch = schar(*chararray_,end);
-      if (chareq(ch,ascii(NL))) { /*printf("%d=NL",end);*/break; }
+      if (chareq(ch,ascii(NL))) { DEBUG_OUT(("%d=NL",end)); break; }
       if (filling && (chareq(ch,ascii(' ')) || chareq(ch,ascii('\t')))) {
-        # printf("%d=SPC",end);
-        end++; # include the space
+        DEBUG_OUT(("%d=SPC",end));
+        end++; /* include the space */
         nl_type = S(Kfill);
         break;
       }
       end++;
     }
-    # printf("/%d]",end);
+    DEBUG_OUT(("/%d]",end));
     if (beg != end) {
       var uintL count = end-beg;
-      var object ssstring = Car(TheStream(*stream_)->strm_pphelp_strings); # Semi-Simple-String
+      var object ssstring = Car(TheStream(*stream_)->strm_pphelp_strings); /* Semi-Simple-String */
       ssstring = ssstring_append_extend(ssstring,*chararray_,beg,count);
-      if (wr_ss_lpos(*stream_,&TheSnstring(TheIarray(ssstring)->data)->data[TheIarray(ssstring)->dims[1]],count)) # update Line-Position
-        TheStream(*stream_)->strm_pphelp_modus = T; # After NL: Mode := multi-liner
+      if (wr_ss_lpos(*stream_,&TheSnstring(TheIarray(ssstring)->data)->data[TheIarray(ssstring)->dims[1]],count)) /* update Line-Position */
+        TheStream(*stream_)->strm_pphelp_modus = T; /* After NL: Mode := multi-liner */
     }
     if (end == start+len)
       break;
@@ -2739,77 +2765,77 @@ local maygc void wr_ch_array_pphelp (const gcv_object_t* stream_,
     cons_ssstring(stream_,nl_type);
     beg = end;
     if (nullp(nl_type))
-      beg++; # skip the newline
+      beg++; /* skip the newline */
   }
-  # printf("\n");
+  DEBUG_OUT(("\n"));
 }
 
-# UP: Returns a Pretty-Printer-Auxiliary-Stream.
-# make_pphelp_stream()
-# can trigger GC
+/* UP: Returns a Pretty-Printer-Auxiliary-Stream.
+ make_pphelp_stream()
+ can trigger GC */
 global maygc object make_pphelp_stream (void) {
   pushSTACK(cons_ssstring(NULL,NIL));
-  var object stream = # new Stream, only WRITE-CHAR allowed
+  var object stream = /* new Stream, only WRITE-CHAR allowed */
     allocate_stream(strmflags_wr_ch_B,strmtype_pphelp,strm_len+2,0);
   stream_dummy_fill(stream);
   TheStream(stream)->strm_wr_ch =
     TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_pphelp);
   TheStream(stream)->strm_wr_ch_array =
     TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_pphelp);
-  TheStream(stream)->strm_pphelp_strings = popSTACK(); # enter String-List
-  TheStream(stream)->strm_pphelp_modus = NIL; # Mode := single-liner
+  TheStream(stream)->strm_pphelp_strings = popSTACK(); /* enter String-List */
+  TheStream(stream)->strm_pphelp_modus = NIL; /* Mode := single-liner */
   return stream;
 }
 
 
-# Buffered-Input-Stream
-# =====================
+/* Buffered-Input-Stream
+   =====================
 
-# Element-Type: character
-# Directions: only input
-# (make-buffered-input-stream fun mode) returns a Buffered-Input-Stream.
-#   fun is a Function of 0 Arguments, that returns upon call
-#   either NIL (stands for EOF) or up to three values string, start, end.
-#   Functionality: (read-char ...) returns one after another the characters
-#   of the current String; if it is consumed, fun is called, and if the returning
-#   value is a String, the new current String is given by
-#     (multiple-value-bind (str start end) (funcall fun)
-#       (subseq str (or start 0) (or end 'NIL))
-#     )
-#   The String returned by fun should not be changed.
-#   (Otherwise fun should copy the String with COPY-SEQ beforehand.)
-#   mode determines, how the Stream acts regarding to LISTEN.
-#   mode = NIL: Stream acts like a File-Stream, i.e. on LISTEN
-#               and empty current String fun is called.
-#   mode = T: Stream acts like an interactive Stream without EOF,
-#             i.e. one can assume, that always further characters will
-#             arrive, without calling fun.
-#   mode a Function: This Function tells, upon call, if
-#             further non-empty Strings are to be expected.
-#   (clear-input ...) finishes the processing of the current String.
+ Element-Type: character
+ Directions: only input
+ (make-buffered-input-stream fun mode) returns a Buffered-Input-Stream.
+   fun is a Function of 0 Arguments, that returns upon call
+   either NIL (stands for EOF) or up to three values string, start, end.
+   Functionality: (read-char ...) returns one after another the characters
+   of the current String; if it is consumed, fun is called, and if the returning
+   value is a String, the new current String is given by
+     (multiple-value-bind (str start end) (funcall fun)
+       (subseq str (or start 0) (or end 'NIL))
+     )
+   The String returned by fun should not be changed.
+   (Otherwise fun should copy the String with COPY-SEQ beforehand.)
+   mode determines, how the Stream acts regarding to LISTEN.
+   mode = NIL: Stream acts like a File-Stream, i.e. on LISTEN
+               and empty current String fun is called.
+   mode = T: Stream acts like an interactive Stream without EOF,
+             i.e. one can assume, that always further characters will
+             arrive, without calling fun.
+   mode a Function: This Function tells, upon call, if
+             further non-empty Strings are to be expected.
+   (clear-input ...) finishes the processing of the current String.
 
-# Additional Components:
-  # define strm_buff_in_fun      strm_other[0]  # Read-Function
-  #define strm_buff_in_mode      strm_other[1]  # Mode or Listen-Function
-  #define strm_buff_in_string    strm_other[2]  # current String for Input
-  #define strm_buff_in_index     strm_other[3]  # Index in the String (Fixnum >=0)
-  #define strm_buff_in_endindex  strm_other[4]  # Endindex (Fixnum >= index >=0)
+ Additional Components:
+  define strm_buff_in_fun     strm_other[0]  - Read-Function */
+#define strm_buff_in_mode     strm_other[1] /* Mode or Listen-Function */
+#define strm_buff_in_string   strm_other[2] /* current String for Input */
+#define strm_buff_in_index    strm_other[3] /* Index in the String (Fixnum >=0) */
+#define strm_buff_in_endindex strm_other[4] /* Endindex (Fixnum >= index >=0) */
 
-# READ-CHAR - Pseudo-Function for Buffered-Input-Streams:
+/* READ-CHAR - Pseudo-Function for Buffered-Input-Streams: */
 local maygc object rd_ch_buff_in (const gcv_object_t* stream_) {
   var object stream = *stream_;
   var uintV index = posfixnum_to_V(TheStream(stream)->strm_buff_in_index);
   var uintV endindex =
     posfixnum_to_V(TheStream(stream)->strm_buff_in_endindex);
   while (index >= endindex) { /* string end reached */
-    # call fun:
+    /* call fun: */
     funcall(TheStream(stream)->strm_buff_in_fun,0);
     if (!stringp(value1))
-      return eof_value; # EOF reached
-    # fetch new String and check ranges:
-    pushSTACK(value1); # String
-    pushSTACK(mv_count >= 2 ? value2 : unbound); # start
-    pushSTACK(mv_count >= 3 ? value3 : unbound); # end
+      return eof_value; /* EOF reached */
+    /* fetch new String and check ranges: */
+    pushSTACK(value1); /* String */
+    pushSTACK(mv_count >= 2 ? value2 : unbound); /* start */
+    pushSTACK(mv_count >= 3 ? value3 : unbound); /* end */
     var stringarg val;
     var object string = test_string_limits_ro(&val);
     stream = *stream_;
@@ -2819,75 +2845,72 @@ local maygc object rd_ch_buff_in (const gcv_object_t* stream_) {
     TheStream(stream)->strm_buff_in_index = fixnum(index);
     TheStream(stream)->strm_buff_in_endindex = fixnum(endindex);
   }
-  # index < endvalid
+  /* index < endvalid */
   var uintL len;
   var uintL offset;
   var object string = unpack_string_ro(TheStream(stream)->strm_buff_in_string,&len,&offset);
-  if (index >= len) { # Index too big ?
-    pushSTACK(stream); # STREAM-ERROR slot STREAM
+  if (index >= len) { /* Index too big ? */
+    pushSTACK(stream); /* STREAM-ERROR slot STREAM */
     pushSTACK(TheStream(stream)->strm_buff_in_string);
     pushSTACK(stream);
-    fehler(stream_error,GETTEXT("~S is beyond the end because the string ~S has been adjusted"));
+    error(stream_error,GETTEXT("~S is beyond the end because the string ~S has been adjusted"));
   }
   /* fetch character from String */
   var object ch = code_char(schar(string,offset+index));
-  # increase Index:
+  /* increase Index: */
   TheStream(stream)->strm_buff_in_index = fixnum_inc(TheStream(stream)->strm_buff_in_index,1);
   return ch;
 }
 
 /* Closes a Buffered-Input-Stream.
- close_buff_in(stream);
- > stream : Buffered-Input-Stream
- > abort: flag: non-0 => ignore errors */
-local maygc void close_buff_in (object stream, uintB abort) {
-  TheStream(stream)->strm_buff_in_fun = NIL; # Function := NIL
-  TheStream(stream)->strm_buff_in_mode = NIL; # Mode := NIL
-  TheStream(stream)->strm_buff_in_string = NIL; # String := NIL
+ close_buff_in(stream, abort);
+ > stream : Buffered-Input-Stream */
+local maygc void close_buff_in (object stream) {
+  TheStream(stream)->strm_buff_in_fun = NIL; /* Function := NIL */
+  TheStream(stream)->strm_buff_in_mode = NIL; /* Mode := NIL */
+  TheStream(stream)->strm_buff_in_string = NIL; /* String := NIL */
 }
 
-# Determines, if a character is available on a Buffered-Input-Stream.
-# listen_char_buff_in(stream)
-# > stream : Buffered-Input-Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
-# can trigger GC
-local maygc signean listen_char_buff_in (object stream) {
+/* Determines, if a character is available on a Buffered-Input-Stream.
+ listen_char_buff_in(stream)
+ > stream : Buffered-Input-Stream
+ < result: input availability
+ can trigger GC */
+local maygc listen_t listen_char_buff_in (object stream) {
   var uintV index = posfixnum_to_V(TheStream(stream)->strm_buff_in_index);
   var uintV endindex = posfixnum_to_V(TheStream(stream)->strm_buff_in_endindex);
   if (index < endindex)
-    return ls_avail;
+    return LISTEN_AVAIL;
   var object mode = TheStream(stream)->strm_buff_in_mode;
   if (eq(mode,S(nil))) {
     pushSTACK(stream);
-    mode = peek_char(&STACK_0); # peek_char makes read_char, calls fun
+    mode = peek_char(&STACK_0); /* peek_char makes read_char, calls fun */
     skipSTACK(1);
     if (eq(mode,eof_value))
-      return ls_eof; # EOF reached
+      return LISTEN_EOF; /* EOF reached */
     else
-      return ls_avail;
+      return LISTEN_AVAIL;
   } else if (eq(mode,S(t))) {
-    return ls_avail;
+    return LISTEN_AVAIL;
   } else {
-    funcall(mode,0); # call mode
-    if (nullp(value1)) # no more Strings to be expected?
-      return ls_eof; # yes -> EOF reached
+    funcall(mode,0); /* call mode */
+    if (nullp(value1)) /* no more Strings to be expected? */
+      return LISTEN_EOF; /* yes -> EOF reached */
     else
-      return ls_avail;
+      return LISTEN_AVAIL;
   }
 }
 
-# UP: Deletes already entered interactive Input from a Buffered-Input-Stream.
-# clear_input_buff_in(stream)
-# > stream: Buffered-Input-Stream
-# < result: true if Input was deleted
-# can trigger GC
+/* UP: Deletes already entered interactive Input from a Buffered-Input-Stream.
+ clear_input_buff_in(stream)
+ > stream: Buffered-Input-Stream
+ < result: true if Input was deleted
+ can trigger GC */
 local maygc bool clear_input_buff_in (object stream) {
-  # end processing of the current String:
+  /* end processing of the current String: */
   var object index = TheStream(stream)->strm_buff_in_index;
   var object endindex = TheStream(stream)->strm_buff_in_endindex;
-  TheStream(stream)->strm_buff_in_index = endindex; # index := endindex
+  TheStream(stream)->strm_buff_in_index = endindex; /* index := endindex */
   if (eq(index,endindex))
     return false;
   else
@@ -2896,177 +2919,198 @@ local maygc bool clear_input_buff_in (object stream) {
 
 LISPFUNNR(make_buffered_input_stream,2)
 { /* (MAKE-BUFFERED-INPUT-STREAM fun mode) */
-  var object stream = # new Stream, only READ-CHAR allowed
+  var object stream = /* new Stream, only READ-CHAR allowed */
     allocate_stream(strmflags_rd_ch_B,strmtype_buff_in,strm_len+5,0);
   stream_dummy_fill(stream);
   TheStream(stream)->strm_rd_ch = P(rd_ch_buff_in);
   TheStream(stream)->strm_rd_ch_array = P(rd_ch_array_dummy);
   TheStream(stream)->strm_buff_in_mode = popSTACK();
   TheStream(stream)->strm_buff_in_fun = popSTACK();
-  TheStream(stream)->strm_buff_in_string = O(empty_string); # String := ""
-  TheStream(stream)->strm_buff_in_index = Fixnum_0; # Index := 0
-  TheStream(stream)->strm_buff_in_endindex = Fixnum_0; # Endindex := 0
+  TheStream(stream)->strm_buff_in_string = O(empty_string); /* String := "" */
+  TheStream(stream)->strm_buff_in_index = Fixnum_0; /* Index := 0 */
+  TheStream(stream)->strm_buff_in_endindex = Fixnum_0; /* Endindex := 0 */
   VALUES1(stream); /* return stream */
 }
 
 LISPFUNNR(buffered_input_stream_index,1)
 { /* (SYS::BUFFERED-INPUT-STREAM-INDEX buffered-input-stream)
      returns the Index */
-  var object stream = popSTACK(); # Argument
-  # must be a Buffered-Input-Stream:
+  var object stream = popSTACK(); /* Argument */
+  /* must be a Buffered-Input-Stream: */
   if (!(builtin_stream_p(stream)
         && (TheStream(stream)->strmtype == strmtype_buff_in))) {
     pushSTACK(stream);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: ~S is not a buffered input stream"));
+    error(error_condition,GETTEXT("~S: ~S is not a buffered input stream"));
   }
   var object index = TheStream(stream)->strm_buff_in_index;
-  # if a Character was pushed back with UNREAD-CHAR,
-  # use (1- index), a Fixnum >=0, as value:
+  /* if a Character was pushed back with UNREAD-CHAR,
+   use (1- index), a Fixnum >=0, as value: */
   if (TheStream(stream)->strmflags & strmflags_unread_B)
     index = fixnum_inc(index,-1);
   VALUES1(index);
 }
 
+/* handling of (close :abort): ignore the error and proceed to close FDs */
+#if !defined(MULTITHREAD)
+/* should be per thread - moved to clisp_thread_t in MT */
+local bool running_handle_close_errors = false;
+#endif
+local void handle_close_errors (void* sp, gcv_object_t* frame, object label,
+                                object condition) {
+  if (running_handle_close_errors) return;
+  else running_handle_close_errors = true;
+  unwind_upto(frame);
+}
+#define MAYBE_IGNORE_ERRORS(abort,code)                                 \
+  if (abort) {                                                          \
+    var sp_jmp_buf returner; /* return point */                         \
+    running_handle_close_errors = false;                                \
+    make_HANDLER_entry_frame(O(handler_for_error), handle_close_errors, \
+                             returner, goto end_ignore_errors; );       \
+  }                                                                     \
+  code;                                                                 \
+  if (abort) running_handle_close_errors = false;                       \
+ end_ignore_errors:                                                     \
+  if (abort) { unwind_HANDLER_frame(); }
 
-# Buffered-Output-Stream
-# ======================
 
-# Element-Type: character
-# Directions: only output
-# (make-buffered-output-stream fun) returns a Buffered-Output-Stream.
-#   fun is a Function expecting one Argument, a Simple-String.
-#   Functionality: (write-char ...) gathers the written characters in
-#   a String, until a #\Newline or a FORCE-/FINISH-OUTPUT-
-#   request arrives. Then it calls fun with a Simple-String as Argument,
-#   that contains the so far collected stuff.
-#   (clear-output ...) dicards the so far collected characters.
+/* Buffered-Output-Stream
+   ======================
 
-# Additional Components:
-  # define strm_buff_out_fun    strm_other[0]  # Output-Function
-  #define strm_buff_out_string  strm_other[1]  # Semi-Simple-String for Output
+ Element-Type: character
+ Directions: only output
+ (make-buffered-output-stream fun) returns a Buffered-Output-Stream.
+   fun is a Function expecting one Argument, a Simple-String.
+   Functionality: (write-char ...) gathers the written characters in
+   a String, until a #\Newline or a FORCE-/FINISH-OUTPUT-
+   request arrives. Then it calls fun with a Simple-String as Argument,
+   that contains the so far collected stuff.
+   (clear-output ...) dicards the so far collected characters.
 
-# UP: Moves the pending Output of a Buffered-Output-Stream to the destination.
-# finish_output_buff_out(stream);
-# > stream: Buffered-Output-Stream
-# can trigger GC
+ Additional Components:
+ define strm_buff_out_fun    strm_other[0]  - Output-Function */
+#define strm_buff_out_string strm_other[1] /* Semi-Simple-String for Output */
+
+/* UP: Moves the pending Output of a Buffered-Output-Stream to the destination.
+ finish_output_buff_out(stream);
+ > stream: Buffered-Output-Stream
+ can trigger GC */
 local maygc void finish_output_buff_out (object stream) {
   pushSTACK(stream);
-  var object string = TheStream(stream)->strm_buff_out_string; # String
-  string = coerce_ss(string); # convert to Simple-String (enforces copying)
+  var object string = TheStream(stream)->strm_buff_out_string; /* String */
+  string = coerce_ss(string); /* convert to Simple-String (enforces copying) */
   stream = STACK_0; STACK_0 = string;
-  # empty String by Fill-Pointer:=0 :
+  /* empty String by Fill-Pointer:=0 : */
   TheIarray(TheStream(stream)->strm_buff_out_string)->dims[1] = 0;
-  funcall(TheStream(stream)->strm_buff_out_fun,1); # call Function
+  funcall(TheStream(stream)->strm_buff_out_fun,1); /* call Function */
 }
 
-# UP: Moves the pending Output of a Buffered-Output-Stream to the destination.
-# force_output_buff_out(stream);
-# > stream: Buffered-Output-Stream
-# can trigger GC
-  #define force_output_buff_out  finish_output_buff_out
+/* UP: Moves the pending Output of a Buffered-Output-Stream to the destination.
+ force_output_buff_out(stream);
+ > stream: Buffered-Output-Stream
+ can trigger GC */
+#define force_output_buff_out  finish_output_buff_out
 
-# UP: Deletes the pending Output of a Buffered-Output-Stream.
-# clear_output_buff_out(stream);
-# > stream: Buffered-Output-Stream
-# can trigger GC
+/* UP: Deletes the pending Output of a Buffered-Output-Stream.
+ clear_output_buff_out(stream);
+ > stream: Buffered-Output-Stream
+ can trigger GC */
 local maygc void clear_output_buff_out (object stream) {
-  # empty String by Fill-Pointer:=0 :
+  /* empty String by Fill-Pointer:=0 : */
   TheIarray(TheStream(stream)->strm_buff_out_string)->dims[1] = 0;
-  # leave Line-Position unchanged??
+  /* leave Line-Position unchanged?? */
 }
 
-# WRITE-CHAR - Pseudo-Function for Buffered-Output-Streams:
+/* WRITE-CHAR - Pseudo-Function for Buffered-Output-Streams: */
 local maygc void wr_ch_buff_out (const gcv_object_t* stream_, object ch) {
   var object stream = *stream_;
   check_wr_char(stream,ch);
-  # push Character in the String:
+  /* push Character in the String: */
   ssstring_push_extend(TheStream(stream)->strm_buff_out_string,char_code(ch));
-  # After #\Newline pass on Buffer:
+  /* After #\Newline pass on Buffer: */
   if (chareq(char_code(ch),ascii(NL)))
     force_output_buff_out(*stream_);
 }
 
 /* Closes a Buffered-Output-Stream.
- close_buff_out(stream);
+ close_buff_out(stream, abort);
  > stream : Buffered-Output-Stream
  > abort: flag: non-0 => ignore errors
  can trigger GC */
 local maygc void close_buff_out (object stream, uintB abort) {
-  pushSTACK(stream); # save stream
-  finish_output_buff_out(stream);
-  stream = popSTACK(); # restore stream
-  TheStream(stream)->strm_buff_out_fun = NIL; # Function := NIL
-  TheStream(stream)->strm_buff_out_string = NIL; # String := NIL
+  pushSTACK(stream); /* save stream */
+  MAYBE_IGNORE_ERRORS(abort,finish_output_buff_out(stream));
+  stream = popSTACK(); /* restore stream */
+  TheStream(stream)->strm_buff_out_fun = NIL; /* Function := NIL */
+  TheStream(stream)->strm_buff_out_string = NIL; /* String := NIL */
 }
 
-# (MAKE-BUFFERED-OUTPUT-STREAM fun [line-position])
+/* (MAKE-BUFFERED-OUTPUT-STREAM fun [line-position]) */
 LISPFUN(make_buffered_output_stream,seclass_read,1,1,norest,nokey,0,NIL) {
-  # check line-position:
+  /* check line-position: */
   if (!boundp(STACK_0)) {
-    STACK_0 = Fixnum_0; # default value 0
-  } else { # line-position specified, should be a Fixnum >=0 :
+    STACK_0 = Fixnum_0; /* default value 0 */
+  } else { /* line-position specified, should be a Fixnum >=0 : */
     if (!posfixnump(STACK_0))
-      fehler_posfixnum(STACK_0);
+      error_posfixnum(STACK_0);
   }
-  # allocate small Semi-Simple-String of Length 50 :
+  /* allocate small Semi-Simple-String of Length 50 : */
   pushSTACK(make_ssstring(SEMI_SIMPLE_DEFAULT_SIZE));
-  var object stream = # new Stream, only WRITE-CHAR allowed
+  var object stream = /* new Stream, only WRITE-CHAR allowed */
     allocate_stream(strmflags_wr_ch_B,strmtype_buff_out,strm_len+2,0);
   stream_dummy_fill(stream);
   TheStream(stream)->strm_wr_ch =
     TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_buff_out);
   TheStream(stream)->strm_wr_ch_array =
     TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_dummy);
-  TheStream(stream)->strm_buff_out_string = popSTACK(); # enter String
-  TheStream(stream)->strm_wr_ch_lpos = popSTACK(); # enter Line Position
-  TheStream(stream)->strm_buff_out_fun = popSTACK(); # enter Function
+  TheStream(stream)->strm_buff_out_string = popSTACK(); /* enter String */
+  TheStream(stream)->strm_wr_ch_lpos = popSTACK(); /* enter Line Position */
+  TheStream(stream)->strm_buff_out_fun = popSTACK(); /* enter Function */
   VALUES1(stream); /* return stream */
 }
 
 
 #ifdef GENERIC_STREAMS
 
-# Generic Streams
-# ===============
+/* Generic Streams
+   ===============
 
-  # Contains a "controller object".
-  # define strm_controller_object  strm_other[0]  # see lispbibl.d
+ Contains a "controller object".
+ define strm_controller_object  strm_other[0]  - see lispbibl.d
 
-  # The function GENERIC-STREAM-CONTROLLER will return some
-  # object c associated with the stream s.
+ The function GENERIC-STREAM-CONTROLLER will return some
+ object c associated with the stream s.
 
-  #   (GENERIC-STREAM-READ-CHAR c)                      --> character or NIL
-  #   (GENERIC-STREAM-PEEK-CHAR c)                      --> character or NIL
-  #   (GENERIC-STREAM-READ-CHAR-WILL-HANG-P c)          --> {T,NIL}
-  #   (GENERIC-STREAM-CLEAR-INPUT c)                    --> {T,NIL}
-  #   (GENERIC-STREAM-WRITE-CHAR c ch)                  -->
-  #   (GENERIC-STREAM-WRITE-STRING c string start len)  -->
-  #   (GENERIC-STREAM-FINISH-OUTPUT c)                  -->
-  #   (GENERIC-STREAM-FORCE-OUTPUT c)                   -->
-  #   (GENERIC-STREAM-CLEAR-OUTPUT c)                   -->
-  #   (GENERIC-STREAM-READ-BYTE c)                      --> integer or NIL
-  #   (GENERIC-STREAM-WRITE-BYTE c i)                   -->
-  #   (GENERIC-STREAM-CLOSE c)                          -->
+     (GENERIC-STREAM-READ-CHAR c)                      --> character or NIL
+     (GENERIC-STREAM-PEEK-CHAR c)                      --> character or NIL
+     (GENERIC-STREAM-READ-CHAR-WILL-HANG-P c)          --> {T,NIL}
+     (GENERIC-STREAM-CLEAR-INPUT c)                    --> {T,NIL}
+     (GENERIC-STREAM-WRITE-CHAR c ch)                  -->
+     (GENERIC-STREAM-WRITE-STRING c string start len)  -->
+     (GENERIC-STREAM-FINISH-OUTPUT c)                  -->
+     (GENERIC-STREAM-FORCE-OUTPUT c)                   -->
+     (GENERIC-STREAM-CLEAR-OUTPUT c)                   -->
+     (GENERIC-STREAM-READ-BYTE c)                      --> integer or NIL
+     (GENERIC-STREAM-WRITE-BYTE c i)                   -->
+     (GENERIC-STREAM-CLOSE c)                          -->
 
-# (READ-CHAR s) ==
-# (GENERIC-STREAM-READ-CHAR c)
+ (READ-CHAR s) == (GENERIC-STREAM-READ-CHAR c) */
 local maygc object rd_ch_generic (const gcv_object_t* stream_) {
   pushSTACK(*stream_); funcall(L(generic_stream_controller),1);
   pushSTACK(value1); funcall(S(generic_stream_rdch),1);
   return nullp(value1) ? eof_value : value1;
 }
 
-# (PEEK-CHAR s) ==
-# (GENERIC-STREAM-PEEK-CHAR c)
+/* (PEEK-CHAR s) == (GENERIC-STREAM-PEEK-CHAR c) */
 local maygc object pk_ch_generic (const gcv_object_t* stream_) {
   pushSTACK(*stream_); funcall(L(generic_stream_controller),1);
   pushSTACK(value1); funcall(S(generic_stream_pkch),1);
   if (nullp(value1))
     value1 = eof_value;
   if ((mv_count >= 2) && !nullp(value2)) {
-    # READ-CHAR already executed -> must execute an implicit UNREAD-CHAR
-    # (i.e. save the result for the next READ-CHAR/PEEK-CHAR).
+    /* READ-CHAR already executed -> must execute an implicit UNREAD-CHAR
+     (i.e. save the result for the next READ-CHAR/PEEK-CHAR). */
     TheStream(*stream_)->strm_rd_ch_last = value1;
     if (!eq(value1,eof_value))
       TheStream(*stream_)->strmflags |= strmflags_unread_B;
@@ -3074,46 +3118,43 @@ local maygc object pk_ch_generic (const gcv_object_t* stream_) {
   return value1;
 }
 
-# (LISTEN s) ==
-# (IF (GENERIC-STREAM-READ-CHAR-WILL-HANG-P c)
-#   :WAIT
-#   (IF (GENERIC-STREAM-PEEK-CHAR c)
-#     :INPUT-AVAILABLE
-#     :EOF
-# ) )
-local maygc signean listen_char_generic (object stream) {
+/* (LISTEN s) ==
+ (IF (GENERIC-STREAM-READ-CHAR-WILL-HANG-P c)
+   :WAIT
+   (IF (GENERIC-STREAM-PEEK-CHAR c)
+     :INPUT-AVAILABLE
+     :EOF)) */
+local maygc listen_t listen_char_generic (object stream) {
   pushSTACK(stream);
   pushSTACK(stream); funcall(L(generic_stream_controller),1);
   pushSTACK(value1); funcall(S(generic_stream_read_char_will_hang_p),1);
   if (!nullp(value1)) {
-    skipSTACK(1); return ls_wait;
+    skipSTACK(1); return LISTEN_WAIT;
   }
   var object nextchar = pk_ch_generic(&STACK_0);
   skipSTACK(1);
   if (eq(nextchar,eof_value))
-    return ls_eof;
+    return LISTEN_EOF;
   else
-    return ls_avail;
+    return LISTEN_AVAIL;
 }
 
-# (CLEAR-INPUT s) ==
-# (GENERIC-STREAM-CLEAR-INPUT c)
+/* (CLEAR-INPUT s) == (GENERIC-STREAM-CLEAR-INPUT c) */
 local maygc bool clear_input_generic (object stream) {
   pushSTACK(stream); funcall(L(generic_stream_controller),1);
   pushSTACK(value1); funcall(S(generic_stream_clear_input),1);
   return !nullp(value1);
 }
 
-# (WRITE-CHAR ch s) ==
-# (GENERIC-STREAM-WRITE-CHAR c ch)
+/* (WRITE-CHAR ch s) == (GENERIC-STREAM-WRITE-CHAR c ch) */
 local maygc void wr_ch_generic (const gcv_object_t* stream_, object ch) {
-  # ch is a character, need not save it
+  /* ch is a character, need not save it */
   pushSTACK(*stream_); funcall(L(generic_stream_controller),1);
   pushSTACK(value1); pushSTACK(ch); funcall(S(generic_stream_wrch),2);
 }
 
-# (WRITE-CHAR-ARRAY s string start len) ==
-# (GENERIC-STREAM-WRITE-STRING c string start len)
+/* (WRITE-CHAR-ARRAY s string start len) ==
+ (GENERIC-STREAM-WRITE-STRING c string start len) */
 local maygc void wr_ch_array_generic (const gcv_object_t* stream_,
                                       const gcv_object_t* chararray_,
                                       uintL start, uintL len) {
@@ -3126,49 +3167,45 @@ local maygc void wr_ch_array_generic (const gcv_object_t* stream_,
   wr_ss_lpos(*stream_,&charptr[len],len);
 }
 
-# (FINISH-OUTPUT s) ==
-# (GENERIC-STREAM-FINISH-OUTPUT c)
+/* (FINISH-OUTPUT s) == (GENERIC-STREAM-FINISH-OUTPUT c) */
 local maygc void finish_output_generic (object stream) {
   pushSTACK(stream); funcall(L(generic_stream_controller),1);
   pushSTACK(value1); funcall(S(generic_stream_finish_output),1);
 }
 
-# (FORCE-OUTPUT s) ==
-# (GENERIC-STREAM-FORCE-OUTPUT c)
+/* (FORCE-OUTPUT s) == (GENERIC-STREAM-FORCE-OUTPUT c) */
 local maygc void force_output_generic (object stream) {
   pushSTACK(stream); funcall(L(generic_stream_controller),1);
   pushSTACK(value1); funcall(S(generic_stream_force_output),1);
 }
 
-# (CLEAR-OUTPUT s) ==
-# (GENERIC-STREAM-CLEAR-OUTPUT c)
+/* (CLEAR-OUTPUT s) == (GENERIC-STREAM-CLEAR-OUTPUT c) */
 local maygc void clear_output_generic (object stream) {
   pushSTACK(stream); funcall(L(generic_stream_controller),1);
   pushSTACK(value1); funcall(S(generic_stream_clear_output),1);
 }
 
-# (READ-BYTE s) ==
-# (GENERIC-STREAM-READ-BYTE c)
+/* (READ-BYTE s) == (GENERIC-STREAM-READ-BYTE c) */
 local maygc object rd_by_generic (object stream) {
   pushSTACK(stream); funcall(L(generic_stream_controller),1);
   pushSTACK(value1); funcall(S(generic_stream_rdby),1);
   return (nullp(value1) ? eof_value : value1);
 }
 
-# (WRITE-BYTE s i) ==
-# (GENERIC-STREAM-WRITE-BYTE c i)
+/* (WRITE-BYTE s i) == (GENERIC-STREAM-WRITE-BYTE c i) */
 local maygc void wr_by_generic (object stream, object obj) {
-  pushSTACK(obj); # save obj
+  pushSTACK(obj); /* save obj */
   pushSTACK(stream); funcall(L(generic_stream_controller),1);
   obj = STACK_0;
   STACK_0 = value1; pushSTACK(obj); funcall(S(generic_stream_wrby),2);
 }
 
-# (CLOSE s) ==
-# (GENERIC-STREAM-CLOSE c)
+/* (CLOSE s) == (GENERIC-STREAM-CLOSE c) */
 local maygc void close_generic (object stream, uintB abort) {
-  pushSTACK(stream); funcall(L(generic_stream_controller),1);
-  pushSTACK(value1); funcall(S(generic_stream_close),1);
+  MAYBE_IGNORE_ERRORS(abort, {
+    pushSTACK(stream); funcall(L(generic_stream_controller),1);
+    pushSTACK(value1); funcall(S(generic_stream_close),1);
+  });
 }
 
 LISPFUNN(generic_stream_controller,1) {
@@ -3210,161 +3247,160 @@ LISPFUNN(generic_stream_p,1) {
 #endif
 
 
-# Streams communicating with the exterior world, based on bytes
-# =============================================================
+/* Streams communicating with the exterior world, based on bytes
+   =============================================================
 
-# They can be classified in three ways:
-# According to strmtype:
+ They can be classified in three ways:
+ According to strmtype:
 
-#                      file  ----  strmtype_file
-#                    /
-#             handle
-#           /        \           /  strmtype_pipe_in
-#   channel            pipe  -----  strmtype_pipe_out
-#           \
-#             socket  -----   strmtype_x11socket
-#                         \   strmtype_socket
+                      file  ----  strmtype_file
+                    /
+             handle
+           /        \           /  strmtype_pipe_in
+   channel            pipe  -----  strmtype_pipe_out
+            \
+             socket  -----   strmtype_x11socket
+                         \   strmtype_socket
 
-# According to buffering:
+ According to buffering:
 
-#             unbuffered
-#           /
-#   channel
-#           \
-#             buffered
+             unbuffered
+           /
+   channel
+            \
+             buffered
 
-# According to element type:
+ According to element type:
 
-#             CHARACTER or ([UN]SIGNED-BYTE n), n a multiple of 8 (setfable!)
-#           /
-#   channel
-#           \
-#             ([UN]SIGNED-BYTE n), n not a multiple of 8 (only if buffered)
+             CHARACTER or ([UN]SIGNED-BYTE n), n a multiple of 8 (setfable!)
+           /
+   channel
+            \
+             ([UN]SIGNED-BYTE n), n not a multiple of 8 (only if buffered)
 
 
-# UP: Check a :BUFFERED argument.
-# test_buffered_arg(arg)
-# > object arg: argument
-# < signean buffered: +1 for T, -1 for NIL, 0 for :DEFAULT
-local signean test_buffered_arg (object arg) {
+ UP: Check a :BUFFERED argument.
+ test_buffered_arg(arg)
+ > object arg: argument
+ < buffered_t: +1 for T, -1 for NIL, 0 for :DEFAULT */
+typedef enum { BUFFERED_T, BUFFERED_NIL, BUFFERED_DEFAULT } buffered_t;
+local buffered_t test_buffered_arg (object arg) {
   if (!boundp(arg) || eq(arg,S(Kdefault)))
-    return 0;
+    return BUFFERED_DEFAULT;
   if (nullp(arg))
-    return -1;
+    return BUFFERED_NIL;
   if (eq(arg,T))
-    return 1;
-  pushSTACK(arg); pushSTACK(S(Kbuffered));
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(error,GETTEXT("~S: illegal ~S argument ~S"));
+    return BUFFERED_T;
+  error_illegal_arg(arg,O(type_buffered_arg),S(Kbuffered));
 }
 
-# Classification of possible :ELEMENT-TYPEs.
+/* Classification of possible :ELEMENT-TYPEs. */
 typedef enum {
-  eltype_ch,    # CHARACTER
-  eltype_iu,    # (UNSIGNED-BYTE n)
-  eltype_is     # (SIGNED-BYTE n)
+  eltype_ch,    /* CHARACTER */
+  eltype_iu,    /* (UNSIGNED-BYTE n) */
+  eltype_is     /* (SIGNED-BYTE n) */
 } eltype_kind;
 
-# An analyzed :ELEMENT-TYPE argument.
+/* An analyzed :ELEMENT-TYPE argument. */
 typedef struct {
   eltype_kind kind;
-  uintL       size; # the n in ([UN]SIGNED-BYTE n),
-                    # >0, <intDsize*uintWC_max,
-                    # but 0 for eltype_ch
+  uintL       size; /* the n in ([UN]SIGNED-BYTE n), */
+                    /* >0, <intDsize*uintWC_max,
+                     but 0 for eltype_ch */
 } decoded_el_t;
 
-# UP: Check a :ELEMENT-TYPE argument.
-# test_eltype_arg(&eltype,&decoded);
-# > object eltype: argument (in the STACK)
-# < decoded: decoded eltype
-# can trigger GC
-local maygc void test_eltype_arg (gcv_object_t* eltype_, decoded_el_t* decoded) {
+/* UP: Check a :ELEMENT-TYPE argument.
+ test_eltype_arg(&eltype,&decoded);
+ > object eltype: argument (in the STACK)
+ < decoded: decoded eltype
+ can trigger GC */
+local maygc void test_eltype_arg (gcv_object_t* eltype_, decoded_el_t* decoded)
+{
   var object arg = *eltype_;
   if (!boundp(arg) || eq(arg,S(character)) || eq(arg,S(string_char))
-      || eq(arg,S(Kdefault))) { # CHARACTER, STRING-CHAR, :DEFAULT
+      || eq(arg,S(Kdefault))) { /* CHARACTER, STRING-CHAR, :DEFAULT */
     decoded->kind = eltype_ch; decoded->size = 0; return;
   }
-  if (eq(arg,S(bit))) { # BIT
+  if (eq(arg,S(bit))) { /* BIT */
     decoded->kind = eltype_iu; decoded->size = 1; return;
   }
-  if (eq(arg,S(unsigned_byte))) { # UNSIGNED-BYTE
+  if (eq(arg,S(unsigned_byte))) { /* UNSIGNED-BYTE */
     decoded->kind = eltype_iu; decoded->size = 8; return;
   }
-  if (eq(arg,S(signed_byte))) { # SIGNED-BYTE
+  if (eq(arg,S(signed_byte))) { /* SIGNED-BYTE */
     decoded->kind = eltype_is; decoded->size = 8; return;
   }
   var object eltype_size;
-  if (consp(arg) && mconsp(Cdr(arg)) && nullp(Cdr(Cdr(arg)))) { # two-element List
+  if (consp(arg) && mconsp(Cdr(arg)) && nullp(Cdr(Cdr(arg)))) { /* two-element List */
     var object h = Car(arg);
-    if (eq(h,S(mod))) { # (MOD n)
+    if (eq(h,S(mod))) { /* (MOD n) */
       decoded->kind = eltype_iu;
-      h = Car(Cdr(arg)); # n
-      # must be an Integer >0 :
+      h = Car(Cdr(arg)); /* n */
+      /* must be an Integer >0 : */
       if (!(integerp(h) && positivep(h) && !eq(h,Fixnum_0)))
         goto bad_eltype;
-      # build eltype_size := (integer-length (1- n)) :
-      pushSTACK(h); funcall(L(einsminus),1); # (1- n)
-      pushSTACK(value1); funcall(L(integer_length),1); # (integer-length (1- n))
+      /* build eltype_size := (integer-length (1- n)) : */
+      pushSTACK(h); funcall(L(minus_one),1); /* (1- n) */
+      pushSTACK(value1); funcall(L(integer_length),1); /* (integer-length (1- n)) */
       eltype_size = value1;
       goto eltype_integer;
     }
-    if (eq(h,S(unsigned_byte))) { # (UNSIGNED-BYTE n)
+    if (eq(h,S(unsigned_byte))) { /* (UNSIGNED-BYTE n) */
       decoded->kind = eltype_iu;
       eltype_size = Car(Cdr(arg));
       goto eltype_integer;
     }
-    if (eq(h,S(signed_byte))) { # (SIGNED-BYTE n)
+    if (eq(h,S(signed_byte))) { /* (SIGNED-BYTE n) */
       decoded->kind = eltype_is;
       eltype_size = Car(Cdr(arg));
       goto eltype_integer;
     }
   }
-  # First of all canonicalize a little bit (therewith the different
-  # SUBTYPEP will not have to do the same three times):
-  pushSTACK(arg); funcall(S(canonicalize_type),1); # (SYS::CANONICALIZE-TYPE arg)
-  pushSTACK(value1); # save canon-arg
-  pushSTACK(STACK_0); pushSTACK(S(character)); funcall(S(subtypep),2); # (SUBTYPEP canon-arg 'CHARACTER)
-  if (!nullp(value1)) {
-    skipSTACK(1);
-    decoded->kind = eltype_ch; decoded->size = 0;
-    return;
+  { /* First of all canonicalize a little bit (therewith the different
+       SUBTYPEP will not have to do the same three times): */
+    pushSTACK(arg); funcall(S(canonicalize_type),1); /* (SYS::CANONICALIZE-TYPE arg) */
+    pushSTACK(value1); /* save canon-arg */
+    pushSTACK(STACK_0); pushSTACK(S(character)); funcall(S(subtypep),2); /* (SUBTYPEP canon-arg 'CHARACTER) */
+    if (!nullp(value1)) {
+      skipSTACK(1);
+      decoded->kind = eltype_ch; decoded->size = 0;
+      return;
+    }
+    funcall(S(subtype_integer),1); /* (SYS::SUBTYPE-INTEGER canon-arg) */
   }
-  funcall(S(subtype_integer),1); # (SYS::SUBTYPE-INTEGER canon-arg)
   if (!((mv_count>1) && integerp(value1) && integerp(value2)))
     goto bad_eltype;
   {
-    # arg is a subtype of `(INTEGER ,low ,high) and
-    # value1 = low, value2 = high.
+    /* arg is a subtype of `(INTEGER ,low ,high) and
+     value1 = low, value2 = high. */
     var uintL l;
     if (positivep(value1)) {
-      l = I_integer_length(value2); # (INTEGER-LENGTH high)
+      l = I_integer_length(value2); /* (INTEGER-LENGTH high) */
       decoded->kind = eltype_iu;
     } else {
-      var uintL l1 = I_integer_length(value1); # (INTEGER-LENGTH low)
-      var uintL l2 = I_integer_length(value2); # (INTEGER-LENGTH high)
+      var uintL l1 = I_integer_length(value1); /* (INTEGER-LENGTH low) */
+      var uintL l2 = I_integer_length(value2); /* (INTEGER-LENGTH high) */
       l = (l1>l2 ? l1 : l2) + 1;
       decoded->kind = eltype_is;
     }
     eltype_size = fixnum(l);
   }
  eltype_integer:
-  # check eltype_size:
+  /* check eltype_size: */
   if (!(posfixnump(eltype_size) && !eq(eltype_size,Fixnum_0)
         && ((oint_data_len < log2_intDsize+intWCsize)
-           # [when oint_data_len <= log2(intDsize)+intWCsize-1 always
-           #  eltype_size < 2^oint_data_len < intDsize*(2^intWCsize-1) ]
+           /* [when oint_data_len <= log2(intDsize)+intWCsize-1 always
+             eltype_size < 2^oint_data_len < intDsize*(2^intWCsize-1) ] */
             || (as_oint(eltype_size) <
                 as_oint(fixnum(intDsize*(uintV)(vbitm(intWCsize)-1)))))))
     goto bad_eltype;
   decoded->size = posfixnum_to_V(eltype_size);
   return;
  bad_eltype:
-  pushSTACK(*eltype_); pushSTACK(S(Kelement_type));
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(error,GETTEXT("~S: illegal ~S argument ~S"));
+  error_illegal_arg(*eltype_,nullobj,S(Kelement_type));
 }
 
-# evaluate the appropriate forms
+/* evaluate the appropriate forms */
 #define ELTYPE_DISPATCH(decoded,ch,iu,is)                       \
   switch (decoded->kind) {                                      \
     case eltype_ch: /*CHARACTER*/               ch; break;      \
@@ -3373,11 +3409,11 @@ local maygc void test_eltype_arg (gcv_object_t* eltype_, decoded_el_t* decoded) 
     default: NOTREACHED;                                        \
   }
 
-# UP: Returns a canonical representation for a :ELEMENT-TYPE.
-# canon_eltype(&decoded)
-# > decoded: decoded eltype
-# < result: either CHARACTER or ([UN]SIGNED-BYTE n)
-# can trigger GC
+/* UP: Returns a canonical representation for a :ELEMENT-TYPE.
+ canon_eltype(&decoded)
+ > decoded: decoded eltype
+ < result: either CHARACTER or ([UN]SIGNED-BYTE n)
+ can trigger GC */
 local maygc object canon_eltype (const decoded_el_t* decoded) {
   ELTYPE_DISPATCH(decoded,{
     return S(character);
@@ -3392,186 +3428,163 @@ local maygc object canon_eltype (const decoded_el_t* decoded) {
   });
 }
 
-# UP: Check an :EXTERNAL-FORMAT argument.
-# test_external_format_arg(arg)
-# > arg: argument
-# < result: an encoding
-# can trigger GC
+/* UP: Check an :EXTERNAL-FORMAT argument.
+ test_external_format_arg(arg)
+ > arg: argument
+ < result: an encoding
+ can trigger GC */
 #define test_external_format_arg(arg)                   \
   check_encoding(arg,&O(default_file_encoding),true)
 
 #ifdef UNIX
 
-# UP: Deletes already entered interactive Input from a Handle.
-  local void clear_tty_input (Handle handle)
-   {
-    # Method 1: tcflush TCIFLUSH, see TERMIOS(3V)
-    # Method 2: ioctl TCFLSH TCIFLUSH, see TERMIO(4)
-    # Method 3: ioctl TIOCFLUSH FREAD, see TTCOMPAT(4)
-    begin_system_call();
-    #ifdef UNIX_TERM_TERMIOS
-      if (!( TCFLUSH(handle,TCIFLUSH) ==0)) {
-        if (!((errno==ENOTTY)||(errno==EINVAL))) { # no TTY: OK
-          local bool flag = false;
-          # report other Error, but only once
-          if (!flag) { flag = true; OS_error(); }
-        }
-      }
-    #endif
-    #ifdef UNIX_TERM_TERMIO
-      #ifdef TCIFLUSH # !RISCOS
-      if (!( ioctl(handle,TCFLSH,(CADDR_T)TCIFLUSH) ==0)) {
-        if (!(errno==ENOTTY)) { # no TTY: OK
-          local bool flag = false;
-          # report other Error, but only once
-          if (!flag) { flag = true; OS_error(); }
-        }
-      }
-      #endif
-    #endif
-    #ifdef UNIX_TERM_SGTTY
-      {
-        var int arg = FREAD;
-        if (!( ioctl(handle,TIOCFLUSH,&arg) ==0)) {
-          if (!(errno==ENOTTY)) { # no TTY: OK
-            local bool flag = false;
-            # report other Error, but only once
-            if (!flag) { flag = true; OS_error(); }
-          }
-        }
-      }
-    #endif
-    end_system_call();
-  }
-
-# UP: Move the pending Output of a Handle to the destination.
-  local void finish_tty_output (Handle handle)
-  {
-    # Method 1: fsync, see FSYNC(2)
-    # Method 2: tcdrain, see TERMIOS(3V)
-    # Method 3: ioctl TCSBRK 1, see TERMIO(4)
-    # poss. Method 3: ioctl TCGETS/TCSETSW, see TERMIO(4)
-    # or (almost equivalent) ioctl TIOCGETP/TIOCSETP, see TTCOMPAT(4)
-    begin_system_call();
-    #if !(defined(UNIX) && !defined(HAVE_FSYNC))
-      if (!( fsync(handle) ==0)) {
-        #ifndef UNIX_BEOS # BeOS 5 apparently does not set errno
-          #ifdef UNIX_IRIX
-          if (!(errno==ENOSYS))
-          #endif
-          #ifdef UNIX_CYGWIN32 /* for win95 and xterm/rxvt */
-          if ((errno != EBADF) && (errno != EACCES))
-          #endif
-          #ifdef UNIX_DARWIN
-          if ((errno != EOPNOTSUPP) && (errno != ENODEV))
-          #endif
-          if (!(errno==EINVAL))
-            { OS_error(); }
-        #endif
-      }
-    #endif
-    #ifdef UNIX_TERM_TERMIOS
-      if (!( TCDRAIN(handle) ==0)) {
-        if (!((errno==ENOTTY)||(errno==EINVAL)))
-        #ifdef UNIX_DARWIN
-        if (!((errno==EOPNOTSUPP)||(errno==ENODEV)))
-        #endif
-          { OS_error(); } # no TTY: OK, report other Error
-      }
-    #endif
-    #ifdef UNIX_TERM_TERMIO
-      if (!( ioctl(handle,TCSBRK,(CADDR_T)1) ==0)) {
-        if (!(errno==ENOTTY)) { OS_error(); }
-      }
-    #endif
-    #if defined(UNIX_TERM_TERMIOS) && defined(TCGETS) && defined(TCSETSW)
-      {
-        var struct termios term_parameters;
-        if (!(   ( ioctl(handle,TCGETS,&term_parameters) ==0)
-              && ( ioctl(handle,TCSETSW,&term_parameters) ==0))) {
-          if (!((errno==ENOTTY)||(errno==EINVAL)))
-            { OS_error(); } # no TTY: OK, report other Error
-        }
-      }
-    #endif
-    #if 0 # Caution: This should cause FINISH-OUTPUT and CLEAR-INPUT!
-      {
-        var struct sgttyb tty_parameters;
-        if (!(   ( ioctl(handle,TIOCGETP,&tty_parameters) ==0)
-              && ( ioctl(handle,TIOCSETP,&tty_parameters) ==0))) {
-          if (!(errno==ENOTTY)) { OS_error(); }
-        }
-      }
-    #endif
-    end_system_call();
-  }
-
-# UP: Move the pending Output of a Handle to the destination.
-  local void force_tty_output (Handle handle);
-#if !(defined(UNIX) && !defined(HAVE_FSYNC))
-  local void force_tty_output (Handle handle)
-  {
-    # Method: fsync, see FSYNC(2)
-    begin_system_call();
-    if (!( fsync(handle) ==0)) {
-      #ifndef UNIX_BEOS # BeOS 5 apparently does not set errno
-        #ifdef UNIX_IRIX
-        if (!(errno==ENOSYS))
-        #endif
-        #ifdef UNIX_CYGWIN32 /* for win95 and xterm/rxvt */
-        if ((errno != EBADF) && (errno != EACCES))
-        #endif
-        #ifdef UNIX_DARWIN
-        if ((errno != EOPNOTSUPP) && (errno != ENODEV))
-        #endif
-        if (!(errno==EINVAL))
-          OS_error();
-      #endif
+/* UP: Deletes already entered interactive Input from a Handle. */
+local void clear_tty_input (Handle handle) {
+  /* Method 1: tcflush TCIFLUSH, see TERMIOS(3V)
+     Method 2: ioctl TCFLSH TCIFLUSH, see TERMIO(4)
+     Method 3: ioctl TIOCFLUSH FREAD, see TTCOMPAT(4) */
+  begin_system_call();
+ #ifdef UNIX_TERM_TERMIOS
+  if (!( TCFLUSH(handle,TCIFLUSH) ==0)) {
+    if (!((errno==ENOTTY)||(errno==EINVAL))) { /* no TTY: OK */
+      local bool flag = false;
+      /* report other Error, but only once */
+      if (!flag) { flag = true; OS_error(); }
     }
-    end_system_call();
   }
+ #endif
+ #if  defined(UNIX_TERM_TERMIO) && defined(TCIFLUSH) /* !RISCOS */
+  if (!( ioctl(handle,TCFLSH,(CADDR_T)TCIFLUSH) ==0)) {
+    if (!(errno==ENOTTY)) { /* no TTY: OK */
+      local bool flag = false;
+      /* report other Error, but only once */
+      if (!flag) { flag = true; OS_error(); }
+    }
+  }
+ #endif
+ #ifdef UNIX_TERM_SGTTY
+  {
+    var int arg = FREAD;
+    if (!( ioctl(handle,TIOCFLUSH,&arg) ==0)) {
+      if (!(errno==ENOTTY)) { /* no TTY: OK */
+        local bool flag = false;
+        /* report other Error, but only once */
+        if (!flag) { flag = true; OS_error(); }
+      }
+    }
+  }
+ #endif
+  end_system_call();
+}
+
+#if defined(UNIX_IRIX)
+  #define IS_EINVAL_EXTRA  (errno==ENOSYS)
+#elif defined(UNIX_CYGWIN32) /* for Woe95 and xterm/rxvt, and WoeXP /dev/null */
+  #define IS_EINVAL_EXTRA  ((errno==EBADF)||(errno==EACCES)||(errno==EBADRQC))
+#elif defined(UNIX_DARWIN) || defined(UNIX_FREEBSD) || defined(UNIX_NETBSD) || defined(UNIX_OPENBSD)
+  #define IS_EINVAL_EXTRA  ((errno==EOPNOTSUPP)||(errno==ENOTSUP)||(errno==ENODEV))
+#else
+  #define IS_EINVAL_EXTRA  0
+#endif
+#define IS_EINVAL ((errno==EINVAL)||IS_EINVAL_EXTRA)
+
+/* UP: Move the pending Output of a Handle to the destination. */
+local void finish_tty_output (Handle handle) {
+  /* Method 1: fsync, see fsync(2)
+     Method 2: tcdrain, see termios(3V)
+     Method 3: ioctl TCSBRK 1, see TERMIO(4)
+     poss. Method 3: ioctl TCGETS/TCSETSW, see termio(4) or tty_ioctl(4)
+     or (almost equivalent) ioctl TIOCGETP/TIOCSETP, see TTCOMPAT(4) */
+  begin_system_call();
+ #if !(defined(UNIX) && !defined(HAVE_FSYNC))
+  if (!( fsync(handle) ==0)) {
+  #ifndef UNIX_BEOS /* BeOS 5 apparently does not set errno */
+    if (!IS_EINVAL)
+      { OS_error(); }
+  #endif
+  } else goto ok;
+ #endif
+ #ifdef UNIX_TERM_TERMIOS
+  if (!( TCDRAIN(handle) ==0)) {
+    if (!((errno==ENOTTY)||IS_EINVAL))
+      { OS_error(); } /* no TTY: OK, report other Error */
+  } else goto ok;
+ #endif
+ #ifdef UNIX_TERM_TERMIO
+  if (!( ioctl(handle,TCSBRK,(CADDR_T)1) ==0)) {
+    if (!(errno==ENOTTY)) { OS_error(); }
+  } else goto ok;
+ #endif
+ #if defined(UNIX_TERM_TERMIOS) && defined(TCGETS) && defined(TCSETSW)
+  {
+    var struct termios term_parameters;
+    if (!(   ( ioctl(handle,TCGETS,&term_parameters) ==0)
+          && ( ioctl(handle,TCSETSW,&term_parameters) ==0))) {
+      if (!((errno==ENOTTY)||(errno==EINVAL)))
+        { OS_error(); } /* no TTY: OK, report other Error */
+    } else goto ok;
+  }
+ #endif
+ #if 0 /* Caution: This should cause FINISH-OUTPUT and CLEAR-INPUT! */
+  {
+    var struct sgttyb tty_parameters;
+    if (!(   ( ioctl(handle,TIOCGETP,&tty_parameters) ==0)
+          && ( ioctl(handle,TIOCSETP,&tty_parameters) ==0))) {
+      if (!(errno==ENOTTY)) { OS_error(); }
+    } else goto ok;
+  }
+ #endif
+ ok:
+  end_system_call();
+}
+
+/* UP: Move the pending Output of a Handle to the destination. */
+local void force_tty_output (Handle handle);
+#if !(defined(UNIX) && !defined(HAVE_FSYNC))
+local void force_tty_output (Handle handle) {
+  /* Method: fsync, see FSYNC(2) */
+  begin_system_call();
+  if (!( fsync(handle) ==0)) {
+   #ifndef UNIX_BEOS /* BeOS 5 apparently does not set errno */
+    if (!IS_EINVAL)
+      OS_error();
+   #endif
+  }
+  end_system_call();
+}
 #else
   #define force_tty_output(handle)
 #endif
 
-# UP: Deletes the pending Output of a Handle.
-  local void clear_tty_output (Handle handle)
-  {
-    # Method 1: tcflush TCOFLUSH, see TERMIOS(3V)
-    # Method 2: ioctl TCFLSH TCOFLUSH, see TERMIO(4)
-    # Method 3: ioctl TIOCFLUSH FWRITE, see TTCOMPAT(4)
-    begin_system_call();
-    #ifdef UNIX_TERM_TERMIOS
-      if (!( TCFLUSH(handle,TCOFLUSH) ==0)) {
-        #ifdef UNIX_IRIX
-        if (!(errno==ENOSYS))
-        #endif
-        if (!((errno==ENOTTY)||(errno==EINVAL)))
-        #ifdef UNIX_DARWIN
-        if (!((errno==EOPNOTSUPP)||(errno==ENODEV)))
-        #endif
-          { OS_error(); } # no TTY: OK, report other Error
-      }
-    #endif
-    #ifdef UNIX_TERM_TERMIO
-      #ifdef TCOFLUSH # !RISCOS
-      if (!( ioctl(handle,TCFLSH,(CADDR_T)TCOFLUSH) ==0)) {
-        if (!(errno==ENOTTY)) { OS_error(); } # no TTY: OK, report other Error
-      }
-      #endif
-    #endif
-    #ifdef UNIX_TERM_SGTTY
-      {
-        var int arg = FWRITE;
-        if (!( ioctl(handle,TIOCFLUSH,&arg) ==0)) {
-          if (!(errno==ENOTTY)) { OS_error(); } # no TTY: OK, report other Error
-        }
-      }
-    #endif
-    end_system_call();
+/* UP: Deletes the pending Output of a Handle. */
+local void clear_tty_output (Handle handle) {
+  /* Method 1: tcflush TCOFLUSH, see TERMIOS(3V)
+     Method 2: ioctl TCFLSH TCOFLUSH, see TERMIO(4)
+     Method 3: ioctl TIOCFLUSH FWRITE, see TTCOMPAT(4) */
+  begin_system_call();
+ #ifdef UNIX_TERM_TERMIOS
+  if (!( TCFLUSH(handle,TCOFLUSH) ==0)) {
+    if (!((errno==ENOTTY)||IS_EINVAL))
+      { OS_error(); } /* no TTY: OK, report other Error */
   }
+ #endif
+ #if defined(UNIX_TERM_TERMIO) && defined(TCOFLUSH) /* !RISCOS */
+  if (!( ioctl(handle,TCFLSH,(CADDR_T)TCOFLUSH) ==0)) {
+    if (!(errno==ENOTTY)) { OS_error(); } /* no TTY: OK, report other Error */
+  }
+ #endif
+ #ifdef UNIX_TERM_SGTTY
+  {
+    var int arg = FWRITE;
+    if (!( ioctl(handle,TIOCFLUSH,&arg) ==0)) {
+      if (!(errno==ENOTTY)) { OS_error(); } /* no TTY: OK, report other Error */
+    }
+  }
+ #endif
+  end_system_call();
+}
 
-#endif # UNIX
+#endif /* UNIX */
 
 #if defined(WIN32_NATIVE)
 
@@ -3596,65 +3609,109 @@ local void clear_tty_input (Handle handle) {
   end_system_call();
 }
 
-# UP: Move the pending Output of a Handle to the destination.
+/* UP: Move the pending Output of a Handle to the destination. */
   local void finish_tty_output (Handle handle);
-  # Maybe call WaitCommEvent with argument EV_TXEMPTY ?
+  /* Maybe call WaitCommEvent with argument EV_TXEMPTY ? */
   #define finish_tty_output(handle)
 
-# UP: Move the pending Output of a Handle to the destination.
+/* UP: Move the pending Output of a Handle to the destination. */
   local void force_tty_output (Handle handle);
   #define force_tty_output(handle)  finish_tty_output(handle)
 
-# UP: Deletes the pending Output of a Handle.
+/* UP: Deletes the pending Output of a Handle. */
 local void clear_tty_output (Handle handle) {
   begin_system_call();
-  # Maybe it's a serial communication.
+  /* Maybe it's a serial communication. */
   if (!PurgeComm(handle,PURGE_TXABORT|PURGE_TXCLEAR))
     error_unless_invalid();
   end_system_call();
 }
 
+
 #endif
 
-# UP: Determines, if a Handle refers to a (static) File.
-# regular_handle_p(handle)
-# > handle: Handle of the opened File
-# < result: true if it is a (static) File
-local bool regular_handle_p (Handle handle) {
+/* UP: Return platform-specific file type
+ handle_type(handle)
+ > handle: open handle (file or pipe)
+ < result: an integer, identifying the type */
  #if defined(UNIX)
+#define handle_type_t mode_t
+local handle_type_t handle_type (Handle handle) {
   var struct stat statbuf;
   begin_system_call();
   if (!( fstat(handle,&statbuf) ==0)) { OS_error(); }
   end_system_call();
-  return (S_ISREG(statbuf.st_mode) || S_ISBLK(statbuf.st_mode));
- #endif
- #ifdef WIN32_NATIVE
+  return statbuf.st_mode;
+}
+#elif defined(WIN32_NATIVE)
+#define handle_type_t DWORD
+local handle_type_t handle_type (Handle handle) {
   var DWORD filetype;
   begin_system_call();
   filetype = GetFileType(handle);
   end_system_call();
-  return (filetype == FILE_TYPE_DISK);
+  return filetype;
+}
+#else
+#error handle_type() and handle_type_t are not defined
+#endif
+
+/* UP: Determines, if a Handle refers to a (static) File.
+ regular_handle_p(handle)
+ > handle: Handle of the opened File
+ < result: true if it is a (static) File */
+local inline bool regular_handle_type_p (handle_type_t mode) {
+ #if defined(UNIX)
+  return S_ISREG(mode) || S_ISBLK(mode);
+ #elif defined(WIN32_NATIVE)
+  return mode == FILE_TYPE_DISK;
  #endif
 }
+#define regular_handle_p(h)  regular_handle_type_p(handle_type(h))
 
-# UP: Determines if two Handle refer to the same file or device.
-# same_handle_p(handle1,handle2)
-# > handle1: Handle of the first open device
-# > handle2: Handle of the second open device
-# < result: true if handle1 and handle2 are exchangeable
-#define SAME_HANDLE_P_OUT(x)  do { /*printf x; fflush(stdout);*/ } while(0)
+/* UP: Determines, if a Handle refers to a pipe or a socket
+ pipe_handle_p(handle)
+ > handle: Handle of the opened File
+ < result: true if it is a socket or a pipe */
+local inline bool pipe_handle_type_p (handle_type_t mode) {
+ #if defined(UNIX)
+  return S_ISFIFO(mode)
+   #if defined(S_ISSOCK)
+    || S_ISSOCK(mode)
+   #endif
+    ;
+ #elif defined(WIN32_NATIVE)
+  return mode == FILE_TYPE_PIPE;
+ #endif
+}
+#define pipe_handle_p(h)  pipe_handle_type_p(handle_type(h))
+
+/* UP: Determines, if a Handle refers to a pipe, socket, file
+ pipe_handle_p(handle)
+ > handle: Handle of the opened File
+ < result: true if it is a socket/pipe/file */
+local inline bool pipe_file_handle_p (Handle handle) {
+  handle_type_t mode = handle_type(handle);
+  DEBUG_OUT(("\npipe_file_handle_p(%d): 0x%x\n",handle,mode));
+  return regular_handle_type_p(mode) || pipe_handle_type_p(mode);
+}
+
+/* UP: Determines if two Handle refer to the same file or device.
+ same_handle_p(handle1,handle2)
+ > handle1: Handle of the first open device
+ > handle2: Handle of the second open device
+ < result: true if handle1 and handle2 are exchangeable */
 local bool same_handle_p (Handle handle1, Handle handle2) {
  #if defined(UNIX)
   var struct stat statbuf1;
   var struct stat statbuf2;
   begin_system_call();
-  SAME_HANDLE_P_OUT(("\nsame_handle_p(%d,%d)\n",handle1,handle2));
+  DEBUG_OUT(("\nsame_handle_p(%d,%d)\n",handle1,handle2));
   if (!( fstat(handle1,&statbuf1) ==0)) { OS_error(); }
   if (!( fstat(handle2,&statbuf2) ==0)) { OS_error(); }
-  SAME_HANDLE_P_OUT(("dev: 0x%lx 0x%lx  ino: 0x%lx 0x%lx  mode: 0x%x 0x%x\n",
-                     statbuf1.st_dev,statbuf2.st_dev,
-                     statbuf1.st_ino,statbuf2.st_ino,
-                     statbuf1.st_mode,statbuf2.st_mode));
+  DEBUG_OUT(("dev: 0x%lx 0x%lx  ino: 0x%lx 0x%lx  mode: 0x%x 0x%x\n",
+             statbuf1.st_dev,statbuf2.st_dev,statbuf1.st_ino,statbuf2.st_ino,
+             statbuf1.st_mode,statbuf2.st_mode));
   if (statbuf1.st_dev == statbuf2.st_dev
       && statbuf1.st_ino == statbuf2.st_ino) {
     /* handle1 and handle2 point to the same inode. */
@@ -3663,10 +3720,10 @@ local bool same_handle_p (Handle handle1, Handle handle2) {
       /* handle1 and handle2 are exchangeable only if they are positioned
          at the same file position. */
       var off_t pos1 = lseek(handle1,0,SEEK_CUR);
-      SAME_HANDLE_P_OUT(("pos1: %ld\n",pos1));
+      DEBUG_OUT(("pos1: %ld\n",pos1));
       if (pos1 >= 0) {
         var off_t pos2 = lseek(handle2,0,SEEK_CUR);
-        SAME_HANDLE_P_OUT(("pos2: %ld\n",pos2));
+        DEBUG_OUT(("pos2: %ld\n",pos2));
         if (pos2 >= 0) {
           end_system_call();
           return (pos1 == pos2);
@@ -3682,7 +3739,7 @@ local bool same_handle_p (Handle handle1, Handle handle2) {
  #endif
  #if defined(WIN32_NATIVE)
   /* Same handle? */
-  SAME_HANDLE_P_OUT(("\nsame_handle_p(0x%lx,0x%lx)\n",handle1,handle2));
+  DEBUG_OUT(("\nsame_handle_p(0x%lx,0x%lx)\n",handle1,handle2));
   if (handle1 == handle2)
     return true;
   /* Same handle type? */
@@ -3691,7 +3748,7 @@ local bool same_handle_p (Handle handle1, Handle handle2) {
   var DWORD filetype2;
   filetype1 = GetFileType(handle1);
   filetype2 = GetFileType(handle2);
-  SAME_HANDLE_P_OUT(("GetFileType: 0x%lx  0x%lx\n",filetype1,filetype2));
+  DEBUG_OUT(("GetFileType: 0x%lx  0x%lx\n",filetype1,filetype2));
   if (filetype1 == filetype2) {
     if (filetype1 == FILE_TYPE_DISK) {
       /* handle1 and handle2 are both files. */
@@ -3699,16 +3756,16 @@ local bool same_handle_p (Handle handle1, Handle handle2) {
       var BY_HANDLE_FILE_INFORMATION fileinfo2;
       if (!GetFileInformationByHandle(handle1,&fileinfo1)) { OS_error(); }
       if (!GetFileInformationByHandle(handle2,&fileinfo2)) { OS_error(); }
-      SAME_HANDLE_P_OUT(("GetFileInformationByHandle:\n vol: 0x%lx  0x%lx\n"
-                         " index: 0x%x,0x%x  0x%x,0x%x\n attr: 0x%lx  0x%lx\n"
-                         " size: 0x%x,0x%x  0x%x,0x%x\n",
-                         fileinfo1.dwVolumeSerialNumber,
-                         fileinfo2.dwVolumeSerialNumber,
-                         fileinfo1.nFileIndexHigh,fileinfo1.nFileIndexLow,
-                         fileinfo2.nFileIndexHigh,fileinfo2.nFileIndexLow,
-                         fileinfo1.dwFileAttributes,fileinfo2.dwFileAttributes,
-                         fileinfo1.nFileSizeHigh,fileinfo1.nFileSizeLow,
-                         fileinfo2.nFileSizeHigh,fileinfo2.nFileSizeLow));
+      DEBUG_OUT(("GetFileInformationByHandle:\n vol: 0x%lx  0x%lx\n"
+                 " index: 0x%x,0x%x  0x%x,0x%x\n attr: 0x%lx  0x%lx\n"
+                 " size: 0x%x,0x%x  0x%x,0x%x\n",
+                 fileinfo1.dwVolumeSerialNumber,
+                 fileinfo2.dwVolumeSerialNumber,
+                 fileinfo1.nFileIndexHigh,fileinfo1.nFileIndexLow,
+                 fileinfo2.nFileIndexHigh,fileinfo2.nFileIndexLow,
+                 fileinfo1.dwFileAttributes,fileinfo2.dwFileAttributes,
+                 fileinfo1.nFileSizeHigh,fileinfo1.nFileSizeLow,
+                 fileinfo2.nFileSizeHigh,fileinfo2.nFileSizeLow));
       end_system_call();
       #define TIME_EQ(ft1,ft2)  \
         ((ft1).dwLowDateTime == (ft2).dwLowDateTime \
@@ -3729,95 +3786,96 @@ local bool same_handle_p (Handle handle1, Handle handle2) {
     } else if (filetype1 == FILE_TYPE_CHAR) {
       /* Same console? */
       var DWORD console_mode;
-      SAME_HANDLE_P_OUT(("FILE_TYPE_CHAR\n"));
+      DEBUG_OUT(("FILE_TYPE_CHAR\n"));
       if (GetConsoleMode(handle1,&console_mode)) {
-        SAME_HANDLE_P_OUT(("console_mode1: 0x%lx\n",console_mode));
+        DEBUG_OUT(("console_mode1: 0x%lx\n",console_mode));
         if (GetConsoleMode(handle2,&console_mode)) {
-          SAME_HANDLE_P_OUT(("console_mode2: 0x%lx\n",console_mode));
+          DEBUG_OUT(("console_mode2: 0x%lx\n",console_mode));
           end_system_call();
           return true;
         }
       }
-    } else
-      SAME_HANDLE_P_OUT(("neither FILE_TYPE_CHAR nor FILE_TYPE_DISK\n"));
+    } else { DEBUG_OUT(("neither FILE_TYPE_CHAR nor FILE_TYPE_DISK\n")); }
     /* Cannot determine equality. Assume they are different. */
   }
   end_system_call();
   return false;
  #endif
 }
-#undef SAME_HANDLE_P_OUT
 
 
-# Channel-Streams
-# ===============
+/* Channel-Streams
+   ===============
 
-# Channel streams are a common framework which perform their input/output
-# via a channel from the operating system. Encompasses: terminal stream,
-# file stream, pipe stream, socket stream.
+ Channel streams are a common framework which perform their input/output
+ via a channel from the operating system. Encompasses: terminal stream,
+ file stream, pipe stream, socket stream.
 
-# Because the input side has some non-GCed fields, all channel streams must
-# have the same number of GCed fields.
+ Because the input side has some non-GCed fields, all channel streams must
+ have the same number of GCed fields.
 
-# Fields used for both the input side and the output side:
+ Fields used for both the input side and the output side:
 
-  # define strm_eltype   strm_other[0] # CHARACTER or ([UN]SIGNED-BYTE n)
+ define strm_eltype   strm_other[0] - CHARACTER or ([UN]SIGNED-BYTE n)
+ define strm_encoding strm_other[1] - Encoding (used iff eltype = CHARACTER) */
 
-  # define strm_encoding strm_other[1] # an Encoding
-                                       # (used if eltype = CHARACTER only)
+#define strm_bitbuffer strm_other[2] /* (used if eltype /= CHARACTER only) */
+#define strm_buffer    strm_other[3] /* (used by buffered streams only) */
 
-  #define strm_bitbuffer strm_other[2] # (used if eltype /= CHARACTER only)
+/* Fields used for the input side only: */
 
-  #define strm_buffer    strm_other[3] # (used by buffered streams only)
+/* /=NIL or NIL, depending on whether the input channel is a tty
+ handle and therefore needs special treatment in the
+ low_listen function on some OSes (used by unbuffered streams only) */
+#define strm_isatty    strm_other[3]
+#define strm_ichannel_position 4     /* ichannel index */
 
-# Fields used for the input side only:
+/* the input channel, an encapsulated handle, or, on WIN32_NATIVE,
+   an encapsulated SOCKET */
+#define strm_ichannel  strm_other[strm_ichannel_position]
 
-  #define strm_isatty    strm_other[3] # /=NIL or NIL, depending on whether
-                                       # the input channel is a tty handle and
-                                       # therefore needs special treatment in
-                                       # the low_listen function on some OSes
-                                       # (used by unbuffered streams only)
-  #define strm_ichannel_position 4     /* ichannel index */
-  #define strm_ichannel  strm_other[strm_ichannel_position] # the input channel,
-                                       # an encapsulated handle, or, on
-                                       # WIN32_NATIVE, an encapsulated SOCKET
+/* Fields used for the output side only: */
+#define strm_ochannel_position 5    /* ochannel index */
+#define strm_ochannel strm_other[strm_ochannel_position] /* the output channel */
+/* an encapsulated handle, or, on WIN32_NATIVE, an encapsulated SOCKET */
 
-# Fields used for the output side only:
+/* Fields reserved for the specialized stream: */
+#define strm_field1    strm_other[6]
+#define strm_field2    strm_other[7]
 
-  #define strm_ochannel_position 5    /* ochannel index */
-  #define strm_ochannel strm_other[strm_ochannel_position] # the output channel,
-                                       # an encapsulated handle, or, on
-                                       # WIN32_NATIVE, an encapsulated SOCKET
-
-# Fields reserved for the specialized stream:
-
-  #define strm_field1    strm_other[6]
-  #define strm_field2    strm_other[7]
-
-# Binary fields start here.
-  #define strm_channel_extrafields  strm_other[8]
+/* Binary fields start here. */
+#define strm_channel_extrafields  strm_other[8]
 #define strm_channel_len  (strm_len+8)
 
-# Additional binary (not GCed) fields:
+/* Additional binary (not GCed) fields: */
 typedef struct strm_channel_extrafields_t {
-  /*bool*/int buffered : 8;            # false for unbuffered streams,
-                                       # true for buffered streams
-  /*bool*/int regular : 8;             # whether the handle refers to a regular file
-  uintL bitsize;                       # If the element-type is ([UN]SIGNED-BYTE n):
-                                       #   n = number of bits per unit,
-                                       #   >0, <intDsize*uintWC_max.
-                                       # If the element-type is CHARACTER: 0.
+  /*bool*/int buffered : 8; /* false for unbuffered streams,
+                                  true for buffered streams */
+  /*bool*/int regular : 8;  /* whether the handle refers to a regular file */
+  uintL bitsize;            /* If the element-type is ([UN]SIGNED-BYTE n):
+                               n = number of bits per unit,
+                               >0, <intDsize*uintWC_max.
+                               If the element-type is CHARACTER: 0. */
   void (* low_close) (object stream, object handle, uintB abort);
-  # Fields used if the element-type is CHARACTER:
-  uintL lineno;                        # line number during read, >0
+  /* Fields used if the element-type is CHARACTER: */
+  uintL lineno;                        /* line number during read, >0 */
+   /* For general interoperability with Win32 systems, we recognize all possible
+    line-terminators: LF, CR/LF and CR, independently of strm_encoding.
+    This is because, when confronted with Unix-style text files (eol = LF),
+    some Microsoft editors insert new lines with eol = CR/LF,
+    while other Microsoft editors insert new lines with eol = CR.
+    Java learned the lesson and understands all three line-terminators.
+    So do we, see http://clisp.cons.org/impnotes/clhs-newline.html
+    See also http://www.unicode.org/reports/tr13/tr13-9.html */
+  /*bool*/int  ignore_next_LF : 8;     /* true after reading a CR */
   struct file_id fid;                  /* unique file ID */
-  #if defined(UNICODE) && defined(HAVE_GOOD_ICONV)
-  iconv_t iconvdesc;                   # input conversion descriptor and state
-  iconv_t oconvdesc;                   # output conversion descriptor and state
+  #if defined(ENABLE_UNICODE) && defined(HAVE_GOOD_ICONV)
+  iconv_t iconvdesc;        /* input conversion descriptor and state */
+  iconv_t oconvdesc;        /* output conversion descriptor and state */
   #endif
 } strm_channel_extrafields_t;
 
-# Accessors.
+/* Accessors. */
 #define ChannelStream_eltype(stream)  TheStream(stream)->strm_eltype
 #define ChannelStream_isatty(stream)  TheStream(stream)->strm_isatty
 #define ChannelStream_ichannel(stream)  TheStream(stream)->strm_ichannel
@@ -3827,70 +3885,63 @@ typedef struct strm_channel_extrafields_t {
 #define ChannelStream_bitsize(stream)   ((strm_channel_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->bitsize
 #define ChannelStreamLow_close(stream)   ((strm_channel_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_close
 #define ChannelStream_lineno(stream)   ((strm_channel_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->lineno
+#define ChannelStream_ignore_next_LF(stream)   ((strm_channel_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->ignore_next_LF
 #define ChannelStream_file_id(stream)  ((strm_channel_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->fid
-#if defined(UNICODE) && defined(HAVE_GOOD_ICONV)
+#if defined(ENABLE_UNICODE) && defined(HAVE_GOOD_ICONV)
 #define ChannelStream_iconvdesc(stream)   ((strm_channel_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->iconvdesc
 #define ChannelStream_oconvdesc(stream)   ((strm_channel_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->oconvdesc
 #endif
 
-# Additional binary (not GCed) fields, used by unbuffered streams only:
+/* Additional binary (not GCed) fields, used by unbuffered streams only: */
 typedef struct strm_unbuffered_extrafields_t {
   strm_channel_extrafields_t _parent;
-  # The low_... operations operate on bytes only, and independently of the
-  # stream's element type. They cannot cause GC.
-  # Fields used for the input side only:
+  /* The low_... operations operate on bytes only, and independently of the
+   stream's element type. They cannot cause GC.
+   Fields used for the input side only: */
   sintL        (* low_read)        (object stream);
-  signean      (* low_listen)      (object stream);
+  listen_t     (* low_listen)      (object stream);
   bool         (* low_clear_input) (object stream);
   uintB*       (* low_read_array)  (object stream, uintB* byteptr,
                                     uintL len, perseverance_t persev);
-  sintL status;                        # -1 means EOF reached
-                                       #  0 means unknown, bytebuf invalid
-                                       # >0 means the number of valid bytes in
-                                       #    bytebuf, to be consumed
-  uintB bytebuf[max_bytes_per_chart];  # the last bytes read
-                                       # but not yet consumed
-   # For general interoperability with Win32 systems, we recognize all possible
-   # line-terminators: LF, CR/LF and CR, independently of strm_encoding. This
-   # is because, when confronted to Unix-style text files (eol = LF), some
-   # Microsoft editors insert new lines with eol = CR/LF, while other Microsoft
-   # editors insert new lines with eol = CR. Java learned the lesson and
-   # understands all three line-terminators. So do we.
-  /*bool*/int  ignore_next_LF : 8;     # true after reading a CR
-  # Fields used for the output side only:
+  sintL status;                 /* -1 means EOF reached
+                                   0  means unknown, bytebuf invalid
+                                   >0 means the number of valid bytes in
+                                      bytebuf, to be consumed */
+  uintB bytebuf[max_bytes_per_chart]; /* the last bytes read but not yet consumed */
+  /* Fields used for the output side only: */
   void         (* low_write)         (object stream, uintB b);
-  const uintB* (* low_write_array)   (object stream, const uintB* byteptr, uintL len, perseverance_t persev);
+  const uintB* (* low_write_array)   (object stream, const uintB* byteptr,
+                                      uintL len, perseverance_t persev);
   void         (* low_finish_output) (object stream);
   void         (* low_force_output)  (object stream);
   void         (* low_clear_output)  (object stream);
 } strm_unbuffered_extrafields_t;
 
-# Accessors.
+/* Accessors. */
 #define UnbufferedStreamLow_read(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_read
 #define UnbufferedStreamLow_listen(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_listen
 #define UnbufferedStreamLow_clear_input(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_clear_input
 #define UnbufferedStreamLow_read_array(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_read_array
 #define UnbufferedStream_status(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->status
 #define UnbufferedStream_bytebuf(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->bytebuf
-#define UnbufferedStream_ignore_next_LF(stream)   ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->ignore_next_LF
 #define UnbufferedStreamLow_write(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_write
 #define UnbufferedStreamLow_write_array(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_write_array
 #define UnbufferedStreamLow_finish_output(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_finish_output
 #define UnbufferedStreamLow_force_output(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_force_output
 #define UnbufferedStreamLow_clear_output(stream)  ((strm_unbuffered_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)->low_clear_output
 
-# Error message after user interrupt.
-# fehler_interrupt();
-nonreturning_function(local, fehler_interrupt, (void)) {
+/* Error message after user interrupt.
+ error_interrupt(); */
+nonreturning_function(local, error_interrupt, (void)) {
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(interrupt_condition,GETTEXT("~S: Ctrl-C: User break"));
+  error(interrupt_condition,GETTEXT("~S: Ctrl-C: User break"));
 }
 
-# General Subroutines
-# ===================
+/* General Subroutines
+   ===================
 
-# saving_errno(statement) -- execute a statement, but save the errno during it
-# OS_error_saving_errno(statement) -- ... then signal the error
+ saving_errno(statement) -- execute a statement, but save the errno during it
+ OS_error_saving_errno(statement) -- ... then signal the error */
 #ifdef WIN32
   #define saving_errno(statement)  \
     do { var int _olderrno = GetLastError(); statement; SetLastError(_olderrno); } while(0)
@@ -3903,20 +3954,20 @@ nonreturning_function(local, fehler_interrupt, (void)) {
     do { var int _olderrno = errno; statement; errno = _olderrno; OS_error(); } while(0)
 #endif
 
-# iconv-based encodings
-# ---------------------
+/* iconv-based encodings
+   ---------------------
 
-# Here enc_charset is a simple-string, not a symbol. The system decides
-# which encodings are available, and there is no API for getting them all.
+ Here enc_charset is a simple-string, not a symbol. The system decides
+ which encodings are available, and there is no API for getting them all. */
 
-#if defined(UNICODE) && defined(HAVE_GOOD_ICONV)
+#if defined(ENABLE_UNICODE) && defined(HAVE_GOOD_ICONV)
 
-# Our internal encoding is UCS-4 with platform dependent endianness.
+/* Our internal encoding is UCS-4 with platform dependent endianness. */
 #ifdef GNU_LIBICONV
   #define CLISP_INTERNAL_CHARSET  "UCS-4-INTERNAL"
 #else
   #if (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 2))
-    # glibc >= 2.2 also has UCS-4BE, UCS-4LE but WCHAR_T is more efficient.
+    /* glibc >= 2.2 also has UCS-4BE, UCS-4LE but WCHAR_T is more efficient. */
     #define CLISP_INTERNAL_CHARSET  "WCHAR_T"
   #elif defined(UNIX_HPUX) && BIG_ENDIAN_P
     #define CLISP_INTERNAL_CHARSET  "ucs4"
@@ -3924,13 +3975,13 @@ nonreturning_function(local, fehler_interrupt, (void)) {
     #if BIG_ENDIAN_P
       #define CLISP_INTERNAL_CHARSET  "UCS-4"
     #else
-      #define CLISP_INTERNAL_CHARSET  "UCS-4"  # FIXME: This is probably wrong
+      #define CLISP_INTERNAL_CHARSET  "UCS-4"  /* FIXME: This is probably wrong */
     #endif
   #endif
 #endif
 
-# min. bytes per character = 1
-# max. bytes per character unknown, assume it's <= max_bytes_per_chart
+/* min. bytes per character = 1
+ max. bytes per character unknown, assume it's <= max_bytes_per_chart */
 
 global uintL iconv_mblen (object encoding, const uintB* src, const uintB* srcend);
 global void iconv_mbstowcs (object encoding, object stream, const uintB* *srcp, const uintB* srcend, chart* *destp, chart* destend);
@@ -3938,11 +3989,11 @@ global uintL iconv_wcslen (object encoding, const chart* src, const chart* srcen
 global void iconv_wcstombs (object encoding, object stream, const chart* *srcp, const chart* srcend, uintB* *destp, uintB* destend);
 global object iconv_range (object encoding, uintL start, uintL end, uintL maxintervals);
 
-# Error, when a character cannot be converted to an encoding.
-# fehler_unencodable(encoding);
-nonreturning_function(extern, fehler_unencodable, (object encoding, chart ch));
+/* Error, when a character cannot be converted to an encoding.
+ error_unencodable(encoding); */
+nonreturning_function(extern, error_unencodable, (object encoding, chart ch));
 
-# Avoid annoying warning caused by a wrongly standardized iconv() prototype.
+/* Avoid annoying warning caused by a wrongly standardized iconv() prototype. */
 #ifdef GNU_LIBICONV
   #undef iconv
   #define iconv(cd,inbuf,inbytesleft,outbuf,outbytesleft) \
@@ -3952,10 +4003,10 @@ nonreturning_function(extern, fehler_unencodable, (object encoding, chart ch));
     (iconv)(cd,(ICONV_CONST char **)(inbuf),inbytesleft,outbuf,outbytesleft)
 #endif
 
-# open the iconv conversion and signal errors when necessary
-# skip error when CHARSET is NULLOBJ
-# begin_system_call() must be called before this!!!
-# end_system_call() must be called after this!!!
+/* open the iconv conversion and signal errors when necessary
+ skip error when CHARSET is NULLOBJ
+ begin_system_call() must be called before this!!!
+ end_system_call() must be called after this!!! */
 local iconv_t open_iconv (const char * to_code, const char * from_code,
                           object charset) {
   var iconv_t cd = iconv_open(to_code,from_code);
@@ -3963,15 +4014,15 @@ local iconv_t open_iconv (const char * to_code, const char * from_code,
     if (errno == EINVAL) {
       end_system_call();
       pushSTACK(charset);
-      fehler(error,GETTEXT("unknown character set ~S"));
+      error(error_condition,GETTEXT("unknown character set ~S"));
     }
     ANSIC_error();
   }
   return cd;
 }
 
-# check whether the charset is valid
-# when CHARSET is NULLOBJ, return false instead of signalling an error
+/* check whether the charset is valid
+ when CHARSET is NULLOBJ, return false instead of signalling an error */
 global bool check_charset (const char * code, object charset) {
   begin_system_call();
   var iconv_t cd = open_iconv(CLISP_INTERNAL_CHARSET,code,charset);
@@ -3990,7 +4041,7 @@ global bool check_charset (const char * code, object charset) {
   return true;
 }
 
-# Bytes to characters.
+/* Bytes to characters. */
 
 global uintL iconv_mblen (object encoding, const uintB* src,
                           const uintB* srcend) {
@@ -4010,8 +4061,8 @@ global uintL iconv_mblen (object encoding, const uintB* src,
         var size_t outsize = tmpbufsize*sizeof(chart);
         var size_t res = iconv(cd,&inptr,&insize,&outptr,&outsize);
         if (res == (size_t)(-1) && errno != E2BIG) {
-          # At the end of a delimited string, we treat
-          # EINVAL (incomplete input) like EILSEQ (conversion error)
+          /* At the end of a delimited string, we treat
+           EINVAL (incomplete input) like EILSEQ (conversion error) */
           if (errno == EILSEQ || errno == EINVAL) {
             ASSERT(insize > 0);
             var object action = TheEncoding(encoding)->enc_towcs_error;
@@ -4048,7 +4099,7 @@ global void iconv_mbstowcs (object encoding, object stream,
   var char* outptr = (char*)*destp;
   var size_t outsize = (char*)destend-(char*)*destp;
   if (eq(stream,nullobj)) {
-    # Standalone call, must be consistent with iconv_mblen:
+    /* Standalone call, must be consistent with iconv_mblen: */
     with_sstring_0(TheEncoding(encoding)->enc_charset,Symbol_value(S(ascii)),
                    charset_asciz, {
       begin_system_call();
@@ -4057,8 +4108,8 @@ global void iconv_mbstowcs (object encoding, object stream,
       while (insize > 0 && outsize > 0) {
         var size_t res = iconv(cd,&inptr,&insize,&outptr,&outsize);
         if (res == (size_t)(-1)) {
-          # At the end of a delimited string, we treat
-          # EINVAL (incomplete input) like EILSEQ (conversion error)
+          /* At the end of a delimited string, we treat
+           EINVAL (incomplete input) like EILSEQ (conversion error) */
           if (errno == EILSEQ || errno == EINVAL) {
             ASSERT(insize > 0);
             var object action = TheEncoding(encoding)->enc_towcs_error;
@@ -4086,15 +4137,15 @@ global void iconv_mbstowcs (object encoding, object stream,
       ASSERT(insize == 0 && outsize == 0);
     });
   } else {
-    # Called from a channel-stream.
+    /* Called from a channel-stream. */
     var iconv_t cd = ChannelStream_iconvdesc(stream);
     begin_system_call();
     while (insize > 0) {
       var size_t res = iconv(cd,&inptr,&insize,&outptr,&outsize);
       if (res == (size_t)(-1)) {
-        if (errno == EINVAL) # incomplete input?
+        if (errno == EINVAL) /* incomplete input? */
           break;
-        else if (errno == E2BIG) # output buffer full?
+        else if (errno == E2BIG) /* output buffer full? */
           break;
         else if (errno == EILSEQ) {
           ASSERT(insize > 0);
@@ -4123,7 +4174,7 @@ global void iconv_mbstowcs (object encoding, object stream,
   *destp = (chart*)outptr;
 }
 
-# Characters to bytes.
+/* Characters to bytes. */
 
 global uintL iconv_wcslen (object encoding, const chart* src,
                            const chart* srcend) {
@@ -4143,7 +4194,7 @@ global uintL iconv_wcslen (object encoding, const chart* src,
         var size_t outsize = tmpbufsize;
         var size_t res = iconv(cd,&inptr,&insize,&outptr,&outsize);
         if (res == (size_t)(-1) && errno != E2BIG) {
-          if (errno == EILSEQ) { # invalid input?
+          if (errno == EILSEQ) { /* invalid input? */
             ASSERT(insize >= sizeof(chart));
             var object action = TheEncoding(encoding)->enc_tombs_error;
             if (eq(action,S(Kignore))) {
@@ -4163,12 +4214,12 @@ global uintL iconv_wcslen (object encoding, const chart* src,
                   ANSIC_error();
                 } else {
                   end_system_call();
-                  fehler_unencodable(encoding,*(const chart*)inptr);
+                  error_unencodable(encoding,*(const chart*)inptr);
                 }
               }
             } else {
               end_system_call();
-              fehler_unencodable(encoding,*(const chart*)inptr);
+              error_unencodable(encoding,*(const chart*)inptr);
             }
           } else if (errno == EINVAL) { /* incomplete input? */
             NOTREACHED;
@@ -4187,7 +4238,7 @@ global uintL iconv_wcslen (object encoding, const chart* src,
       var size_t outsize = tmpbufsize;
       var size_t res = iconv(cd,NULL,NULL,&outptr,&outsize);
       if (res == (size_t)(-1)) {
-        if (errno == E2BIG) { # output buffer too small?
+        if (errno == E2BIG) { /* output buffer too small? */
           NOTREACHED;
         } else {
           var int saved_errno = errno;
@@ -4213,7 +4264,7 @@ global void iconv_wcstombs (object encoding, object stream,
   var char* outptr = (char*)*destp;
   var size_t outsize = destend-*destp;
   if (eq(stream,nullobj)) {
-    # Standalone call, must be consistent with iconv_wcslen:
+    /* Standalone call, must be consistent with iconv_wcslen: */
     with_sstring_0(TheEncoding(encoding)->enc_charset,Symbol_value(S(ascii)),
                    charset_asciz, {
       begin_system_call();
@@ -4241,12 +4292,12 @@ global void iconv_wcstombs (object encoding, object stream,
                   ANSIC_error();
                 } else {
                   end_system_call();
-                  fehler_unencodable(encoding,*(const chart*)inptr);
+                  error_unencodable(encoding,*(const chart*)inptr);
                 }
               }
             } else {
               end_system_call();
-              fehler_unencodable(encoding,*(const chart*)inptr);
+              error_unencodable(encoding,*(const chart*)inptr);
             }
           } else if (errno == EINVAL) { /* incomplete input? */
             NOTREACHED;
@@ -4275,17 +4326,17 @@ global void iconv_wcstombs (object encoding, object stream,
       }
       if (iconv_close(cd) < 0) { ANSIC_error(); }
       end_system_call();
-      # Now insize == 0, and if iconv_wcslen has been used to determine
-      # the destination size, then also outsize == 0.
+      /* Now insize == 0, and if iconv_wcslen has been used to determine
+       the destination size, then also outsize == 0. */
     });
   } else {
-    # Called from a channel-stream.
+    /* Called from a channel-stream. */
     var iconv_t cd = ChannelStream_oconvdesc(stream);
     begin_system_call();
     while (insize > 0) {
       var size_t res = iconv(cd,&inptr,&insize,&outptr,&outsize);
       if (res == (size_t)(-1)) {
-        if (errno == EILSEQ) { # invalid input?
+        if (errno == EILSEQ) { /* invalid input? */
           ASSERT(insize >= sizeof(chart));
           var object action = TheEncoding(encoding)->enc_tombs_error;
           if (eq(action,S(Kignore))) {
@@ -4310,18 +4361,18 @@ global void iconv_wcstombs (object encoding, object stream,
                 if (inptr > (char*)*srcp)
                   break;
                 end_system_call();
-                fehler_unencodable(encoding,*(const chart*)inptr);
+                error_unencodable(encoding,*(const chart*)inptr);
               }
             }
           } else {
             if (inptr > (char*)*srcp)
               break;
             end_system_call();
-            fehler_unencodable(encoding,*(const chart*)inptr);
+            error_unencodable(encoding,*(const chart*)inptr);
           }
-        } else if (errno == EINVAL) { # incomplete input?
+        } else if (errno == EINVAL) { /* incomplete input? */
           NOTREACHED;
-        } else if (errno == E2BIG) { # output buffer full?
+        } else if (errno == E2BIG) { /* output buffer full? */
           break;
         } else {
           ANSIC_error();
@@ -4334,10 +4385,10 @@ global void iconv_wcstombs (object encoding, object stream,
   *destp = (uintB*)outptr;
 }
 
-# Determining the range of encodable characters.
+/* Determining the range of encodable characters. */
 global object iconv_range (object encoding, uintL start, uintL end,
                            uintL maxintervals) {
-  var uintL count = 0; # number of intervals already on the STACK
+  var uintL count = 0; /* number of intervals already on the STACK */
   if (maxintervals > 0) {
     var iconv_t cd;
     with_sstring_0(TheEncoding(encoding)->enc_charset,Symbol_value(S(ascii)),
@@ -4350,10 +4401,10 @@ global object iconv_range (object encoding, uintL start, uintL end,
     {
       var uintL i1;
       var uintL i2;
-      var bool have_i1_i2 = false; # [i1,i2] = interval being built
+      var bool have_i1_i2 = false; /* [i1,i2] = interval being built */
       var uintL i = start;
       while (1) {
-        # Here count < maxintervals.
+        /* Here count < maxintervals. */
         var chart ch = as_chart(i);
         var uintB buf[max_bytes_per_chart];
         var const char* inptr = (const char*)&ch;
@@ -4366,14 +4417,14 @@ global object iconv_range (object encoding, uintL start, uintL end,
           if (res == (size_t)(-1)) {
             if (errno == EILSEQ) { /* invalid input? */
               end_system_call();
-              # ch not encodable -> finish the interval
+              /* ch not encodable -> finish the interval */
               if (have_i1_i2) {
                 pushSTACK(code_char(as_chart(i1)));
                 pushSTACK(code_char(as_chart(i2)));
                 check_STACK(); count++;
                 have_i1_i2 = false;
-                # If we have already produced the maximum number of intervals
-                # requested by the caller, it's of no use to search further.
+                /* If we have already produced the maximum number of intervals
+                 requested by the caller, it's of no use to search further. */
                 if (count == maxintervals)
                   break;
               }
@@ -4414,12 +4465,12 @@ global object iconv_range (object encoding, uintL start, uintL end,
   return stringof(2*count);
 }
 
-#endif # UNICODE && HAVE_GOOD_ICONV
+#endif /* ENABLE_UNICODE && HAVE_GOOD_ICONV */
 
-# Initializes some ChannelStream fields.
-# ChannelStream_init(stream);
-# > stream: channel-stream with encoding
-#if defined(UNICODE) && defined(HAVE_GOOD_ICONV)
+/* Initializes some ChannelStream fields.
+ ChannelStream_init(stream);
+ > stream: channel-stream with encoding */
+#if defined(ENABLE_UNICODE) && defined(HAVE_GOOD_ICONV)
 local void ChannelStream_init (object stream) {
   var object encoding = TheStream(stream)->strm_encoding;
   if (simple_string_p(TheEncoding(encoding)->enc_charset)) {
@@ -4454,86 +4505,93 @@ local void ChannelStream_init (object stream) {
   #define ChannelStream_init(stream)
 #endif
 
-# Cleans up some ChannelStream fields.
-# ChannelStream_fini(stream);
-#if defined(UNICODE) && defined(HAVE_GOOD_ICONV)
-local void ChannelStream_fini (object stream) {
+/* Cleans up some ChannelStream fields.
+ ChannelStream_fini(stream,abort); */
+#if defined(ENABLE_UNICODE) && defined(HAVE_GOOD_ICONV)
+local void ChannelStream_fini (object stream, uintB abort) {
   if (ChannelStream_iconvdesc(stream) != (iconv_t)0) {
     begin_system_call();
-    if (iconv_close(ChannelStream_iconvdesc(stream)) < 0) { ANSIC_error(); }
+    if (iconv_close(ChannelStream_iconvdesc(stream)) < 0 && !abort)
+      { ANSIC_error(); }
     end_system_call();
     ChannelStream_iconvdesc(stream) = (iconv_t)0;
   }
   if (ChannelStream_oconvdesc(stream) != (iconv_t)0) {
     begin_system_call();
-    if (iconv_close(ChannelStream_oconvdesc(stream)) < 0) { ANSIC_error(); }
+    if (iconv_close(ChannelStream_oconvdesc(stream)) < 0 && !abort)
+      { ANSIC_error(); }
     end_system_call();
     ChannelStream_oconvdesc(stream) = (iconv_t)0;
   }
 }
 #else
-  #define ChannelStream_fini(stream)
+#define ChannelStream_fini(stream,abort)
 #endif
 
-# Closes a handle.
-local void low_close_handle (object stream, object handle, uintB abort) {
-  begin_system_call();
+/* Closes a handle. */
+local maygc void low_close_handle (object stream, object handle, uintB abort) {
+  var Handle fd = TheHandle(handle);
+  pushSTACK(stream);
+  begin_blocking_system_call();
  #ifdef UNIX
-  if (!( CLOSE(TheHandle(handle)) ==0) && !abort)
-    { end_system_call(); OS_filestream_error(stream); }
+  if (!( CLOSE(fd) ==0) && !abort)
+    { end_blocking_system_call(); OS_filestream_error(popSTACK()); }
  #endif
  #ifdef WIN32_NATIVE
-  if (!CloseHandle(TheHandle(handle)) && !abort)
-    { end_system_call(); OS_filestream_error(stream); }
+  if (!CloseHandle(fd) && !abort)
+    { end_blocking_system_call(); OS_filestream_error(popSTACK()); }
  #endif
-  end_system_call();
+  end_blocking_system_call();
+  skipSTACK(1);
 }
 
-# Subroutines for Integer-Streams
-# ===============================
+/* Subroutines for Integer-Streams
+   ===============================
 
-# For file streams with element type INTEGER ("byte files") every integer
-# uses the same amount of bits. The bits and bytes are stored in little-endian
-# order, because big-endian order would lead to madness. So the bit number i
-# of element number j is = bit number (i+j*bitsize) of the entire bit stream
-# = bit number ((i+j*bitsize) mod 8) in byte number floor((i+j*bitsize)/8).
+ For file streams with element type INTEGER ("byte files") every integer
+ uses the same amount of bits. The bits and bytes are stored in little-endian
+ order, because big-endian order would lead to madness. So the bit number i
+ of element number j is = bit number (i+j*bitsize) of the entire bit stream
+ = bit number ((i+j*bitsize) mod 8) in byte number floor((i+j*bitsize)/8).
 
-# strm_bitbuffer is a simple-bit-vector with ceiling(bitsize/8)*8 bits,
-# filled in little-endian order.
+ strm_bitbuffer is a simple-bit-vector with ceiling(bitsize/8)*8 bits,
+ filled in little-endian order.
 
-# All subroutines below get passed as arguments: bitsize (size per unit, it is
-# also stored in the stream), bytesize = ceiling(bitsize/8) = number of bytes
-# the bitbuffer can hold.
+ All subroutines below get passed as arguments: bitsize (size per unit, it is
+ also stored in the stream), bytesize = ceiling(bitsize/8) = number of bytes
+ the bitbuffer can hold.
 
-# Note that unbuffered file-streams cannot be of type ib or ic (too
-# complicated for the moment), only type ia is supported for them.
+ Note that unbuffered file-streams cannot be of type ib or ic (too
+ complicated for the moment), only type ia is supported for them.
 
-# Subroutines for the Input side
-# ------------------------------
+ Subroutines for the Input side
+ ------------------------------ */
 
-local maygc object bitbuff_iu_I (object bitbuffer, uintL bitsize, uintL bytesize) {
+local maygc object bitbuff_iu_I (object bitbuffer, uintL bitsize,
+                                 uintL bytesize) {
   var uintB* bitbufferptr = &TheSbvector(bitbuffer)->data[bytesize-1];
-  *bitbufferptr &= (bit(((bitsize-1)%8)+1)-1); # mask High byte
+  *bitbufferptr &= (bit(((bitsize-1)%8)+1)-1); /* mask High byte */
   pushSTACK(bitbuffer);
   var object result = LESbvector_to_UI(bytesize,&STACK_0);
   skipSTACK(1);
   return result;
 }
 
-# UP for READ-BYTE on File-Streams of Integers, Type u :
-# Returns the bytesize Bytes contained in the Bitbuffer as Integer >=0.
-# can trigger GC
+/* UP for READ-BYTE on File-Streams of Integers, Type u :
+ Returns the bytesize Bytes contained in the Bitbuffer as Integer >=0.
+ can trigger GC */
 local maygc object rd_by_iu_I (object stream, uintL bitsize, uintL bytesize) {
   return bitbuff_iu_I(TheStream(stream)->strm_bitbuffer,bitsize,bytesize);
 }
 
-local maygc object bitbuff_is_I (object bitbuffer, uintL bitsize, uintL bytesize) {
+local maygc object bitbuff_is_I (object bitbuffer, uintL bitsize,
+                                 uintL bytesize) {
   var uintB* bitbufferptr = &TheSbvector(bitbuffer)->data[bytesize-1];
   var uintL signbitnr = (bitsize-1)%8;
   if (!(*bitbufferptr & bit(signbitnr))) {
-    *bitbufferptr &= (bitm(signbitnr+1)-1); # sign-extend High byte
+    *bitbufferptr &= (bitm(signbitnr+1)-1); /* sign-extend High byte */
   } else {
-    *bitbufferptr |= minus_bitm(signbitnr+1); # sign-extend High byte
+    *bitbufferptr |= minus_bitm(signbitnr+1); /* sign-extend High byte */
   }
   pushSTACK(bitbuffer);
   var object result = LESbvector_to_I(bytesize,&STACK_0);
@@ -4541,35 +4599,36 @@ local maygc object bitbuff_is_I (object bitbuffer, uintL bitsize, uintL bytesize
   return result;
 }
 
-# UP for READ-BYTE on File-Streams of Integers, Type s :
-# Returns the bytesize Bytes contained in the Bitbuffer as Integer.
-# can trigger GC
+/* UP for READ-BYTE on File-Streams of Integers, Type s :
+ Returns the bytesize Bytes contained in the Bitbuffer as Integer.
+ can trigger GC */
 local maygc object rd_by_is_I (object stream, uintL bitsize, uintL bytesize) {
   return bitbuff_is_I(TheStream(stream)->strm_bitbuffer,bitsize,bytesize);
 }
 
-# Typ rd_by_ix_I: one of these two Subroutines:
+/* Typ rd_by_ix_I: one of these two Subroutines: */
 typedef maygc object rd_by_ix_I (object stream, uintL bitsize, uintL bytesize);
 
-# Subroutines for the Output side
-# -------------------------------
+/* Subroutines for the Output side
+   -------------------------------
 
-# Function type of a subroutine which writes the bitbuffer contents to the
-# stream.
+ Function type of a subroutine which writes the bitbuffer contents to the
+ stream. */
 typedef void wr_by_aux_ix (object stream, uintL bitsize, uintL bytesize);
 
 local inline void bitbuff_ixu_sub (object stream, object bitbuffer,
                                    uintL bitsize, object obj) {
   if (UI_to_LEbytes(obj,bitsize,TheSbvector(bitbuffer)->data))
-    fehler_bad_integer(stream,obj);
+    error_bad_integer(stream,obj);
 }
 
-# UP for WRITE-BYTE on File-Streams of Integers, Type u :
-# Store the Object (an Integer >=0) as bytesize Bytes in the Bitbuffer.
-# > stream : File-Stream for Integers, Type u
-# > obj : Object to be written
-# > finisher : Routine for Finalization
-local maygc void wr_by_ixu_sub (object stream, object obj, wr_by_aux_ix* finisher) {
+/* UP for WRITE-BYTE on File-Streams of Integers, Type u :
+ Store the Object (an Integer >=0) as bytesize Bytes in the Bitbuffer.
+ > stream : File-Stream for Integers, Type u
+ > obj : Object to be written
+ > finisher : Routine for Finalization */
+local maygc void wr_by_ixu_sub (object stream, object obj,
+                                wr_by_aux_ix* finisher) {
   var uintL bitsize = ChannelStream_bitsize(stream);
   var uintL bytesize = ceiling(bitsize,8);
   ASSERT_wr_int(stream,obj);
@@ -4580,15 +4639,16 @@ local maygc void wr_by_ixu_sub (object stream, object obj, wr_by_aux_ix* finishe
 local inline void bitbuff_ixs_sub (object stream, object bitbuffer,
                                    uintL bitsize, object obj) {
   if (I_to_LEbytes(obj,bitsize,TheSbvector(bitbuffer)->data))
-    fehler_bad_integer(stream,obj);
+    error_bad_integer(stream,obj);
 }
 
-# UP for WRITE-BYTE on File-Streams of Integers, Type s :
-# Stores the Object (an Integer) as bytesize Bytes in the Bitbuffer.
-# > stream : File-Stream for Integers, Type s
-# > obj : Object to be written
-# > finisher : Routine for Finalization
-local maygc void wr_by_ixs_sub (object stream, object obj, wr_by_aux_ix* finisher) {
+/* UP for WRITE-BYTE on File-Streams of Integers, Type s :
+ Stores the Object (an Integer) as bytesize Bytes in the Bitbuffer.
+ > stream : File-Stream for Integers, Type s
+ > obj : Object to be written
+ > finisher : Routine for Finalization */
+local maygc void wr_by_ixs_sub (object stream, object obj,
+                                wr_by_aux_ix* finisher) {
   var uintL bitsize = ChannelStream_bitsize(stream);
   var uintL bytesize = ceiling(bitsize,8);
   ASSERT_wr_int(stream,obj);
@@ -4596,16 +4656,16 @@ local maygc void wr_by_ixs_sub (object stream, object obj, wr_by_aux_ix* finishe
   (*finisher)(stream,bitsize,bytesize);
 }
 
-# Handle-Streams, Input side
-# ==========================
+/* Handle-Streams, Input side
+   ==========================
 
-# Low-level
-# ---------
+ Low-level
+ ---------
 
-# Push a byte into bytebuf.
-# UnbufferedStreamLow_push_byte(stream,b);
-# Assumes 0 <= UnbufferedStream_status(stream) < max_bytes_per_chart.
-#if (max_bytes_per_chart > 1) # i.e. defined(UNICODE)
+ Push a byte into bytebuf.
+ UnbufferedStreamLow_push_byte(stream,b);
+ Assumes 0 <= UnbufferedStream_status(stream) < max_bytes_per_chart. */
+#if (max_bytes_per_chart > 1) /* i.e. defined(ENABLE_UNICODE) */
   #define UnbufferedStreamLow_push_byte(stream,b)  \
      ASSERT((uintL)UnbufferedStream_status(stream) < max_bytes_per_chart);    \
      UnbufferedStream_bytebuf(stream)[UnbufferedStream_status(stream)++] = b;
@@ -4615,10 +4675,10 @@ local maygc void wr_by_ixs_sub (object stream, object obj, wr_by_aux_ix* finishe
      UnbufferedStream_status(stream) = 1;
 #endif
 
-# Push a byte to the front of bytebuf.
-# UnbufferedStreamLow_pushfront_byte(stream,b);
-# Assumes 0 <= UnbufferedStream_status(stream) < max_bytes_per_chart.
-#if (max_bytes_per_chart > 1) # i.e. defined(UNICODE)
+/* Push a byte to the front of bytebuf.
+ UnbufferedStreamLow_pushfront_byte(stream,b);
+ Assumes 0 <= UnbufferedStream_status(stream) < max_bytes_per_chart. */
+#if (max_bytes_per_chart > 1) /* i.e. defined(ENABLE_UNICODE) */
   #define UnbufferedStreamLow_pushfront_byte(stream,b)  \
       ASSERT((uintL)UnbufferedStream_status(stream) < max_bytes_per_chart); \
       { var uintL _count = UnbufferedStream_status(stream)++;               \
@@ -4633,9 +4693,9 @@ local maygc void wr_by_ixs_sub (object stream, object obj, wr_by_aux_ix* finishe
       UnbufferedStream_status(stream) = 1;
 #endif
 
-#ifdef UNICODE
-# Push a number of bytes to the front of bytebuf.
-# UnbufferedStreamLow_pushfront_bytes(stream,byteptr,bytecount);
+#ifdef ENABLE_UNICODE
+/* Push a number of bytes to the front of bytebuf.
+ UnbufferedStreamLow_pushfront_bytes(stream,byteptr,bytecount); */
 #define UnbufferedStreamLow_pushfront_bytes(stream,byteptr,bytecount)        \
   { var uintL _push = (bytecount);                                           \
     if (_push > 0) {                                                         \
@@ -4655,7 +4715,7 @@ local maygc void wr_by_ixs_sub (object stream, object obj, wr_by_aux_ix* finishe
  UnbufferedStreamLow_pop_byte(stream,b);
  declares and assigns a value to b.
  Assumes UnbufferedStream_status(stream) > 0. */
-#if (max_bytes_per_chart > 1) # i.e. defined(UNICODE)
+#if (max_bytes_per_chart > 1) /* i.e. defined(ENABLE_UNICODE) */
   #define UnbufferedStreamLow_pop_byte(stream,b)  \
       var uintB b = UnbufferedStream_bytebuf(stream)[0];            \
       { var uintL _count = --UnbufferedStream_status(stream);       \
@@ -4684,49 +4744,52 @@ local inline uintB* UnbufferedStream_pop_all (object stream,
   return byteptr;
 }
 
-local sintL low_read_unbuffered_handle (object stream) {
-  if (UnbufferedStream_status(stream) < 0) { # already EOF?
+local maygc sintL low_read_unbuffered_handle (object stream) {
+  if (UnbufferedStream_status(stream) < 0) { /* already EOF? */
     return -1;
   }
-  if (UnbufferedStream_status(stream) > 0) { # bytebuf contains valid bytes?
+  if (UnbufferedStream_status(stream) > 0) { /* bytebuf contains valid bytes? */
     UnbufferedStreamLow_pop_byte(stream,b); return b;
   }
   var Handle handle = TheHandle(TheStream(stream)->strm_ichannel);
   var uintB b;
- restart_it:
-  run_time_stop(); # hold run time clock
-  begin_system_call();
-  var ssize_t result = full_read(handle,&b,1); # try to read a byte
-  end_system_call();
-  run_time_restart(); # resume run time clock
+  pushSTACK(stream);
+  /*restart_it:*/
+  run_time_stop(); /* hold run time clock */
+  /* try to read a byte */
+  var ssize_t result;
+  GC_SAFE_SYSTEM_CALL(result=, full_read(handle,&b,1));
+  run_time_restart(); /* resume run time clock */
+  stream=popSTACK();
   if (result<0) {
     #ifdef WIN32_NATIVE
     begin_system_call();
-    if (GetLastError()==ERROR_SIGINT) { # Interrupt by Ctrl-C ?
+    if (GetLastError()==ERROR_SIGINT) { /* Interrupt by Ctrl-C ? */
       end_system_call();
-      fehler_interrupt();
+      error_interrupt();
     }
+    end_system_call();
     #endif
     OS_error();
   }
-  if (result==0) { # no byte available -> must be EOF
+  if (result==0) { /* no byte available -> must be EOF */
     UnbufferedStream_status(stream) = -1; return -1;
   } else {
     return b;
   }
 }
 
-local signean listen_handle (Handle handle, bool tty_p, int *byte) {
-  # Method 1: poll, see POLL(2)
-  # Method 2: select, see SELECT(2)
-  # Method 3: ioctl FIONREAD, see FILIO(4)
-  # Method 4: switch temporarily to non-blocking I/O and try read(),
-  #           see READ(2V), FILIO(4), or
-  #           see READ(2V), FCNTL(2V), FCNTL(5)
+local listen_t listen_handle (Handle handle, bool tty_p, int *byte) {
+/* Method 1: poll, see POLL(2)
+   Method 2: select, see SELECT(2)
+   Method 3: ioctl FIONREAD, see FILIO(4)
+   Method 4: switch temporarily to non-blocking I/O and try read(),
+             see READ(2V), FILIO(4), or
+             see READ(2V), FCNTL(2V), FCNTL(5) */
   #if !defined(WIN32_NATIVE)
   #if defined(HAVE_POLL) && (defined(HAVE_RELIABLE_POLL) || !defined(HAVE_RELIABLE_SELECT))
   {
-    # Use poll() with a single handle and timeout = zero interval.
+    /* Use poll() with a single handle and timeout = zero interval. */
     var struct pollfd pollfd_bag[1];
     pollfd_bag[0].fd = handle;
     pollfd_bag[0].events = POLLIN;
@@ -4740,21 +4803,21 @@ local signean listen_handle (Handle handle, bool tty_p, int *byte) {
       OS_error();
     } else {
       end_system_call();
-      # revents has POLLIN or some other bits set if read() would return
-      # without blocking.
+      /* revents has POLLIN or some other bits set if read() would return
+       without blocking. */
       if (pollfd_bag[0].revents == 0)
-        return ls_wait;
-      # When read() returns a result without blocking, this can also be
-      # EOF! (Example: Linux and pipes.) We therefore refrain from simply
-      # doing  { return ls_avail; }  and instead try methods 3 and 4.
+        return LISTEN_WAIT;
+      /* When read() returns a result without blocking, this can also be
+       EOF! (Example: Linux and pipes.) We therefore refrain from simply
+       doing  { return LISTEN_AVAIL; }  and instead try methods 3 and 4. */
     }
   }
   #elif defined(HAVE_SELECT) && !defined(UNIX_BEOS)
   {
-    # Use select() with readfds = singleton set {handle}
-    # and timeout = zero interval.
-    var fd_set handle_set; # set of handles := {handle}
-    var struct timeval zero_time; # time interval := 0
+    /* Use select() with readfds = singleton set {handle}
+     and timeout = zero interval. */
+    var fd_set handle_set; /* set of handles := {handle} */
+    var struct timeval zero_time; /* time interval := 0 */
     begin_system_call();
     FD_ZERO(&handle_set); FD_SET(handle,&handle_set);
   restart_select:
@@ -4763,57 +4826,51 @@ local signean listen_handle (Handle handle, bool tty_p, int *byte) {
     if (result<0) {
       if (errno==EINTR)
         goto restart_select;
-      if (!(errno==EBADF)) { OS_error(); } # UNIX_LINUX returns EBADF for files!
+      if (!(errno==EBADF)) { OS_error(); } /* UNIX_LINUX returns EBADF for files! */
       end_system_call();
     } else {
       end_system_call();
-      # result = number of handles in handle_set for which read() would
-      # return without blocking.
+      /* result = number of handles in handle_set for which read() would
+       return without blocking. */
       if (result==0)
-        return ls_wait;
-      # result=1
-      # When read() returns a result without blocking, this can also be
-      # EOF! (Example: Linux and pipes.) We therefore refrain from simply
-      # doing  { return ls_avail; }  and instead try methods 3 and 4.
+        return LISTEN_WAIT;
+      /* result=1
+       When read() returns a result without blocking, this can also be
+       EOF! (Example: Linux and pipes.) We therefore refrain from simply
+       doing  { return LISTEN_AVAIL; }  and instead try methods 3 and 4. */
     }
   }
   #endif
   begin_system_call();
   #ifdef HAVE_FIONREAD
-  # Try to enquire the number of available bytes:
+  /* Try to enquire the number of available bytes: */
   {
     var unsigned long bytes_ready;
-    # Clear bytes_ready before use. Some kernels (such as Linux-2.4.18 on ia64)
-    # apparently expect an 'int *', not a 'long *', as argument of this ioctl,
-    # and thus fill only part of the bytes_ready variable. Fortunately,
-    # endianness is not a problem here, because we only check whether
-    # bytes_ready is == 0 or != 0.
+    /* Clear bytes_ready before use. Some kernels (such as Linux-2.4.18 on ia64)
+     apparently expect an 'int *', not a 'long *', as argument of this ioctl,
+     and thus fill only part of the bytes_ready variable. Fortunately,
+     endianness is not a problem here, because we only check whether
+     bytes_ready is == 0 or != 0. */
     bytes_ready = 0;
     if ( ioctl(handle,FIONREAD,&bytes_ready) <0) {
-      # Enquiry failed, probably wasn't a file
-      if (!((errno == ENOTTY)
-            || (errno == EINVAL)
-           #ifdef ENOSYS # for UNIX_IRIX
-            || (errno == ENOSYS)
-           #endif
-            ) ) {
-        OS_error();
-      }
+      /* Enquiry failed, probably wasn't a file */
+      if (!((errno == ENOTTY)||IS_EINVAL))
+        { OS_error(); }
     } else {
-      # Enquiry succeeded, so it was a file
+      /* Enquiry succeeded, so it was a file */
       end_system_call();
       if (bytes_ready > 0)
-        return ls_avail;
+        return LISTEN_AVAIL;
       #ifdef HAVE_RELIABLE_FIONREAD
-      # else we have reached the file's EOF:
-      return ls_eof;
+      /* else we have reached the file's EOF: */
+      return LISTEN_EOF;
       #endif
     }
   }
   #endif
   #if !((defined(HAVE_POLL) && (defined(HAVE_RELIABLE_POLL) || !defined(HAVE_RELIABLE_SELECT))) || (defined(HAVE_SELECT) && !defined(UNIX_BEOS)))
-  if (tty_p) { # Terminal
-    # switch to non-blocking mode, then try read():
+  if (tty_p) { /* Terminal */
+    /* switch to non-blocking mode, then try read(): */
     var uintB b;
     var int result;
    restart_read_tty:
@@ -4829,25 +4886,25 @@ local signean listen_handle (Handle handle, bool tty_p, int *byte) {
         goto restart_read_tty;
       if
        #ifdef FIONBIO
-        (errno==EWOULDBLOCK) # BSD 4.2 Error-Code
+        (errno==EWOULDBLOCK) /* BSD 4.2 Error-Code */
        #else
-        ((errno==EAGAIN) # Posix Error-Code
+        ((errno==EAGAIN) /* Posix Error-Code */
         #ifdef EWOULDBLOCK
          || (errno==EWOULDBLOCK)
          #endif
          )
        #endif
-          return ls_wait;
+          return LISTEN_WAIT;
       OS_error();
     }
     end_system_call();
     if (result==0) {
-      return ls_wait;
+      return LISTEN_WAIT;
     } else {
       *byte = b;
-      return ls_avail;
+      return LISTEN_AVAIL;
     }
-    # If this doesn't work, should use a timer 0.1 sec ??
+    /* If this doesn't work, should use a timer 0.1 sec ?? */
   } else
     #endif
     /* file (or pipe) */
@@ -4861,25 +4918,25 @@ local signean listen_handle (Handle handle, bool tty_p, int *byte) {
     }
     end_system_call();
     if (result==0) {
-      return ls_eof;
+      return LISTEN_EOF;
     } else {
       *byte = b;
-      return ls_avail;
+      return LISTEN_AVAIL;
     }
   }
   #elif defined(WIN32_NATIVE)
   begin_system_call();
   var int wont_hang = fd_read_wont_hang_p(handle);
   if (wont_hang == 0) {
-    end_system_call(); return ls_wait;
+    end_system_call(); return LISTEN_WAIT;
   }
   if (wont_hang == 2) {
-    end_system_call(); return ls_eof;
+    end_system_call(); return LISTEN_EOF;
   }
   if (wont_hang == 3) {
-    end_system_call(); return ls_avail;
+    end_system_call(); return LISTEN_AVAIL;
   }
-  # try to read a byte
+  /* try to read a byte */
   var uintB b;
   var ssize_t result = full_read(handle,&b,1);
   if (result<0) {
@@ -4887,51 +4944,59 @@ local signean listen_handle (Handle handle, bool tty_p, int *byte) {
   }
   end_system_call();
   if (result==0) {
-    return ls_eof;
+    return LISTEN_EOF;
   } else {
     if (byte) *byte = b;
-    return ls_avail;
+    return LISTEN_AVAIL;
   }
   #endif
 }
 
-local signean low_listen_unbuffered_handle (object stream) {
-  if (UnbufferedStream_status(stream) < 0) # already EOF?
-    return ls_eof;
-  if (UnbufferedStream_status(stream) > 0) # bytebuf contains valid bytes?
-    return ls_avail;
+local listen_t low_listen_unbuffered_handle (object stream) {
+  if (UnbufferedStream_status(stream) < 0) /* already EOF? */
+    return LISTEN_EOF;
+  if (UnbufferedStream_status(stream) > 0) /* bytebuf contains valid bytes? */
+    return LISTEN_AVAIL;
   var int byte = -1;
-  var signean ret =
+  var listen_t ret =
     listen_handle(TheHandle(TheStream(stream)->strm_ichannel),
                   !nullp(TheStream(stream)->strm_isatty),&byte);
-  if (ls_eof_p(ret)) UnbufferedStream_status(stream) = -1;
+  if (ret == LISTEN_EOF) UnbufferedStream_status(stream) = -1;
   /* Stuff the read byte into the buffer, for next low_read call. */
   if (byte >= 0) { UnbufferedStreamLow_push_byte(stream,byte); }
   return ret;
 }
 
-local bool low_clear_input_unbuffered_handle (object stream) {
+local maygc bool low_clear_input_unbuffered_handle (object stream) {
   if (nullp(TheStream(stream)->strm_isatty))
-    return false; # it's a file -> nothing to do
-  UnbufferedStream_status(stream) = 0; # forget about past EOF
-  # Terminal.
+    return false; /* it's a file -> nothing to do */
+  UnbufferedStream_status(stream) = 0; /* forget about past EOF */
+  /* Terminal. */
   clear_tty_input(TheHandle(TheStream(stream)->strm_ichannel));
-  # In case this didn't work, and as a general method for platforms on
-  # which clear_tty_input() does nothing: read a byte, as long as listen
-  # says that a byte is available.
-  while (ls_avail_p(low_listen_unbuffered_handle(stream))) {
+  /* In case this didn't work, and as a general method for platforms on
+   which clear_tty_input() does nothing: read a byte, as long as listen
+   says that a byte is available. */
+
+  /* low_read_unbuffered_handle is not going to block - we are sure there is
+     character waiting. May be call directly full_read() without defining
+     safe gc region ???*/
+  pushSTACK(stream);
+  while (LISTEN_AVAIL == low_listen_unbuffered_handle(stream)) {
     #ifdef WIN32_NATIVE
-    # Our low_listen_unbuffered_handle function, when applied to a WinNT
-    # console, cannot tell when there is an LF pending after the
-    # preceding CR has been eaten. Therefore be careful to set
-    # UnbufferedStream_ignore_next_LF to true when we read a LF.
+    /* Our low_listen_unbuffered_handle function, when applied to a WinNT
+     console, cannot tell when there is an LF pending after the
+     preceding CR has been eaten. Therefore be careful to set
+     ChannelStream_ignore_next_LF to true when we read a LF. */
     var sintL c = low_read_unbuffered_handle(stream);
+    stream=STACK_0;
     if (c >= 0)
-      UnbufferedStream_ignore_next_LF(stream) = (c == CR);
+      ChannelStream_ignore_next_LF(stream) = (c == CR);
     #else
     low_read_unbuffered_handle(stream);
+    stream=STACK_0;
     #endif
   }
+  skipSTACK(1);
   return true;
 }
 
@@ -4951,36 +5016,38 @@ local bool error_eof_p (void) {
   return ret;
 }
 
-local uintB* low_read_array_unbuffered_handle (object stream, uintB* byteptr,
-                                               uintL len, perseverance_t persev)
+local maygc uintB* low_read_array_unbuffered_handle (object stream,
+                                                     uintB* byteptr, uintL len,
+                                                     perseverance_t persev)
 {
   if (UnbufferedStream_status(stream) < 0) /* already EOF? */
     return byteptr;
   byteptr = UnbufferedStream_pop_all(stream,byteptr,&len);
   if (len == 0) return byteptr;
   var Handle handle = TheHandle(TheStream(stream)->strm_ichannel);
-  # On regular file handles, persev_immediate and persev_bonus are effectively
-  # equivalent to persev_partial. Transforming persev_immediate, persev_bonus
-  # here 1) avoids useless system calls for poll(), select() or non-blocking
-  # I/O and 2) improves EOF detection.
+  /* On regular file handles, persev_immediate and persev_bonus are effectively
+   equivalent to persev_partial. Transforming persev_immediate, persev_bonus
+   here 1) avoids useless system calls for poll(), select() or non-blocking
+   I/O and 2) improves EOF detection. */
   if ((persev == persev_immediate || persev == persev_bonus)
       && ChannelStream_regular(stream))
     persev = persev_partial;
   run_time_stop(); /* hold run time clock */
-  begin_system_call();
-  var ssize_t result = fd_read(handle,byteptr,len,persev);
-  end_system_call();
+  pushSTACK(stream);
+  var ssize_t result;
+  GC_SAFE_SYSTEM_CALL(result=, fd_read(handle,byteptr,len,persev));
+  stream = popSTACK();
   run_time_restart(); /* resume run time clock */
   if (result<0) {
    #if !defined(WIN32_NATIVE)
     begin_system_call();
     if (errno==EINTR) /* Interrupt (poss. by Ctrl-C) ? */
-      interruptp({ end_system_call(); fehler_interrupt(); });
+      { interruptp({ end_system_call(); error_interrupt(); }) };
    #endif
    #ifdef WIN32_NATIVE
     begin_system_call();
     if (GetLastError()==ERROR_SIGINT) { /* Interrupt by Ctrl-C ? */
-      end_system_call(); fehler_interrupt();
+      end_system_call(); error_interrupt();
     }
    #endif
     OS_error();
@@ -4990,92 +5057,117 @@ local uintB* low_read_array_unbuffered_handle (object stream, uintB* byteptr,
   return byteptr+result;
 }
 
-# Integer streams
-# ---------------
+/* Integer streams
+   ---------------
 
-# UP for READ-BYTE on File-Streams of Integers, Type a :
-# Fills the Bitbuffer with the next bitsize Bits.
-# > stream : File-Stream for Integers, Type a
-# > finisher : Routine for Finalization
-# < result : read Integer or eof_value
-local object rd_by_aux_iax_unbuffered (object stream, rd_by_ix_I* finisher) {
+ UP for READ-BYTE on File-Streams of Integers, Type a :
+ Fills the Bitbuffer with the next bitsize Bits.
+ > stream : File-Stream for Integers, Type a
+ > finisher : Routine for Finalization
+ < result : read Integer or eof_value */
+local maygc object rd_by_aux_iax_unbuffered (object stream, rd_by_ix_I* finisher) {
   var uintL bitsize = ChannelStream_bitsize(stream);
   var uintL bytesize = bitsize/8;
-  # transfer sufficiently many bytes into the bitbuffer
+  /* transfer sufficiently many bytes into the bitbuffer */
   var uintB* bitbufferptr =
     &TheSbvector(TheStream(stream)->strm_bitbuffer)->data[0];
+  pin_unprotect_varobject(TheStream(stream)->strm_bitbuffer,PROT_READ_WRITE);
+  pushSTACK(stream);
   if (UnbufferedStreamLow_read_array(stream)(stream,bitbufferptr,bytesize,
                                              persev_full)
       != bitbufferptr+bytesize)
     goto eof;
-  # convert to number:
+  stream = popSTACK();
+  unpin_varobject(TheStream(stream)->strm_bitbuffer);
+  /* convert to number: */
   return (*finisher)(stream,bitsize,bytesize);
- eof: # EOF reached
+ eof: /* EOF reached */
+  stream = popSTACK();
+  unpin_varobject(TheStream(stream)->strm_bitbuffer);
   return eof_value;
 }
 
-# READ-BYTE - Pseudo-Function for File-Streams of Integers, Type au :
-local object rd_by_iau_unbuffered (object stream) {
+/* READ-BYTE - Pseudo-Function for File-Streams of Integers, Type au : */
+local maygc object rd_by_iau_unbuffered (object stream) {
   return rd_by_aux_iax_unbuffered(stream,&rd_by_iu_I);
 }
 
-# READ-BYTE - Pseudo-Function for File-Streams of Integers, Type as :
-local object rd_by_ias_unbuffered (object stream) {
+/* READ-BYTE - Pseudo-Function for File-Streams of Integers, Type as : */
+local maygc object rd_by_ias_unbuffered (object stream) {
   return rd_by_aux_iax_unbuffered(stream,&rd_by_is_I);
 }
 
-# READ-BYTE - Pseudo-Function for Handle-Streams, Type au, bitsize = 8 :
-local object rd_by_iau8_unbuffered (object stream) {
+/* READ-BYTE - Pseudo-Function for Handle-Streams, Type au, bitsize = 8 : */
+local maygc object rd_by_iau8_unbuffered (object stream) {
+ rd_by_iau8_unbuffered_retry:
   var sintL b = UnbufferedStreamLow_read(stream)(stream);
   if (b < 0)
     return eof_value;
+  if (b == LF && ChannelStream_ignore_next_LF(stream)) {
+    /* see comment in rd_by_array_iau8_unbuffered */
+    ChannelStream_ignore_next_LF(stream) = false;
+    goto rd_by_iau8_unbuffered_retry;
+  }
   return fixnum((uintB)b);
 }
 
-# READ-BYTE-ARRAY - Pseudo-Function for Handle-Streams, Type au, bitsize = 8 :
-local uintL rd_by_array_iau8_unbuffered (const gcv_object_t* stream_,
-                                         const gcv_object_t* bytearray_,
-                                         uintL start, uintL len, perseverance_t persev)
-{
-  var object stream = *stream_;
+/* READ-BYTE-ARRAY - Pseudo-Function for Handle-Streams, Type au, bitsize = 8 : */
+local maygc uintL rd_by_array_iau8_unbuffered (const gcv_object_t* stream_,
+                                               const gcv_object_t* bytearray_,
+                                               uintL start, uintL len,
+                                               perseverance_t persev) {
   var uintB* startptr = &TheSbvector(*bytearray_)->data[start];
+  pin_unprotect_varobject(*bytearray_,PROT_READ_WRITE);
   var uintB* endptr =
-    UnbufferedStreamLow_read_array(stream)(stream,startptr,len,persev);
-  return endptr-startptr;
+    UnbufferedStreamLow_read_array(*stream_)(*stream_,startptr,len,persev);
+  unpin_varobject(*bytearray_);
+  var object stream = *stream_;
+  if (startptr < endptr && *startptr == LF
+      && ChannelStream_ignore_next_LF(stream)) {
+    /* if we switch from character to byte input after a NL,
+       we need to drop the next CR
+       https://sourceforge.net/tracker/index.php?func=detail&aid=2022362&group_id=1355&atid=101355 */
+    var uintL len = endptr-startptr-1;
+    /* shift the whole array down by one, dropping CR */
+    var uintL count = len;
+    for (; count--; startptr++) startptr[0] = startptr[1];
+    ChannelStream_ignore_next_LF(stream) = false;
+    endptr = UnbufferedStreamLow_read_array(stream)(stream,startptr,1,persev);
+    return len + (endptr - startptr);
+  } else return endptr-startptr;
 }
 
-# Determines, if  a Byte is available on an Unbuffered-Channel-Stream.
-# listen_byte_ia8_unbuffered(stream)
-# > stream: Unbuffered-Channel-Stream, Type a, bitsize = 8
-# < result:   ls_avail if a byte is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no byte is available, but not because of EOF
-local signean listen_byte_ia8_unbuffered (object stream) {
+/* Determines, if  a Byte is available on an Unbuffered-Channel-Stream.
+ listen_byte_ia8_unbuffered(stream)
+ > stream: Unbuffered-Channel-Stream, Type a, bitsize = 8
+ < result: input availability */
+local listen_t listen_byte_ia8_unbuffered (object stream) {
   return UnbufferedStreamLow_listen(stream)(stream);
 }
 
-# Character streams
-# -----------------
+/* Character streams
+   -----------------
 
-# READ-CHAR - Pseudo-Function for Unbuffered-Channel-Streams:
-local object rd_ch_unbuffered (const gcv_object_t* stream_) {
+ READ-CHAR - Pseudo-Function for Unbuffered-Channel-Streams: */
+local maygc object rd_ch_unbuffered (const gcv_object_t* stream_) {
   var object stream = *stream_;
-  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) # already EOF?
+  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) /* already EOF? */
     return eof_value;
  retry: {
     var chart c;
-   #ifdef UNICODE
-    var object encoding = TheStream(stream)->strm_encoding;
+   #ifdef ENABLE_UNICODE
     var uintB buf[max_bytes_per_chart];
     var uintL buflen = 0;
-    loop {
+    while (1) {
       var sintL b = UnbufferedStreamLow_read(stream)(stream);
       if (b < 0)
         return eof_value;
+      stream=*stream_;
       ASSERT(buflen < max_bytes_per_chart);
       buf[buflen++] = (uintB)b;
       var const uintB* bptr = &buf[0];
       var chart* cptr = &c;
+      var object encoding = TheStream(stream)->strm_encoding;
       Encoding_mbstowcs(encoding)
         (encoding,stream,&bptr,&buf[buflen],&cptr,cptr+1);
       if (cptr == &c) { /* Not a complete character. */
@@ -5097,84 +5189,90 @@ local object rd_ch_unbuffered (const gcv_object_t* stream_) {
       var sintL b = UnbufferedStreamLow_read(stream)(stream);
       if (b < 0)
         return eof_value;
+      stream=*stream_;
       c = as_chart((uintB)b);
     }
    #endif
     if (chareq(c,ascii(NL))) {
-      if (UnbufferedStream_ignore_next_LF(stream)) {
-        UnbufferedStream_ignore_next_LF(stream) = false;
+      if (ChannelStream_ignore_next_LF(stream)) {
+        ChannelStream_ignore_next_LF(stream) = false;
         goto retry;
       }
       /* increment lineno: */
       ChannelStream_lineno(stream) += 1;
     } else if (chareq(c,ascii(CR))) {
-      UnbufferedStream_ignore_next_LF(stream) = true;
+      ChannelStream_ignore_next_LF(stream) = true;
       c = ascii(NL);
       /* increment lineno: */
       ChannelStream_lineno(stream) += 1;
     } else {
-      UnbufferedStream_ignore_next_LF(stream) = false;
+      ChannelStream_ignore_next_LF(stream) = false;
     }
     return code_char(c);
   }
 }
 
-# Determines, if a character is available on an Unbuffered-Channel-Stream.
-# listen_char_unbuffered(stream)
-# > stream: Unbuffered-Channel-Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
-local signean listen_char_unbuffered (object stream) {
-  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) # already EOF ?
-    return ls_eof;
-  var signean result;
-  #ifdef UNICODE
+/* Determines, if a character is available on an Unbuffered-Channel-Stream.
+ listen_char_unbuffered(stream)
+ > stream: Unbuffered-Channel-Stream
+ < result: input availability */
+local maygc listen_t listen_char_unbuffered (object stream) {
+  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) /* already EOF ? */
+    return LISTEN_EOF;
+  var listen_t result;
+  pushSTACK(stream); /* save it */
+  #ifdef ENABLE_UNICODE
   var chart c;
-  var object encoding = TheStream(stream)->strm_encoding;
   var uintB buf[max_bytes_per_chart];
   var uintL buflen = 0;
-  loop {
+  while (1) {
     result = UnbufferedStreamLow_listen(stream)(stream);
-    if (ls_eof_p(result))
+    if (result == LISTEN_EOF)
       break;
-    if (!ls_avail_p(result)) {
-      # Stop reading.
-      # Move the buffer into bytebuf.
+    if (result != LISTEN_AVAIL) {
+      /* Stop reading.
+       Move the buffer into bytebuf. */
       UnbufferedStreamLow_pushfront_bytes(stream,&buf[0],buflen);
       break;
     }
+    /* this call is not going to block since we are sure that there is
+       character waiting to be read. However since low_read_unbuffered_handle
+       may trigger GC (full_read) so this function also maygc.
+       Another option is to call full_read() here without surrounding it
+       in safe for GC ??? */
     var sintL b = UnbufferedStreamLow_read(stream)(stream);
     if (b < 0) {
-      result = ls_eof; break;
+      result = LISTEN_EOF; break;
     }
+    stream=STACK_0;
     ASSERT(buflen < max_bytes_per_chart);
     buf[buflen++] = (uintB)b;
     var const uintB* bptr = &buf[0];
     var chart* cptr = &c;
+    var object encoding = TheStream(stream)->strm_encoding;
     Encoding_mbstowcs(encoding)
       (encoding,stream,&bptr,&buf[buflen],&cptr,cptr+1);
     if (cptr == &c) {
-      # Not a complete character.
-      # Shift the buffer
+      /* Not a complete character.
+       Shift the buffer */
       if (!(bptr == &buf[0])) {
         var const uintB* ptr1 = bptr;
         var uintB* ptr2 = &buf[0];
-        until (ptr1 == &buf[buflen]) { *ptr2++ = *ptr1++; }
+        while (ptr1 != &buf[buflen]) { *ptr2++ = *ptr1++; }
         buflen = ptr2 - &buf[0];
       }
     } else {
-      # Read a complete character.
-      if (UnbufferedStream_ignore_next_LF(stream) && chareq(c,ascii(NL))) {
-        # Move the remainder of the buffer into bytebuf.
+      /* Read a complete character. */
+      if (ChannelStream_ignore_next_LF(stream) && chareq(c,ascii(NL))) {
+        /* Move the remainder of the buffer into bytebuf. */
         UnbufferedStreamLow_pushfront_bytes(stream,bptr,&buf[buflen]-bptr);
         buflen--; /* discard the NL from buf */
-        UnbufferedStream_ignore_next_LF(stream) = false;
+        ChannelStream_ignore_next_LF(stream) = false;
       } else {
-        # Move the buffer into bytebuf.
+        /* Move the buffer into bytebuf. */
         UnbufferedStreamLow_pushfront_bytes(stream,&buf[0],buflen);
-        UnbufferedStream_ignore_next_LF(stream) = false;
-        result = ls_avail;
+        ChannelStream_ignore_next_LF(stream) = false;
+        result = LISTEN_AVAIL;
         break;
       }
     }
@@ -5182,94 +5280,99 @@ local signean listen_char_unbuffered (object stream) {
   #else
  retry:
   result = UnbufferedStreamLow_listen(stream)(stream);
-  if (ls_avail_p(result) && UnbufferedStream_ignore_next_LF(stream)) {
+  if (result == LISTEN_AVAIL && ChannelStream_ignore_next_LF(stream)) {
     var sintL b = UnbufferedStreamLow_read(stream)(stream);
+    stream=STACK_0;
     if (b < 0)
-      return ls_eof;
-    UnbufferedStream_ignore_next_LF(stream) = false;
+      return LISTEN_EOF;
+    ChannelStream_ignore_next_LF(stream) = false;
     if (b == NL)
       goto retry;
     UnbufferedStreamLow_pushfront_byte(stream,b);
   }
   #endif
+  skipSTACK(1); /* discard the stream */
   return result;
 }
 
-# UP: Deletes already entered interactive Input from a
-# Unbuffered-Channel-Stream.
-# clear_input_unbuffered(stream);
-# > stream: Unbuffered-Channel-Stream
-# < result: true if Input was deleted, else false
-local bool clear_input_unbuffered (object stream) {
+/* UP: Deletes already entered interactive Input from a
+ Unbuffered-Channel-Stream.
+ clear_input_unbuffered(stream);
+ > stream: Unbuffered-Channel-Stream
+ < result: true if Input was deleted, else false */
+local maygc bool clear_input_unbuffered (object stream) {
+  UnbufferedStream_status(stream) = 0; /* forget about past EOF & bytebuf */
+  TheStream(stream)->strm_rd_ch_last = NIL; /* forget last char */
   if (nullp(TheStream(stream)->strm_isatty))
-    return false; # it's a file -> nothing to do
-  TheStream(stream)->strm_rd_ch_last = NIL; # forget about past EOF
+    return false; /* it's a file -> nothing to do */
   #ifdef WIN32_NATIVE
-  # Our low_listen_unbuffered_handle function, when applied to a WinNT
-  # console, cannot tell when there is an LF pending after the
-  # preceding CR has been eaten. Therefore be careful not to reset
-  # UnbufferedStream_ignore_next_LF.
+  /* Our low_listen_unbuffered_handle function, when applied to a WinNT
+   console, cannot tell when there is an LF pending after the
+   preceding CR has been eaten. Therefore be careful not to reset
+   ChannelStream_ignore_next_LF. */
   #else
-  UnbufferedStream_ignore_next_LF(stream) = false;
+  ChannelStream_ignore_next_LF(stream) = false;
   #endif
   UnbufferedStreamLow_clear_input(stream)(stream);
   return true;
 }
 
-# READ-CHAR-ARRAY - Pseudo-Function for Unbuffered-Channel-Streams:
-local uintL rd_ch_array_unbuffered (const gcv_object_t* stream_,
-                                    const gcv_object_t* chararray_,
-                                    uintL start, uintL len) {
-  # Need a temporary buffer for CR/LF->NL translation.
+/* READ-CHAR-ARRAY - Pseudo-Function for Unbuffered-Channel-Streams: */
+local maygc uintL rd_ch_array_unbuffered (const gcv_object_t* stream_,
+                                          const gcv_object_t* chararray_,
+                                          uintL start, uintL len) {
+  /* Need a temporary buffer for CR/LF->NL translation. */
   #define tmpbufsize 4096
   var chart tmpbuf[tmpbufsize];
   var object stream = *stream_;
   var uintL end = start+len;
   var uintL currindex = start;
-  loop {
+  while (1) {
     var uintL remaining = end - currindex;
     if (remaining == 0)
       break;
     if (remaining > tmpbufsize)
       remaining = tmpbufsize;
     var uintL count;
-    #ifdef UNICODE
-    # In order to read n characters, we read n bytes. (Fewer than n bytes
-    # will not suffice.) If these aren't enough bytes, the next round
-    # will provide them.
-    # FIXME: Could use TheEncoding(encoding)->min_bytes_per_char here.
+    #ifdef ENABLE_UNICODE
+    /* In order to read n characters, we read n bytes. (Fewer than n bytes
+     will not suffice.) If these aren't enough bytes, the next round
+     will provide them.
+     FIXME: Could use TheEncoding(encoding)->min_bytes_per_char here. */
+    pushSTACK(TheStream(stream)->strm_encoding);
     {
-      var object encoding = TheStream(stream)->strm_encoding;
       var uintB tmptmpbuf[tmpbufsize];
       var uintB* tmptmpendptr =
         UnbufferedStreamLow_read_array(stream)(stream,tmptmpbuf,remaining,
                                                persev_full);
+      stream=*stream_; /* restore stream */
+      var object encoding = STACK_0; /* restore the encoding */
       var const uintB* tmptmpptr = &tmptmpbuf[0];
       var chart* tmpptr = &tmpbuf[0];
       Encoding_mbstowcs(encoding)
         (encoding,stream,&tmptmpptr,tmptmpendptr,&tmpptr,&tmpbuf[tmpbufsize]);
       count = tmpptr - &tmpbuf[0];
       ASSERT(tmptmpendptr-tmptmpptr < max_bytes_per_chart);
-      # Move the remainder of tmptmpbuf into bytebuf.
+      /* Move the remainder of tmptmpbuf into bytebuf. */
       UnbufferedStreamLow_pushfront_bytes(stream,tmptmpptr,
                                           tmptmpendptr-tmptmpptr);
     }
+    skipSTACK(1); /* the encoding */
     if (count == 0) {
-      # Filling the last few characters must be done one by one, in
-      # order not to overrun the goal.
-      pushSTACK(stream);
+      /* Filling the last few characters must be done one by one, in
+       order not to overrun the goal. */
       do {
-        var object ch = rd_ch_unbuffered(&STACK_0);
+        var object ch = rd_ch_unbuffered(stream_);
         if (eq(ch,eof_value))
           break;
         tmpbuf[count++] = char_code(ch);
         remaining--;
       } while (remaining > 0);
-      skipSTACK(1);
     }
     #else
     count = (chart*)UnbufferedStreamLow_read_array(stream)(stream,(uintB*)tmpbuf,remaining,persev_full) - &tmpbuf[0];
     #endif
+    stream=*stream_; /* rd_ch_unbuffered or read_array maygc */
     if (count == 0)
       break;
     var const chart* tmpptr = &tmpbuf[0];
@@ -5277,8 +5380,8 @@ local uintL rd_ch_array_unbuffered (const gcv_object_t* stream_,
       var chart c = *tmpptr++;
       count--;
       if (chareq(c,ascii(NL))) {
-        if (UnbufferedStream_ignore_next_LF(stream)) {
-          UnbufferedStream_ignore_next_LF(stream) = false;
+        if (ChannelStream_ignore_next_LF(stream)) {
+          ChannelStream_ignore_next_LF(stream) = false;
         } else {
           ChannelStream_lineno(stream) += 1;
           sstring_store(*chararray_,currindex++,ascii(NL));
@@ -5288,14 +5391,14 @@ local uintL rd_ch_array_unbuffered (const gcv_object_t* stream_,
           if (chareq(*tmpptr,ascii(NL))) {
             tmpptr++; count--;
           }
-          UnbufferedStream_ignore_next_LF(stream) = false;
+          ChannelStream_ignore_next_LF(stream) = false;
         } else {
-          UnbufferedStream_ignore_next_LF(stream) = true;
+          ChannelStream_ignore_next_LF(stream) = true;
         }
         ChannelStream_lineno(stream) += 1;
         sstring_store(*chararray_,currindex++,ascii(NL));
       } else {
-        UnbufferedStream_ignore_next_LF(stream) = false;
+        ChannelStream_ignore_next_LF(stream) = false;
         sstring_store(*chararray_,currindex++,c);
       }
     } while (count > 0);
@@ -5304,71 +5407,75 @@ local uintL rd_ch_array_unbuffered (const gcv_object_t* stream_,
   #undef tmpbufsize
 }
 
-# Initializes the input side fields of an unbuffered stream.
-# UnbufferedHandleStream_input_init(stream);
-#define UnbufferedHandleStream_input_init(stream)                       \
- { UnbufferedStreamLow_read(stream) = &low_read_unbuffered_handle;      \
-   UnbufferedStreamLow_listen(stream) = &low_listen_unbuffered_handle;  \
-   UnbufferedStreamLow_clear_input(stream) =                            \
-     &low_clear_input_unbuffered_handle;                                \
-   UnbufferedStreamLow_read_array(stream) =                             \
-     &low_read_array_unbuffered_handle;                                 \
-   UnbufferedHandleStream_input_init_data(stream);                      \
- }
+/* Initializes the input side fields of an unbuffered stream.
+ UnbufferedHandleStream_input_init(stream); */
+#define UnbufferedHandleStream_input_init(stream)   do {                \
+  UnbufferedStreamLow_read(stream) = &low_read_unbuffered_handle;       \
+  UnbufferedStreamLow_listen(stream) = &low_listen_unbuffered_handle;   \
+  UnbufferedStreamLow_clear_input(stream) =                             \
+    &low_clear_input_unbuffered_handle;                                 \
+  UnbufferedStreamLow_read_array(stream) =                              \
+    &low_read_array_unbuffered_handle;                                  \
+  UnbufferedHandleStream_input_init_data(stream);                       \
+ } while(0)
 #define UnbufferedHandleStream_input_init_data(stream)  \
-    UnbufferedStream_status(stream) = 0;
+    UnbufferedStream_status(stream) = 0
 
 /* Closes a Channel-Stream.
- close_ichannel(stream);
+ close_ichannel(stream, abort);
  > stream : Channel-Stream
  > abort: flag: non-0 => ignore errors */
-local void close_ichannel (object stream, uintB abort) {
+local maygc void close_ichannel (object stream, uintB abort) {
+  pushSTACK(stream);
   ChannelStreamLow_close(stream)(stream,TheStream(stream)->strm_ichannel,abort);
-  ChannelStream_fini(stream);
+  stream = popSTACK();
+  ChannelStream_fini(stream,abort);
   if (ChannelStream_bitsize(stream) > 0) {
-    ChannelStream_bitsize(stream) = 0; # delete bitsize
-    TheStream(stream)->strm_bitbuffer = NIL; # free Bitbuffer
+    ChannelStream_bitsize(stream) = 0; /* delete bitsize */
+    TheStream(stream)->strm_bitbuffer = NIL; /* free Bitbuffer */
   }
 }
 
-# Handle-Streams, Output side
-# ===========================
+/* Handle-Streams, Output side
+   ===========================
 
-# Low-level
-# ---------
+ Low-level
+ --------- */
 
-local void low_write_unbuffered_handle (object stream, uintB b) {
+local maygc void low_write_unbuffered_handle (object stream, uintB b) {
   var Handle handle = TheHandle(TheStream(stream)->strm_ochannel);
  restart_it:
-  begin_system_call();
-  # Try to output the byte.
-  var ssize_t result = full_write(handle,&b,1);
+  /* Try to output the byte. */
+  pushSTACK(stream);
+  var ssize_t result;
+  GC_SAFE_SYSTEM_CALL(result=, full_write(handle,&b,1));
+  stream = popSTACK();
   if (result<0) { OS_error(); }
-  end_system_call();
-  if (result==0) # not successful?
-    fehler_unwritable(TheSubr(subr_self)->name,stream);
+  if (result==0) /* not successful? */
+    error_unwritable(TheSubr(subr_self)->name,stream);
 }
 
-local const uintB* low_write_array_unbuffered_handle (object stream,
+local maygc const uintB* low_write_array_unbuffered_handle (object stream,
                                                       const uintB* byteptr,
                                                       uintL len,
                                                       perseverance_t persev) {
   var Handle handle = TheHandle(TheStream(stream)->strm_ochannel);
-  # On regular file handles, persev_immediate and persev_bonus are effectively
-  # equivalent to persev_partial. Transforming persev_immediate, persev_bonus
-  # here 1) avoids useless system calls for poll(), select() or non-blocking
-  # I/O and 2) improves EOWF detection.
+  /* On regular file handles, persev_immediate and persev_bonus are effectively
+   equivalent to persev_partial. Transforming persev_immediate, persev_bonus
+   here 1) avoids useless system calls for poll(), select() or non-blocking
+   I/O and 2) improves EOWF detection. */
   if ((persev == persev_immediate || persev == persev_bonus)
       && ChannelStream_regular(stream))
     persev = persev_partial;
-  begin_system_call();
-  var ssize_t result = fd_write(handle,byteptr,len,persev);
+  pushSTACK(stream);
+  var ssize_t result;
+  GC_SAFE_SYSTEM_CALL(result=, fd_write(handle,byteptr,len,persev));
+  stream = popSTACK();
   if (result<0) { OS_error(); }
-  end_system_call();
   /* Safety check whether persev argument was respected or EOWF was reached: */
   if ((persev == persev_full && !(result==(sintL)len))
       || (persev == persev_partial && !(result>0)))
-    fehler_unwritable(TheSubr(subr_self)->name,stream);
+    error_unwritable(TheSubr(subr_self)->name,stream);
   return byteptr+result;
 }
 
@@ -5384,58 +5491,64 @@ local void low_clear_output_unbuffered_handle (object stream) {
   clear_tty_output(TheHandle(TheStream(stream)->strm_ochannel));
 }
 
-# Integer streams
-# ---------------
+/* Integer streams
+   ---------------
 
-# UP for WRITE-BYTE on File-Streams of Integers, Type a :
-# Writes the Bitbuffer-Content to the File.
-local void wr_by_aux_ia_unbuffered (object stream, uintL bitsize,
+ UP for WRITE-BYTE on File-Streams of Integers, Type a :
+ Writes the Bitbuffer-Content to the File. */
+local maygc void wr_by_aux_ia_unbuffered (object stream, uintL bitsize,
                                     uintL bytesize) {
   uintB* bitbufferptr = TheSbvector(TheStream(stream)->strm_bitbuffer)->data;
+  pin_unprotect_varobject(TheStream(stream)->strm_bitbuffer,PROT_READ);
   UnbufferedStreamLow_write_array(stream)(stream,bitbufferptr,bytesize,
                                           persev_full);
+  unpin_varobject(TheStream(stream)->strm_bitbuffer);
 }
 
-# WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type au :
+/* WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type au : */
 local maygc void wr_by_iau_unbuffered (object stream, object obj) {
   wr_by_ixu_sub(stream,obj,&wr_by_aux_ia_unbuffered);
 }
 
-# WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type as :
+/* WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type as : */
 local maygc void wr_by_ias_unbuffered (object stream, object obj) {
   wr_by_ixs_sub(stream,obj,&wr_by_aux_ia_unbuffered);
 }
 
-# WRITE-BYTE - Pseudo-Function for Handle-Streams, Type au, bitsize = 8 :
+/* WRITE-BYTE - Pseudo-Function for Handle-Streams, Type au, bitsize = 8 : */
 local maygc void wr_by_iau8_unbuffered (object stream, object obj) {
   ASSERT_wr_int(stream,obj);
   if (!(posfixnump(obj) && (posfixnum_to_V(obj) < bit(8))))
-    fehler_bad_integer(stream,obj);
+    error_bad_integer(stream,obj);
   UnbufferedStreamLow_write(stream)(stream,(uintB)posfixnum_to_V(obj));
 }
 
-# WRITE-BYTE-ARRAY - Pseudo-Function for Handle-Streams, Type au, bitsize = 8 :
+/* WRITE-BYTE-ARRAY - Pseudo-Function for Handle-Streams, Type au, bitsize = 8 : */
 local maygc uintL wr_by_array_iau8_unbuffered (const gcv_object_t* stream_,
                                                const gcv_object_t* bytearray_,
-                                               uintL start, uintL len, perseverance_t persev) {
+                                               uintL start, uintL len,
+                                               perseverance_t persev) {
   object stream = *stream_;
   uintB* startp = &TheSbvector(*bytearray_)->data[start];
+  pin_unprotect_varobject(*bytearray_,PROT_READ);
   const uintB* endp =
     UnbufferedStreamLow_write_array(stream)(stream,startp,len,persev);
+  unpin_varobject(*bytearray_);
   return (endp - startp);
 }
 
-# Character streams
-# -----------------
+/* Character streams
+   -----------------
 
-# Three versions, one for each kind of line-terminator: :unix, :mac, :dos.
+ Three versions, one for each kind of line-terminator: :unix, :mac, :dos.
 
-# WRITE-CHAR - Pseudo-Function for Unbuffered-Channel-Streams:
-local maygc void wr_ch_unbuffered_unix (const gcv_object_t* stream_, object ch) {
+ WRITE-CHAR - Pseudo-Function for Unbuffered-Channel-Streams: */
+local maygc void wr_ch_unbuffered_unix (const gcv_object_t* stream_, object ch)
+{
   var object stream = *stream_;
   check_wr_char(stream,ch);
-  var chart c = char_code(ch); # Code of the character
-  #ifdef UNICODE
+  var chart c = char_code(ch); /* Code of the character */
+  #ifdef ENABLE_UNICODE
   var uintB buf[max_bytes_per_chart];
   var object encoding = TheStream(stream)->strm_encoding;
   var const chart* cptr = &c;
@@ -5451,42 +5564,46 @@ local maygc void wr_ch_unbuffered_unix (const gcv_object_t* stream_, object ch) 
   #endif
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for Unbuffered-Channel-Streams:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for Unbuffered-Channel-Streams: */
 local maygc void wr_ch_array_unbuffered_unix (const gcv_object_t* stream_,
                                               const gcv_object_t* chararray_,
                                               uintL start, uintL len) {
   var object stream = *stream_;
   var const chart* charptr;
   unpack_sstring_alloca(*chararray_,len,start, charptr=);
-  #ifdef UNICODE
+  pin_unprotect_varobject(*chararray_,PROT_READ); /*charptr may point to heap*/
+  #ifdef ENABLE_UNICODE
   #define tmpbufsize 4096
   var const chart* endptr = charptr + len;
   var uintB tmptmpbuf[tmpbufsize*max_bytes_per_chart];
-  var object encoding = TheStream(stream)->strm_encoding;
   do {
     var uintB* bptr = &tmptmpbuf[0];
+    var object encoding = TheStream(stream)->strm_encoding;
     Encoding_wcstombs(encoding)(encoding,stream,&charptr,endptr,&bptr,
                                 &tmptmpbuf[tmpbufsize*max_bytes_per_chart]);
     var uintL tmptmpbuflen = bptr-&tmptmpbuf[0];
     if (tmptmpbuflen > 0)
       UnbufferedStreamLow_write_array(stream)(stream,&tmptmpbuf[0],
                                               tmptmpbuflen,persev_full);
+    stream=*stream_; /* write_array maygc */
   } while (charptr != endptr);
   #undef tmpbufsize
   #else
   var const chart* endptr = (const chart*)UnbufferedStreamLow_write_array(stream)(stream,(const uintB*)charptr,len,persev_full);
+  stream=*stream_; /* write_array maygc */
   #endif
-  wr_ss_lpos(stream,endptr,len); # update Line-Position
+  unpin_varobject(*chararray_);
+  wr_ss_lpos(stream,endptr,len); /* update Line-Position */
 }
 
-# WRITE-CHAR - Pseudo-Function for Unbuffered-Channel-Streams:
+/* WRITE-CHAR - Pseudo-Function for Unbuffered-Channel-Streams: */
 local maygc void wr_ch_unbuffered_mac (const gcv_object_t* stream_, object ch) {
   var object stream = *stream_;
   check_wr_char(stream,ch);
-  var chart c = char_code(ch); # Code of the character
+  var chart c = char_code(ch); /* Code of the character */
   if (chareq(c,ascii(NL)))
     c = ascii(CR);
-  #ifdef UNICODE
+  #ifdef ENABLE_UNICODE
   var uintB buf[max_bytes_per_chart];
   var object encoding = TheStream(stream)->strm_encoding;
   var const chart* cptr = &c;
@@ -5502,19 +5619,21 @@ local maygc void wr_ch_unbuffered_mac (const gcv_object_t* stream_, object ch) {
   #endif
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for Unbuffered-Channel-Streams:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for Unbuffered-Channel-Streams: */
 local maygc void wr_ch_array_unbuffered_mac (const gcv_object_t* stream_,
                                              const gcv_object_t* chararray_,
                                              uintL start, uintL len) {
   var object stream = *stream_;
   var const chart* charptr;
   unpack_sstring_alloca(*chararray_,len,start, charptr=);
-  # Need a temporary buffer for NL->CR translation.
+  pin_unprotect_varobject(*chararray_,PROT_READ);
+  /* Need a temporary buffer for NL->CR translation. */
   #define tmpbufsize 4096
   var chart tmpbuf[tmpbufsize];
-  #ifdef UNICODE
+  #ifdef ENABLE_UNICODE
   var uintB tmptmpbuf[tmpbufsize*max_bytes_per_chart];
-  var object encoding = TheStream(stream)->strm_encoding;
+  var object encoding;
+  pushSTACK(TheStream(stream)->strm_encoding);
   #endif
   var uintL remaining = len;
   do {
@@ -5530,9 +5649,10 @@ local maygc void wr_ch_array_unbuffered_mac (const gcv_object_t* stream_,
           c = ascii(CR);
         *tmpptr++ = c;
       });
-      #ifdef UNICODE
+      #ifdef ENABLE_UNICODE
       var const chart* cptr = tmpbuf;
       var uintB* bptr = &tmptmpbuf[0];
+      encoding = STACK_0;
       Encoding_wcstombs(encoding)(encoding,stream,&cptr,tmpptr,&bptr,
                                   &tmptmpbuf[tmpbufsize*max_bytes_per_chart]);
       ASSERT(cptr == tmpptr);
@@ -5544,20 +5664,25 @@ local maygc void wr_ch_array_unbuffered_mac (const gcv_object_t* stream_,
       UnbufferedStreamLow_write_array(stream)(stream,(const uintB*)tmpbuf,n,
                                               persev_full);
       #endif
+      stream=*stream_; /* write_array maygc */
     }
     remaining -= n;
   } while (remaining > 0);
   #undef tmpbufsize
-  wr_ss_lpos(stream,charptr,len); # update Line-Position
+  #ifdef ENABLE_UNICODE
+  skipSTACK(1); /* the encoding */
+  #endif
+  unpin_varobject(*chararray_);
+  wr_ss_lpos(stream,charptr,len); /* update Line-Position */
 }
 
-# WRITE-CHAR - Pseudo-Function for Unbuffered-Channel-Streams:
+/* WRITE-CHAR - Pseudo-Function for Unbuffered-Channel-Streams: */
 local maygc void wr_ch_unbuffered_dos (const gcv_object_t* stream_, object ch) {
   var object stream = *stream_;
   check_wr_char(stream,ch);
-  var chart c = char_code(ch); # Code of the character
+  var chart c = char_code(ch); /* Code of the character */
   static chart const crlf[2] = { ascii(CR), ascii(LF) };
-  #ifdef UNICODE
+  #ifdef ENABLE_UNICODE
   var uintB buf[2*max_bytes_per_chart];
   var object encoding = TheStream(stream)->strm_encoding;
   var const chart* cp;
@@ -5584,19 +5709,21 @@ local maygc void wr_ch_unbuffered_dos (const gcv_object_t* stream_, object ch) {
   #endif
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for Unbuffered-Channel-Streams:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for Unbuffered-Channel-Streams: */
 local maygc void wr_ch_array_unbuffered_dos (const gcv_object_t* stream_,
                                              const gcv_object_t* chararray_,
                                              uintL start, uintL len) {
   var object stream = *stream_;
   var const chart* charptr;
   unpack_sstring_alloca(*chararray_,len,start, charptr=);
-  # Need a temporary buffer for NL->CR/LF translation.
+  pin_unprotect_varobject(*chararray_,PROT_READ);
+  /* Need a temporary buffer for NL->CR/LF translation. */
   #define tmpbufsize 4096
   var chart tmpbuf[2*tmpbufsize];
-  #ifdef UNICODE
+  #ifdef ENABLE_UNICODE
   var uintB tmptmpbuf[2*tmpbufsize*max_bytes_per_chart];
-  var object encoding = TheStream(stream)->strm_encoding;
+  var object encoding;
+  pushSTACK(TheStream(stream)->strm_encoding);
   #endif
   var uintL remaining = len;
   do {
@@ -5614,9 +5741,10 @@ local maygc void wr_ch_array_unbuffered_dos (const gcv_object_t* stream_,
           *tmpptr++ = c;
         }
       });
-      #ifdef UNICODE
+      #ifdef ENABLE_UNICODE
       var const chart* cptr = tmpbuf;
       var uintB* bptr = &tmptmpbuf[0];
+      encoding=STACK_0;
       Encoding_wcstombs(encoding)(encoding,stream,&cptr,tmpptr,&bptr,&tmptmpbuf[2*tmpbufsize*max_bytes_per_chart]);
       ASSERT(cptr == tmpptr);
       var uintL tmptmpbuflen = bptr-&tmptmpbuf[0];
@@ -5627,23 +5755,28 @@ local maygc void wr_ch_array_unbuffered_dos (const gcv_object_t* stream_,
       UnbufferedStreamLow_write_array(stream)(stream,(const uintB*)tmpbuf,
                                               tmpptr-&tmpbuf[0],persev_full);
       #endif
+      stream=*stream_;
     }
     remaining -= n;
   } while (remaining > 0);
   #undef tmpbufsize
-  wr_ss_lpos(stream,charptr,len); # update Line-Position
+  #ifdef ENABLE_UNICODE
+  skipSTACK(1); /* encoding */
+  #endif
+  unpin_varobject(*chararray_);
+  wr_ss_lpos(stream,charptr,len); /* update Line-Position */
 }
 
-# Macro: Emits a shift sequence to let the output conversion descriptor of an
-# Unbuffered-Channel-Stream return to the initial state.
-# oconv_unshift_output_unbuffered(stream);
-# > stream: Unbuffered-Channel-Stream
-#if defined(UNICODE) && defined(HAVE_GOOD_ICONV)
+/* Macro: Emits a shift sequence to let the output conversion descriptor of an
+ Unbuffered-Channel-Stream return to the initial state.
+ oconv_unshift_output_unbuffered(stream);
+ > stream: Unbuffered-Channel-Stream */
+#if defined(ENABLE_UNICODE) && defined(HAVE_GOOD_ICONV)
  #define oconv_unshift_output_unbuffered(stream)               \
      if (ChannelStream_oconvdesc(stream) != (iconv_t)0) {      \
        oconv_unshift_output_unbuffered_(stream);               \
      }
-local void oconv_unshift_output_unbuffered_ (object stream) {
+local maygc void oconv_unshift_output_unbuffered_ (object stream) {
  #define tmpbufsize 4096
   var uintB tmpbuf[tmpbufsize];
   var char* outptr = (char*)tmpbuf;
@@ -5669,79 +5802,95 @@ local void oconv_unshift_output_unbuffered_ (object stream) {
  #define oconv_unshift_output_unbuffered(stream)
 #endif
 
-# UP: Move the pending Output of a Unbuffered-Channel-Stream to the destination.
-# finish_output_unbuffered(stream);
-# > stream: Handle-Stream
-# can trigger GC
+/* UP: Move the pending Output of a Unbuffered-Channel-Stream to the destination.
+ finish_output_unbuffered(stream);
+ > stream: Handle-Stream
+ can trigger GC */
 local maygc void finish_output_unbuffered (object stream) {
+  pushSTACK(stream);
   oconv_unshift_output_unbuffered(stream);
+  stream = popSTACK();
   UnbufferedStreamLow_finish_output(stream)(stream);
 }
 
-# UP: Move the pending Output of a Unbuffered-Channel-Stream to the destination.
-# force_output_unbuffered(stream);
-# > stream: Handle-Stream
-# can trigger GC
+/* UP: Move the pending Output of a Unbuffered-Channel-Stream to the destination.
+ force_output_unbuffered(stream);
+ > stream: Handle-Stream
+ can trigger GC */
 local maygc void force_output_unbuffered (object stream) {
+  pushSTACK(stream);
   oconv_unshift_output_unbuffered(stream);
+  stream = popSTACK();
   UnbufferedStreamLow_force_output(stream)(stream);
 }
 
-# UP: Delete the pending Output of a Unbuffered-Channel-Stream.
-# clear_output_unbuffered(stream);
-# > stream: Handle-Stream
-# can trigger GC
+/* UP: Delete the pending Output of a Unbuffered-Channel-Stream.
+ clear_output_unbuffered(stream);
+ > stream: Handle-Stream
+ can trigger GC */
 local maygc void clear_output_unbuffered (object stream) {
   UnbufferedStreamLow_clear_output(stream)(stream);
 }
 
-# Initializes the output side fields of an unbuffered handle stream.
-# UnbufferedHandleStream_output_init(stream);
-#define UnbufferedHandleStream_output_init(stream)                      \
-    { UnbufferedStreamLow_write(stream) = &low_write_unbuffered_handle; \
-      UnbufferedStreamLow_write_array(stream) =                         \
-        &low_write_array_unbuffered_handle;                             \
-      UnbufferedStreamLow_finish_output(stream) =                       \
-        &low_finish_output_unbuffered_handle;                           \
-      UnbufferedStreamLow_force_output(stream) =                        \
-        &low_force_output_unbuffered_handle;                            \
-      UnbufferedStreamLow_clear_output(stream) =                        \
-        &low_clear_output_unbuffered_handle;                            \
-    }
+/* Initializes the output side fields of an unbuffered handle stream.
+ UnbufferedHandleStream_output_init(stream); */
+#define UnbufferedHandleStream_output_init(stream)     do {             \
+  UnbufferedStreamLow_write(stream) = &low_write_unbuffered_handle;     \
+  UnbufferedStreamLow_write_array(stream) =                             \
+    &low_write_array_unbuffered_handle;                                 \
+  UnbufferedStreamLow_finish_output(stream) =                           \
+    &low_finish_output_unbuffered_handle;                               \
+  UnbufferedStreamLow_force_output(stream) =                            \
+    &low_force_output_unbuffered_handle;                                \
+  UnbufferedStreamLow_clear_output(stream) =                            \
+    &low_clear_output_unbuffered_handle;                                \
+ } while (0)
 
 /* Closes a Channel-Stream.
- close_ochannel(stream);
+ close_ochannel(stream, abort);
  > stream : Channel-Stream
  > abort: flag: non-0 => ignore errors */
-local void close_ochannel (object stream, uintB abort) {
-  oconv_unshift_output_unbuffered(stream);
+local maygc void close_ochannel (object stream, uintB abort) {
+  pushSTACK(stream);
+  MAYBE_IGNORE_ERRORS(abort,oconv_unshift_output_unbuffered(stream));
+  stream = STACK_0;
   ChannelStreamLow_close(stream)(stream,TheStream(stream)->strm_ochannel,abort);
-  ChannelStream_fini(stream);
+  stream = popSTACK();
+  ChannelStream_fini(stream,abort);
   if (ChannelStream_bitsize(stream) > 0) {
-    ChannelStream_bitsize(stream) = 0; # delete bitsize
-    TheStream(stream)->strm_bitbuffer = NIL; # free Bitbuffer
+    ChannelStream_bitsize(stream) = 0; /* delete bitsize */
+    TheStream(stream)->strm_bitbuffer = NIL; /* free Bitbuffer */
   }
 }
 
 
-# Unbuffered File-Stream
-# ======================
+/* Unbuffered File-Stream
+   ====================== */
 
-# UP: Checks an Element-Type for an Unbuffered-Stream
-# check_unbuffered_eltype(&eltype);
-# > eltype: Element-Type in decoded form
+/* check if the eltype specifies a binary stream which element size which is
+   not a whole multiple of a byte, i.e., a stream which must be buffered */
+#define NON_WHOLE_BYTE_P(eltype)                                \
+  ((eltype->kind != eltype_ch) && ((eltype->size % 8) != 0))
+
+/* UP: Checks an Element-Type for an Unbuffered-Stream
+ check_unbuffered_eltype(&eltype);
+ > eltype: Element-Type in decoded form */
 local void check_unbuffered_eltype (const decoded_el_t* eltype) {
-  if (!((eltype->kind == eltype_ch) || ((eltype->size % 8) == 0))) {
+  if (NON_WHOLE_BYTE_P(eltype)) {
     pushSTACK(canon_eltype(eltype));
     pushSTACK(S(Kelement_type));
-    fehler(error,GETTEXT("Unbuffered streams need an ~S with a bit size being a multiple of 8, not ~S"));
+    error(error_condition,GETTEXT("Unbuffered streams need an ~S with a bit size being a multiple of 8, not ~S"));
   }
 }
+#define CHECK_UNBUFFERED_ELTYPE(buffered,direction,eltype)              \
+  if ((direction == DIRECTION_INPUT && buffered == BUFFERED_NIL)        \
+      || (direction == DIRECTION_OUTPUT && buffered != BUFFERED_T))     \
+    check_unbuffered_eltype(&eltype)
 
-# UP: Fills in the pseudofunctions for an unbuffered stream.
-# fill_pseudofuns_unbuffered(stream,&eltype);
-# > stream: stream being built up, with correct strmflags and encoding
-# > eltype: Element-Type in decoded form
+/* UP: Fills in the pseudofunctions for an unbuffered stream.
+ fill_pseudofuns_unbuffered(stream,&eltype);
+ > stream: stream being built up, with correct strmflags and encoding
+ > eltype: Element-Type in decoded form */
 local void fill_pseudofuns_unbuffered (object stream,
                                        const decoded_el_t* eltype) {
   var uintB flags = TheStream(stream)->strmflags;
@@ -5770,17 +5919,20 @@ local void fill_pseudofuns_unbuffered (object stream,
         TheStream(stream)->strm_wr_ch =
           TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_unbuffered_unix);
         TheStream(stream)->strm_wr_ch_array =
-          TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_unbuffered_unix);
+          TheStream(stream)->strm_wr_ch_array_npnl =
+          P(wr_ch_array_unbuffered_unix);
       } else if (eq(eol,S(Kmac))) {
         TheStream(stream)->strm_wr_ch =
           TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_unbuffered_mac);
         TheStream(stream)->strm_wr_ch_array =
-          TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_unbuffered_mac);
+          TheStream(stream)->strm_wr_ch_array_npnl =
+          P(wr_ch_array_unbuffered_mac);
       } else if (eq(eol,S(Kdos))) {
         TheStream(stream)->strm_wr_ch =
           TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_unbuffered_dos);
         TheStream(stream)->strm_wr_ch_array =
-          TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_unbuffered_dos);
+          TheStream(stream)->strm_wr_ch_array_npnl =
+          P(wr_ch_array_unbuffered_dos);
       } else
         NOTREACHED;
     } else {
@@ -5806,61 +5958,62 @@ local void fill_pseudofuns_unbuffered (object stream,
 #define RO_P(dir)    ((dir) & bit(1)) /* immutable */
 #define WRITE_P(dir) ((dir) & bit(2)) /* writable */
 #define DIRECTION_FLAGS(dir)                                                \
-   (READ_P(dir) ? strmflags_rd_B : 0)  /* permits READ-CHAR, READ-BYTE */   \
+  ((READ_P(dir) ? strmflags_rd_B : 0)  /* permits READ-CHAR, READ-BYTE */ \
  | (WRITE_P(dir) ? strmflags_wr_B : 0) /* permits WRITE-CHAR, WRITE-BYTE */ \
- | (RO_P(dir) ? strmflags_immut_B : 0) /* immutable object */
+ | (RO_P(dir) ? strmflags_immut_B : 0)) /* immutable object */
 
-# UP: creates an Unbuffered-Channel-Stream
-# make_unbuffered_stream(type,direction,&eltype,handle_regular,handle_tty)
-# > STACK_2: Encoding
-# > STACK_1: Element-Type
-# > STACK_0: Handle of the opened File
-# > type: stream type
-# > direction: direction_t (see lispbibl.d)
-# > eltype: Element-Type in decoded form
-# > handle_regular: whether the handle refers to a regular file
-# > handle_tty: if the Handle is a tty (only necessary if direction & bit(0))
-# < result: File-Handle-Stream, Handle_{input,output}_init still needs to be called
-# < STACK: cleaned up
-# can trigger GC
+#define ELTYPE_FLAFS(eltype)                                    \
+  (strmflags_immut_B | (eltype->kind == eltype_ch               \
+                        ? strmflags_ch_B : strmflags_by_B))
+
+
+/* UP: creates an Unbuffered-Channel-Stream
+ make_unbuffered_stream(type,direction,&eltype,handle_regular,handle_tty)
+ > STACK_2: Encoding
+ > STACK_1: Element-Type
+ > STACK_0: Handle of the opened File
+ > type: stream type
+ > direction: direction_t (see lispbibl.d)
+ > eltype: Element-Type in decoded form
+ > handle_regular: whether the handle refers to a regular file
+ > handle_tty: if the Handle is a tty (only necessary if direction & bit(0))
+ < result: File-Handle-Stream, Handle_{input,output}_init still needs to be called
+ < STACK: cleaned up
+ can trigger GC */
 local maygc object make_unbuffered_stream (uintB type, direction_t direction,
                                            const decoded_el_t* eltype,
-                                           bool handle_regular, bool handle_tty) {
-  # Flags:
-  var uintB flags = DIRECTION_FLAGS(direction);
-  if (eltype->kind == eltype_ch)
-    flags &= strmflags_ch_B | strmflags_immut_B;
-  else
-    flags &= strmflags_by_B | strmflags_immut_B;
-  # allocate Stream:
+                                           bool handle_regular, bool handle_tty)
+{
+  var uintB flags = DIRECTION_FLAGS(direction) & ELTYPE_FLAFS(eltype);
+  /* allocate Stream: */
   var object stream = allocate_stream(flags,type,strm_channel_len,
                                       sizeof(strm_unbuffered_extrafields_t));
-  # and fill:
+  /* and fill: */
   TheStream(stream)->strm_encoding = STACK_2;
   fill_pseudofuns_unbuffered(stream,eltype);
-  UnbufferedStream_ignore_next_LF(stream) = false;
-  TheStream(stream)->strm_wr_ch_lpos = Fixnum_0; # Line Position := 0
+  ChannelStream_ignore_next_LF(stream) = false;
+  TheStream(stream)->strm_wr_ch_lpos = Fixnum_0; /* Line Position := 0 */
   {
     var object handle = popSTACK();
     if (READ_P(direction))
-      TheStream(stream)->strm_ichannel = handle; # enter Handle
+      TheStream(stream)->strm_ichannel = handle; /* enter Handle */
     if (WRITE_P(direction))
-      TheStream(stream)->strm_ochannel = handle; # enter Handle
+      TheStream(stream)->strm_ochannel = handle; /* enter Handle */
     if (type == strmtype_file)
-      TheStream(stream)->strm_buffered_channel = handle; # enter Handle
+      TheStream(stream)->strm_buffered_channel = handle; /* enter Handle */
   }
-  # enter Flag isatty = (handle_tty ? T : NIL) :
+  /* enter Flag isatty = (handle_tty ? T : NIL) : */
   TheStream(stream)->strm_isatty = (handle_tty ? T : NIL);
   TheStream(stream)->strm_eltype = popSTACK();
   ChannelStream_buffered(stream) = false;
   ChannelStream_regular(stream) = handle_regular;
   ChannelStream_init(stream);
-  # element-type dependent initializations:
+  /* element-type dependent initializations: */
   ChannelStream_bitsize(stream) = eltype->size;
-  ChannelStream_lineno(stream) = 1; # initialize always (cf. set-stream-element-type)
+  ChannelStream_lineno(stream) = 1; /* initialize always (cf. set-stream-element-type) */
   if (!(eltype->kind == eltype_ch)) {
-  # File-Stream for Integers
-  # allocate Bitbuffer:
+  /* File-Stream for Integers
+   allocate Bitbuffer: */
     pushSTACK(stream);
     var object bitbuffer = allocate_bit_vector(Atype_Bit,eltype->size);
     stream = popSTACK();
@@ -5871,67 +6024,67 @@ local maygc object make_unbuffered_stream (uintB type, direction_t direction,
 }
 
 
-# File-Stream
-# ===========
+/* File-Stream
+   ===========
 
-# In order to not have to bestir the UNIX for each Character,
-# our own Buffer is maintained.
-# (This caused e.g. for the Consumption of a 408 KByte- File on an Atari
-# an acceleration by a Factor of 2.7 from 500 sec to 180 sec.)
+ In order to not have to bestir the UNIX for each Character,
+ our own Buffer is maintained.
+ (This caused e.g. for the Consumption of a 408 KByte- File on an Atari
+ an acceleration by a Factor of 2.7 from 500 sec to 180 sec.)
 
-# Additional fields:
-  # define strm_file_name        strm_field1   # Filename, a pathname or NIL
-  # define strm_file_truename    strm_field2   # Truename, a non-logical pathname or NIL
-  # define strm_buffered_channel strm_ochannel # a wrapped Handle
-  # define strm_buffered_bufflen 4096 # buffer length, a power of 2, <2^16
-  #define strm_buffered_buffer   strm_buffer   # our own buffer, a simple-bit-vector
-                                               # with strm_buffered_bufflen bytes
+ Additional fields:
+  define strm_file_name        strm_field1   - Filename, a pathname or NIL
+  define strm_file_truename    strm_field2   - Truename, a non-logical pathname or NIL
+  define strm_buffered_channel strm_ochannel - a wrapped Handle
+  define strm_buffered_bufflen 4096 - buffer length, a power of 2, <2^16
+ our own buffer, a simple-bit-vector with strm_buffered_bufflen bytes: */
+#define strm_buffered_buffer strm_buffer
 
-# Additional binary (not GCed) fields:
+/* Additional binary (not GCed) fields: */
 typedef struct strm_buffered_extrafields_t {
   strm_channel_extrafields_t _parent;
   uintL (* low_fill)  (object stream, perseverance_t persev);
   void  (* low_flush) (object stream, uintL bufflen);
-  uoff_t buffstart;    # start position of buffer
-  uintL endvalid;      # index up to which the data is known to be valid
-  uintL index;         # index into buffer (>=0, <=endvalid)
-  /*bool*/int have_eof_p : 8; # indicates that eof is right after endvalid
-  /*bool*/int modified : 8;   # true if the buffer contains modified data,
-                              # else false
-  /*bool*/int blockpositioning : 8; # whether the handle refers to a regular
-                          # file and permits to position the buffer at
-                          # buffstart = (sector number) * strm_buffered_bufflen
-  # endvalid always indicates how much of the buffer contains data
-  # have_eof_p = true indicates that the EOF is known to be at the
-  #    endvalid position.  It could be there without have_eof_p being true,
-  #    but it will be discovered by the next buffered_nextbyte() then
-  # buffstart = (sector number) * strm_buffered_bufflen,
-  #             if blockpositioning permitted.
-  # The position of handle, known to the OS, set via lseek, is normally
-  # (but not always!) the end of the current buffer.  More importantly,
-  # before flushing the buffer to disk, the handle is lseek()ed to
-  # buffstart, which ensures data is written where it should be.  This
-  # then leaves the position at the correct point for subsequent reads.
-# Up to now a file is considered built from bytes of 8 bits.
-# Logically, it is built up from other units:
-  uoff_t position;              # position in logical units
+  uoff_t buffstart;    /* start position of buffer */
+  uintL endvalid;      /* index up to which the data is known to be valid */
+  uintL index;         /* index into buffer (>=0, <=endvalid) */
+  /*bool*/int have_eof_p : 8; /* indicates that eof is right after endvalid */
+  /*bool*/int modified : 8;   /* true if the buffer contains modified data,
+    else false */
+  /*bool*/int blockpositioning : 8; /* whether the handle refers to a regular
+                                   file and permits to position the buffer at
+                           buffstart = (sector number) * strm_buffered_bufflen
+   endvalid always indicates how much of the buffer contains data
+   have_eof_p = true indicates that the EOF is known to be at the
+      endvalid position.  It could be there without have_eof_p being true,
+      but it will be discovered by the next buffered_nextbyte() then
+   buffstart = (sector number) * strm_buffered_bufflen,
+               if blockpositioning permitted.
+   The position of handle, known to the OS, set via lseek, is normally
+   (but not always!) the end of the current buffer.  More importantly,
+   before flushing the buffer to disk, the handle is lseek()ed to
+   buffstart, which ensures data is written where it should be.  This
+   then leaves the position at the correct point for subsequent reads.
+ Up to now a file is considered built from bytes of 8 bits.
+ Logically, it is built up from other units: */
+  uoff_t position;              /* position in logical units */
 } strm_buffered_extrafields_t;
 
-# More fields in file streams with element type INTEGER, type ib or ic.
+/* More fields in file streams with element type INTEGER, type ib or ic. */
 typedef struct strm_i_buffered_extrafields_t {
   strm_buffered_extrafields_t _parent;
-  # If bitsize is not a multiple of 8:
-  uintL bitindex;               # index in the current byte, >=0, <=8
-  # The buffer contains 8*index+bitindex bits. The bits are ordered in the
-  # order bit0,....,bit7. If bitsize<8, the length of the file (measured in
-  # bits) is stored in the first 4 bytes of the files [in little-endian order]
-  # when the file is closed. The actual data then begins in the 5th byte.
-  uoff_t eofposition;           # position of logical EOF
+  /* If bitsize is not a multiple of 8: */
+  uintL bitindex;               /* index in the current byte, >=0, <=8 */
+  /* The buffer contains 8*index+bitindex bits. The bits are ordered in the
+   order bit0,....,bit7. If bitsize<8, the length of the file (measured in
+   bits) is stored in the first 4 bytes of the files [in little-endian order]
+   when the file is closed. The actual data then begins in the 5th byte. */
+  uoff_t eofposition;           /* position of logical EOF */
 } strm_i_buffered_extrafields_t;
 
-# In closed file streams only the fields `name' and `truename' are relevant.
+/* In closed file streams only the fields `name' and `truename' are relevant. */
 
-# Accessors.
+/* Accessors. */
 #define FileStream_name(stream)  TheStream(stream)->strm_file_name
 #define FileStream_truename(stream)  TheStream(stream)->strm_file_truename
 #define BufferedStream_channel(stream) TheStream(stream)->strm_buffered_channel
@@ -5972,44 +6125,48 @@ typedef struct strm_i_buffered_extrafields_t {
   TheHandle(ChannelStream_buffered(obj) ? BufferedStream_channel(obj)   \
             : ChannelStream_ochannel(obj))
 
-# File-Stream in general
-# ======================
+/* File-Stream in general
+   ======================
 
-/* return the file stream truename
+ return the file stream truename
  > s: file stream (open or closed) - no type check is done!
  < truename of the file associated with the stream
  for syscall module */
-global object file_stream_truename (object s)
+modexp object file_stream_truename (object s)
 { return FileStream_truename(s); }
 
 #ifdef UNIX
-# Assumption: All File-Descriptors delivered by OPEN(2)  (called Handles
-# here) fit in an uintW.
-# Substantiation: as is generally known: 0 <= fd < getdtablesize() .
+/* Assumption: All File-Descriptors delivered by OPEN(2)  (called Handles
+ here) fit in an uintW.
+ Substantiation: as is generally known: 0 <= fd < getdtablesize() . */
 #endif
 
-# Note about regular and non-regular files:
-# - For regular files that were opened with O_RDONLY or O_RDWR but not O_WRONLY,
-#   we assume that it makes sense to read a block, modify it, reposition the
-#   handle back to the beginning of the block and write it back.
-# - For regular files opened with O_WRONLY, we use a simple output buffer.
-# - For non-regular files, we don't call handle_lseek. Therefore mixed I/O is
-#   not possible. Only input-only and output-only modes are possible.
+/* Note about regular and non-regular files:
+ - For regular files that were opened with O_RDONLY or O_RDWR but not O_WRONLY,
+   we assume that it makes sense to read a block, modify it, reposition the
+   handle back to the beginning of the block and write it back.
+ - For regular files opened with O_WRONLY, we use a simple output buffer.
+ - For non-regular files, we don't call handle_lseek. Therefore mixed I/O is
+   not possible. Only input-only and output-only modes are possible.
 
-# position the Handle:
-# handle_lseek(stream,handle,offset,mode,result_assignment);
-# > mode: Positioning-Mode:
-#         SEEK_SET  "absolute"
-#         SEEK_CUR  "relative"
-#         SEEK_END  "at the end"
-# < result: new Position
+ position the Handle:
+ handle_lseek(stream,handle,offset,mode,result_assignment);
+ stream_ should be pointer to GC safe location (since the call itself is
+ surrounded by GC safe region - multithreading).
+ > mode: Positioning-Mode:
+         SEEK_SET  "absolute"
+         SEEK_CUR  "relative"
+         SEEK_END  "at the end"
+ < result: new Position */
 #if defined(UNIX) || defined(WIN32_NATIVE)
-  #define handle_lseek(stream,handle,offset,mode,result_assignment)     \
-    { var off_t result = lseek(TheHandle(handle),offset,mode);          \
-      if (result<0) /* error occurred? */                               \
-        { end_system_call(); OS_filestream_error(stream); }             \
-      unused (result_assignment result);                                \
+  #define fd_lseek(stream_,fd,offset,mode,result_assignment)    \
+    { var off_t result = lseek(fd,offset,mode);                \
+      if (result<0) /* error occurred? */                      \
+        { end_blocking_system_call(); OS_filestream_error(*stream_); }    \
+      unused (result_assignment result);                       \
     }
+  #define handle_lseek(stream_,fd,offset,mode,result_assignment) \
+    fd_lseek(stream_,fd,offset,mode,result_assignment)
 #endif
 
 /* UP: Fills the buffer, up to strm_buffered_bufflen bytes.
@@ -6017,22 +6174,25 @@ global object file_stream_truename (object s)
  > stream: (open) byte-based file stream
  > persev: one of persev_partial, persev_immediate, persev_bonus
  < result: number of bytes read */
-local uintL low_fill_buffered_handle (object stream, perseverance_t persev) {
+local maygc uintL low_fill_buffered_handle (object stream, perseverance_t persev) {
   var Handle handle = TheHandle(BufferedStream_channel(stream));
   var uintB* buff = BufferedStream_buffer_address(stream,0);
-  # On regular file handles, persev_immediate and persev_bonus are effectively
-  # equivalent to persev_partial. Transforming persev_immediate, persev_bonus
-  # here 1) avoids useless system calls for poll(), select() or non-blocking
-  # I/O and 2) improves EOF detection.
+  /* On regular file handles, persev_immediate and persev_bonus are effectively
+   equivalent to persev_partial. Transforming persev_immediate, persev_bonus
+   here 1) avoids useless system calls for poll(), select() or non-blocking
+   I/O and 2) improves EOF detection. */
   if ((persev == persev_immediate || persev == persev_bonus)
       && ChannelStream_regular(stream))
     persev = persev_partial;
   if ((TheStream(stream)->strmflags & strmflags_rd_B) == 0
       && !ChannelStream_regular(stream))
     return 0; /* wronly stream to a special device, handle is O_WRONLY */
-  begin_system_call();
-  var ssize_t result = fd_read(handle,buff,strm_buffered_bufflen,persev);
-  end_system_call();
+  pin_unprotect_varobject(BufferedStream_buffer(stream),PROT_READ_WRITE);
+  pushSTACK(stream);
+  var ssize_t result;
+  GC_SAFE_SYSTEM_CALL(result=, fd_read(handle,buff,strm_buffered_bufflen,persev));
+  stream = popSTACK();
+  unpin_varobject(BufferedStream_buffer(stream));
   if (result<0)               /* error occurred? */
     OS_filestream_error(stream);
   if (result==0 && error_eof_p())
@@ -6040,54 +6200,56 @@ local uintL low_fill_buffered_handle (object stream, perseverance_t persev) {
   return result;
 }
 
-# Functions for writing the buffer.
-# low_flush_buffered_handle(stream,bufflen);
-# buffered_flush(stream);
-# These are called only if the buffer is modified.
-# Of course, the buffer is modified only by the WRITE-BYTE/WRITE-CHAR
-# operations.
+/* Functions for writing the buffer.
+ low_flush_buffered_handle(stream,bufflen);
+ buffered_flush(stream);
+ These are called only if the buffer is modified.
+ Of course, the buffer is modified only by the WRITE-BYTE/WRITE-CHAR
+ operations. */
 
-# UP: Finishes the Writing-Back of the Buffers.
-# low_flush_buffered_handle(stream,bufflen);
-# > stream : (open) Byte-based File-Stream.
-# > bufflen : Number of Bytes to be written
-# < modified_flag of stream : deleted
-# changed in stream: index
-local void low_flush_buffered_handle (object stream, uintL bufflen) {
-  begin_system_call();
-  var ssize_t result =          /* write Buffer */
-    full_write(TheHandle(BufferedStream_channel(stream)),
-               BufferedStream_buffer_address(stream,0),
-               bufflen);
-  if (result==bufflen) { # everything written correctly
-    end_system_call(); BufferedStream_modified(stream) = false;
-  } else { # not everything written
+/* UP: Finishes the Writing-Back of the Buffers.
+ low_flush_buffered_handle(stream,bufflen);
+ > stream : (open) Byte-based File-Stream.
+ > bufflen : Number of Bytes to be written
+ < modified_flag of stream : deleted
+ changed in stream: index */
+local maygc void low_flush_buffered_handle (object stream, uintL bufflen) {
+  var Handle handle = TheHandle(BufferedStream_channel(stream));
+  var uintB* buff = BufferedStream_buffer_address(stream,0);
+  pin_unprotect_varobject(BufferedStream_buffer(stream),PROT_READ);
+  pushSTACK(stream);
+  var ssize_t result;
+  GC_SAFE_SYSTEM_CALL(result=, full_write(handle,buff,bufflen));
+  stream = popSTACK();
+  unpin_varobject(BufferedStream_buffer(stream));
+  if (result==bufflen) { /* everything written correctly */
+    BufferedStream_modified(stream) = false;
+  } else { /* not everything written */
     #ifdef UNIX
-    if (result<0) # error occurred?
+    if (result<0) /* error occurred? */
       #ifdef ENOSPC
       if (!(errno == ENOSPC))
       #endif
         #ifdef EDQUOT
         if (!(errno == EDQUOT))
         #endif
-          { end_system_call(); OS_filestream_error(stream); }
+          { OS_filestream_error(stream); }
     #endif
     #if defined(WIN32_NATIVE)
-    if (result<0) { # error occurred?
-      end_system_call(); OS_filestream_error(stream);
+    if (result<0) { /* error occurred? */
+      OS_filestream_error(stream);
     }
     #endif
-    end_system_call();
-    # Not everything was written, probably because of full disk.
-    # In order to avoid inconsistencies, must close the file.
-    BufferedStream_modified(stream) = false; # data is lost!
+    /* Not everything was written, probably because of full disk.
+     In order to avoid inconsistencies, must close the file. */
+    BufferedStream_modified(stream) = false; /* data is lost! */
     pushSTACK(stream);
     builtin_stream_close(&STACK_0,0); /* file close */
-    clr_break_sem_4(); # no more UNIX operations are active
-    # Report the error.
-    pushSTACK(Truename_or_Self(STACK_0)); # FILE-ERROR slot PATHNAME
-    pushSTACK(STACK_(0+1)); # stream
-    fehler(file_error,GETTEXT("Closed ~S because disk is full."));
+    clr_break_sem_4(); /* no more UNIX operations are active */
+    /* Report the error. */
+    pushSTACK(Truename_or_Self(STACK_0)); /* FILE-ERROR slot PATHNAME */
+    pushSTACK(STACK_(0+1)); /* stream */
+    error(file_error,GETTEXT("Closed ~S because disk is full."));
   }
 }
 
@@ -6096,17 +6258,20 @@ local void low_flush_buffered_handle (object stream, uintL bufflen) {
     BufferedStreamLow_flush(stream) = &low_flush_buffered_handle; \
   }
 
-# UP: Writes the modified Buffer back.
-# buffered_flush(stream);
-# > stream : (open) Byte-based File-Stream.
-# < modified_flag of stream : deleted
-# changed in stream: index
-local void buffered_flush (object stream) {
+/* UP: Writes the modified Buffer back.
+ buffered_flush(stream);
+ > stream : (open) Byte-based File-Stream.
+ < modified_flag of stream : deleted
+ changed in stream: index */
+local maygc void buffered_flush (object stream) {
   if (BufferedStream_blockpositioning(stream)) {
-    begin_system_call();
-    handle_lseek(stream,BufferedStream_channel(stream),
-                 BufferedStream_buffstart(stream),SEEK_SET,); # positioning back
-    end_system_call();
+    var Handle handle = TheHandle(BufferedStream_channel(stream));
+    var uoff_t buffstart = BufferedStream_buffstart(stream);
+    pushSTACK(stream);
+    begin_blocking_system_call();
+    handle_lseek(&STACK_0,handle,buffstart,SEEK_SET,); /* positioning back */
+    end_blocking_system_call();
+    stream = popSTACK();
   }
   BufferedStreamLow_flush(stream)(stream,BufferedStream_endvalid(stream));
 }
@@ -6121,24 +6286,30 @@ local void buffered_flush (object stream) {
                  be read or written)
             else Pointer to the next Byte (can be read or written)
  changed in stream: index, endvalid, have_eof_p, buffstart */
-local uintB* buffered_nextbyte (object stream, perseverance_t persev) {
+local maygc uintB* buffered_nextbyte (object stream, perseverance_t persev) {
   var sintL endvalid = BufferedStream_endvalid(stream);
   var uintL index = BufferedStream_index(stream);
   if ((endvalid == index) && !BufferedStream_have_eof_p(stream)) {
+    pushSTACK(stream);
     /* Buffer must be newly filled. */
-    if (BufferedStream_modified(stream))
+    if (BufferedStream_modified(stream)) {
       /* First, the Buffer must be flushed out: */
       buffered_flush(stream); /* FIXME: buffered_flush() may hang! */
+      stream = STACK_0; /* flush maygc */
+    }
     BufferedStream_buffstart(stream) += endvalid;
     var uintL result;
     if (BufferedStream_blockpositioning(stream)
         || (TheStream(stream)->strmflags & strmflags_rd_B)) {
       result = BufferedStreamLow_fill(stream)(stream,persev);
+      stream = popSTACK(); /* fill maygc */
       if (result == 0 && !BufferedStream_have_eof_p(stream)
           && persev != persev_partial)
         return (uintB*)-1; /* would hang */
-    } else
+    } else {
+      skipSTACK(1); /* saved stream */
       result = 0;
+    }
     BufferedStream_index(stream) = index = 0;
     BufferedStream_modified(stream) = false;
     BufferedStream_endvalid(stream) = endvalid = result;
@@ -6148,175 +6319,199 @@ local uintB* buffered_nextbyte (object stream, perseverance_t persev) {
   if (index < endvalid)
     return BufferedStream_buffer_address(stream,index);
   else if (BufferedStream_have_eof_p(stream))
-    return (uintB*)NULL; # EOF reached
+    return (uintB*)NULL; /* EOF reached */
   else
     NOTREACHED;
 }
 
-# UP: Prepares the writing of a Byte at EOF.
-# buffered_eofbyte(stream);
-# > stream : (open) Byte-based File-Stream, for which
-#            currently  buffered_nextbyte(stream)==NULL  is true.
-# < result : Pointer to the next (free) Byte
-# changed in stream: index, endvalid, buffstart
-local uintB* buffered_eofbyte (object stream) {
-  # EOF.  endvalid=index.
+/* UP: Prepares the writing of a Byte at EOF.
+ buffered_eofbyte(stream);
+ > stream : (open) Byte-based File-Stream, for which
+            currently  buffered_nextbyte(stream)==NULL  is true.
+ < result : Pointer to the next (free) Byte
+ changed in stream: index, endvalid, buffstart */
+local maygc uintB* buffered_eofbyte (object stream) {
+  /* EOF.  endvalid=index. */
   ASSERT(BufferedStream_have_eof_p(stream));
   if (BufferedStream_endvalid(stream) == strm_buffered_bufflen) {
-    # Buffer must be filled newly. Because after that EOF will occur anyway,
-    # it is sufficient, to flush the Buffer out:
-    if (BufferedStream_modified(stream))
+    /* Buffer must be filled newly. Because after that EOF will occur anyway,
+     it is sufficient, to flush the Buffer out: */
+    if (BufferedStream_modified(stream)) {
+      pushSTACK(stream);
       buffered_flush(stream);
+      stream = popSTACK();
+    }
     BufferedStream_buffstart(stream) += strm_buffered_bufflen;
     BufferedStream_endvalid(stream) = 0;
-    BufferedStream_index(stream) = 0; # index := 0
-    BufferedStream_modified(stream) = false; # unmodified
+    BufferedStream_index(stream) = 0; /* index := 0 */
+    BufferedStream_modified(stream) = false; /* unmodified */
   }
-  # increase endvalid:
+  /* increase endvalid: */
   BufferedStream_endvalid(stream) += 1;
   return BufferedStream_buffer_address(stream,BufferedStream_index(stream));
 }
 
-# UP: Writes a Byte to a Byte-based File-Stream.
-# buffered_writebyte(stream,b);
-# > stream : (open) Byteblock-based File-Stream.
-# > b : Byte to be written
-# changed in stream: index, endvalid, buffstart
-local void buffered_writebyte (object stream, uintB b) {
+/* UP: Writes a Byte to a Byte-based File-Stream.
+ buffered_writebyte(stream,b);
+ > stream : (open) Byteblock-based File-Stream.
+ > b : Byte to be written
+ changed in stream: index, endvalid, buffstart */
+local maygc void buffered_writebyte (object stream, uintB b) {
+  pushSTACK(stream);
   var uintB* ptr = buffered_nextbyte(stream,persev_partial);
+  stream = STACK_0;
   if (!(ptr == (uintB*)NULL)) {
-    if (*ptr == b) # no real Modification?
+    if (*ptr == b) /* no real Modification? */
       goto no_modification;
   } else {
-    ptr = buffered_eofbyte(stream); # EOF -> make room for 1 Byte
+    ptr = buffered_eofbyte(stream); /* EOF -> make room for 1 Byte */
+    stream = STACK_0;
   }
-  # write next Byte in the Buffer:
+  /* write next Byte in the Buffer: */
   *ptr = b; BufferedStream_modified(stream) = true;
  no_modification:
-  # increment index
+  skipSTACK(1);
+  /* increment index */
   BufferedStream_index(stream) += 1;
 }
 
-# File-Stream, Byte-based (b_file)
-# ===========  ==========
+/* File-Stream, Byte-based (b_file)
+   ===========  ==========
 
-# error-message because of positioning behind EOF.
-# fehler_position_beyond_EOF(stream);
-nonreturning_function(local, fehler_position_beyond_EOF, (object stream)) {
-  pushSTACK(Truename_or_Self(stream)); # FILE-ERROR slot PATHNAME
+ error-message because of positioning behind EOF.
+ error_position_beyond_EOF(stream); */
+nonreturning_function(local, error_position_beyond_EOF, (object stream)) {
+  pushSTACK(Truename_or_Self(stream)); /* FILE-ERROR slot PATHNAME */
   pushSTACK(stream);
-  fehler(file_error,GETTEXT("cannot position ~S beyond EOF"));
+  error(file_error,GETTEXT("cannot position ~S beyond EOF"));
 }
 
-# UP: Positions an (open) Byte-based File-Stream to a
-# specified Position.
-# position_file_buffered(stream,position);
-# > stream : (open) Byte-based File-Stream.
-# > position : new Position
-# changed in stream: index, endvalid, buffstart
-local void position_file_buffered (object stream, uoff_t position) {
-  # Is the new Position in the same Sector?
+/* UP: Positions an (open) Byte-based File-Stream to a
+ specified Position.
+ position_file_buffered(stream,position);
+ > stream : (open) Byte-based File-Stream.
+ > position : new Position
+ changed in stream: index, endvalid, buffstart */
+local maygc void position_file_buffered (object stream, uoff_t position) {
+  /* Is the new Position in the same Sector? */
   {
     var uintL endvalid = BufferedStream_endvalid(stream);
     var uoff_t newindex = position - BufferedStream_buffstart(stream);
-    if (newindex <= endvalid) { # yes -> only index has to be changed:
+    if (newindex <= endvalid) { /* yes -> only index has to be changed: */
       BufferedStream_index(stream) = newindex;
       return;
     }
   }
-  # poss. flush Buffer:
-  if (BufferedStream_modified(stream))
+  pushSTACK(stream);
+  /* poss. flush Buffer: */
+  if (BufferedStream_modified(stream)) {
     buffered_flush(stream);
-  # Now modified_flag is deleted.
-  if (!BufferedStream_blockpositioning(stream)) { # Positioning:
-    begin_system_call();
-    handle_lseek(stream,BufferedStream_channel(stream),position,SEEK_SET,);
-    end_system_call();
+    stream = STACK_0; /* restore stream in case of GC during blocking*/
+  }
+  var Handle handle = TheHandle(BufferedStream_channel(stream));
+  /* Now modified_flag is deleted. */
+  if (!BufferedStream_blockpositioning(stream)) { /* Positioning: */
+    begin_blocking_system_call();
+    handle_lseek(&STACK_0,handle,position,SEEK_SET,);
+    end_blocking_system_call();
+    stream = STACK_0;
     BufferedStream_buffstart(stream) = position;
     BufferedStream_endvalid(stream) = 0;
-    BufferedStream_index(stream) = 0; # index := 0
-    BufferedStream_modified(stream) = false; # unmodified
+    BufferedStream_index(stream) = 0; /* index := 0 */
+    BufferedStream_modified(stream) = false; /* unmodified */
     BufferedStream_have_eof_p(stream) = false;
   } else {
     var uoff_t oldposition = BufferedStream_buffstart(stream) + BufferedStream_index(stream);
-    # Positioning:
+    /* Positioning: */
     {
       var uoff_t newposition;
-      begin_system_call();
-      handle_lseek(stream,BufferedStream_channel(stream),
+      begin_blocking_system_call();
+      handle_lseek(&STACK_0,handle,
                    floor(position,strm_buffered_bufflen)*strm_buffered_bufflen,
                    SEEK_SET,newposition=);
-      end_system_call();
+      end_blocking_system_call();
+      stream = STACK_0;
       BufferedStream_buffstart(stream) = newposition;
     }
-    # read Sector:
+    /* read Sector: */
     BufferedStream_endvalid(stream) = 0;
-    BufferedStream_index(stream) = 0; # index := 0
-    BufferedStream_modified(stream) = false; # unmodified
+    BufferedStream_index(stream) = 0; /* index := 0 */
+    BufferedStream_modified(stream) = false; /* unmodified */
     BufferedStream_have_eof_p(stream) = false;
-    var uintL newindex = position % strm_buffered_bufflen; # desired Index in the Sector
-    if (newindex!=0) { # Position between Sectors -> nothing needs to be read
+    var uintL newindex = position % strm_buffered_bufflen; /* desired Index in the Sector */
+    if (newindex!=0) { /* Position between Sectors -> nothing needs to be read */
       buffered_nextbyte(stream,persev_partial);
+      stream = STACK_0;
       /* index=0; set index to (position mod bufflen), but check first: */
       var uintL endvalid = BufferedStream_endvalid(stream);
-      # newindex must be in the valid range
+      /* newindex must be in the valid range */
       if (newindex > endvalid) {
-        # Error. But first position back to the old Position:
+        /* Error. But first position back to the old Position: */
         check_SP();
-        position_file_buffered(stream,oldposition); # position back
-        fehler_position_beyond_EOF(stream);
+        position_file_buffered(stream,oldposition); /* position back */
+        stream = popSTACK(); /* error will not return */
+        error_position_beyond_EOF(stream);
       }
       BufferedStream_index(stream) = newindex;
     }
   }
+  skipSTACK(1);
 }
 
-# UP: flushes pending write (if any), moves OS file pointer so
-# that there's no more preread data in the buffer to use the handle.
-# sync_file_buffered(stream,position);
-# > stream : (open) Byte-based File-Stream.
-# changed in stream: index, endvalid, buffstart
-local void sync_file_buffered (object stream) {
+/* UP: flushes pending write (if any), moves OS file pointer so
+ that there's no more preread data in the buffer to use the handle.
+ sync_file_buffered(stream,position);
+ > stream : (open) Byte-based File-Stream.
+ changed in stream: index, endvalid, buffstart */
+local maygc void sync_file_buffered (object stream) {
   var uoff_t position = BufferedStream_buffstart(stream)+BufferedStream_index(stream);
-  # poss. flush Buffer:
-  if (BufferedStream_modified(stream))
+  var Handle handle = TheHandle(BufferedStream_channel(stream));
+  pushSTACK(stream);
+  /* poss. flush Buffer: */
+  if (BufferedStream_modified(stream)) {
     buffered_flush(stream);
-  # Now modified_flag is deleted.
-  begin_system_call();
-  handle_lseek(stream,BufferedStream_channel(stream),position,SEEK_SET,);
-  end_system_call();
-  # ampy: don't respect blockpositioning, acceptable ?
+    stream = STACK_0;
+  }
+  /* Now modified_flag is deleted. */
+  begin_blocking_system_call();
+  handle_lseek(&STACK_0,handle,position,SEEK_SET,);
+  end_blocking_system_call();
+  stream = popSTACK();
+  /* ampy: don't respect blockpositioning, acceptable ? */
   BufferedStream_buffstart(stream) = position;
   BufferedStream_endvalid(stream) = 0;
-  BufferedStream_index(stream) = 0; # index == endvalid, next read will refill the buffer
-  BufferedStream_modified(stream) = false; # unmodified
+  BufferedStream_index(stream) = 0; /* index == endvalid, next read will refill the buffer */
+  BufferedStream_modified(stream) = false; /* unmodified */
   BufferedStream_have_eof_p(stream) = false;
 }
 
-# UP: Reads an Array of Bytes from an (open) Byte-based
-# File-Stream.
-# read_byte_array_buffered(stream,byteptr,len,persev)
-# > stream : (open) Byte-based File-Stream.
-# > byteptr[0..len-1] : place
-# > len : > 0
-# > persev: how to react on incomplete I/O
-# < byteptr[0..count-1] : read Bytes.
-# < result: &byteptr[count] (with count = len, or count < len if EOF reached)
-# changed in stream: index, endvalid, buffstart
-local uintB* read_byte_array_buffered (object stream, uintB* byteptr,
-                                       uintL len, perseverance_t persev) {
+/* UP: Reads an Array of Bytes from an (open) Byte-based
+ File-Stream.
+ read_byte_array_buffered(stream,byteptr,len,persev)
+ > stream : (open) Byte-based File-Stream.
+ > byteptr[0..len-1] : place
+ > len : > 0
+ > persev: how to react on incomplete I/O
+ < byteptr[0..count-1] : read Bytes.
+ < result: &byteptr[count] (with count = len, or count < len if EOF reached)
+ changed in stream: index, endvalid, buffstart */
+local maygc uintB* read_byte_array_buffered (object stream, uintB* byteptr,
+                                             uintL len,
+                                             perseverance_t persev) {
+  pushSTACK(stream);
   for (;;) {
     var uintB* ptr = buffered_nextbyte(stream, persev == persev_full ? persev_partial : persev);
     if (ptr == (uintB*)NULL || ptr == (uintB*)-1)
       break;
+    stream = STACK_0; /* restore stream */
     var uintL endvalid = BufferedStream_endvalid(stream);
     var uintL available = endvalid - BufferedStream_index(stream);
     if (available > len)
       available = len;
-    # copy all available bytes:
+    /* copy all available bytes: */
     copy_mem_b(byteptr,ptr,available);
     byteptr += available;
-    # increment index:
+    /* increment index: */
     BufferedStream_index(stream) += available;
     len -= available;
     if (len == 0)
@@ -6326,56 +6521,60 @@ local uintB* read_byte_array_buffered (object stream, uintB* byteptr,
         persev = persev_bonus;
       #if defined(UNIX) || defined(WIN32_NATIVE)
       if (persev == persev_immediate || persev == persev_bonus)
-        # There's no need to continue the loop, with persev_immediate or
-        # persev_bonus, because if read() has returned a partial result, it
-        # means that nothing more is immediately available. (The OS doesn't
-        # gratuitously return less bytes to read() than available. Except when
-        # the system call was interrupted by a signal; but this can't happen
-        # because install_signal_handler() is careful to ensure restartable
-        # system calls.)
+        /* There's no need to continue the loop, with persev_immediate or
+         persev_bonus, because if read() has returned a partial result, it
+         means that nothing more is immediately available. (The OS doesn't
+         gratuitously return less bytes to read() than available. Except when
+         the system call was interrupted by a signal; but this can't happen
+         because install_signal_handler() is careful to ensure restartable
+         system calls.) */
         break;
       #endif
     }
   }
+  skipSTACK(1);
   return byteptr;
 }
 
-# UP: Writes an Array of Bytes to an (open) Byte-based
-# File-Stream.
-# write_byte_array_buffered(stream,byteptr,len,persev)
-# > stream : (open) Byte-based File-Stream.
-# > byteptr[0..len-1] : Bytes to be written.
-# > len : > 0
-# > persev: how to react on incomplete I/O
-# < result: &byteptr[len]
-# changed in stream: index, endvalid, buffstart
-local const uintB* write_byte_array_buffered (object stream,
-                                              const uintB* byteptr,
-                                              uintL len, perseverance_t persev) {
+/* UP: Writes an Array of Bytes to an (open) Byte-based
+ File-Stream.
+ write_byte_array_buffered(stream,byteptr,len,persev)
+ > stream : (open) Byte-based File-Stream.
+ > byteptr[0..len-1] : Bytes to be written.
+ > len : > 0
+ > persev: how to react on incomplete I/O
+ < result: &byteptr[len]
+ changed in stream: index, endvalid, buffstart */
+local maygc const uintB* write_byte_array_buffered (object stream,
+                                                    const uintB* byteptr,
+                                                    uintL len,
+                                                    perseverance_t persev) {
   var uintL remaining = len;
   var uintB* ptr;
-  for (;;) { # still remaining>0 Bytes to be filled.
+  pushSTACK(stream);
+  for (;;) { /* still remaining>0 Bytes to be filled. */
     ptr = buffered_nextbyte(stream, persev == persev_full ? persev_partial : persev);
+    stream = STACK_0;
     if (ptr == (uintB*)NULL)
       goto eof_reached;
     if (ptr == (uintB*)-1) return byteptr;
     var uintL endvalid = BufferedStream_endvalid(stream);
-    var uintL next = # as many as still fit in the Buffer or until EOF
-      endvalid - BufferedStream_index(stream); # > 0 !
+    var uintL next = /* as many as still fit in the Buffer or until EOF */
+      endvalid - BufferedStream_index(stream); /* > 0 ! */
     if (next > remaining)
       next = remaining;
-    { # copy next Bytes in the Buffer:
+    { /* copy next Bytes in the Buffer: */
       var uintL count;
       dotimespL(count,next, {
-        var uintB b = *byteptr++; # next Byte
+        var uintB b = *byteptr++; /* next Byte */
         if (!(*ptr == b)) {
-          *ptr = b; BufferedStream_modified(stream) = true; # in the Buffer
+          *ptr = b; BufferedStream_modified(stream) = true; /* in the Buffer */
         }
         ptr++;
       });
     }
     remaining = remaining - next;
-    # increment index
+    /* increment index */
     BufferedStream_index(stream) += next;
     if (remaining == 0)
       break;
@@ -6384,67 +6583,71 @@ local const uintB* write_byte_array_buffered (object stream,
         persev = persev_bonus;
       #if defined(UNIX) || defined(WIN32_NATIVE)
       if (persev == persev_immediate || persev == persev_bonus)
-        # There's no need to continue the loop, with persev_immediate or
-        # persev_bonus, because if write() has returned a partial result, it
-        # means that nothing more is immediately accepted. (The OS doesn't
-        # gratuitously return less bytes to write() than it can. Except when
-        # the system call was interrupted by a signal; but this can't happen
-        # because install_signal_handler() is careful to ensure restartable
-        # system calls.)
+        /* There's no need to continue the loop, with persev_immediate or
+         persev_bonus, because if write() has returned a partial result, it
+         means that nothing more is immediately accepted. (The OS doesn't
+         gratuitously return less bytes to write() than it can. Except when
+         the system call was interrupted by a signal; but this can't happen
+         because install_signal_handler() is careful to ensure restartable
+         system calls.) */
         break;
       #endif
     }
   }
   if (false) {
-  eof_reached: # Write at EOF, endvalid = index
-    do { # Still remaining>0 Bytes to file.
-      var uintL next = # as many as there is still room in the Buffer
+  eof_reached: /* Write at EOF, endvalid = index */
+    do { /* Still remaining>0 Bytes to file. */
+      var uintL next = /* as many as there is still room in the Buffer */
         strm_buffered_bufflen - BufferedStream_index(stream);
       if (next==0) {
-        # Buffer must be filled newly. After that, EOF arrives anyway,
-        # so it is sufficient to flush the buffer:
-        if (BufferedStream_modified(stream))
+        /* Buffer must be filled newly. After that, EOF arrives anyway,
+         so it is sufficient to flush the buffer: */
+        if (BufferedStream_modified(stream)) {
           buffered_flush(stream);
+          stream = STACK_0;
+        }
         BufferedStream_buffstart(stream) += strm_buffered_bufflen;
         BufferedStream_endvalid(stream) = 0;
-        BufferedStream_index(stream) = 0; # index := 0
-        BufferedStream_modified(stream) = false; # unmodified
-        # Then try again:
+        BufferedStream_index(stream) = 0; /* index := 0 */
+        BufferedStream_modified(stream) = false; /* unmodified */
+        /* Then try again: */
         next = strm_buffered_bufflen;
       }
       if (next > remaining)
         next = remaining;
-      # copy the next bytes in the buffer:
+      /* copy the next bytes in the buffer: */
       copy_mem_b(BufferedStream_buffer_address(stream,BufferedStream_index(stream)),
                  byteptr,next);
       byteptr += next;
       BufferedStream_modified(stream) = true;
       remaining = remaining - next;
-      # increment index and endvalid
+      /* increment index and endvalid */
       BufferedStream_index(stream) += next;
       BufferedStream_endvalid(stream) += next;
     } while (remaining != 0);
   }
+  skipSTACK(1);
   return byteptr;
 }
 
-# File-Stream of Characters
-# ==========================
+/* File-Stream of Characters
+   ==========================
 
-# Input side
-# ----------
+ Input side
+ ----------
 
-# READ-CHAR - Pseudo-Function for File-Streams of Characters
-local object rd_ch_buffered (const gcv_object_t* stream_) {
+ READ-CHAR - Pseudo-Function for File-Streams of Characters */
+local maygc object rd_ch_buffered (const gcv_object_t* stream_) {
+ rd_ch_buffered_retry:
+  var uintB* bufferptr = buffered_nextbyte(*stream_,persev_partial);
   var object stream = *stream_;
-  var uintB* bufferptr = buffered_nextbyte(stream,persev_partial);
-  if (bufferptr == (uintB*)NULL) # EOF ?
+  if (bufferptr == (uintB*)NULL) /* EOF ? */
     return eof_value;
-  # fetch next character:
+  /* fetch next character: */
   var chart c;
-  #ifdef UNICODE
+  #ifdef ENABLE_UNICODE
   var object encoding = TheStream(stream)->strm_encoding;
-  { # Does the buffer contain a complete character?
+  { /* Does the buffer contain a complete character? */
     var uintL endvalid = BufferedStream_endvalid(stream);
     var uintL available = endvalid - BufferedStream_index(stream);
     var const uintB* bptr = bufferptr;
@@ -6453,36 +6656,37 @@ local object rd_ch_buffered (const gcv_object_t* stream_) {
       (encoding,stream,&bptr,bufferptr+available,&cptr,&c+1);
     if (cptr == &c+1) {
       var uintL n = bptr-bufferptr;
-      # increment index and position
+      /* increment index and position */
       BufferedStream_index(stream) += n;
       BufferedStream_position(stream) += n;
     } else {
       var uintB buf[max_bytes_per_chart];
       var uintL buflen = 0;
-      loop {
+      pushSTACK(encoding);
+      while (1) {
         ASSERT(buflen < max_bytes_per_chart);
         buf[buflen++] = *bufferptr;
-        # increment index and position
+        /* increment index and position */
         BufferedStream_index(stream) += 1;
         BufferedStream_position(stream) += 1;
         var const uintB* bptr = &buf[0];
         var chart* cptr = &c;
         Encoding_mbstowcs(encoding)(encoding,stream,&bptr,&buf[buflen],&cptr,cptr+1);
         if (cptr == &c) {
-          # Not a complete character.
-          # Shift the buffer
+          /* Not a complete character.
+           Shift the buffer */
           if (!(bptr == &buf[0])) {
             var const uintB* ptr1 = bptr;
             var uintB* ptr2 = &buf[0];
-            until (ptr1 == &buf[buflen]) { *ptr2++ = *ptr1++; }
+            while (ptr1 != &buf[buflen]) { *ptr2++ = *ptr1++; }
             buflen = ptr2 - &buf[0];
           }
         } else {
-          # Read a complete character.
+          /* Read a complete character. */
           if (!(bptr == &buf[buflen])) {
-            # At most one lookahead byte. Make it unread.
+            /* At most one lookahead byte. Make it unread. */
             ASSERT(bptr == &buf[buflen-1]);
-            # decrement index and position again:
+            /* decrement index and position again: */
             BufferedStream_index(stream) -= 1;
             BufferedStream_position(stream) -= 1;
           }
@@ -6491,26 +6695,26 @@ local object rd_ch_buffered (const gcv_object_t* stream_) {
         bufferptr = buffered_nextbyte(stream,persev_partial);
         if (bufferptr == (uintB*)NULL)
           return eof_value;
+        stream = *stream_; /* restore stream */
+        encoding = STACK_0;
       }
+      skipSTACK(1);
     }
   }
   #else
-  c = as_chart(*bufferptr); # Character from the Buffer
-  # increment index and position
+  c = as_chart(*bufferptr); /* Character from the Buffer */
+  /* increment index and position */
   BufferedStream_index(stream) += 1;
   BufferedStream_position(stream) += 1;
   #endif
   if (chareq(c,ascii(NL))) {
+    if (ChannelStream_ignore_next_LF(stream)) {
+      ChannelStream_ignore_next_LF(stream) = false;
+      goto rd_ch_buffered_retry;
+    }
     ChannelStream_lineno(stream) += 1;
   } else if (chareq(c,ascii(CR))) {
-    # check next character for LF
-    bufferptr = buffered_nextbyte(stream,persev_partial);
-    # FIXME: This is wrong. It assumes an ASCII compatible encoding.
-    if ((bufferptr != NULL) && chareq(as_chart(*bufferptr),ascii(LF))) {
-      # increment index and position
-      BufferedStream_index(stream) += 1;
-      BufferedStream_position(stream) += 1;
-    }
+    ChannelStream_ignore_next_LF(stream) = true;
     c = ascii(NL);
     ChannelStream_lineno(stream) += 1;
   }
@@ -6520,36 +6724,59 @@ local object rd_ch_buffered (const gcv_object_t* stream_) {
 /* Determines, if a character is available on a File-Stream.
  listen_char_buffered(stream)
  > stream: File-Stream of Characters
- < result:   ls_avail if a character is available,
-             ls_eof   if EOF is reached,
-             ls_wait  if no character is available, but not because of EOF */
-local signean listen_char_buffered (object stream) {
-  uintB* buf = buffered_nextbyte(stream,persev_immediate);
-  if (buf == (uintB*)NULL) return ls_eof; /* EOF */
-  if (buf == (uintB*)-1)   return ls_wait; /* will hang */
-  /* In case of UNICODE, the presence of a byte does not guarantee the
-   presence of a multi-byte character. Returning ls_avail here is
+ < result: input availability */
+local maygc listen_t listen_char_buffered (object stream) {
+ listen_char_buffered_retry:
+  pushSTACK(stream);
+  var uintB* buf = buffered_nextbyte(stream,persev_immediate);
+  stream = popSTACK();
+  if (buf == (uintB*)NULL) return LISTEN_EOF; /* EOF */
+  if (buf == (uintB*)-1)   return LISTEN_WAIT; /* will hang */
+  if (*buf == '\n' && ChannelStream_ignore_next_LF(stream)) { /* discard LF */
+    /* assume that '\n' is LF in all encodings */
+    BufferedStream_index(stream) += 1;
+    BufferedStream_position(stream) += 1;
+    ChannelStream_ignore_next_LF(stream) = false;
+    goto listen_char_buffered_retry;
+    /* we might extract rd_ch_buffered_low from above instead,
+       but it seems too much work for little gain */
+  }
+  /* In case of ENABLE_UNICODE, the presence of a byte does not guarantee the
+   presence of a multi-byte character. Returning LISTEN_AVAIL here is
    therefore not correct. But this doesn't matter since programs seeing
-   ls_avail will call read-char, and this will do the right thing anyway. */
-  return ls_avail;
+   LISTEN_AVAIL will call read-char, and this will do the right thing anyway. */
+  return LISTEN_AVAIL;
 }
 
-# READ-CHAR-ARRAY - Pseudo-Function for File-Streams of Characters:
-local uintL rd_ch_array_buffered (const gcv_object_t* stream_,
-                                  const gcv_object_t* chararray_,
-                                  uintL start, uintL len) {
+/* UP: discard already entered input from a Buffered Stream.
+ clear_input_buffered(stream);
+ > stream: Buffered Stream
+ < result: true if Input was deleted, else false */
+local maygc bool clear_input_buffered (object stream) {
+  bool ret = BufferedStream_have_eof_p(stream);
+  BufferedStream_have_eof_p(stream) = false;
+  return ret;
+}
+
+/* READ-CHAR-ARRAY - Pseudo-Function for File-Streams of Characters: */
+local maygc uintL rd_ch_array_buffered (const gcv_object_t* stream_,
+                                        const gcv_object_t* chararray_,
+                                        uintL start, uintL len) {
   var object stream = *stream_;
-  #ifdef UNICODE
+  #ifdef ENABLE_UNICODE
   #define tmpbufsize 4096
   var uintL end = start+len;
   var uintL currindex = start;
   var object encoding = TheStream(stream)->strm_encoding;
-  loop {
+  pushSTACK(encoding);
+  while (1) {
     var uintL startindex = currindex;
     var uintB* bufferptr = buffered_nextbyte(stream,persev_partial);
-    if (bufferptr == (uintB*)NULL) # EOF -> finished
+    stream = *stream_; /* restore */
+    encoding = STACK_0;
+    if (bufferptr == (uintB*)NULL) /* EOF -> finished */
       break;
-    { # Read as many complete characters from the buffer as possible.
+    { /* Read as many complete characters from the buffer as possible. */
       var uintL endvalid = BufferedStream_endvalid(stream);
       var uintL available = endvalid - BufferedStream_index(stream);
       var const uintB* bptr = bufferptr;
@@ -6560,56 +6787,60 @@ local uintL rd_ch_array_buffered (const gcv_object_t* stream_,
          &tmpbuf[end-currindex < tmpbufsize ? end-currindex : tmpbufsize]);
       if (!(cptr == &tmpbuf[0])) {
         var uintL n = bptr-bufferptr;
-        # increment index and position
+        /* increment index and position */
         BufferedStream_index(stream) += n;
         BufferedStream_position(stream) += n;
-        # store the read characters
+        /* store the read characters */
         sstring_store_array(*chararray_,currindex,tmpbuf,cptr-&tmpbuf[0]);
         currindex += cptr-&tmpbuf[0];
         stream = *stream_;
+        encoding = STACK_0;
       } else {
         var uintB buf[max_bytes_per_chart];
         var uintL buflen = 0;
-        loop {
+        while (1) {
           ASSERT(buflen < max_bytes_per_chart);
           buf[buflen++] = *bufferptr;
-          # increment index and position
+          /* increment index and position */
           BufferedStream_index(stream) += 1;
           BufferedStream_position(stream) += 1;
           var const uintB* bptr = &buf[0];
           var chart* cptr = &tmpbuf[0];
           Encoding_mbstowcs(encoding)(encoding,stream,&bptr,&buf[buflen],&cptr,cptr+1);
-          if (cptr == &tmpbuf[0]) { # Not a complete character.
-            # Shift the buffer
+          if (cptr == &tmpbuf[0]) { /* Not a complete character. */
+            /* Shift the buffer */
             if (!(bptr == &buf[0])) {
               var const uintB* ptr1 = bptr;
               var uintB* ptr2 = &buf[0];
-              until (ptr1 == &buf[buflen]) { *ptr2++ = *ptr1++; }
+              while (ptr1 != &buf[buflen]) { *ptr2++ = *ptr1++; }
               buflen = ptr2 - &buf[0];
             }
-          } else { # Read a complete character.
+          } else { /* Read a complete character. */
             if (!(bptr == &buf[buflen])) {
-              # At most one lookahead byte. Make it unread.
+              /* At most one lookahead byte. Make it unread. */
               ASSERT(bptr == &buf[buflen-1]);
-              # decrement index and position again:
+              /* decrement index and position again: */
               BufferedStream_index(stream) -= 1;
               BufferedStream_position(stream) -= 1;
             }
-            # store the read character
+            /* store the read character */
             sstring_store(*chararray_,currindex++,tmpbuf[0]);
             stream = *stream_;
             break;
           }
           bufferptr = buffered_nextbyte(stream,persev_partial);
-          if (bufferptr == (uintB*)NULL) # EOF -> finished
+          stream = *stream_;
+          encoding = STACK_0;
+          if (bufferptr == (uintB*)NULL) /* EOF -> finished */
             break;
         }
-        if (currindex == startindex) # EOF -> finished
+        if (currindex == startindex) /* EOF -> finished */
           break;
       }
     }
-    # Now apply CR/LF->NL and CR->NL conversion to the characters
-    # [startindex..currindex).
+
+    /* Now apply CR/LF->NL and CR->NL conversion to the characters
+     [startindex..currindex). */
     {
       var object chararray = *chararray_;
       sstring_un_realloc(chararray);
@@ -6621,18 +6852,16 @@ local uintL rd_ch_array_buffered (const gcv_object_t* stream_,
         do {
           cintX c = *ptr1++;
           if (chareq(as_chart(c),ascii(NL))) {
+            if (ChannelStream_ignore_next_LF(stream)) {
+              ChannelStream_ignore_next_LF(stream) = false;
+              if (ptr1 == currptr) break; else continue;
+            }
             ChannelStream_lineno(stream) += 1;
           } else if (chareq(as_chart(c),ascii(CR))) {
-            # check next character for LF
+            /* check next character for LF */
             if (ptr1 == currptr) {
-              var uintB* bufferptr = buffered_nextbyte(stream,persev_partial);
-              if ((bufferptr != NULL)
-                  # FIXME: This is wrong. It assumes an ASCII compatible encoding.
-                  && chareq(as_chart(*bufferptr),ascii(LF))) {
-                # increment index and position
-                BufferedStream_index(stream) += 1;
-                BufferedStream_position(stream) += 1;
-              }
+              /* cannot check in this buffer; mark for next. */
+              ChannelStream_ignore_next_LF(stream) = true;
             } else {
               if (chareq(as_chart(*ptr1),ascii(LF)))
                 ptr1++;
@@ -6641,32 +6870,35 @@ local uintL rd_ch_array_buffered (const gcv_object_t* stream_,
             ChannelStream_lineno(stream) += 1;
           }
           *ptr2++ = c;
-        } until (ptr1 == currptr);
+        } while (ptr1 != currptr);
         currindex = ptr2 - &((SstringX)TheVarobject(chararray))->data[0];
       });
     }
     if (currindex == end)
       break;
   }
+  skipSTACK(1); /* encoding */
   return currindex - start;
   #else
   var chart* startptr = &TheSnstring(*chararray_)->data[start];
   var chart* charptr = startptr;
   do {
     var uintB* ptr = buffered_nextbyte(stream,persev_partial);
-    if (ptr == (uintB*)NULL) # EOF -> finished
+    if (ptr == (uintB*)NULL) /* EOF -> finished */
       break;
+    stream = *stream_;
     var chart ch = as_chart(*ptr);
-    # increment index and position
+    /* increment index and position */
     BufferedStream_index(stream) += 1;
     BufferedStream_position(stream) += 1;
     if (chareq(ch,ascii(NL))) {
       ChannelStream_lineno(stream) += 1;
     } else if (chareq(ch,ascii(CR))) {
-      # check next character for LF
+      /* check next character for LF */
       ptr = buffered_nextbyte(stream,persev_partial);
+      stream = *stream_;
       if (!(ptr == (uintB*)NULL) && chareq(as_chart(*ptr),ascii(LF))) {
-        # increment index and position
+        /* increment index and position */
         BufferedStream_index(stream) += 1;
         BufferedStream_position(stream) += 1;
       }
@@ -6679,26 +6911,28 @@ local uintL rd_ch_array_buffered (const gcv_object_t* stream_,
   #endif
 }
 
-# Output side
-# -----------
+/* Output side
+   -----------
 
-# UP: Writes a Byte to a Byte-based File-Stream.
-# write_byte_buffered(stream,b);
-# > stream : (open) Byte-based File-Stream.
-# > b : Byte to be written
-# changed in stream: index, endvalid, buffstart, position
-local void write_byte_buffered (object stream, uintB b) {
+ UP: Writes a Byte to a Byte-based File-Stream.
+ write_byte_buffered(stream,b);
+ > stream : (open) Byte-based File-Stream.
+ > b : Byte to be written
+ changed in stream: index, endvalid, buffstart, position */
+local maygc void write_byte_buffered (object stream, uintB b) {
+  pushSTACK(stream);
   buffered_writebyte(stream,b);
-  # increment position
+  stream = popSTACK();
+  /* increment position */
   BufferedStream_position(stream) += 1;
 }
 
-# WRITE-CHAR - Pseudo-Function for File-Streams of Characters
+/* WRITE-CHAR - Pseudo-Function for File-Streams of Characters */
 local maygc void wr_ch_buffered_unix (const gcv_object_t* stream_, object obj) {
   var object stream = *stream_;
   check_wr_char(stream,obj);
   var chart c = char_code(obj);
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   var uintB buf[max_bytes_per_chart];
   var object encoding = TheStream(stream)->strm_encoding;
   var const chart* cptr = &c;
@@ -6709,15 +6943,16 @@ local maygc void wr_ch_buffered_unix (const gcv_object_t* stream_, object obj) {
   var uintL buflen = bptr-&buf[0];
   if (buflen > 0) {
     write_byte_array_buffered(stream,&buf[0],buflen,persev_full);
-    # increment position
+    stream = *stream_;
+    /* increment position */
     BufferedStream_position(stream) += buflen;
   }
  #else
-  write_byte_buffered(stream,as_cint(c)); # write unchanged
+  write_byte_buffered(stream,as_cint(c)); /* write unchanged */
  #endif
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for File-Streams of Characters:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for File-Streams of Characters: */
 local maygc void wr_ch_array_buffered_unix (const gcv_object_t* stream_,
                                             const gcv_object_t* chararray_,
                                             uintL start, uintL len) {
@@ -6725,38 +6960,42 @@ local maygc void wr_ch_array_buffered_unix (const gcv_object_t* stream_,
   var const chart* charptr;
   unpack_sstring_alloca(*chararray_,len,start, charptr=);
   var const chart* endptr = charptr + len;
- #ifdef UNICODE
+  pin_unprotect_varobject(*chararray_,PROT_READ);
+ #ifdef ENABLE_UNICODE
   #define tmpbufsize 4096
   var uintB tmptmpbuf[tmpbufsize*max_bytes_per_chart];
-  var object encoding = TheStream(stream)->strm_encoding;
   do {
     var uintB* bptr = &tmptmpbuf[0];
+    var object encoding = TheStream(stream)->strm_encoding;
     Encoding_wcstombs(encoding)(encoding,stream,&charptr,endptr,&bptr,
                                 &tmptmpbuf[tmpbufsize*max_bytes_per_chart]);
     var uintL tmptmpbuflen = bptr-&tmptmpbuf[0];
     if (tmptmpbuflen > 0) {
       write_byte_array_buffered(stream,&tmptmpbuf[0],tmptmpbuflen,persev_full);
-      # increment position
+      stream=*stream_;
+      /* increment position */
       BufferedStream_position(stream) += tmptmpbuflen;
     }
-  } until (charptr == endptr);
+  } while (charptr != endptr);
   #undef tmpbufsize
  #else
   write_byte_array_buffered(stream,(const uintB*)charptr,len,persev_full);
-  # increment position
+  stream=*stream_;
+  /* increment position */
   BufferedStream_position(stream) += len;
  #endif
-  wr_ss_lpos(stream,endptr,len); # update Line-Position
+  unpin_varobject(*chararray_);
+  wr_ss_lpos(stream,endptr,len); /* update Line-Position */
 }
 
-# WRITE-CHAR - Pseudo-Function for File-Streams of Characters
+/* WRITE-CHAR - Pseudo-Function for File-Streams of Characters */
 local maygc void wr_ch_buffered_mac (const gcv_object_t* stream_, object obj) {
   var object stream = *stream_;
   check_wr_char(stream,obj);
   var chart c = char_code(obj);
   if (chareq(c,ascii(NL)))
     c = ascii(CR);
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   var uintB buf[max_bytes_per_chart];
   var object encoding = TheStream(stream)->strm_encoding;
   var const chart* cptr = &c;
@@ -6766,27 +7005,27 @@ local maygc void wr_ch_buffered_mac (const gcv_object_t* stream_, object obj) {
   var uintL buflen = bptr-&buf[0];
   if (buflen > 0) {
     write_byte_array_buffered(stream,&buf[0],buflen,persev_full);
-    # increment position
-    BufferedStream_position(stream) += buflen;
+    /* increment position */
+    BufferedStream_position(*stream_) += buflen;
   }
  #else
   write_byte_buffered(stream,as_cint(c));
  #endif
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for File-Streams of Characters:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for File-Streams of Characters: */
 local maygc void wr_ch_array_buffered_mac (const gcv_object_t* stream_,
                                            const gcv_object_t* chararray_,
                                            uintL start, uintL len) {
   var object stream = *stream_;
   var const chart* charptr;
   unpack_sstring_alloca(*chararray_,len,start, charptr=);
- #ifdef UNICODE
-  # Need a temporary buffer for NL->CR translation.
+  pin_unprotect_varobject(*chararray_,PROT_READ);
+ #ifdef ENABLE_UNICODE
+  /* Need a temporary buffer for NL->CR translation. */
   #define tmpbufsize 4096
   var chart tmpbuf[tmpbufsize];
   var uintB tmptmpbuf[tmpbufsize*max_bytes_per_chart];
-  var object encoding = TheStream(stream)->strm_encoding;
   var uintL remaining = len;
   do {
     var uintL n = remaining;
@@ -6803,13 +7042,15 @@ local maygc void wr_ch_array_buffered_mac (const gcv_object_t* stream_,
       });
       var const chart* cptr = tmpbuf;
       var uintB* bptr = &tmptmpbuf[0];
+      var object encoding = TheStream(stream)->strm_encoding;
       Encoding_wcstombs(encoding)(encoding,stream,&cptr,tmpptr,&bptr,
                                   &tmptmpbuf[tmpbufsize*max_bytes_per_chart]);
       ASSERT(cptr == tmpptr);
       var uintL tmptmpbuflen = bptr-&tmptmpbuf[0];
       if (tmptmpbuflen > 0) {
         write_byte_array_buffered(stream,&tmptmpbuf[0],tmptmpbuflen,persev_full);
-        # increment position
+        stream = *stream_;
+        /* increment position */
         BufferedStream_position(stream) += tmptmpbuflen;
       }
     }
@@ -6822,19 +7063,20 @@ local maygc void wr_ch_array_buffered_mac (const gcv_object_t* stream_,
     var chart c = *charptr++;
     if (chareq(c,ascii(NL)))
       c = ascii(CR);
-    write_byte_buffered(stream,as_cint(c));
+    write_byte_buffered(*stream_,as_cint(c));
     remaining--;
-  } until (remaining == 0);
+  } while (remaining != 0);
  #endif
-  wr_ss_lpos(stream,charptr,len); # update Line-Position
+  unpin_varobject(*chararray_);
+  wr_ss_lpos(*stream_,charptr,len); /* update Line-Position */
 }
 
-# WRITE-CHAR - Pseudo-Function for File-Streams of Characters
+/* WRITE-CHAR - Pseudo-Function for File-Streams of Characters */
 local maygc void wr_ch_buffered_dos (const gcv_object_t* stream_, object obj) {
   var object stream = *stream_;
   check_wr_char(stream,obj);
   var chart c = char_code(obj);
-#ifdef UNICODE
+#ifdef ENABLE_UNICODE
   static chart const crlf[2] = { ascii(CR), ascii(LF) };
   var uintB buf[2*max_bytes_per_chart];
   var object encoding = TheStream(stream)->strm_encoding;
@@ -6853,31 +7095,31 @@ local maygc void wr_ch_buffered_dos (const gcv_object_t* stream_, object obj) {
   var uintL buflen = bptr-&buf[0];
   if (buflen > 0) {
     write_byte_array_buffered(stream,&buf[0],buflen,persev_full);
-    # increment position
-    BufferedStream_position(stream) += buflen;
+    /* increment position */
+    BufferedStream_position(*stream_) += buflen;
   }
  #else
   if (chareq(c,ascii(NL))) {
-    write_byte_buffered(stream,CR); write_byte_buffered(stream,LF);
+    write_byte_buffered(stream,CR); write_byte_buffered(*stream_,LF);
   } else {
     write_byte_buffered(stream,as_cint(c));
   }
  #endif
 }
 
-# WRITE-CHAR-ARRAY - Pseudo-Function for File-Streams of Characters:
+/* WRITE-CHAR-ARRAY - Pseudo-Function for File-Streams of Characters: */
 local maygc void wr_ch_array_buffered_dos (const gcv_object_t* stream_,
                                            const gcv_object_t* chararray_,
                                            uintL start, uintL len) {
   var object stream = *stream_;
   var const chart* charptr;
   unpack_sstring_alloca(*chararray_,len,start, charptr=);
- #ifdef UNICODE
-  # Need a temporary buffer for NL->CR translation.
+  pin_unprotect_varobject(*chararray_,PROT_READ);
+ #ifdef ENABLE_UNICODE
+  /* Need a temporary buffer for NL->CR translation. */
   #define tmpbufsize 4096
   var chart tmpbuf[2*tmpbufsize];
   var uintB tmptmpbuf[2*tmpbufsize*max_bytes_per_chart];
-  var object encoding = TheStream(stream)->strm_encoding;
   var uintL remaining = len;
   do {
     var uintL n = remaining;
@@ -6896,12 +7138,14 @@ local maygc void wr_ch_array_buffered_dos (const gcv_object_t* stream_,
       });
       var const chart* cptr = tmpbuf;
       var uintB* bptr = &tmptmpbuf[0];
+      var object encoding = TheStream(stream)->strm_encoding;
       Encoding_wcstombs(encoding)(encoding,stream,&cptr,tmpptr,&bptr,&tmptmpbuf[2*tmpbufsize*max_bytes_per_chart]);
       ASSERT(cptr == tmpptr);
       var uintL tmptmpbuflen = bptr-&tmptmpbuf[0];
       if (tmptmpbuflen > 0) {
         write_byte_array_buffered(stream,&tmptmpbuf[0],tmptmpbuflen,persev_full);
-        # increment position
+        stream = *stream_;
+        /* increment position */
         BufferedStream_position(stream) += tmptmpbuflen;
       }
     }
@@ -6913,26 +7157,27 @@ local maygc void wr_ch_array_buffered_dos (const gcv_object_t* stream_,
   do {
     var chart c = *charptr++;
     if (chareq(c,ascii(NL))) {
-      write_byte_buffered(stream,CR); write_byte_buffered(stream,LF);
+      write_byte_buffered(stream,CR); write_byte_buffered(*stream_,LF);
     } else {
       write_byte_buffered(stream,as_cint(c));
     }
+    stream = *stream_;
     remaining--;
-  } until (remaining == 0);
+  } while (remaining != 0);
  #endif
-  wr_ss_lpos(stream,charptr,len); # update Line-Position
+  unpin_varobject(*chararray_);
+  wr_ss_lpos(stream,charptr,len); /* update Line-Position */
 }
 
-# Macro: Emits a shift sequence to let the output conversion descriptor of an
-# Buffered-Channel-Stream return to the initial state.
-# oconv_unshift_output_buffered(stream);
-# > stream: Buffered-Channel-Stream
-#if defined(UNICODE) && defined(HAVE_GOOD_ICONV)
- #define oconv_unshift_output_buffered(stream)  \
-      if (ChannelStream_oconvdesc(stream) != (iconv_t)0) { \
-        oconv_unshift_output_buffered_(stream);            \
-      }
-local void oconv_unshift_output_buffered_ (object stream) {
+/* Macro: Emits a shift sequence to let the output conversion descriptor of an
+ Buffered-Channel-Stream return to the initial state.
+ oconv_unshift_output_buffered(stream);
+ > stream: Buffered-Channel-Stream */
+#if defined(ENABLE_UNICODE) && defined(HAVE_GOOD_ICONV)
+  #define oconv_unshift_output_buffered(stream,abort)   \
+    ((ChannelStream_oconvdesc(stream) != (iconv_t)0)    \
+     ? oconv_unshift_output_buffered_(stream,abort) : 0)
+local maygc uintB oconv_unshift_output_buffered_ (object stream, uintB abort) {
  #define tmpbufsize 4096
   var uintB tmpbuf[tmpbufsize];
   var char* outptr = (char*)tmpbuf;
@@ -6941,6 +7186,7 @@ local void oconv_unshift_output_buffered_ (object stream) {
   var size_t res =
     iconv(ChannelStream_oconvdesc(stream),NULL,NULL,&outptr,&outsize);
   if (res == (size_t)(-1)) {
+    if (abort) return 1;
     if (OS_errno == E2BIG) {    /* output buffer too small? */
       NOTREACHED;
     } else {
@@ -6950,85 +7196,95 @@ local void oconv_unshift_output_buffered_ (object stream) {
   end_system_call();
   var uintL outcount = outptr-(char*)tmpbuf;
   if (outcount > 0) {
+    pushSTACK(stream);
     write_byte_array_buffered(stream,&tmpbuf[0],outcount,persev_full);
+    stream = popSTACK();
     /* increment position */
     BufferedStream_position(stream) += outcount;
   }
+  return 0;
  #undef tmpbufsize
 }
 #else
- #define oconv_unshift_output_buffered(stream)
+ #define oconv_unshift_output_buffered(stream,abort)  0
 #endif
 
-# File-Stream, Bit-based
-# ========================
+/* File-Stream, Bit-based
+   ========================
 
-# There are 6 types, altogether:
-# Three Cases
-#   a - bitsize divisible by 8,
-#   b - bitsize < 8,
-#   c - bitsize not divisible by 8 and >= 8,
-# distinguished by
-#   s - Element-Type (signed-byte bitsize),
-#       including signed-byte = (signed-byte 8)
-#   u - Element-Type (unsigned-byte bitsize),
-#       including unsigned-byte = (unsigned-byte 8)
-#       and bit = (unsigned-byte 1)
-#       and (mod n) = (unsigned-byte (integer-length n))
+ There are 6 types, altogether:
+ Three Cases
+   a - bitsize divisible by 8,
+   b - bitsize < 8,
+   c - bitsize not divisible by 8 and >= 8,
+ distinguished by
+   s - Element-Type (signed-byte bitsize),
+       including signed-byte = (signed-byte 8)
+   u - Element-Type (unsigned-byte bitsize),
+       including unsigned-byte = (unsigned-byte 8)
+       and bit = (unsigned-byte 1)
+       and (mod n) = (unsigned-byte (integer-length n))
 
-# UP: Positions an (open) Bit-based File-Stream to a
-# specified Position.
-# position_file_i_buffered(stream,position);
-# > stream : (open) Byte-based File-Stream.
-# > position : new (logical) Position
-# changed in stream: index, endvalid, buffstart, bitindex
-local void position_file_i_buffered (object stream, uoff_t position) {
+ UP: Positions an (open) Bit-based File-Stream to a
+ specified Position.
+ position_file_i_buffered(stream,position);
+ > stream : (open) Byte-based File-Stream.
+ > position : new (logical) Position
+ changed in stream: index, endvalid, buffstart, bitindex */
+local maygc void position_file_i_buffered (object stream, uoff_t position) {
   var uintL bitsize = ChannelStream_bitsize(stream);
   var uoff_t position_bits = position * bitsize;
+  pushSTACK(stream);
   if (bitsize < 8)
-    position_bits += sizeof(uintL)*8; # consider Header
-  # position at Bit Number position_bits.
-  position_file_buffered(stream,floor(position_bits,8)); # position to the Byte
-  if ((bitsize % 8) == 0) # For Type a that's all.
+    position_bits += sizeof(uintL)*8; /* consider Header */
+  /* position at Bit Number position_bits. */
+  position_file_buffered(stream,floor(position_bits,8)); /* position to the Byte */
+  stream = STACK_0;
+  if ((bitsize % 8) == 0) /* For Type a that's all. */
     return;
-  if (# Is the addressed position situated in the first byte after EOF ?
+  if (/* Is the addressed position situated in the first byte after EOF ? */
       ((!((position_bits%8)==0))
        && (buffered_nextbyte(stream,persev_partial) == (uintB*)NULL))
-       # Is the addressed position situated in the last byte too far?
+       /* Is the addressed position situated in the last byte too far? */
       || ((bitsize < 8)
-          && (position > BufferedStream_eofposition(stream)))) {
-    # Error. But first position back to the old Position:
+          && (position > BufferedStream_eofposition(STACK_0/*stream*/)))) {
+    /* Error. But first position back to the old Position: */
+    stream = popSTACK();
     var uoff_t oldposition = BufferedStream_position(stream);
     check_SP();
-    position_file_i_buffered(stream,oldposition); # positioning back
-    fehler_position_beyond_EOF(stream);
+    position_file_i_buffered(stream,oldposition); /* positioning back */
+    error_position_beyond_EOF(stream);
   }
+  stream = popSTACK();
   BufferedStream_bitindex(stream) = position_bits%8;
 }
 
-# Input side
-# ----------
+/* Input side
+   ----------
 
-# UP for READ-BYTE on File-Streams of Integers, Type a :
-# Fills the Bitbuffer with the next bitsize Bits.
-# > stream : File-Stream of Integers, Type a
-# > finisher : Routine for Finalization
-# < result : read Integer or eof_value
+ UP for READ-BYTE on File-Streams of Integers, Type a :
+ Fills the Bitbuffer with the next bitsize Bits.
+ > stream : File-Stream of Integers, Type a
+ > finisher : Routine for Finalization
+ < result : read Integer or eof_value */
 local object rd_by_aux_iax_buffered (object stream, rd_by_ix_I* finisher) {
   var uintL bitsize = ChannelStream_bitsize(stream);
   var uintL bytesize = bitsize/8;
-  # transfer sufficiently many bytes into the bitbuffer
+  /* transfer sufficiently many bytes into the bitbuffer */
   var uintB* bitbufferptr =
     &TheSbvector(TheStream(stream)->strm_bitbuffer)->data[0];
-  #if 0 # equivalent, but slower
+  pin_unprotect_varobject(TheStream(stream)->strm_bitbuffer,PROT_READ_WRITE);
+  pushSTACK(stream);
+  #if 0 /* equivalent, but slower */
   var uintL count;
   dotimespL(count,bytesize, {
     var uintB* ptr = buffered_nextbyte(stream,persev_partial);
     if (ptr == (uintB*)NULL)
       goto eof;
-    # fetch next Byte:
+    stream = STACK_0;
+    /* fetch next Byte: */
     *bitbufferptr++ = *ptr;
-    # increment index
+    /* increment index */
     BufferedStream_index(stream) += 1;
   });
   #else
@@ -7036,115 +7292,130 @@ local object rd_by_aux_iax_buffered (object stream, rd_by_ix_I* finisher) {
       != bitbufferptr+bytesize)
     goto eof;
   #endif
-  # increment position
+  stream = popSTACK();
+  unpin_varobject(TheStream(stream)->strm_bitbuffer);
+  /* increment position */
   BufferedStream_position(stream) += 1;
-  # convert to number:
+  /* convert to number: */
   return (*finisher)(stream,bitsize,bytesize);
-  eof: # EOF reached
+  eof: /* EOF reached */
+  stream = popSTACK();
+  unpin_varobject(TheStream(stream)->strm_bitbuffer);
   position_file_buffered(stream,BufferedStream_position(stream)*bytesize);
   return eof_value;
 }
 
-# UP for READ-BYTE on File-Streams of Integers, Type b :
-# Fills the Bitbuffer with the next bitsize Bits.
-# > stream : File-Stream of Integers, Type b
-# > finisher : Routine for Finalization
-# < result : read Integer or eof_value
-local object rd_by_aux_ibx_buffered (object stream, rd_by_ix_I* finisher) {
-  # Only for position < eofposition there's something to read:
+/* UP for READ-BYTE on File-Streams of Integers, Type b :
+ Fills the Bitbuffer with the next bitsize Bits.
+ > stream : File-Stream of Integers, Type b
+ > finisher : Routine for Finalization
+ < result : read Integer or eof_value */
+local maygc object rd_by_aux_ibx_buffered(object stream, rd_by_ix_I* finisher) {
+  /* Only for position < eofposition there's something to read: */
   if (BufferedStream_position(stream) == BufferedStream_eofposition(stream))
     goto eof;
+  pushSTACK(stream);
   {
-    var uintL bitsize = ChannelStream_bitsize(stream); # bitsize (>0, <8)
-    # transfer sufficient many bits into the bitbuffer
+    var uintL bitsize = ChannelStream_bitsize(stream); /* bitsize (>0, <8) */
+    /* transfer sufficient many bits into the bitbuffer */
     var uintL bitindex = BufferedStream_bitindex(stream);
     var uintL count = bitindex + bitsize;
     var uint8 bit_akku;
     var uintB* ptr = buffered_nextbyte(stream,persev_partial);
     if (ptr == (uintB*)NULL)
       goto eof;
-    # Get first partial byte:
+    stream = STACK_0;
+    /* Get first partial byte: */
     bit_akku = (*ptr)>>bitindex;
-    # bitshift := 8-bitindex
-    # For bit_akku the Bits (bitshift-1)..0 are valid.
+    /* bitshift := 8-bitindex
+     For bit_akku the Bits (bitshift-1)..0 are valid. */
     if (count > 8) {
-      # increment index, because *ptr is processed:
+      /* increment index, because *ptr is processed: */
       BufferedStream_index(stream) += 1;
-      count -= 8; # still count (>0) Bits to fetch.
+      count -= 8; /* still count (>0) Bits to fetch. */
       var uintB* ptr = buffered_nextbyte(stream,persev_partial);
+      stream = STACK_0;
       if (ptr == (uintB*)NULL)
         goto eof1;
-      # fetch next Byte:
-      # (8-bitindex < 8, because else count = 0+bitsize < 8 !)
+      /* fetch next Byte:
+       (8-bitindex < 8, because else count = 0+bitsize < 8 !) */
       bit_akku |= (*ptr)<<(8-bitindex);
     }
-    # For bit_akku all 8 Bits are valid.
-    # save 8 Bits:
+    /* For bit_akku all 8 Bits are valid.
+     save 8 Bits: */
     TheSbvector(TheStream(stream)->strm_bitbuffer)->data[0] = bit_akku;
     BufferedStream_bitindex(stream) = count;
-    # increment position
+    /* increment position */
     BufferedStream_position(stream) += 1;
-    # convert to number:
+    skipSTACK(1);
+    /* convert to number: */
     return (*finisher)(stream,bitsize,1);
   eof1:
-    # position back again:
+    /* position back again: */
     position_file_i_buffered(stream,BufferedStream_position(stream));
   }
- eof: # EOF was reached
+ eof: /* EOF was reached */
+  skipSTACK(1);
   return eof_value;
 }
 
-# UP for READ-BYTE on File-Streams of Integers, Type c :
-# Fills the Bitbuffer with the next bitsize Bits.
-# > stream : File-Stream of Integers, Type c
-# > finisher : Routine for Finalization
-# < result : read Integer or eof_value
-local object rd_by_aux_icx_buffered (object stream, rd_by_ix_I* finisher) {
+/* UP for READ-BYTE on File-Streams of Integers, Type c :
+ Fills the Bitbuffer with the next bitsize Bits.
+ > stream : File-Stream of Integers, Type c
+ > finisher : Routine for Finalization
+ < result : read Integer or eof_value */
+local maygc object rd_by_aux_icx_buffered (object stream,
+                                            rd_by_ix_I* finisher) {
   var uintL bitsize = ChannelStream_bitsize(stream);
   var uintL bytesize = ceiling(bitsize,8);
-  # transfer sufficiently many bits into the bitbuffer
+  /* transfer sufficiently many bits into the bitbuffer */
   var uintB* bitbufferptr =
     &TheSbvector(TheStream(stream)->strm_bitbuffer)->data[0];
+  pin_unprotect_varobject(TheStream(stream)->strm_bitbuffer,PROT_READ_WRITE);
+  pushSTACK(stream);
   var uintL count = bitsize;
   var uintL bitshift = BufferedStream_bitindex(stream);
   var uintB* ptr = buffered_nextbyte(stream,persev_partial);
+  stream = STACK_0;
   if (ptr != (uintB*)NULL) {
     if (bitshift==0) {
-      # Optimized loop, without shifting.
-      loop {
-        *bitbufferptr++ = *ptr; # store 8 bits
-        # After digesting *ptr, increment index:
+      /* Optimized loop, without shifting. */
+      while (1) {
+        *bitbufferptr++ = *ptr; /* store 8 bits */
+        /* After digesting *ptr, increment index: */
         BufferedStream_index(stream) += 1;
         count -= 8;
-        # have to get count (>0) bits.
+        /* have to get count (>0) bits. */
         ptr = buffered_nextbyte(stream,persev_partial);
+        stream = STACK_0;
         if (ptr == (uintB*)NULL)
           goto eof;
-        if (count<=8) # are count bits finished?
+        if (count<=8) /* are count bits finished? */
           break;
       }
-      # Still need count = bitsize%8 (>0,<8) bits.
-      *bitbufferptr++ = *ptr; # store 8 bits
+      /* Still need count = bitsize%8 (>0,<8) bits. */
+      *bitbufferptr++ = *ptr; /* store 8 bits */
     } else {
-      # start getting bytes:
+      /* start getting bytes: */
       var uint16 bit_akku = (*ptr)>>bitshift;
-      bitshift = 8-bitshift; # bitshift := 8-bitindex (>0, <8)
+      bitshift = 8-bitshift; /* bitshift := 8-bitindex (>0, <8) */
       count -= bitshift;
-      loop {
+      while (1) {
         BufferedStream_index(stream) += 1;
-        # bit_akku: bits (bitshift-1)..0 are valid.
-        # have to get count (>0) bits.
+        /* bit_akku: bits (bitshift-1)..0 are valid.
+         have to get count (>0) bits. */
         {
           var uintB* ptr = buffered_nextbyte(stream,persev_partial);
+          stream = STACK_0;
           if (ptr == (uintB*)NULL)
             goto eof;
-          # get next byte:
+          /* get next byte: */
           bit_akku |= (uint16)(*ptr)<<bitshift;
         }
-        # bit_akku: bits (7+bitshift)..0 are valid.
-        *bitbufferptr++ = (uint8)bit_akku; # store 8 bits
+        /* bit_akku: bits (7+bitshift)..0 are valid. */
+        *bitbufferptr++ = (uint8)bit_akku; /* store 8 bits */
         bit_akku >>= 8;
-        if (count<=8) # are count bits finished?
+        if (count<=8) /* are count bits finished? */
           break;
         count -= 8;
       }
@@ -7153,116 +7424,148 @@ local object rd_by_aux_icx_buffered (object stream, rd_by_ix_I* finisher) {
         BufferedStream_index(stream) += 1;
       }
       if ((bitsize%8) <= bitshift)
-        *bitbufferptr++ = (uint8)bit_akku; # store bitshift bits
-      # Now bitbufferptr has been incremented
-      #   ceiling(bitsize-bitshift,8) + ((bitsize%8) <= bitshift ? 1 : 0)
-      #   = ceiling(bitsize,8) = bytesize
-      # times.
+        *bitbufferptr++ = (uint8)bit_akku; /* store bitshift bits */
+      /* Now bitbufferptr has been incremented
+         ceiling(bitsize-bitshift,8) + ((bitsize%8) <= bitshift ? 1 : 0)
+         = ceiling(bitsize,8) = bytesize
+       times. */
     }
+    skipSTACK(1);
+    unpin_varobject(TheStream(stream)->strm_bitbuffer);
     ASSERT(bitbufferptr == &TheSbvector(TheStream(stream)->strm_bitbuffer)->data[bytesize]);
     BufferedStream_bitindex(stream) = count;
-    BufferedStream_position(stream) += 1; # increment position
-    return (*finisher)(stream,bitsize,bytesize); # convert to a number
+    BufferedStream_position(stream) += 1; /* increment position */
+    return (*finisher)(stream,bitsize,bytesize); /* convert to a number */
   }
  eof:
+  unpin_varobject(TheStream(stream)->strm_bitbuffer);
   position_file_i_buffered(stream,BufferedStream_position(stream));
   return eof_value;
 }
 
-# READ-BYTE - Pseudo-Function for File-Streams of Integers, Type au :
-local object rd_by_iau_buffered (object stream) {
+/* READ-BYTE - Pseudo-Function for File-Streams of Integers, Type au : */
+local maygc object rd_by_iau_buffered (object stream) {
   return rd_by_aux_iax_buffered(stream,&rd_by_iu_I);
 }
 
-# READ-BYTE - Pseudo-Function for File-Streams of Integers, Type as :
-local object rd_by_ias_buffered (object stream) {
+/* READ-BYTE - Pseudo-Function for File-Streams of Integers, Type as : */
+local maygc object rd_by_ias_buffered (object stream) {
   return rd_by_aux_iax_buffered(stream,&rd_by_is_I);
 }
 
-# READ-BYTE - Pseudo-Function for File-Streams of Integers, Type bu :
-local object rd_by_ibu_buffered (object stream) {
+/* READ-BYTE - Pseudo-Function for File-Streams of Integers, Type bu : */
+local maygc object rd_by_ibu_buffered (object stream) {
   return rd_by_aux_ibx_buffered(stream,&rd_by_iu_I);
 }
 
-# READ-BYTE - Pseudo-Function for File-Streams of Integers, Type bs :
-local object rd_by_ibs_buffered (object stream) {
+/* READ-BYTE - Pseudo-Function for File-Streams of Integers, Type bs : */
+local maygc object rd_by_ibs_buffered (object stream) {
   return rd_by_aux_ibx_buffered(stream,&rd_by_is_I);
 }
 
-# READ-BYTE - Pseudo-Function for File-Streams of Integers, Type cu :
-local object rd_by_icu_buffered (object stream) {
+/* READ-BYTE - Pseudo-Function for File-Streams of Integers, Type cu : */
+local maygc object rd_by_icu_buffered (object stream) {
   return rd_by_aux_icx_buffered(stream,&rd_by_iu_I);
 }
 
-# READ-BYTE - Pseudo-Function for File-Streams of Integers, Type cs :
-local object rd_by_ics_buffered (object stream) {
+/* READ-BYTE - Pseudo-Function for File-Streams of Integers, Type cs : */
+local maygc object rd_by_ics_buffered (object stream) {
   return rd_by_aux_icx_buffered(stream,&rd_by_is_I);
 }
 
-# READ-BYTE - Pseudo-Function for File-Streams of Integers, Type au, bitsize = 8 :
-local object rd_by_iau8_buffered (object stream) {
+/* READ-BYTE - Pseudo-Function for File-Streams of Integers, Type au, bitsize = 8 : */
+local maygc object rd_by_iau8_buffered (object stream) {
+  pushSTACK(stream);
+ rd_by_iau8_buffered_retry:
   var uintB* ptr = buffered_nextbyte(stream,persev_partial);
+  stream = STACK_0;
   if (!(ptr == (uintB*)NULL)) {
-    var object obj = fixnum(*ptr);
-    # increment index and position
     BufferedStream_index(stream) += 1;
+    if (*ptr == LF && ChannelStream_ignore_next_LF(stream)) {
+      /* see comment in rd_by_array_iau8_unbuffered */
+      ChannelStream_ignore_next_LF(stream) = false;
+      goto rd_by_iau8_buffered_retry;
+    }
+    skipSTACK(1);
+    var object obj = fixnum(*ptr);
     BufferedStream_position(stream) += 1;
     return obj;
   } else {
+    skipSTACK(1);
     return eof_value;
   }
 }
 
-# READ-BYTE-SEQUENCE for File-Streams of Integers, Type au, bitsize = 8 :
-local uintL rd_by_array_iau8_buffered (const gcv_object_t* stream_,
-                                       const gcv_object_t* bytearray_,
-                                       uintL start, uintL len, perseverance_t persev) {
+/* READ-BYTE-SEQUENCE for File-Streams of Integers, Type au, bitsize = 8 : */
+local maygc uintL rd_by_array_iau8_buffered (const gcv_object_t* stream_,
+                                             const gcv_object_t* bytearray_,
+                                             uintL start, uintL len,
+                                             perseverance_t persev) {
+  pin_unprotect_varobject(*bytearray_,PROT_READ_WRITE);
   var uintB* startptr = &TheSbvector(*bytearray_)->data[start];
   var uintB* endptr = read_byte_array_buffered(*stream_,startptr,len,persev);
   var uintL result = endptr-startptr;
-  # increment position:
+  if (result && *startptr == LF && ChannelStream_ignore_next_LF(*stream_)) {
+    /* see comment in rd_by_array_iau8_unbuffered */
+    var uintL count = --result;
+    for (; count--; startptr++) startptr[0] = startptr[1];
+    ChannelStream_ignore_next_LF(*stream_) = false;
+    endptr = read_byte_array_buffered(*stream_,startptr,1,persev);
+    result += endptr - startptr;  /* 0 or 1 */
+  }
+  unpin_varobject(*bytearray_);
+  /* increment position: */
   BufferedStream_position(*stream_) += result;
   return result;
 }
 
-# Determines, if a Byte is available on a File-Stream.
-# listen_byte_ia8_buffered(stream)
-# > stream: File-Stream of Integers, Type a, bitsize = 8
-# < result:   ls_avail if a byte is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no byte is available, but not because of EOF
-local signean listen_byte_ia8_buffered (object stream) {
-  if (buffered_nextbyte(stream,persev_partial) == (uintB*)NULL)
-    return ls_eof; # EOF
-  return ls_avail;
+/* Determines, if a Byte is available on a File-Stream.
+ listen_byte_ia8_buffered(stream)
+ > stream: File-Stream of Integers, Type a, bitsize = 8
+ < result: input availability
+ can trigger GC */
+local maygc listen_t listen_byte_ia8_buffered (object stream) {
+  uintB* buf = buffered_nextbyte(stream,persev_immediate);
+  if (buf == (uintB*)NULL) return LISTEN_EOF; /* EOF */
+  if (buf == (uintB*)-1)   return LISTEN_WAIT; /* will hang */
+  return LISTEN_AVAIL;
 }
 
-# Output side
-# -----------
+/* Output side
+   -----------
 
-# UP for WRITE-BYTE on File-Streams of Integers, Type a :
-# Writes the Bitbuffer-Content to the File.
-local void wr_by_aux_ia_buffered (object stream, uintL bitsize, uintL bytesize)
+ UP for WRITE-BYTE on File-Streams of Integers, Type a :
+ Writes the Bitbuffer-Content to the File. */
+local maygc void wr_by_aux_ia_buffered (object stream, uintL bitsize,
+                                        uintL bytesize)
 {
+  pin_unprotect_varobject(TheStream(stream)->strm_bitbuffer,PROT_READ);
+  pushSTACK(stream);
   var uintB* bitbufferptr = &TheSbvector(TheStream(stream)->strm_bitbuffer)->data[0];
-  #if 0 # equivalent, but slow
+  #if 0 /* equivalent, but slow */
   var uintL count;
   dotimespL(count,bytesize, {
     buffered_writebyte(stream,*bitbufferptr++);
+    stream = STACK_0;
   });
+  skipSTACK(0);
   #else
   write_byte_array_buffered(stream,bitbufferptr,bytesize,persev_full);
+  stream = popSTACK();
   #endif
-  # increment position:
+  /* increment position: */
   BufferedStream_position(stream) += 1;
+  unpin_varobject(TheStream(stream)->strm_bitbuffer);
 }
 
-# write last byte (count bits):
+/* write last byte (count bits): */
 #define WRITE_LAST_BYTE                                                 \
  if (count!=0) {                                                        \
    ptr = buffered_nextbyte(stream,persev_partial);                      \
+   stream = STACK_0;                                                    \
    if (ptr == (uintB*)NULL) { /* EOF */                                 \
      ptr = buffered_eofbyte(stream); /* 1 Byte */                       \
+     stream = STACK_0;                                                  \
      *ptr = (uint8)bit_akku; /* write byte */                           \
    } else { /* overwrite the last byte only partially: */               \
      var uint8 diff = (*ptr ^ (uint8)bit_akku) & (uint8)(bit(count)-1); \
@@ -7274,49 +7577,60 @@ local void wr_by_aux_ia_buffered (object stream, uintL bitsize, uintL bytesize)
  no_modification: ;                                                     \
  }
 
-# UP for WRITE-BYTE on File-Streams of Integers, Type b :
-# Writes the Bitbuffer-Content to the File.
-local void wr_by_aux_ib_buffered (object stream, uintL bitsize, uintL bytesize)
+/* UP for WRITE-BYTE on File-Streams of Integers, Type b :
+ Writes the Bitbuffer-Content to the File. */
+local maygc void wr_by_aux_ib_buffered (object stream, uintL bitsize,
+                                        uintL bytesize)
 {
+  pin_unprotect_varobject(TheStream(stream)->strm_bitbuffer,PROT_READ);
+  pushSTACK(stream);
   var uintL bitshift = BufferedStream_bitindex(stream);
   var uint16 bit_akku = (uint16)(TheSbvector(TheStream(stream)->strm_bitbuffer)->data[0])<<bitshift;
   var uintL count = bitsize;
   var uintB* ptr = buffered_nextbyte(stream,persev_partial);
-  # start getting bytes:
+  stream = STACK_0;
+  /* start getting bytes: */
   if (!(ptr == (uintB*)NULL))
     bit_akku |= (*ptr)&(bit(bitshift)-1);
   count += bitshift;
-  # poss. write single Byte:
+  /* poss. write single Byte: */
   if (count>=8) {
     buffered_writebyte(stream,(uint8)bit_akku);
+    stream = STACK_0;
     bit_akku = bit_akku>>8;
     count -= 8;
   }
   WRITE_LAST_BYTE;
   BufferedStream_bitindex(stream) = count;
-  # increment position and poss. eofposition:
+  /* increment position and poss. eofposition: */
   if (BufferedStream_eofposition(stream) == BufferedStream_position(stream))
     BufferedStream_eofposition(stream) += 1;
   BufferedStream_position(stream) += 1;
+  skipSTACK(1); unpin_varobject(TheStream(stream)->strm_bitbuffer);
 }
 
-# UP for WRITE-BYTE on File-Streams of Integers, Type c :
-# Writes the Bitbuffer-Content to the File.
-local void wr_by_aux_ic_buffered (object stream, uintL bitsize, uintL bytesize) {
+/* UP for WRITE-BYTE on File-Streams of Integers, Type c :
+ Writes the Bitbuffer-Content to the File. */
+local maygc void wr_by_aux_ic_buffered (object stream, uintL bitsize,
+                                        uintL bytesize) {
+  pin_unprotect_varobject(TheStream(stream)->strm_bitbuffer,PROT_READ);
+  pushSTACK(stream);
   var uintB* bitbufferptr=TheSbvector(TheStream(stream)->strm_bitbuffer)->data;
   var uintL bitshift = BufferedStream_bitindex(stream);
   var uintL count = bitsize;
   var uint16 bit_akku;
   var uintB* ptr = buffered_nextbyte(stream,persev_partial);
-  # start getting bytes:
+  stream = STACK_0;
+  /* start getting bytes: */
   bit_akku = (ptr==(uintB*)NULL ? 0 : (*ptr)&(bit(bitshift)-1) );
   count += bitshift;
-  # write individual bytes:
-  loop {
+  /* write individual bytes: */
+  while (1) {
     bit_akku |= (uint16)(*bitbufferptr++)<<bitshift;
     if (count<8)
       break;
     buffered_writebyte(stream,(uint8)bit_akku);
+    stream = STACK_0;
     bit_akku = bit_akku>>8;
     count -= 8;
     if (count<=bitshift)
@@ -7325,184 +7639,199 @@ local void wr_by_aux_ic_buffered (object stream, uintL bitsize, uintL bytesize) 
   WRITE_LAST_BYTE;
   BufferedStream_bitindex(stream) = count;
   BufferedStream_position(stream) += 1;
+  skipSTACK(1); unpin_varobject(TheStream(stream)->strm_bitbuffer);
 }
 #undef WRITE_LAST_BYTE
 
-# WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type au :
+/* WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type au : */
 local maygc void wr_by_iau_buffered (object stream, object obj) {
   wr_by_ixu_sub(stream,obj,&wr_by_aux_ia_buffered);
 }
 
-# WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type as :
+/* WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type as : */
 local maygc void wr_by_ias_buffered (object stream, object obj) {
   wr_by_ixs_sub(stream,obj,&wr_by_aux_ia_buffered);
 }
 
-# WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type bu :
+/* WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type bu : */
 local maygc void wr_by_ibu_buffered (object stream, object obj) {
   wr_by_ixu_sub(stream,obj,&wr_by_aux_ib_buffered);
 }
 
-# WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type bs :
+/* WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type bs : */
 local maygc void wr_by_ibs_buffered (object stream, object obj) {
   wr_by_ixs_sub(stream,obj,&wr_by_aux_ib_buffered);
 }
 
-# WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type cu :
+/* WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type cu : */
 local maygc void wr_by_icu_buffered (object stream, object obj) {
   wr_by_ixu_sub(stream,obj,&wr_by_aux_ic_buffered);
 }
 
-# WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type cs :
+/* WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type cs : */
 local maygc void wr_by_ics_buffered (object stream, object obj) {
   wr_by_ixs_sub(stream,obj,&wr_by_aux_ic_buffered);
 }
 
-# WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type au, bitsize = 8 :
+/* WRITE-BYTE - Pseudo-Function for File-Streams of Integers, Type au, bitsize = 8 : */
 local maygc void wr_by_iau8_buffered (object stream, object obj) {
   ASSERT_wr_int(stream,obj);
   if (!(posfixnump(obj) && (posfixnum_to_V(obj) < bit(8))))
-    fehler_bad_integer(stream,obj);
+    error_bad_integer(stream,obj);
   write_byte_buffered(stream,(uintB)posfixnum_to_V(obj));
 }
 
-# WRITE-BYTE-SEQUENCE for File-Streams of Integers, Type au, bitsize = 8 :
+/* WRITE-BYTE-SEQUENCE for File-Streams of Integers, Type au, bitsize = 8 : */
 local maygc uintL wr_by_array_iau8_buffered (const gcv_object_t* stream_,
                                              const gcv_object_t* bytearray_,
-                                             uintL start, uintL len, perseverance_t persev) {
+                                             uintL start, uintL len,
+                                             perseverance_t persev) {
   write_byte_array_buffered(*stream_,TheSbvector(*bytearray_)->data+start,len,persev_full);
-  # increment position:
+  /* increment position: */
   BufferedStream_position(*stream_) += len;
   return len;
 }
 
-# File-Stream in general
-# ======================
+/* File-Stream in general
+   ======================
 
-# UP: Positions an (open) File-Stream to the start.
-# logical_position_file_start(stream);
-# > stream : (open) File-Stream.
-# changed in stream: index, endvalid, buffstart, ..., position, rd_ch_last
-local uoff_t logical_position_file_start (object stream) {
+ UP: Positions an (open) File-Stream to the start.
+ logical_position_file_start(stream);
+ > stream : (open) File-Stream.
+ changed in stream: index, endvalid, buffstart, ..., position, rd_ch_last */
+local maygc uoff_t logical_position_file_start (object stream) {
   var uintL bitsize = ChannelStream_bitsize(stream);
+  pushSTACK(stream);
   position_file_buffered
     (stream,
-     bitsize > 0 && bitsize < 8 # Integer-Stream of Type b ?
-     ? sizeof(uintL) : 0); # yes -> Position 4, else Position 0
+     bitsize > 0 && bitsize < 8 /* Integer-Stream of Type b ? */
+     ? sizeof(uintL) : 0); /* yes -> Position 4, else Position 0 */
+  stream = popSTACK();
   if (!((bitsize % 8) == 0))
-    # Integer-Stream of Type b,c
-    BufferedStream_bitindex(stream) = 0; # bitindex := 0
-  TheStream(stream)->strm_rd_ch_last = NIL; # Lastchar := NIL
+    /* Integer-Stream of Type b,c */
+    BufferedStream_bitindex(stream) = 0; /* bitindex := 0 */
+  TheStream(stream)->strm_rd_ch_last = NIL; /* Lastchar := NIL */
   TheStream(stream)->strmflags &= ~strmflags_unread_B;
   return BufferedStream_position(stream) = 0; /* position := 0 */
 }
 
-# UP: Positions an (open) File-Stream to a given Position.
-# logical_position_file(stream,position);
-# > stream : (open) File-Stream.
-# > position : new (logical) Position
-# changed in stream: index, endvalid, buffstart, ..., position, rd_ch_last
-local uoff_t logical_position_file (object stream, uoff_t position) {
+/* UP: Positions an (open) File-Stream to a given Position.
+ logical_position_file(stream,position);
+ > stream : (open) File-Stream.
+ > position : new (logical) Position
+ changed in stream: index, endvalid, buffstart, ..., position, rd_ch_last */
+local maygc uoff_t logical_position_file (object stream, uoff_t position) {
   var uintL bitsize = ChannelStream_bitsize(stream);
-  if (bitsize > 0) { # Integer-Stream ?
-    if ((bitsize % 8) == 0) { # Type a
+  pushSTACK(stream);
+  if (bitsize > 0) { /* Integer-Stream ? */
+    if ((bitsize % 8) == 0) { /* Type a */
       position_file_buffered(stream,position*(bitsize/8));
-    } else { # Type b,c
+    } else { /* Type b,c */
       position_file_i_buffered(stream,position);
     }
-  } else { # Character-Stream
+    stream = popSTACK();
+  } else { /* Character-Stream */
     position_file_buffered(stream,position);
-    TheStream(stream)->strm_rd_ch_last = NIL; # Lastchar := NIL
+    stream = popSTACK();
+    TheStream(stream)->strm_rd_ch_last = NIL; /* Lastchar := NIL */
     TheStream(stream)->strmflags &= ~strmflags_unread_B;
   }
   return BufferedStream_position(stream) = position;
 }
 
-# UP: Positions an (open) File-Stream to the end.
-# logical_position_file_end(stream);
-# > stream : (open) File-Stream.
-# changed in stream: index, endvalid, buffstart, ..., position, rd_ch_last
-local uoff_t logical_position_file_end (object stream) {
-  # poss. flush Buffer:
-  if (BufferedStream_modified(stream))
+/* UP: Positions an (open) File-Stream to the end.
+ logical_position_file_end(stream);
+ > stream : (open) File-Stream.
+ changed in stream: index, endvalid, buffstart, ..., position, rd_ch_last */
+local maygc uoff_t logical_position_file_end (object stream) {
+  pushSTACK(stream);
+  /* poss. flush Buffer: */
+  if (BufferedStream_modified(stream)) {
     buffered_flush(stream);
-  var uoff_t eofbytes; # EOF-Position, measured in Bytes
-  # position to the End:
-  begin_system_call();
-  handle_lseek(stream,BufferedStream_channel(stream),0,SEEK_END,eofbytes=);
-  end_system_call();
-  # calculate logical Position and correct eofbytes:
-  var uoff_t position; # logical Position
-  var uintL eofbits = 0; # Bit-Complement for eofbytes
+    stream = STACK_0;
+  }
+  var Handle handle = TheHandle(BufferedStream_channel(stream));
+  var uoff_t eofbytes; /* EOF-Position, measured in Bytes */
+  /* position to the End: */
+  begin_blocking_system_call();
+  handle_lseek(&STACK_0,handle,0,SEEK_END,eofbytes=);
+  end_blocking_system_call();
+  stream = STACK_0;
+  /* calculate logical Position and correct eofbytes: */
+  var uoff_t position; /* logical Position */
+  var uintL eofbits = 0; /* Bit-Complement for eofbytes */
   var uintL bitsize = ChannelStream_bitsize(stream);
-  if (bitsize > 0) { # Integer-Stream ?
-    if ((bitsize % 8) == 0) { # Type a
+  if (bitsize > 0) { /* Integer-Stream ? */
+    if ((bitsize % 8) == 0) { /* Type a */
       var uintL bytesize = bitsize/8;
       position = floor(eofbytes,bytesize);
       eofbytes = position*bytesize;
-    } else if (bitsize < 8) { # Type b
-      eofbytes -= sizeof(uintL); # consider Header
-      # Is the memorized EOF-Position plausible?
+    } else if (bitsize < 8) { /* Type b */
+      eofbytes -= sizeof(uintL); /* consider Header */
+      /* Is the memorized EOF-Position plausible? */
       position = BufferedStream_eofposition(stream);
-      if (!(ceiling(position*bitsize,8)==eofbytes)) # yes -> use it
-        position = floor(eofbytes*8,bitsize); # no -> recalculate it
-      # recalculate eofbytes and eofbits:
+      if (!(ceiling(position*bitsize,8)==eofbytes)) /* yes -> use it */
+        position = floor(eofbytes*8,bitsize); /* no -> recalculate it */
+      /* recalculate eofbytes and eofbits: */
       eofbytes = floor(position*bitsize,8);
       eofbits = (position*bitsize)%8;
-      eofbytes += sizeof(uintL); # consider Header
-    } else { # Type c
+      eofbytes += sizeof(uintL); /* consider Header */
+    } else { /* Type c */
       position = floor(eofbytes*8,bitsize);
       eofbytes = floor(position*bitsize,8);
       eofbits = (position*bitsize)%8;
     }
-  } else { # Character-Stream
+  } else { /* Character-Stream */
     position = eofbytes;
   }
   if (!BufferedStream_blockpositioning(stream)) {
-    # Now position at the End:
+    /* Now position at the End: */
     BufferedStream_buffstart(stream) = eofbytes;
     BufferedStream_endvalid(stream) = 0;
-    BufferedStream_index(stream) = 0; # index := 0
-    BufferedStream_modified(stream) = false; # unmodified
+    BufferedStream_index(stream) = 0; /* index := 0 */
+    BufferedStream_modified(stream) = false; /* unmodified */
     BufferedStream_have_eof_p(stream) = true;
-  } else { # position to the start of the last Sector:
+  } else { /* position to the start of the last Sector: */
     {
       var uoff_t buffstart;
-      begin_system_call();
-      handle_lseek(stream,BufferedStream_channel(stream),
+      begin_blocking_system_call();
+      handle_lseek(&STACK_0,handle,
                    floor(eofbytes,strm_buffered_bufflen)*strm_buffered_bufflen,
                    SEEK_SET,buffstart=);
-      end_system_call();
+      end_blocking_system_call();
+      stream = STACK_0;
       BufferedStream_buffstart(stream) = buffstart;
     }
-    # read Sector:
+    /* read Sector: */
     BufferedStream_endvalid(stream) = 0;
-    BufferedStream_index(stream) = 0; # index := 0
-    BufferedStream_modified(stream) = false; # unmodified
+    BufferedStream_index(stream) = 0; /* index := 0 */
+    BufferedStream_modified(stream) = false; /* unmodified */
     BufferedStream_have_eof_p(stream) = false;
     var uintL endvalid = eofbytes % strm_buffered_bufflen;
     if (!((endvalid==0) && (eofbits==0))) {
-      # EOF at end of Sector -> nothing to read
+      /* EOF at end of Sector -> nothing to read */
       buffered_nextbyte(stream,persev_partial);
-      # Now index=0. set index and endvalid:
+      stream = STACK_0;
+      /* Now index=0. set index and endvalid: */
       BufferedStream_index(stream) = endvalid;
       if (eofbits != 0)
         endvalid += 1;
       BufferedStream_endvalid(stream) = endvalid;
     }
   }
-  if (!((bitsize % 8) == 0)) { # Integer-Stream of type b,c
+  if (!((bitsize % 8) == 0)) { /* Integer-Stream of type b,c */
     BufferedStream_bitindex(stream) = eofbits;
   }
-  TheStream(stream)->strm_rd_ch_last = NIL; # Lastchar := NIL
+  TheStream(stream)->strm_rd_ch_last = NIL; /* Lastchar := NIL */
   TheStream(stream)->strmflags &= ~strmflags_unread_B;
+  skipSTACK(1);
   return BufferedStream_position(stream) = position; /* set position */
 }
 
-# UP: Fills in the pseudofunctions for a buffered stream.
-# fill_pseudofuns_buffered(stream,&eltype);
-# > stream: stream being built up, with correct strmflags and encoding
-# > eltype: Element-Type in decoded form
+/* UP: Fills in the pseudofunctions for a buffered stream.
+ fill_pseudofuns_buffered(stream,&eltype);
+ > stream: stream being built up, with correct strmflags and encoding
+ > eltype: Element-Type in decoded form */
 local void fill_pseudofuns_buffered (object stream,
                                      const decoded_el_t* eltype) {
   var uintB flags = TheStream(stream)->strmflags;
@@ -7550,17 +7879,20 @@ local void fill_pseudofuns_buffered (object stream,
         TheStream(stream)->strm_wr_ch =
           TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_buffered_unix);
         TheStream(stream)->strm_wr_ch_array =
-          TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_buffered_unix);
+          TheStream(stream)->strm_wr_ch_array_npnl =
+          P(wr_ch_array_buffered_unix);
       } else if (eq(eol,S(Kmac))) {
         TheStream(stream)->strm_wr_ch =
           TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_buffered_mac);
         TheStream(stream)->strm_wr_ch_array =
-          TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_buffered_mac);
+          TheStream(stream)->strm_wr_ch_array_npnl =
+          P(wr_ch_array_buffered_mac);
       } else if (eq(eol,S(Kdos))) {
         TheStream(stream)->strm_wr_ch =
           TheStream(stream)->strm_wr_ch_npnl = P(wr_ch_buffered_dos);
         TheStream(stream)->strm_wr_ch_array =
-          TheStream(stream)->strm_wr_ch_array_npnl = P(wr_ch_array_buffered_dos);
+          TheStream(stream)->strm_wr_ch_array_npnl =
+          P(wr_ch_array_buffered_dos);
       } else
         NOTREACHED;
     }
@@ -7568,56 +7900,49 @@ local void fill_pseudofuns_buffered (object stream,
 }
 
 
-# UP: creates a buffered file stream
-# make_buffered_stream(type,direction,&eltype,handle_regular,handle_blockpositioning)
-# > STACK_2: Encoding
-# > STACK_1: Element-Type
-# > STACK_0: open file handle
-# > type: stream type
-# > direction: direction_t (see lispbibl.d)
-# > eltype: Element-Type in decoded form
-# > handle_regular: whether the handle refers to a regular file
-# > handle_blockpositioning: whether the handle refers to a regular file which
-#                            can be positioned at n*strm_buffered_bufflen
-# If direction==DIRECTION_IO(5), handle_blockpositioning must be true.
-# < result: buffered file stream, Handle_{input,output}_init still to be called,
-#           for eltype.size<8 also eofposition still to be to determined
-# < STACK: cleaned up
-# can trigger GC
+/* UP: creates a buffered file stream
+ make_buffered_stream(type,direction,&eltype,handle_regular,handle_blockpositioning)
+ > STACK_2: Encoding
+ > STACK_1: Element-Type
+ > STACK_0: open file handle
+ > type: stream type
+ > direction: direction_t (see lispbibl.d)
+ > eltype: Element-Type in decoded form
+ > handle_regular: whether the handle refers to a regular file
+ > handle_blockpositioning: whether the handle refers to a regular file which
+                            can be positioned at n*strm_buffered_bufflen
+ If direction==DIRECTION_IO(5), handle_blockpositioning must be true.
+ < result: buffered file stream, Handle_{input,output}_init still to be called,
+           for eltype.size<8 also eofposition still to be to determined
+ < STACK: cleaned up
+ can trigger GC */
 local maygc object make_buffered_stream (uintB type, direction_t direction,
                                          const decoded_el_t* eltype,
                                          bool handle_regular,
                                          bool handle_blockpositioning) {
-  var uintB flags = DIRECTION_FLAGS(direction);
-  var uintC xlen = sizeof(strm_buffered_extrafields_t); # all File-Streams have that
-  if (eltype->kind == eltype_ch) {
-    flags &= strmflags_ch_B | strmflags_immut_B;
-  } else {
-    flags &= strmflags_by_B | strmflags_immut_B;
-    if ((eltype->size % 8) == 0) { # Type a
-    } else {
-      xlen = sizeof(strm_i_buffered_extrafields_t); # File-Streams have that for Integers at most
-    }
-  }
-  # allocate Stream:
+  var uintB flags = DIRECTION_FLAGS(direction) & ELTYPE_FLAFS(eltype);
+  var uintC xlen = NON_WHOLE_BYTE_P(eltype)
+    ? sizeof(strm_i_buffered_extrafields_t) /* integer file-streams */
+    : sizeof(strm_buffered_extrafields_t); /* all other file-streams */
+  /* allocate Stream: */
   var object stream = allocate_stream(flags,type,strm_channel_len,xlen);
-  # and fill:
+  /* and fill: */
   TheStream(stream)->strm_encoding = STACK_2;
   fill_pseudofuns_buffered(stream,eltype);
-  TheStream(stream)->strm_rd_ch_last = NIL; # Lastchar := NIL
-  TheStream(stream)->strm_wr_ch_lpos = Fixnum_0; # Line Position := 0
-  # Components of File-Streams:
+  TheStream(stream)->strm_rd_ch_last = NIL; /* Lastchar := NIL */
+  TheStream(stream)->strm_wr_ch_lpos = Fixnum_0; /* Line Position := 0 */
+  /* Components of File-Streams: */
   {
-    var object handle = popSTACK(); # restore Handle
-    TheStream(stream)->strm_eltype = popSTACK(); # enter Element-Type
+    var object handle = popSTACK(); /* restore Handle */
+    TheStream(stream)->strm_eltype = popSTACK(); /* enter Element-Type */
     ChannelStream_buffered(stream) = true;
     ChannelStream_regular(stream) = handle_regular;
     ChannelStream_init(stream);
-    if (!nullp(handle)) { # Handle=NIL -> Rest already initialized with NIL, finished
-      BufferedStream_channel(stream) = handle; # enter Handle
+    if (!nullp(handle)) { /* Handle=NIL -> Rest already initialized with NIL, finished */
+      BufferedStream_channel(stream) = handle; /* enter Handle */
       BufferedStream_blockpositioning(stream) = handle_blockpositioning;
-      BufferedStream_buffstart(stream) = 0; # buffstart := 0
-      # allocate Buffer:
+      BufferedStream_buffstart(stream) = 0; /* buffstart := 0 */
+      /* allocate Buffer: */
       pushSTACK(stream);
       {
         var object buffer =
@@ -7626,15 +7951,15 @@ local maygc object make_buffered_stream (uintB type, direction_t direction,
         BufferedStream_buffer(stream) = buffer;
       }
       BufferedStream_endvalid(stream) = 0;
-      BufferedStream_index(stream) = 0; # index := 0
-      BufferedStream_modified(stream) = false; # Buffer unmodified
+      BufferedStream_index(stream) = 0; /* index := 0 */
+      BufferedStream_modified(stream) = false; /* Buffer unmodified */
       BufferedStream_have_eof_p(stream) = false;
-      BufferedStream_position(stream) = 0; # position := 0
+      BufferedStream_position(stream) = 0; /* position := 0 */
       ChannelStream_bitsize(stream) = eltype->size;
-      ChannelStream_lineno(stream) = 1; # initialize always (cf. set-stream-element-type)
+      ChannelStream_lineno(stream) = 1; /* initialize always (cf. set-stream-element-type) */
       if (!(eltype->kind == eltype_ch)) {
-        # File-Stream of Integers
-        # allocate Bitbuffer:
+        /* File-Stream of Integers
+         allocate Bitbuffer: */
         pushSTACK(stream);
         {
           var object bitbuffer =
@@ -7642,8 +7967,8 @@ local maygc object make_buffered_stream (uintB type, direction_t direction,
           stream = popSTACK();
           TheStream(stream)->strm_bitbuffer = bitbuffer;
         }
-        if (!((eltype->size % 8) == 0)) { # Types b,c
-          BufferedStream_bitindex(stream) = 0; # bitindex := 0
+        if (!((eltype->size % 8) == 0)) { /* Types b,c */
+          BufferedStream_bitindex(stream) = 0; /* bitindex := 0 */
         }
       }
     }
@@ -7655,38 +7980,61 @@ local maygc object make_buffered_stream (uintB type, direction_t direction,
   return stream;
 }
 
+#if defined(MULTITHREAD)
+/* O(open_files) is guarded by a global lock */
+global xmutex_t open_files_lock;
+#endif
+
 /* UP: add a stream to the list of open streams O(open_files)
  add_to_open_streams()
  <> stream
  can trigger GC */
 local maygc object add_to_open_streams (object stream) {
   pushSTACK(stream);
-  var object new_cons = allocate_cons();
-  Car(new_cons) = stream = popSTACK();
-  Cdr(new_cons) = O(open_files);
-  O(open_files) = new_cons;
-  return stream;
+  var gcv_object_t *stream_ = &STACK_0;
+  WITH_OS_MUTEX_LOCK(0,&open_files_lock, {
+    var object new_cons = allocate_cons();
+    Car(new_cons) = *stream_;
+    Cdr(new_cons) = O(open_files);
+    O(open_files) = new_cons;
+  });
+  return popSTACK();
+}
+
+/* UP: removes a stream from the list of open streams O(open_files)
+ > stream
+ maygc GC in MT builds */
+local maygc void remove_from_open_streams(object stream)
+{
+  pushSTACK(stream);
+  var gcv_object_t *stream_ = &STACK_0;
+  WITH_OS_MUTEX_LOCK(0,&open_files_lock, {
+    O(open_files) = deleteq(O(open_files),*stream_);
+  });
+  skipSTACK(1);
 }
 
 /* Find an open file that matches the given file ID
  > struct file_id fid = file ID to match
- > uintB* data = open flags to filter
+ > uintB flags = open flags to filter
  < pointer to the stream saved on STACK or NULL
    i.e., on success, adds 1 element to STACK */
-global void* find_open_file (struct file_id *fid, void* data);
-global void* find_open_file (struct file_id *fid, void* data) {
-  var object tail = O(open_files);
-  var uintB flags = *(uintB*)data;
-  while (consp(tail)) {
-    var object stream = Car(tail); tail = Cdr(tail);
-    if (TheStream(stream)->strmtype == strmtype_file
-        && TheStream(stream)->strmflags & flags
-        && file_id_eq(fid,&ChannelStream_file_id(stream))) {
-      pushSTACK(stream);
-      return (void*)&STACK_0;
+global maygc void* find_open_file (struct file_id *fid, uintB flags);
+global maygc void* find_open_file (struct file_id *fid, uintB flags) {
+  pushSTACK(NIL); /* return value if file is found */
+  var gcv_object_t *stream_ = &STACK_0;
+  WITH_OS_MUTEX_LOCK(0, &open_files_lock, {
+    var object tail = O(open_files);
+    while (nullp(*stream_) && consp(tail)) {
+      var object stream = Car(tail); tail = Cdr(tail);
+      if (TheStream(stream)->strmtype == strmtype_file
+          && TheStream(stream)->strmflags & flags
+          && file_id_eq(fid,&ChannelStream_file_id(stream))) {
+        *stream_ = stream;
+      }
     }
-  }
-  return NULL;
+  });
+  return nullp(*stream_) ? (skipSTACK(1),(void*)NULL) : (void*)stream_;
 }
 
 /* UP: creates a File-Stream
@@ -7710,142 +8058,149 @@ global void* find_open_file (struct file_id *fid, void* data) {
  < result: File-Stream (or poss. File-Handle-Stream)
  < STACK: cleaned up
  can trigger GC */
-global maygc object make_file_stream (direction_t direction, bool append_flag,
-                                      bool handle_fresh) {
+modexp maygc object make_file_stream
+(direction_t direction, bool append_flag, bool handle_fresh) {
   var decoded_el_t eltype;
-  var signean buffered;
-  # Check and canonicalize the :ELEMENT-TYPE argument:
+  var buffered_t buffered;
+  /* Check and canonicalize the :ELEMENT-TYPE argument: */
   test_eltype_arg(&STACK_1,&eltype);
   STACK_1 = canon_eltype(&eltype);
-  # Check and canonicalize the :EXTERNAL-FORMAT argument:
+  /* Check and canonicalize the :EXTERNAL-FORMAT argument: */
   STACK_2 = test_external_format_arg(STACK_2);
-  # Stack Layout: filename, truename, buffered, encoding, eltype, handle.
+  /* Stack Layout: filename, truename, buffered, encoding, eltype, handle. */
   var object stream;
   var object handle = STACK_0;
   var Handle file_des = INVALID_HANDLE;
   var bool handle_regular = true;
   if (!nullp(handle))
     handle_regular = regular_handle_p(file_des = TheHandle(handle));
-  # Check and canonicalize the :BUFFERED argument:
-  # Default is T for regular files, NIL for non-regular files because they
-  # probably don't support lseek().
+  /* Check and canonicalize the :BUFFERED argument:
+   Default is T for regular files, NIL for non-regular files because they
+   probably don't support lseek(). */
   buffered = test_buffered_arg(STACK_3);
  #if defined(UNIX)
-  # /proc files are unbuffered by default
-  if ((buffered == 0) && !nullp(STACK_4)) { # truename
+  /* /proc files are unbuffered by default */
+  if ((buffered == BUFFERED_DEFAULT) && !nullp(STACK_4)) { /* truename */
     var object dir = ThePathname(STACK_4)->pathname_directory;
     if (consp(dir) && consp(Cdr(dir)))
       with_sstring_0(Car(Cdr(dir)),O(pathname_encoding),top_dir,
-                     { if (asciz_equal(top_dir,"proc")) buffered = -1; });
+                     { if (asciz_equal(top_dir,"proc"))
+                         buffered = BUFFERED_NIL; });
   }
  #endif
-  if (buffered == 0)
-    buffered = (handle_regular ? 1 : -1);
-  if (buffered < 0) {
+  if (buffered == BUFFERED_DEFAULT)
+    buffered = (handle_regular ? BUFFERED_T : BUFFERED_NIL);
+  if (buffered == BUFFERED_NIL) {
     if (!(eltype.kind == eltype_ch) && !((eltype.size % 8) == 0)) {
-      pushSTACK(STACK_4); # Truename, FILE-ERROR slot PATHNAME
+      pushSTACK(STACK_4); /* Truename, FILE-ERROR slot PATHNAME */
       pushSTACK(STACK_0);
       pushSTACK(STACK_(1+2));
       pushSTACK(S(Kelement_type));
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(file_error,GETTEXT("~S: argument ~S ~S was specified, but ~S is not a regular file."));
+      error(file_error,GETTEXT("~S: argument ~S ~S was specified, but ~S is not a regular file."));
     }
     var bool handle_tty = false;
-    if (READ_P(direction)) # only needed for input handles
-      if (!handle_regular) { # regular files are certainly not ttys
+    if (READ_P(direction)) /* only needed for input handles */
+      if (!handle_regular) { /* regular files are certainly not ttys */
         begin_system_call();
         handle_tty = isatty(file_des);
         end_system_call();
       }
     stream = make_unbuffered_stream(strmtype_file,direction,&eltype,
                                     handle_regular,handle_tty);
-    # file-handle-streams are treated for pathname purposes as file-streams
-    # thus (wrt file_write_date) strm_buffered_channel == strm_ochannel,
-    # and we have pathnames now:
-    TheStream(stream)->strm_file_truename = STACK_1; # truename
-    TheStream(stream)->strm_file_name = STACK_2; # filename
-    if (READ_P(direction)) {
+    /* file-handle-streams are treated for pathname purposes as file-streams
+     thus (wrt file_write_date) strm_buffered_channel == strm_ochannel,
+     and we have pathnames now: */
+    TheStream(stream)->strm_file_truename = STACK_1; /* truename */
+    TheStream(stream)->strm_file_name = STACK_2; /* filename */
+    if (READ_P(direction))
       UnbufferedHandleStream_input_init(stream);
-    }
-    if (WRITE_P(direction)) {
+    if (WRITE_P(direction))
       UnbufferedHandleStream_output_init(stream);
-    }
     ChannelStreamLow_close(stream) = &low_close_handle;
   } else {
     if (direction==DIRECTION_IO && !handle_regular) {
-      # FIXME: Instead of signalling an error, we could return some kind
-      # of two-way-stream (cf. make_socket_stream).
-      pushSTACK(STACK_4); # Truename, FILE-ERROR slot PATHNAME
+      /* FIXME: Instead of signalling an error, we could return some kind
+       of two-way-stream (cf. make_socket_stream). */
+      pushSTACK(STACK_4); /* Truename, FILE-ERROR slot PATHNAME */
       pushSTACK(STACK_0);
       pushSTACK(T);
       pushSTACK(S(Kbuffered));
       pushSTACK(S(Kio));
       pushSTACK(S(Kdirection));
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(file_error,GETTEXT("~S: arguments ~S ~S and ~S ~S were specified, but ~S is not a regular file."));
+      error(file_error,GETTEXT("~S: arguments ~S ~S and ~S ~S were specified, but ~S is not a regular file."));
     }
-    # Positioning the buffer on block boundaries is possible only if
-    # 1. the handle refers to a regular file (otherwise read() and
-    #    write() on the handle may be unrelated),
-    # 2. if write access is requested, the handle is known to have
-    #    read access as well (O_RDWR vs. O_WRONLY).
+    /* Positioning the buffer on block boundaries is possible only if
+     1. the handle refers to a regular file (otherwise read() and
+        write() on the handle may be unrelated),
+     2. if write access is requested, the handle is known to have
+        read access as well (O_RDWR vs. O_WRONLY). */
     var bool handle_blockpositioning =
       (handle_regular && (WRITE_P(direction) ? handle_fresh : true));
-    # Now, if direction==DIRECTION_IO(5), handle_blockpositioning is true.
-    # allocate stream:
+    /* Now, if direction==DIRECTION_IO(5), handle_blockpositioning is true.
+     allocate stream: */
     stream = make_buffered_stream(strmtype_file,direction,&eltype,
                                   handle_regular,handle_blockpositioning);
-    TheStream(stream)->strm_file_truename = STACK_1; # truename
-    TheStream(stream)->strm_file_name = STACK_2; # filename
+    TheStream(stream)->strm_file_truename = STACK_1; /* truename */
+    TheStream(stream)->strm_file_name = STACK_2; /* filename */
     BufferedHandleStream_init(stream);
     ChannelStreamLow_close(stream) = &low_close_handle;
+    pushSTACK(stream); /* STACK_0 = stream */
     if (handle_regular && !handle_fresh) {
       var uoff_t position;
-      begin_system_call();
-      handle_lseek(stream,BufferedStream_channel(stream),0,SEEK_CUR,position=);
-      end_system_call();
+      var Handle fd = TheHandle(BufferedStream_channel(stream));
+      begin_blocking_system_call();
+      handle_lseek(&STACK_0,fd,0,SEEK_CUR,position=);
+      end_blocking_system_call();
+      stream = STACK_0;
       position_file_buffered(stream,position);
+      stream = STACK_0;
     }
     if (!nullp(BufferedStream_channel(stream))
         && !(eltype.kind == eltype_ch) && (eltype.size < 8)) {
-      # Type b
-      # read eofposition:
+      /* Type b
+       read eofposition: */
       var uoff_t eofposition = 0;
       var uintC count;
       for (count = 0; count < 8*sizeof(uintL); count += 8) {
         var uintB* ptr = buffered_nextbyte(stream,persev_partial);
+        stream = STACK_0;
         if (ptr == (uintB*)NULL)
           goto too_short;
         eofposition |= ((*ptr) << count);
-        # increment index, because *ptr is processed:
+        /* increment index, because *ptr is processed: */
         BufferedStream_index(stream) += 1;
       }
       if (false) {
        too_short:
-        # File too short (< sizeof(uintL) Bytes)
-        if ((TheStream(stream)->strmflags & strmflags_wr_by_B) == 0) # Read-Only-Stream?
+        /* File too short (< sizeof(uintL) Bytes) */
+        if ((TheStream(stream)->strmflags & strmflags_wr_by_B) == 0) /* Read-Only-Stream? */
           goto bad_eofposition;
-        # File Read/Write -> set eofposition := 0
+        /* File Read/Write -> set eofposition := 0 */
         eofposition = 0;
-        position_file_buffered(stream,0); # move to position 0
-        var uintC count; # and write eofposition = 0
-        dotimespC(count,sizeof(uintL), { buffered_writebyte(stream,0); } );
+        position_file_buffered(stream,0); /* move to position 0 */
+        stream = STACK_0;
+        var uintC count; /* and write eofposition = 0 */
+        dotimespC(count,sizeof(uintL), { buffered_writebyte(stream,0); stream = STACK_0; } );
       } else if (eofposition > (uintV)(vbitm(oint_data_len)-1)) {
        bad_eofposition:
-        # No valid EOF-Position.
-        # close File and report Error:
-        TheStream(stream)->strmflags &= ~strmflags_wr_by_B; # make Stream Read-Only
-        pushSTACK(stream);
+        /* No valid EOF-Position.
+         close File and report Error: */
+        TheStream(stream)->strmflags &= ~strmflags_wr_by_B; /* make Stream Read-Only */
+        /* the stream is already on the stack */
+        /*pushSTACK(stream);*/
         builtin_stream_close(&STACK_0,0);
-        pushSTACK(Truename_or_Self(STACK_0)); # STREAM-ERROR slot STREAM
-        fehler(stream_error,GETTEXT("file ~S is not an integer file"));
+        pushSTACK(Truename_or_Self(STACK_0)); /* STREAM-ERROR slot STREAM */
+        error(stream_error,GETTEXT("file ~S is not an integer file"));
       }
-      # We rely on the read EOF-Position now!
+      /* We rely on the read EOF-Position now! */
       BufferedStream_eofposition(stream) = eofposition;
     }
+    skipSTACK(1); /* the stream */
   }
   skipSTACK(3);
-  # extend List of open File-Streams by stream:
+  /* extend List of open File-Streams by stream: */
   if (direction != DIRECTION_PROBE) {
     if (handle_regular) { /* init file id */
       begin_system_call();
@@ -7855,169 +8210,158 @@ global maygc object make_file_stream (direction_t direction, bool append_flag,
     }
     stream = add_to_open_streams(stream);
   }
-  # treat Mode :APPEND:
-  # CLHS says that :APPEND implies that "the file pointer is _initially_
-  # positioned at the end of the file". Note that this is different from
-  # the Unix O_APPEND semantics.
+  /* treat Mode :APPEND:
+   CLHS says that :APPEND implies that "the file pointer is _initially_
+   positioned at the end of the file". Note that this is different from
+   the Unix O_APPEND semantics. */
   if (append_flag) {
-    if (buffered < 0) {
-      # position to the End:
-      begin_system_call();
-      handle_lseek(stream,TheStream(stream)->strm_ochannel,0,SEEK_END,);
-      end_system_call();
+    pushSTACK(stream);
+    if (buffered == BUFFERED_NIL) {
+      /* position to the End: */
+      var Handle output = TheHandle(TheStream(stream)->strm_ochannel);
+      begin_blocking_system_call();
+      handle_lseek(&STACK_0,output,0,SEEK_END,);
+      end_blocking_system_call();
     } else {
       logical_position_file_end(stream);
     }
+    stream = popSTACK();
   }
   return stream;
 }
 
-# UP: Prepares the Closing of a File-Stream.
-# Thereby the Buffer and poss. eofposition is flushed.
-# buffered_flush_everything(stream);
-# > stream : (open) File-Stream.
-# changed in stream: index, endvalid, buffstart, ...
-local void buffered_flush_everything (object stream) {
-  # For Integer-Streams (Type b) save eofposition:
+/* UP: Prepares the Closing of a File-Stream.
+ Thereby the Buffer and poss. eofposition is flushed.
+ buffered_flush_everything(stream);
+ > stream : (open) File-Stream.
+ changed in stream: index, endvalid, buffstart, ... */
+local maygc void buffered_flush_everything (object stream) {
+  /* For Integer-Streams (Type b) save eofposition: */
   if (ChannelStream_bitsize(stream) > 0 && ChannelStream_bitsize(stream) < 8)
-    if (TheStream(stream)->strmflags & strmflags_wr_by_B) { # only if not read-only
-      position_file_buffered(stream,0); # move to position 0
+    if (TheStream(stream)->strmflags & strmflags_wr_by_B) { /* only if not read-only */
+      pushSTACK(stream);
+      position_file_buffered(stream,0); /* move to position 0 */
+      stream = STACK_0;
       var uoff_t eofposition = BufferedStream_eofposition(stream);
-      # FIXME: We should give an error if eofposition > ~(uintL)0.
+      /* FIXME: We should give an error if eofposition > ~(uintL)0. */
       var uintC count;
       dotimespC(count,sizeof(uintL), {
         buffered_writebyte(stream,(uintB)eofposition);
+        stream = STACK_0;
         eofposition = eofposition>>8;
       });
+      stream = popSTACK();
     }
   if (BufferedStream_modified(stream))
     buffered_flush(stream);
-  # Now the modified_flag is deleted.
+  /* Now the modified_flag is deleted. */
 }
 
-# UP: Moves the pending Output of a File-Stream to the destination.
-# Writes the Buffer of the File-Stream (also physically) to the File.
-# finish_output_buffered(stream);
-# > stream : File-Stream.
-# changed in stream: handle, index, endvalid, buffstart, ..., rd_ch_last
-# can trigger GC
+/* UP: Moves the pending Output of a File-Stream to the destination.
+ Writes the Buffer of the File-Stream (also physically) to the File.
+ finish_output_buffered(stream);
+ > stream : File-Stream.
+ changed in stream: handle, index, endvalid, buffstart, ..., rd_ch_last
+ can trigger GC */
 local maygc void finish_output_buffered (object stream) {
-  # Handle=NIL (Stream already closed) -> finished:
+  /* Handle=NIL (Stream already closed) -> finished: */
   if (nullp(BufferedStream_channel(stream)))
     return;
-  # no File with write-access -> nothing to do:
+  /* no File with write-access -> nothing to do: */
   if (!(TheStream(stream)->strmflags & strmflags_wr_B))
     return;
-  # flush pending Output in the iconv-Descriptor:
-  oconv_unshift_output_buffered(stream);
-  # poss. flush Buffer and eofposition:
+  pushSTACK(stream);
+  /* flush pending Output in the iconv-Descriptor: */
+  (void)oconv_unshift_output_buffered(stream,0);
+  stream = STACK_0;
+  /* poss. flush Buffer and eofposition: */
   buffered_flush_everything(stream);
-  # Now the modified_flag is deleted.
+  stream = STACK_0;
+  /* Now the modified_flag is deleted. */
   if (ChannelStream_regular(stream)) {
    #ifdef UNIX
     #ifdef HAVE_FSYNC
-    begin_system_call();
-    if (fsync(TheHandle(BufferedStream_channel(stream)))) {
-      end_system_call(); OS_filestream_error(stream);
+    Handle fd=TheHandle(BufferedStream_channel(stream));
+    begin_blocking_system_call();
+    if (fsync(fd)) {
+      end_blocking_system_call(); OS_filestream_error(popSTACK());
     }
-    end_system_call();
+    end_blocking_system_call();
+    stream = STACK_0;
     #endif
-   #else
-    if (!nullp(TheStream(stream)->strm_file_truename)) { # avoid closing stdout_handle
-    #if 0
-     # close File (DOS writes physically):
-      begin_system_call();
-      if ( CLOSE(TheHandle(BufferedStream_channel(stream))) <0) {
-        end_system_call(); OS_filestream_error(stream);
-      }
-      end_system_call();
-      # reopen File:
-      pushSTACK(stream); # save stream
-      pushSTACK(TheStream(stream)->strm_file_truename); # Filename
-      # Directory alrady exists:
-      var object namestring = assume_dir_exists(); # Filename as ASCIZ-String
-      var sintW handle;
-      with_sstring_0(namestring,O(pathname_encoding),namestring_asciz, {
-        begin_system_call();
-        handle = OPEN(namestring_asciz,O_RDWR); # reopen file
-        if (handle < 0) { end_system_call(); OS_filestream_error(STACK_1); }
-        end_system_call();
-      });
-      # Now handle contains the Handle of the opened File.
-      var object handlobj = allocate_handle(handle);
-      skipSTACK(1);
-      stream = popSTACK(); # restore stream
-      # enter new Handle:
-      BufferedStream_channel(stream) = handlobj;
-    #endif
-    }
    #endif
   }
-  # and reposition:
+  skipSTACK(1);
+  /* and reposition: */
   var uoff_t position = BufferedStream_buffstart(stream) + BufferedStream_index(stream);
-  BufferedStream_index(stream) = 0; # index := 0
+  BufferedStream_index(stream) = 0; /* index := 0 */
   BufferedStream_endvalid(stream) = 0;
   if (!BufferedStream_blockpositioning(stream)) {
     BufferedStream_buffstart(stream) = position;
   } else {
-    BufferedStream_buffstart(stream) = 0; # buffstart := 0
+    BufferedStream_buffstart(stream) = 0; /* buffstart := 0 */
     position_file_buffered(stream,position);
   }
-  # Components position, ..., lastchar remain unchanged
+  /* Components position, ..., lastchar remain unchanged */
 }
 
-# UP: Moves the pending Output of a File-Stream to the destination.
-# Writes the Buffer of the File-Stream (also physically) to the File.
-# force_output_buffered(stream);
-# > stream : File-Stream.
-# changed in stream: handle, index, endvalid, buffstart, ..., rd_ch_last
-# can trigger GC
+/* UP: Moves the pending Output of a File-Stream to the destination.
+ Writes the Buffer of the File-Stream (also physically) to the File.
+ force_output_buffered(stream);
+ > stream : File-Stream.
+ changed in stream: handle, index, endvalid, buffstart, ..., rd_ch_last
+ can trigger GC */
   #define force_output_buffered  finish_output_buffered
 
-# UP: Declares a File-Stream as closed.
-# closed_buffered(stream);
-# > stream : (open) File-Stream.
-# changed in stream: all Components except name and truename
+/* UP: Declares a File-Stream as closed.
+ closed_buffered(stream);
+ > stream : (open) File-Stream.
+ changed in stream: all Components except name and truename */
 local void closed_buffered (object stream) {
-  BufferedStream_channel(stream) = NIL; # Handle becomes invalid
-  BufferedStream_buffer(stream) = NIL; # free Buffer
-  BufferedStream_buffstart(stream) = 0; # delete buffstart (unnecessary)
-  BufferedStream_endvalid(stream) = 0; # delete endvalid (unnecessary)
-  BufferedStream_index(stream) = 0; # delete index (unnecessary)
-  BufferedStream_modified(stream) = false; # delete modified_flag (unnecessary)
-  BufferedStream_position(stream) = 0; # delete position (unnecessary)
-  BufferedStream_have_eof_p(stream) = false; # delete have_eof_p (unnecessary)
+  BufferedStream_channel(stream) = NIL; /* Handle becomes invalid */
+  BufferedStream_buffer(stream) = NIL; /* free Buffer */
+  BufferedStream_buffstart(stream) = 0; /* delete buffstart (unnecessary) */
+  BufferedStream_endvalid(stream) = 0; /* delete endvalid (unnecessary) */
+  BufferedStream_index(stream) = 0; /* delete index (unnecessary) */
+  BufferedStream_modified(stream) = false; /* delete modified_flag (unnecessary) */
+  BufferedStream_position(stream) = 0; /* delete position (unnecessary) */
+  BufferedStream_have_eof_p(stream) = false; /* delete have_eof_p (unnecessary) */
   if (ChannelStream_bitsize(stream) > 0) {
-    ChannelStream_bitsize(stream) = 0; # delete bitsize
-    TheStream(stream)->strm_bitbuffer = NIL; # free Bitbuffer
+    ChannelStream_bitsize(stream) = 0; /* delete bitsize */
+    TheStream(stream)->strm_bitbuffer = NIL; /* free Bitbuffer */
   }
-  #if defined(UNICODE) && defined(HAVE_GOOD_ICONV)
-  ChannelStream_iconvdesc(stream) = (iconv_t)0; # delete iconvdesc
-  ChannelStream_oconvdesc(stream) = (iconv_t)0; # delete oconvdesc
+  #if defined(ENABLE_UNICODE) && defined(HAVE_GOOD_ICONV)
+  ChannelStream_iconvdesc(stream) = (iconv_t)0; /* delete iconvdesc */
+  ChannelStream_oconvdesc(stream) = (iconv_t)0; /* delete oconvdesc */
   #endif
 }
 
 /* UP: Closes a File-Stream.
- close_buffered(stream);
+ close_buffered(stream, abort);
  > stream : File-Stream.
  > abort: flag: non-0 => ignore errors
  changed in stream: all Components except name and truename */
-local void close_buffered (object stream, uintB abort) {
-  # Handle=NIL (Stream already closed) -> finished:
+local maygc void close_buffered (object stream, uintB abort) {
+  /* Handle=NIL (Stream already closed) -> finished: */
   if (nullp(BufferedStream_channel(stream)))
     return;
-  # Flush pending Output in the iconv-Descriptor:
-  oconv_unshift_output_buffered(stream);
-  # poss. flush Buffer and eofposition:
-  buffered_flush_everything(stream);
-  # Now the modified_flag is deleted.
-  # close File:
+  pushSTACK(stream);
+  /* Flush pending Output in the iconv-Descriptor: */
+  if (!oconv_unshift_output_buffered(stream,abort)) { /* success */
+    stream = STACK_0;
+    /* poss. flush Buffer and eofposition: */
+    MAYBE_IGNORE_ERRORS(abort,buffered_flush_everything(stream));
+  }
+  stream = STACK_0;
+  /* Now the modified_flag is deleted (unless aborted!)
+   close File: */
   ChannelStreamLow_close(stream)(stream,BufferedStream_channel(stream),abort);
-  ChannelStream_fini(stream);
-  # make Components invalid (close_dummys comes later):
+  stream = popSTACK();
+  ChannelStream_fini(stream,abort);
+  /* make Components invalid (close_dummys comes later): */
   closed_buffered(stream);
-  # remove stream from the List of all open File-Streams:
-  O(open_files) = deleteq(O(open_files),stream);
+  /* remove stream from the List of all open File-Streams: */
+  remove_from_open_streams(stream);
 }
 
 LISPFUNNF(file_stream_p,1)
@@ -8030,55 +8374,55 @@ LISPFUNNF(file_stream_p,1)
 
 #ifdef KEYBOARD
 
-# Keyboard-Stream
-# ===============
+/* Keyboard-Stream
+   ===============
 
-# Functionality:
-# Reads a character from the keyboard.
-# Returns a Character with Font=0 and following Bits:
-#   HYPER      if special key.
-#              Among the special keys are the Non-Standard-Tasten.
-#   CHAR-CODE  For normal keys the Ascii-Code,
-#   SUPER      if pressed with Shift-Key(s) and another Code had been the result
-#                without Shift,
-#   CONTROL    if pressed with Control-Key,
-#   META       if pressed with Alternate-Key.
+ Functionality:
+ Reads a character from the keyboard.
+ Returns a Character with Font=0 and following Bits:
+   HYPER      if special key.
+              Among the special keys are the Non-Standard-Tasten.
+   CHAR-CODE  For normal keys the Ascii-Code,
+   SUPER      if pressed with Shift-Key(s) and another Code had been the result
+                without Shift,
+   CONTROL    if pressed with Control-Key,
+   META       if pressed with Alternate-Key. */
 
-#if defined(UNIX) && !defined(NEXTAPP)
-  # Additional Components:
-  #define strm_keyboard_isatty  strm_isatty   # Flag, if stdin is a Terminal
-  #define strm_keyboard_handle  strm_ichannel # Handle for listen_char_unbuffered()
-  #define strm_keyboard_buffer  strm_field1   # List of still to be delivered characters
-  #define strm_keyboard_keytab  strm_field2   # List of all key bindings
-                                              # always (char1 ... charn . result)
+#if defined(UNIX)
+  /* Additional Components: */
+  #define strm_keyboard_isatty  strm_isatty   /* Flag, if stdin is a Terminal */
+  #define strm_keyboard_handle  strm_ichannel /* Handle for listen_char_unbuffered() */
+  #define strm_keyboard_buffer  strm_field1   /* List of still to be delivered characters */
+  #define strm_keyboard_keytab  strm_field2   /* List of all key bindings */
+                                              /* always (char1 ... charn . result) */
   #define strm_keyboard_len  strm_channel_len
   #define strm_keyboard_xlen  sizeof(strm_unbuffered_extrafields_t)
 #elif defined(WIN32_NATIVE)
-  # Additional Components:
-  #define strm_keyboard_isatty  strm_isatty   # Flag, if stdin is a Terminal
-  #define strm_keyboard_handle  strm_ichannel # Handle for listen_char_unbuffered()
+  /* Additional Components: */
+  #define strm_keyboard_isatty  strm_isatty   /* Flag, if stdin is a Terminal */
+  #define strm_keyboard_handle  strm_ichannel /* Handle for listen_char_unbuffered() */
   #define strm_keyboard_len  strm_channel_len
   #define strm_keyboard_xlen  sizeof(strm_unbuffered_extrafields_t)
 #else
-  # No Additional Components:
+  /* No Additional Components: */
   #define strm_keyboard_len  strm_len
   #define strm_keyboard_xlen  0
 #endif
 
-# The keyboard events are instances of INPUT-CHARACTER. We create them by
-# calling MAKE-INPUT-CHARACTER or MAKE-CHAR. The following structure describes
-# the arguments to MAKE-INPUT-CHARACTER.
+/* The keyboard events are instances of INPUT-CHARACTER. We create them by
+ calling MAKE-INPUT-CHARACTER or MAKE-CHAR. The following structure describes
+ the arguments to MAKE-INPUT-CHARACTER. */
 typedef struct {
   const char * key;
   chart code;
   uintB bits;
 } key_event_t;
 
-# Initializers for the two most common kinds of keyboard events.
+/* Initializers for the two most common kinds of keyboard events. */
   #define key_ascii(asc)  { NULL, ascii(asc), 0 }
   #define key_special(name)  { name, ascii(0), char_hyper_c }
 
-# Creates a keyboard event.
+/* Creates a keyboard event. */
 local object make_key_event (const key_event_t* event) {
   if ((event->key == NULL) && (event->bits == 0)) {
     pushSTACK(S(Kchar)); pushSTACK(code_char(event->code));
@@ -8095,90 +8439,83 @@ local object make_key_event (const key_event_t* event) {
   return value1;
 }
 
-# Values for the bits, must agree with xcharin.lisp.
+/* Values for the bits, must agree with xcharin.lisp. */
   #define char_control_c  1
   #define char_meta_c     2
   #define char_super_c    4
   #define char_hyper_c    8
 
-# Determines, if a Character is available on the Keyboard-Stream.
-# listen_char_keyboard(stream)
-# > stream: Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
+/* Determines, if a Character is available on the Keyboard-Stream.
+ listen_char_keyboard(stream)
+ > stream: Stream
+ < result: input availability */
 #ifdef WIN32_NATIVE
-local signean listen_char_keyboard (object stream) {
+local listen_t listen_char_keyboard (object stream) {
   var Handle handle = TheHandle(TheStream(stream)->strm_keyboard_handle);
-  # See the implementation of listen_char_unbuffered() for consoles.
+  /* See the implementation of listen_char_unbuffered() for consoles. */
   var DWORD nevents;
   begin_system_call();
   if (!GetNumberOfConsoleInputEvents(handle,&nevents)) {
     OS_error();
   }
-  # It's a console.
-  if (nevents==0) { # no character available
-    end_system_call(); return ls_wait;
+  /* It's a console. */
+  if (nevents==0) { /* no character available */
+    end_system_call(); return LISTEN_WAIT;
   }
   var INPUT_RECORD* events = (INPUT_RECORD*)alloca(nevents*sizeof(INPUT_RECORD));
   var DWORD nevents_read;
   if (!PeekConsoleInput(handle,events,nevents,&nevents_read)) {
     OS_error();
   }
-  if (nevents_read==0) { # no character available
-    end_system_call(); return ls_wait;
+  if (nevents_read==0) { /* no character available */
+    end_system_call(); return LISTEN_WAIT;
   }
-  { # Look out for any Key-Down event.
+  { /* Look out for any Key-Down event. */
     var DWORD i;
     for (i = 0; i < nevents_read; i++) {
       if (events[i].EventType == KEY_EVENT
           && events[i].Event.KeyEvent.bKeyDown
           && events[i].Event.KeyEvent.uAsciiChar != 0) {
-        # character available
-        end_system_call(); return ls_avail;
+        /* character available */
+        end_system_call(); return LISTEN_AVAIL;
       }
     }
   }
-  # no character available
-  end_system_call(); return ls_wait;
+  /* no character available */
+  end_system_call(); return LISTEN_WAIT;
 }
 #endif
-#if defined(UNIX) && !defined(NEXTAPP)
+#if defined(UNIX)
   #define listen_char_keyboard  listen_char_unbuffered
 #endif
-#if defined(NEXTAPP)
-  #define listen_char_keyboard(stream)  (stream, ls_eof)
-#endif
 
-# UP: Deletes already entered interactive Input from a Keyboard-Stream.
-# clear_input_keyboard(stream);
-# > stream: Stream
-# < result: true if Input was deleted, else false
+/* UP: Deletes already entered interactive Input from a Keyboard-Stream.
+ clear_input_keyboard(stream);
+ > stream: Stream
+ < result: true if Input was deleted, else false */
 local bool clear_input_keyboard (object stream) {
  #ifdef WIN32_NATIVE
   clear_tty_input(TheHandle(TheStream(stream)->strm_keyboard_handle));
   pushSTACK(stream);
-  while (ls_avail_p(listen_char_keyboard(STACK_0))) {
+  while (LISTEN_AVAIL == listen_char_keyboard(STACK_0))
     read_char(&STACK_0);
-  }
   skipSTACK(1);
  #endif
- #if defined(UNIX) && !defined(NEXTAPP)
-  if (nullp(TheStream(stream)->strm_keyboard_isatty)) # File -> do nothing
+ #if defined(UNIX)
+  if (nullp(TheStream(stream)->strm_keyboard_isatty)) /* File -> do nothing */
     return false;
-  # Terminal
-  TheStream(stream)->strm_rd_ch_last = NIL; # EOF forgotten
+  /* Terminal */
+  TheStream(stream)->strm_rd_ch_last = NIL; /* EOF forgotten */
   clear_tty_input(stdin_handle);
   pushSTACK(stream);
-  while (ls_avail_p(listen_char_keyboard(STACK_0))) {
+  while (LISTEN_AVAIL == listen_char_keyboard(STACK_0))
     read_char(&STACK_0);
-  }
   skipSTACK(1);
  #endif
   return true;
 }
 
-# Read a character from Keyboard:
+/* Read a character from Keyboard: */
 #ifdef WIN32_NATIVE
 local object rd_ch_keyboard (const gcv_object_t* stream_) {
   var INPUT_RECORD event;
@@ -8187,11 +8524,11 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
  restart_it:
   handle = TheHandle(TheStream(*stream_)->strm_keyboard_handle);
   begin_system_call();
-  loop {
+  while (1) {
     if (!ReadConsoleInput1(handle,&event,&nevents_read)) {
-      if (GetLastError()==ERROR_SIGINT) { # Break by Ctrl-C ?
+      if (GetLastError()==ERROR_SIGINT) { /* Break by Ctrl-C ? */
         end_system_call();
-        pushSTACK(S(read_char)); tast_break(); # call Break-Loop
+        pushSTACK(S(read_char)); tast_break(); /* call Break-Loop */
         goto restart_it;
       }
       OS_error();
@@ -8207,43 +8544,43 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
         }
       }
       if ((uintB)event.Event.KeyEvent.uAsciiChar <= ' ') {
-        # Translate Virtual Keycode.
+        /* Translate Virtual Keycode. */
         local const struct { WORD vkcode; key_event_t myevent; } vktable[] = {
-          VK_BACK,    { NULL,  BS, 0 },               # #\Backspace
-          VK_TAB,     { NULL, TAB, 0 },               # #\Tab
-          VK_CLEAR,   { NULL, PG, 0 },                # #\Page
-          VK_RETURN,  { NULL,  CR, 0 },               # #\Return
-          VK_ESCAPE,  { NULL, ESC, 0 },               # #\Escape
+          VK_BACK,    { NULL,  BS, 0 },               /* #\Backspace */
+          VK_TAB,     { NULL, TAB, 0 },               /* #\Tab */
+          VK_CLEAR,   { NULL, PG, 0 },                /* #\Page */
+          VK_RETURN,  { NULL,  CR, 0 },               /* #\Return */
+          VK_ESCAPE,  { NULL, ESC, 0 },               /* #\Escape */
           VK_SHIFT,   { "SHIFT", 0, 0 },
           VK_CONTROL, { "CONTROL", 0, 0 },
           VK_MENU,    { "MENU", 0, 0 },
           VK_PAUSE,   { "PAUSE", 0, 0 },
           VK_CAPITAL, { "CAPITAL", 0, 0 },
-          VK_LEFT,    { "LEFT", 0, char_hyper_c },    # #\Left
-          VK_RIGHT,   { "RIGHT", 0, char_hyper_c },   # #\Right
-          VK_UP,      { "UP", 0, char_hyper_c },      # #\Up
-          VK_DOWN,    { "DOWN", 0, char_hyper_c },    # #\Down
-          VK_PRIOR,   { "PGUP", 0, char_hyper_c },    # #\PgUp
-          VK_NEXT,    { "PGDN", 0, char_hyper_c },    # #\PgDn
-          VK_HOME,    { "HOME", 0, char_hyper_c },    # #\Home
-          VK_END,     { "END", 0, char_hyper_c },     # #\End
-          VK_INSERT,  { "INSERT", 0, char_hyper_c },  # #\Insert
-          VK_DELETE,  { "DELETE", 0, char_hyper_c },  # #\Delete
-          12,         { "CENTER", 0, char_hyper_c },  # #\Center
-          VK_F1,      { "F1", 0, char_hyper_c },      # #\F1
-          VK_F2,      { "F2", 0, char_hyper_c },      # #\F2
-          VK_F3,      { "F3", 0, char_hyper_c },      # #\F3
-          VK_F4,      { "F4", 0, char_hyper_c },      # #\F4
-          VK_F5,      { "F5", 0, char_hyper_c },      # #\F5
-          VK_F6,      { "F6", 0, char_hyper_c },      # #\F6
-          VK_F7,      { "F7", 0, char_hyper_c },      # #\F7
-          VK_F8,      { "F8", 0, char_hyper_c },      # #\F8
-          VK_F9,      { "F9", 0, char_hyper_c },      # #\F9
-          VK_F10,     { "F10", 0, char_hyper_c },     # #\F10
-          VK_F11,     { "F11", 0, char_hyper_c },     # #\F11
-          VK_F12,     { "F12", 0, char_hyper_c },     # #\F12
-          VK_LWIN,    { "WIN", 0, char_hyper_c },     # Win key
-          VK_RWIN,    { "WIN", 0, char_hyper_c },     # Same
+          VK_LEFT,    { "LEFT", 0, char_hyper_c },    /* #\Left */
+          VK_RIGHT,   { "RIGHT", 0, char_hyper_c },   /* #\Right */
+          VK_UP,      { "UP", 0, char_hyper_c },      /* #\Up */
+          VK_DOWN,    { "DOWN", 0, char_hyper_c },    /* #\Down */
+          VK_PRIOR,   { "PGUP", 0, char_hyper_c },    /* #\PgUp */
+          VK_NEXT,    { "PGDN", 0, char_hyper_c },    /* #\PgDn */
+          VK_HOME,    { "HOME", 0, char_hyper_c },    /* #\Home */
+          VK_END,     { "END", 0, char_hyper_c },     /* #\End */
+          VK_INSERT,  { "INSERT", 0, char_hyper_c },  /* #\Insert */
+          VK_DELETE,  { "DELETE", 0, char_hyper_c },  /* #\Delete */
+          12,         { "CENTER", 0, char_hyper_c },  /* #\Center */
+          VK_F1,      { "F1", 0, char_hyper_c },      /* #\F1 */
+          VK_F2,      { "F2", 0, char_hyper_c },      /* #\F2 */
+          VK_F3,      { "F3", 0, char_hyper_c },      /* #\F3 */
+          VK_F4,      { "F4", 0, char_hyper_c },      /* #\F4 */
+          VK_F5,      { "F5", 0, char_hyper_c },      /* #\F5 */
+          VK_F6,      { "F6", 0, char_hyper_c },      /* #\F6 */
+          VK_F7,      { "F7", 0, char_hyper_c },      /* #\F7 */
+          VK_F8,      { "F8", 0, char_hyper_c },      /* #\F8 */
+          VK_F9,      { "F9", 0, char_hyper_c },      /* #\F9 */
+          VK_F10,     { "F10", 0, char_hyper_c },     /* #\F10 */
+          VK_F11,     { "F11", 0, char_hyper_c },     /* #\F11 */
+          VK_F12,     { "F12", 0, char_hyper_c },     /* #\F12 */
+          VK_LWIN,    { "WIN", 0, char_hyper_c },     /* Win key */
+          VK_RWIN,    { "WIN", 0, char_hyper_c },     /* Same */
           VK_APPS,    { "APPS", 0, char_hyper_c },    /* App key */
           VK_SELECT,  { "SELECT", 0, char_hyper_c },
           VK_PRINT,   { "PRINT", 0, char_hyper_c },
@@ -8282,58 +8619,58 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
           VK_LAUNCH_APP1, { "LAUNCH_APP1", 0, char_hyper_c },
           VK_LAUNCH_APP2, { "LAUNCH_APP2", 0, char_hyper_c },
          #endif
-          ' ',        { NULL, ' ', 0 },               # #\Space
-          '0',        { NULL, '0', 0 },               # #\0
-          '1',        { NULL, '1', 0 },               # #\1
-          '2',        { NULL, '2', 0 },               # #\2
-          '3',        { NULL, '3', 0 },               # #\3
-          '4',        { NULL, '4', 0 },               # #\4
-          '5',        { NULL, '5', 0 },               # #\5
-          '6',        { NULL, '6', 0 },               # #\6
-          '7',        { NULL, '7', 0 },               # #\7
-          '8',        { NULL, '8', 0 },               # #\8
-          '9',        { NULL, '9', 0 },               # #\9
-          'A',        { NULL, 'A', 0 },               # #\A
-          'B',        { NULL, 'B', 0 },               # #\B
-          'C',        { NULL, 'C', 0 },               # #\C
-          'D',        { NULL, 'D', 0 },               # #\D
-          'E',        { NULL, 'E', 0 },               # #\E
-          'F',        { NULL, 'F', 0 },               # #\F
-          'G',        { NULL, 'G', 0 },               # #\G
-          'H',        { NULL, 'H', 0 },               # #\H
-          'I',        { NULL, 'I', 0 },               # #\I
-          'J',        { NULL, 'J', 0 },               # #\J
-          'K',        { NULL, 'K', 0 },               # #\K
-          'L',        { NULL, 'L', 0 },               # #\L
-          'M',        { NULL, 'M', 0 },               # #\M
-          'N',        { NULL, 'N', 0 },               # #\N
-          'O',        { NULL, 'O', 0 },               # #\O
-          'P',        { NULL, 'P', 0 },               # #\P
-          'Q',        { NULL, 'Q', 0 },               # #\Q
-          'R',        { NULL, 'R', 0 },               # #\R
-          'S',        { NULL, 'S', 0 },               # #\S
-          'T',        { NULL, 'T', 0 },               # #\T
-          'U',        { NULL, 'U', 0 },               # #\U
-          'V',        { NULL, 'V', 0 },               # #\V
-          'W',        { NULL, 'W', 0 },               # #\W
-          'X',        { NULL, 'X', 0 },               # #\X
-          'Y',        { NULL, 'Y', 0 },               # #\Y
-          'Z',        { NULL, 'Z', 0 },               # #\Z
-          107,        { NULL, '+', char_hyper_c },    # #\HYPER-+
-          109,        { NULL, '-', char_hyper_c },    # #\HYPER--
-          106,        { NULL, '*', char_hyper_c },    # #\HYPER-*
-          111,        { NULL, '/', char_hyper_c },    # #\HYPER-/
-          186,        { NULL, ';', 0 },               # #\;
-          187,        { NULL, '=', 0 },               # #\=
-          188,        { NULL, ',', 0 },               # #\,
-          189,        { NULL, '-', 0 },               # #\-
-          190,        { NULL, '.', 0 },               # #\.
-          191,        { NULL, '/', 0 },               # #\/
-          192,        { NULL, '`', 0 },               # #\`
-          219,        { NULL, '[', 0 },               # #\[
-          220,        { NULL, '\\', 0 },              # #\\
-          221,        { NULL, ']', 0 },               # #\]
-          222,        { NULL, '\'', 0 },              # #\'
+          ' ',        { NULL, ' ', 0 },               /* #\Space */
+          '0',        { NULL, '0', 0 },               /* #\0 */
+          '1',        { NULL, '1', 0 },               /* #\1 */
+          '2',        { NULL, '2', 0 },               /* #\2 */
+          '3',        { NULL, '3', 0 },               /* #\3 */
+          '4',        { NULL, '4', 0 },               /* #\4 */
+          '5',        { NULL, '5', 0 },               /* #\5 */
+          '6',        { NULL, '6', 0 },               /* #\6 */
+          '7',        { NULL, '7', 0 },               /* #\7 */
+          '8',        { NULL, '8', 0 },               /* #\8 */
+          '9',        { NULL, '9', 0 },               /* #\9 */
+          'A',        { NULL, 'A', 0 },               /* #\A */
+          'B',        { NULL, 'B', 0 },               /* #\B */
+          'C',        { NULL, 'C', 0 },               /* #\C */
+          'D',        { NULL, 'D', 0 },               /* #\D */
+          'E',        { NULL, 'E', 0 },               /* #\E */
+          'F',        { NULL, 'F', 0 },               /* #\F */
+          'G',        { NULL, 'G', 0 },               /* #\G */
+          'H',        { NULL, 'H', 0 },               /* #\H */
+          'I',        { NULL, 'I', 0 },               /* #\I */
+          'J',        { NULL, 'J', 0 },               /* #\J */
+          'K',        { NULL, 'K', 0 },               /* #\K */
+          'L',        { NULL, 'L', 0 },               /* #\L */
+          'M',        { NULL, 'M', 0 },               /* #\M */
+          'N',        { NULL, 'N', 0 },               /* #\N */
+          'O',        { NULL, 'O', 0 },               /* #\O */
+          'P',        { NULL, 'P', 0 },               /* #\P */
+          'Q',        { NULL, 'Q', 0 },               /* #\Q */
+          'R',        { NULL, 'R', 0 },               /* #\R */
+          'S',        { NULL, 'S', 0 },               /* #\S */
+          'T',        { NULL, 'T', 0 },               /* #\T */
+          'U',        { NULL, 'U', 0 },               /* #\U */
+          'V',        { NULL, 'V', 0 },               /* #\V */
+          'W',        { NULL, 'W', 0 },               /* #\W */
+          'X',        { NULL, 'X', 0 },               /* #\X */
+          'Y',        { NULL, 'Y', 0 },               /* #\Y */
+          'Z',        { NULL, 'Z', 0 },               /* #\Z */
+          107,        { NULL, '+', char_hyper_c },    /* #\HYPER-+ */
+          109,        { NULL, '-', char_hyper_c },    /* #\HYPER-- */
+          106,        { NULL, '*', char_hyper_c },    /* #\HYPER-* */
+          111,        { NULL, '/', char_hyper_c },    /* #\HYPER-/ */
+          186,        { NULL, ';', 0 },               /* #\; */
+          187,        { NULL, '=', 0 },               /* #\= */
+          188,        { NULL, ',', 0 },               /* #\, */
+          189,        { NULL, '-', 0 },               /* #\- */
+          190,        { NULL, '.', 0 },               /* #\. */
+          191,        { NULL, '/', 0 },               /* #\/ */
+          192,        { NULL, '`', 0 },               /* #\` */
+          219,        { NULL, '[', 0 },               /* #\[ */
+          220,        { NULL, '\\', 0 },              /* #\ */\
+          221,        { NULL, ']', 0 },               /* #\] */
+          222,        { NULL, '\'', 0 },              /* #\' */
         };
         var int i;
         for (i = 0; i < sizeof(vktable)/sizeof(vktable[0]); i++) {
@@ -8360,7 +8697,7 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
             & (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED))
           ev.bits |= char_meta_c;
       } else {
-       #ifdef UNICODE
+       #ifdef ENABLE_UNICODE
         var object encoding = TheStream(*stream_)->strm_encoding;
         var chart c = as_chart(0);
         var uintB buf[max_bytes_per_chart];
@@ -8371,8 +8708,8 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
         Encoding_mbstowcs(encoding)
           (encoding,*stream_,&bptr,bptr+max_bytes_per_chart,&cptr,cptr+1);
        #else
-        var chart c = event.Event.KeyEvent.uAsciiChar;
-        var cint ci = as_cint(c);
+        var cint ci = event.Event.KeyEvent.uAsciiChar;
+        var chart c = as_chart(ci);
         OemToCharBuff((char *)&ci,(char *)&ci,1);
         c = as_chart(ci);
        #endif
@@ -8381,9 +8718,9 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
         ev.bits = 0;
         if (event.Event.KeyEvent.dwControlKeyState &
             (LEFT_ALT_PRESSED | RIGHT_ALT_PRESSED)) {
-          # c = 'a'..'z' -> translate to 'A'..'Z'
-          # c = 'A'..'Z' -> add "Shift"
-          # c = '<','>' etc. -> don't add "Shift"
+          /* c = 'a'..'z' -> translate to 'A'..'Z'
+           c = 'A'..'Z' -> add "Shift"
+           c = '<','>' etc. -> don't add "Shift" */
           ev.code = up_case(ev.code);
           if (!chareq(ev.code,down_case(ev.code))) {
             if (event.Event.KeyEvent.dwControlKeyState & SHIFT_PRESSED)
@@ -8395,19 +8732,19 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
       end_system_call();
       return make_key_event(&ev);
     }
-    # Other events are silently thrown away.
+    /* Other events are silently thrown away. */
   }
 }
 #endif
 
-#if defined(UNIX) && !defined(NEXTAPP)
+#if defined(UNIX)
 local inline gcv_object_t* kbd_last_buf (const object stream) {
   var gcv_object_t* last_ = &TheStream(stream)->strm_keyboard_buffer;
   while (mconsp(*last_)) { last_ = &Cdr(*last_); }
   return last_;
 }
 
-# cf. rd_ch_unbuffered() :
+/* cf. rd_ch_unbuffered() : */
 local object rd_ch_keyboard (const gcv_object_t* stream_) {
  restart_it: {
   var object stream = *stream_;
@@ -8451,10 +8788,10 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
       Car(new_cons) = code_char(as_chart(c)); /* FIXME: This should take into account the encoding. */
       *kbd_last_buf(stream = *stream_) = new_cons;
     }
-    # Is the buffer a complete sequence of characters for a key,
-    # so we will return this key. Is the buffer a genuine starting piece
-    # of a sequence of characters for a key, so we will wait a little bit.
-    # Otherwise we start to empty the buffer character for character.
+    /* Is the buffer a complete sequence of characters for a key,
+     so we will return this key. Is the buffer a genuine starting piece
+     of a sequence of characters for a key, so we will wait a little bit.
+     Otherwise we start to empty the buffer character for character. */
     {
       var object keytab = TheStream(stream)->strm_keyboard_keytab;
       while (consp(keytab)) {
@@ -8466,7 +8803,7 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
         }
         if (atomp(L2)) {
           if (atomp(L1)) {
-            # complete sequence of characters
+            /* complete sequence of characters */
             TheStream(stream)->strm_keyboard_buffer = NIL;
             return L1;
           }
@@ -8483,7 +8820,7 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
           L1 = Cdr(L1); L2 = Cdr(L2);
         }
         if (atomp(L2))
-          # As consp(L1), the starting piece of a sequence of characters is there.
+          /* As consp(L1), the starting piece of a sequence of characters is there. */
           goto wait_for_another;
       }
     }
@@ -8491,18 +8828,18 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
   wait_for_another:
   #if defined(HAVE_POLL)
     {
-      # Use poll() with a single handle {stdin_handle}
-      # and timeout = zero interval.
+      /* Use poll() with a single handle {stdin_handle}
+       and timeout = zero interval. */
       var struct pollfd pollfd_bag[1];
       pollfd_bag[0].fd = stdin_handle;
       pollfd_bag[0].events = POLLIN;
       pollfd_bag[0].revents = 0;
      restart_poll:
-      run_time_stop(); # hold run time clock
+      run_time_stop(); /* hold run time clock */
       begin_system_call();
-      var int result = poll(&pollfd_bag[0],1,100); # 1/10 sec
+      var int result = poll(&pollfd_bag[0],1,100); /* 1/10 sec */
       end_system_call();
-      run_time_restart(); # resume run time clock
+      run_time_restart(); /* resume run time clock */
       if (result<0) {
         begin_system_call();
         if (errno==EINTR) {
@@ -8510,27 +8847,27 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
         }
         OS_error();
       } else {
-        # revents has POLLIN or some other bits set if read() would return
-        # without blocking.
+        /* revents has POLLIN or some other bits set if read() would return
+         without blocking. */
         if (pollfd_bag[0].revents == 0)
-          goto empty_buffer; # no character available
+          goto empty_buffer; /* no character available */
       }
     }
   #elif defined(HAVE_SELECT) && !defined(UNIX_BEOS)
     {
-      # Use select with readfds = one-element set {stdin_handle}
-      # and timeout = small time-interval.
-      var fd_set handle_set; # set of handles := {stdin_handle}
-      var struct timeval small_time; # time-interval := 0
+      /* Use select with readfds = one-element set {stdin_handle}
+       and timeout = small time-interval. */
+      var fd_set handle_set; /* set of handles := {stdin_handle} */
+      var struct timeval small_time; /* time-interval := 0 */
       FD_ZERO(&handle_set); FD_SET(stdin_handle,&handle_set);
     restart_select:
-      small_time.tv_sec = 0; small_time.tv_usec = 1000000/10; # 1/10 sec
-      run_time_stop(); # hold run time clock
+      small_time.tv_sec = 0; small_time.tv_usec = 1000000/10; /* 1/10 sec */
+      run_time_stop(); /* hold run time clock */
       begin_system_call();
       var int result;
       result = select(FD_SETSIZE,&handle_set,NULL,NULL,&small_time);
       end_system_call();
-      run_time_restart(); # resume run time clock
+      run_time_restart(); /* resume run time clock */
       if (result<0) {
         begin_system_call();
         if (errno==EINTR) {
@@ -8541,25 +8878,25 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
         }
         end_system_call();
       } else {
-        # result = number of Handles in handle_set, for which read
-        # would return a result immediately.
+        /* result = number of Handles in handle_set, for which read
+         would return a result immediately. */
         if (result==0)
-          goto empty_buffer; # no character available
-        # result=1 -> character available
+          goto empty_buffer; /* no character available */
+        /* result=1 -> character available */
       }
     }
   #else
    #if defined(UNIX_TERM_TERMIOS) || defined(UNIX_TERM_TERMIO)
     {
-      # Use the Termio-Elements VMIN and VTIME.
+      /* Use the Termio-Elements VMIN and VTIME. */
      #ifdef UNIX_TERM_TERMIOS
       var struct termios oldtermio;
       var struct termios newtermio;
-     #else # UNIX_TERM_TERMIO
+     #else /* UNIX_TERM_TERMIO */
       var struct termio oldtermio;
       var struct termio newtermio;
      #endif
-      run_time_stop(); # hold run time clock
+      run_time_stop(); /* hold run time clock */
       begin_system_call();
      #ifdef UNIX_TERM_TERMIOS
       if (!( tcgetattr(stdin_handle,&oldtermio) ==0)) {
@@ -8570,13 +8907,13 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
         if (!(errno==ENOTTY)) { OS_error(); }
       }
      #endif
-      # We assume now, that oldtermio is now identical with the newtermio
-      # from term_raw() (see below). This is ensured, if
-      # 1. (SYS::TERMINAL-RAW T) was called and
-      # 2. stdin_handle and stdout_handle both are the same Terminal. ??
+      /* We assume now, that oldtermio is now identical with the newtermio
+       from term_raw() (see below). This is ensured, if
+       1. (SYS::TERMINAL-RAW T) was called and
+       2. stdin_handle and stdout_handle both are the same Terminal. ?? */
       newtermio = oldtermio;
       newtermio.c_cc[VMIN] = 0;
-      newtermio.c_cc[VTIME] = 1; # 1/10 second timeout
+      newtermio.c_cc[VTIME] = 1; /* 1/10 second timeout */
      #ifdef UNIX_TERM_TERMIOS
       if (!( TCSETATTR(stdin_handle,TCSANOW,&newtermio) ==0)) {
         if (!(errno==ENOTTY)) { OS_error(); }
@@ -8586,7 +8923,7 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
         if (!(errno==ENOTTY)) { OS_error(); }
       }
      #endif
-      var int result = read(stdin_handle,&c,1); # try to read a byte, with timeout
+      var int result = read(stdin_handle,&c,1); /* try to read a byte, with timeout */
      #ifdef UNIX_TERM_TERMIOS
       if (!( TCSETATTR(stdin_handle,TCSANOW,&oldtermio) ==0)) {
         if (!(errno==ENOTTY)) { OS_error(); }
@@ -8597,24 +8934,24 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
       }
      #endif
       end_system_call();
-      run_time_restart(); # resume run time clock
+      run_time_restart(); /* resume run time clock */
       if (result<0) {
         begin_system_call();
-        if (errno==EINTR) { # break (poss. by Ctrl-C) ?
+        if (errno==EINTR) { /* break (poss. by Ctrl-C) ? */
           end_system_call();
-          interruptp({ pushSTACK(S(read_char)); tast_break(); }); # call Break-Loop
+          interruptp({ pushSTACK(S(read_char)); tast_break(); }); /* call Break-Loop */
           goto restart_it;
         }
         OS_error();
       }
       if (result==0)
-        goto empty_buffer; # no character available
-      goto next_char_is_read; # result=1 -> character available
+        goto empty_buffer; /* no character available */
+      goto next_char_is_read; /* result=1 -> character available */
     }
    #else
-    # One could use fcntl(stdin_handle,F_SETFL,...|FASYNC) here
-    # and wait for the Signal SIGIO. But this works only on so
-    # few Systems (see Emacs), that it does not pay off.
+    /* One could use fcntl(stdin_handle,F_SETFL,...|FASYNC) here
+     and wait for the Signal SIGIO. But this works only on so
+     few Systems (see Emacs), that it does not pay off. */
    #endif
   #endif
     goto read_next_char;
@@ -8624,11 +8961,11 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
     TheStream(stream)->strm_keyboard_buffer = Cdr(l);
     var cint c = as_cint(char_code(Car(l)));
     if ((c >= ' ') || (c == ESC) || (c == TAB) || (c == CR) || (c == BS)) {
-      # FIXME: This should take into account the encoding.
+      /* FIXME: This should take into account the encoding. */
       pushSTACK(code_char(as_chart(c))); funcall(S(make_char),1);
       return value1;
     } else {
-      # key presumably pressed with Ctrl
+      /* key presumably pressed with Ctrl */
       var key_event_t event;
       event.key = NULL;
       event.code = ascii(c == 0 ? ' ' : (c | bit(6)));
@@ -8640,24 +8977,23 @@ local object rd_ch_keyboard (const gcv_object_t* stream_) {
 }
 
 
-# UP: extends the List STACK_0 by one key-assignment.
-# can trigger GC
+/* UP: extends the List STACK_0 by one key-assignment.
+ can trigger GC */
 local maygc void add_keybinding (const char* cap, const key_event_t* event) {
   var const uintB* ptr = (const uintB*)cap;
-  if (*ptr=='\0') # avoid empty key-sequence
+  if (*ptr=='\0') /* avoid empty key-sequence */
     return;
-  # FIXME: This should take into account the encoding.
+  /* FIXME: This should take into account the encoding. */
   pushSTACK(allocate_cons());
-  # create List (char1 ... charn . key) :
+  /* create List (char1 ... charn . key) : */
   {
     var uintC count = 0;
-    do {
-      pushSTACK(code_char(as_chart(*ptr))); ptr++; count++;
-    } until (*ptr=='\0');
+    do { pushSTACK(code_char(as_chart(*ptr))); ptr++; count++;
+    } while (*ptr != '\0');
     pushSTACK(make_key_event(event)); count++;
-    funcall(L(liststern),count);
+    funcall(L(liststar),count);
   }
-  # and push on STACK_0:
+  /* and push on STACK_0: */
   {
     var object l = popSTACK();
     Car(l) = value1; Cdr(l) = STACK_0; STACK_0 = l;
@@ -8667,109 +9003,105 @@ local maygc void add_keybinding (const char* cap, const key_event_t* event) {
   do { key_event_t event = initializer; add_keybinding(cap,&event); } while(0)
 #endif
 
-#ifdef NEXTAPP
-  #define rd_ch_keyboard  rd_ch_error
-#endif
-
-# returns a Keyboard-Stream.
-# make_keyboard_stream()
-# can trigger GC
+/* returns a Keyboard-Stream.
+ make_keyboard_stream()
+ can trigger GC */
 local maygc object make_keyboard_stream (void) {
- #if defined(UNIX) && !defined(NEXTAPP)
+ #if defined(UNIX)
   {
-    # build Table of all assignments character-sequence -> Key :
+    /* build Table of all assignments character-sequence -> Key : */
     pushSTACK(NIL);
-    # query Terminal-Type:
+    /* query Terminal-Type: */
     begin_system_call();
     var const char* s = getenv("TERM");
     if (s==NULL) {
       end_system_call();
     } else {
-      var char tbuf[4096]; # internal Buffer for the Termcap-Routines
+      var char tbuf[4096]; /* internal Buffer for the Termcap-Routines */
       if (tgetent(tbuf,s) !=1) {
         end_system_call();
       } else {
-        var char tentry[4096]; # Buffer for the Capabilities that I need
+        var char tentry[4096]; /* Buffer for the Capabilities that I need */
         var char* tp = &tentry[0];
         var const char* cap;
         end_system_call();
-        # Backspace:
+        /* Backspace: */
         begin_system_call(); cap = tgetstr("kb",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_ascii(BS)); # #\Backspace
-        # Insert, Delete:
+          keybinding(cap, key_ascii(BS)); /* #\Backspace */
+        /* Insert, Delete: */
         begin_system_call(); cap = tgetstr("kI",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("INSERT")); # #\Insert
+          keybinding(cap, key_special("INSERT")); /* #\Insert */
         begin_system_call(); cap = tgetstr("kD",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("DELETE")); # #\Delete
-        # arrow keys:
+          keybinding(cap, key_special("DELETE")); /* #\Delete */
+        /* arrow keys: */
         begin_system_call(); cap = tgetstr("ku",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("UP")); # #\Up
+          keybinding(cap, key_special("UP")); /* #\Up */
         if (cap && (cap[0] == ESC) && (cap[1] == 'O') && (cap[2] == 'A') && (cap[3] == '\0'))
-          keybinding(ESCstring"[A", key_special("UP")); # #\Up
+          keybinding(ESCstring"[A", key_special("UP")); /* #\Up */
         begin_system_call(); cap = tgetstr("kd",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("DOWN")); # #\Down
+          keybinding(cap, key_special("DOWN")); /* #\Down */
         if (cap && (cap[0] == ESC) && (cap[1] == 'O') && (cap[2] == 'B') && (cap[3] == '\0'))
-          keybinding(ESCstring"[B", key_special("DOWN")); # #\Down
+          keybinding(ESCstring"[B", key_special("DOWN")); /* #\Down */
         begin_system_call(); cap = tgetstr("kr",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("RIGHT")); # #\Right
+          keybinding(cap, key_special("RIGHT")); /* #\Right */
         if (cap && (cap[0] == ESC) && (cap[1] == 'O') && (cap[2] == 'C') && (cap[3] == '\0'))
-          keybinding(ESCstring"[C", key_special("RIGHT")); # #\Right
+          keybinding(ESCstring"[C", key_special("RIGHT")); /* #\Right */
         begin_system_call(); cap = tgetstr("kl",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("LEFT")); # #\Left
+          keybinding(cap, key_special("LEFT")); /* #\Left */
         if (cap && (cap[0] == ESC) && (cap[1] == 'O') && (cap[2] == 'D') && (cap[3] == '\0'))
-          keybinding(ESCstring"[D", key_special("LEFT")); # #\Left
-        # other cursorblock-keys:
+          keybinding(ESCstring"[D", key_special("LEFT")); /* #\Left */
+        /* other cursorblock-keys: */
         begin_system_call(); cap = tgetstr("kh",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("HOME")); # #\Home
+          keybinding(cap, key_special("HOME")); /* #\Home */
         begin_system_call(); cap = tgetstr("K1",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("HOME")); # #\Home
+          keybinding(cap, key_special("HOME")); /* #\Home */
         begin_system_call(); cap = tgetstr("KH",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("END")); # #\End
+          keybinding(cap, key_special("END")); /* #\End */
         begin_system_call(); cap = tgetstr("K4",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("END")); # #\End
+          keybinding(cap, key_special("END")); /* #\End */
         begin_system_call(); cap = tgetstr("kP",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("PGUP")); # #\PgUp
+          keybinding(cap, key_special("PGUP")); /* #\PgUp */
         begin_system_call(); cap = tgetstr("K3",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("PGUP")); # #\PgUp
+          keybinding(cap, key_special("PGUP")); /* #\PgUp */
         begin_system_call(); cap = tgetstr("kN",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("PGDN")); # #\PgDn
+          keybinding(cap, key_special("PGDN")); /* #\PgDn */
         begin_system_call(); cap = tgetstr("K5",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("PGDN")); # #\PgDn
+          keybinding(cap, key_special("PGDN")); /* #\PgDn */
         begin_system_call(); cap = tgetstr("K2",&tp); end_system_call();
         if (cap)
-          keybinding(cap, key_special("CENTER")); # #\Center
-        # Function Keys:
+          keybinding(cap, key_special("CENTER")); /* #\Center */
+        /* Function Keys: */
         {
           typedef struct { const char* capname; key_event_t key; } funkey;
           local var const funkey funkey_tab[] = {
-            { "k1", key_special("F1") }, # #\F1
-            { "k2", key_special("F2") }, # #\F2
-            { "k3", key_special("F3") }, # #\F3
-            { "k4", key_special("F4") }, # #\F4
-            { "k5", key_special("F5") }, # #\F5
-            { "k6", key_special("F6") }, # #\F6
-            { "k7", key_special("F7") }, # #\F7
-            { "k8", key_special("F8") }, # #\F8
-            { "k9", key_special("F9") }, # #\F9
-            { "k0", key_special("F10") }, # #\F10
-            { "k;", key_special("F10") }, # #\F10
-            { "F1", key_special("F11") }, # #\F11
-            { "F2", key_special("F12") }, # #\F12
+            { "k1", key_special("F1") }, /* #\F1 */
+            { "k2", key_special("F2") }, /* #\F2 */
+            { "k3", key_special("F3") }, /* #\F3 */
+            { "k4", key_special("F4") }, /* #\F4 */
+            { "k5", key_special("F5") }, /* #\F5 */
+            { "k6", key_special("F6") }, /* #\F6 */
+            { "k7", key_special("F7") }, /* #\F7 */
+            { "k8", key_special("F8") }, /* #\F8 */
+            { "k9", key_special("F9") }, /* #\F9 */
+            { "k0", key_special("F10") }, /* #\F10 */
+            { "k;", key_special("F10") }, /* #\F10 */
+            { "F1", key_special("F11") }, /* #\F11 */
+            { "F2", key_special("F12") }, /* #\F12 */
           };
           var uintL i;
           for (i=0; i < sizeof(funkey_tab)/sizeof(funkey); i++) {
@@ -8780,24 +9112,24 @@ local maygc object make_keyboard_stream (void) {
               add_keybinding(cap,&funkey_tab[i].key);
           }
         }
-        # Special Linux console handling:
+        /* Special Linux console handling: */
         begin_system_call();
-        cap = tgetstr("kh",&tp); # Home
+        cap = tgetstr("kh",&tp); /* Home */
         if (!(cap && (cap[0] == ESC) && (cap[1] == '[') && (cap[2] == '1') && (cap[3] == '~') && (cap[4] == '\0')))
           goto not_linux;
-        cap = tgetstr("kI",&tp); # Insert
+        cap = tgetstr("kI",&tp); /* Insert */
         if (!(cap && (cap[0] == ESC) && (cap[1] == '[') && (cap[2] == '2') && (cap[3] == '~') && (cap[4] == '\0')))
           goto not_linux;
-        cap = tgetstr("kD",&tp); # Delete
+        cap = tgetstr("kD",&tp); /* Delete */
         if (!(cap && (cap[0] == ESC) && (cap[1] == '[') && (cap[2] == '3') && (cap[3] == '~') && (cap[4] == '\0')))
           goto not_linux;
         end_system_call();
-        keybinding(ESCstring"[4~", key_special("END")); # #\End
+        keybinding(ESCstring"[4~", key_special("END")); /* #\End */
         if (false) {
         not_linux:
           end_system_call();
         }
-        # Special xterm handling:
+        /* Special xterm handling: */
         begin_system_call();
         cap = tgetstr("ku",&tp);
         if (!(cap && (cap[0] == ESC) && (cap[1] == 'O') && (cap[2] == 'A') && (cap[3] == '\0')))
@@ -8812,16 +9144,16 @@ local maygc object make_keyboard_stream (void) {
         if (!(cap && (cap[0] == ESC) && (cap[1] == 'O') && (cap[2] == 'D') && (cap[3] == '\0')))
           goto not_xterm;
         end_system_call();
-        # Insert, Delete:
-        keybinding(ESCstring"[2~", key_special("INSERT")); # #\Insert
-        keybinding(ESCstring"[3~", key_special("DELETE")); # #\Delete
+        /* Insert, Delete: */
+        keybinding(ESCstring"[2~", key_special("INSERT")); /* #\Insert */
+        keybinding(ESCstring"[3~", key_special("DELETE")); /* #\Delete */
         {
-          # Application Keypad: ESC O M -> Return,
-          # ESC O k -> +, ESC O m -> -, ESC O j -> *, ESC O o -> /
-          # (without Hyper-Bit, because that is too terminal-specific)
-          # ESC O x -> Up, ESC O r -> Down,
-          # ESC O v -> Right, ESC O t -> Left,
-          # ESC O p -> Insert, ESC O l -> Delete.
+          /* Application Keypad: ESC O M -> Return,
+           ESC O k -> +, ESC O m -> -, ESC O j -> *, ESC O o -> /
+           (without Hyper-Bit, because that is too terminal-specific)
+           ESC O x -> Up, ESC O r -> Down,
+           ESC O v -> Right, ESC O t -> Left,
+           ESC O p -> Insert, ESC O l -> Delete. */
           var char cap[4];
           cap[0] = ESC; cap[1] = 'O'; cap[3] = '\0';
           cap[2] = 'M'; keybinding(cap, key_ascii('M'-64));
@@ -8829,40 +9161,40 @@ local maygc object make_keyboard_stream (void) {
           cap[2] = '-'+64; keybinding(cap, key_ascii('-'));
           cap[2] = '*'+64; keybinding(cap, key_ascii('*'));
           cap[2] = '/'+64; keybinding(cap, key_ascii('/'));
-          cap[2] = '8'+64; keybinding(cap, key_special("UP")); # #\Up
-          cap[2] = '2'+64; keybinding(cap, key_special("DOWN")); # #\Down
-          cap[2] = '6'+64; keybinding(cap, key_special("RIGHT")); # #\Right
-          cap[2] = '4'+64; keybinding(cap, key_special("LEFT")); # #\Left
-          cap[2] = '0'+64; keybinding(cap, key_special("INSERT")); # #\Insert
-          cap[2] = '.'+64; keybinding(cap, key_special("DELETE")); # #\Delete
-          cap[2] = ','+64; keybinding(cap, key_special("DELETE")); # #\Delete
-          # "7" -> #\Home, "1" -> #\End, "9" -> #\PgUp, "3" -> #\PgDn,
-          # "5" -> #\Center are already handled above.
+          cap[2] = '8'+64; keybinding(cap, key_special("UP")); /* #\Up */
+          cap[2] = '2'+64; keybinding(cap, key_special("DOWN")); /* #\Down */
+          cap[2] = '6'+64; keybinding(cap, key_special("RIGHT")); /* #\Right */
+          cap[2] = '4'+64; keybinding(cap, key_special("LEFT")); /* #\Left */
+          cap[2] = '0'+64; keybinding(cap, key_special("INSERT")); /* #\Insert */
+          cap[2] = '.'+64; keybinding(cap, key_special("DELETE")); /* #\Delete */
+          cap[2] = ','+64; keybinding(cap, key_special("DELETE")); /* #\Delete */
+          /* "7" -> #\Home, "1" -> #\End, "9" -> #\PgUp, "3" -> #\PgDn,
+           "5" -> #\Center are already handled above. */
         }
       xterm:
-        # arrow keys (see above)
-        # other cursorblock-keys:
-        keybinding(ESCstring"[5~", key_special("PGUP")); # #\PgUp
-        keybinding(ESCstring"[6~", key_special("PGDN")); # #\PgDn
-        keybinding(ESCstring"[7~", key_special("HOME")); # #\Home
-        keybinding(ESCstring"[8~", key_special("END")); # #\End
-        keybinding(ESCstring"OH", key_special("HOME")); # #\Home
-        keybinding(ESCstring"[H", key_special("HOME")); # #\Home
-        keybinding(ESCstring"OF", key_special("END")); # #\End
-        keybinding(ESCstring"[F", key_special("END")); # #\End
-        # function-keys:
-        keybinding(ESCstring"[11~", key_special("F1")); # #\F1
-        keybinding(ESCstring"[12~", key_special("F2")); # #\F2
-        keybinding(ESCstring"[13~", key_special("F3")); # #\F3
-        keybinding(ESCstring"[14~", key_special("F4")); # #\F4
-        keybinding(ESCstring"[15~", key_special("F5")); # #\F5
-        keybinding(ESCstring"[17~", key_special("F6")); # #\F6
-        keybinding(ESCstring"[18~", key_special("F7")); # #\F7
-        keybinding(ESCstring"[19~", key_special("F8")); # #\F8
-        keybinding(ESCstring"[20~", key_special("F9")); # #\F9
-        keybinding(ESCstring"[21~", key_special("F10")); # #\F10
-        keybinding(ESCstring"[23~", key_special("F11")); # #\F11
-        keybinding(ESCstring"[24~", key_special("F12")); # #\F12
+        /* arrow keys (see above)
+         other cursorblock-keys: */
+        keybinding(ESCstring"[5~", key_special("PGUP")); /* #\PgUp */
+        keybinding(ESCstring"[6~", key_special("PGDN")); /* #\PgDn */
+        keybinding(ESCstring"[7~", key_special("HOME")); /* #\Home */
+        keybinding(ESCstring"[8~", key_special("END")); /* #\End */
+        keybinding(ESCstring"OH", key_special("HOME")); /* #\Home */
+        keybinding(ESCstring"[H", key_special("HOME")); /* #\Home */
+        keybinding(ESCstring"OF", key_special("END")); /* #\End */
+        keybinding(ESCstring"[F", key_special("END")); /* #\End */
+        /* function-keys: */
+        keybinding(ESCstring"[11~", key_special("F1")); /* #\F1 */
+        keybinding(ESCstring"[12~", key_special("F2")); /* #\F2 */
+        keybinding(ESCstring"[13~", key_special("F3")); /* #\F3 */
+        keybinding(ESCstring"[14~", key_special("F4")); /* #\F4 */
+        keybinding(ESCstring"[15~", key_special("F5")); /* #\F5 */
+        keybinding(ESCstring"[17~", key_special("F6")); /* #\F6 */
+        keybinding(ESCstring"[18~", key_special("F7")); /* #\F7 */
+        keybinding(ESCstring"[19~", key_special("F8")); /* #\F8 */
+        keybinding(ESCstring"[20~", key_special("F9")); /* #\F9 */
+        keybinding(ESCstring"[21~", key_special("F10")); /* #\F10 */
+        keybinding(ESCstring"[23~", key_special("F11")); /* #\F11 */
+        keybinding(ESCstring"[24~", key_special("F12")); /* #\F12 */
         if (false) {
          not_xterm:
           end_system_call();
@@ -8873,9 +9205,10 @@ local maygc object make_keyboard_stream (void) {
   pushSTACK(allocate_handle(stdin_handle));
  #endif
  #ifdef WIN32_NATIVE
-  # build Console-Handle:
-  # Maybe use CREATE_ALWAYS ?? Maybe use AllocConsole() ??
+  /* build Console-Handle:
+   Maybe use CREATE_ALWAYS ?? Maybe use AllocConsole() ?? */
   {
+    begin_system_call();
     var Handle handle = CreateFile("CONIN$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (handle==INVALID_HANDLE_VALUE) {
       OS_error();
@@ -8884,17 +9217,17 @@ local maygc object make_keyboard_stream (void) {
     pushSTACK(allocate_handle(handle));
   }
  #endif
-  # allocate new Stream:
-  var object stream = # Flags: only READ-CHAR allowed
+  /* allocate new Stream: */
+  var object stream = /* Flags: only READ-CHAR allowed */
     allocate_stream(strmflags_rd_ch_B,strmtype_keyboard,strm_keyboard_len,strm_keyboard_xlen);
-  # and fill:
+  /* and fill: */
   stream_dummy_fill(stream);
   var Stream s = TheStream(stream);
   s->strm_encoding = O(terminal_encoding);
-  s->strm_rd_ch = P(rd_ch_keyboard); # READ-CHAR-Pseudofunction
-  s->strm_rd_ch_array = P(rd_ch_array_dummy); # READ-CHAR-SEQUENCE-Pseudofunction
- #if defined(UNIX) && !defined(NEXTAPP)
-  # determine Flag isatty = (stdin_tty ? T : NIL) :
+  s->strm_rd_ch = P(rd_ch_keyboard); /* READ-CHAR-Pseudofunction */
+  s->strm_rd_ch_array = P(rd_ch_array_dummy); /* READ-CHAR-SEQUENCE-Pseudofunction */
+ #if defined(UNIX)
+  /* determine Flag isatty = (stdin_tty ? T : NIL) : */
   begin_system_call();
   s->strm_keyboard_isatty = (isatty(stdin_handle) ? T : NIL);
   end_system_call();
@@ -8917,60 +9250,72 @@ local maygc object make_keyboard_stream (void) {
   return stream;
 }
 
-# (SYSTEM::MAKE-KEYBOARD-STREAM) creates a new keyboard stream.
-# Should be called once only, and the result assigned to *KEYBOARD-INPUT*.
+/* (SYSTEM::MAKE-KEYBOARD-STREAM) creates a new keyboard stream.
+ Should be called once only, and the result assigned to *KEYBOARD-INPUT*. */
 LISPFUNN(make_keyboard_stream,0) {
   VALUES1(make_keyboard_stream());
 }
 
-#endif # KEYBOARD
+#endif /* KEYBOARD */
 
 
-# Interactive Terminal Stream
-# ===========================
+/* Interactive Terminal Stream
+   =========================== */
 
-#if defined(GNU_READLINE) || defined(NEXTAPP)
-# Function to ignore unconvertible symbols.
+#if defined(GNU_READLINE)
+
+#define begin_rl_callback() end_blocking_call(); begin_callback()
+#define end_rl_callback() end_callback(); begin_blocking_call()
+
+/* Function to ignore unconvertible symbols. */
 local void lisp_completion_ignore (void* sp, gcv_object_t* frame, object label,
                                    object condition) {
-  # (THROW 'SYS::CONVERSION-FAILURE NIL):
+  /* (THROW 'SYS::CONVERSION-FAILURE NIL): */
   VALUES1(NIL);
   throw_to(S(conversion_failure));
 }
-# Completion of Lisp-Symbols
+/* Completion of Lisp-Symbols */
 local maygc char** lisp_completion (char* text, int start, int end) {
-  # text[0..end-start-1] = the_line[start..end-1]
-  # This is a Callback-Function, we must set the Stack correctly again:
-  begin_callback();
-  # call (SYS::COMPLETION text start end) :
+  /* text[start..end-1] = thing to complete within line of text
+   This is a Callback-Function, we must set the Stack correctly again: */
+  begin_rl_callback();
+ #ifdef ENABLE_UNICODE
+  { var object encoding = O(terminal_encoding);
+    start = Encoding_mblen(encoding)(encoding,(const uintB*)text,
+                                     (const uintB*)text+start);
+    end   = Encoding_mblen(encoding)(encoding,(const uintB*)text,
+                                     (const uintB*)text+end);
+  }
+ #endif
+  /* call (SYS::COMPLETION text start end) : */
   pushSTACK(asciz_to_string(text,O(terminal_encoding)));
   pushSTACK(fixnum((uintL)start));
   pushSTACK(fixnum((uintL)end));
   funcall(S(completion),3);
-  var object mlist = value1; # List of the possibilities
-  # reconstruct List of Simple-Strings in malloc-ed Array from malloc-ed
-  # Asciz-Strings:
+  var object mlist = value1; /* List of the possibilities */
+  /* reconstruct List of Simple-Strings in malloc-ed Array from malloc-ed
+   Asciz-Strings: */
   if (nullp(mlist)) {
-    end_callback();
+    end_rl_callback();
     return NULL;
-  } else if (eq(mlist,Fixnum_0)) { # complete called describe => redraw
-    end_callback();
+  } else if (eq(mlist,Fixnum_0)) { /* complete called describe => redraw */
+    end_rl_callback();
     rl_refresh_line(0,0);
     return NULL;
   } else if (!consp(mlist)) {
-    # This error message is self-defense against people who fiddle
-    # around with sys::completion.
-    pushSTACK(mlist);   # slot DATUM of TYPE-ERROR
-    pushSTACK(S(list)); # slot EXPECTED-TYPE of TYPE-ERROR
+    /* This error message is self-defense against people who fiddle
+     around with sys::completion. */
+    pushSTACK(mlist);   /* slot DATUM of TYPE-ERROR */
+    pushSTACK(S(list)); /* slot EXPECTED-TYPE of TYPE-ERROR */
     pushSTACK(S(completion));
     pushSTACK(mlist);
-    fehler(type_error,GETTEXT("Return value ~S of call to ~S is not a list."));
+    error(type_error,GETTEXT("Return value ~S of call to ~S is not a list."));
   }
   begin_system_call();
   var char** array = (char**) malloc((llength(mlist)+1)*sizeof(char*));
   end_system_call();
   if (array==NULL) {
-    end_callback();
+    end_rl_callback();
     return NULL;
   }
   {
@@ -8979,13 +9324,13 @@ local maygc char** lisp_completion (char* text, int start, int end) {
     while (mconsp(STACK_0)) {
       var object m = Car(STACK_0);
       if (!simple_string_p(m)) {
-        pushSTACK(m);                # slot DATUM of TYPE-ERROR
-        pushSTACK(S(simple_string)); # slot EXPECTED-TYPE of TYPE-ERROR
+        pushSTACK(m);                /* slot DATUM of TYPE-ERROR */
+        pushSTACK(S(simple_string)); /* slot EXPECTED-TYPE of TYPE-ERROR */
         pushSTACK(S(simple_string));
         pushSTACK(m);
         pushSTACK(S(completion));
         pushSTACK(mlist);
-        fehler(type_error,GETTEXT("Return value ~S of call to ~S contains ~S which is not a ~S."));
+        error(type_error,GETTEXT("Return value ~S of call to ~S contains ~S which is not a ~S."));
       }
       sstring_un_realloc(m);
       var uintL charcount = Sstring_length(m);
@@ -8997,20 +9342,20 @@ local maygc char** lisp_completion (char* text, int start, int end) {
         var sp_jmp_buf returner;
         finish_entry_frame(CATCH,returner,, goto catch_return; );
       }
-      # Upon charset_type_error, call lisp_completion_ignore.
+      /* Upon charset_type_error, call lisp_completion_ignore. */
       make_HANDLER_frame(O(handler_for_charset_type_error),
                          &lisp_completion_ignore,NULL);
-      { # Convert ptr1 to *TERMINAL-ENCODING*:
+      { /* Convert ptr1 to *TERMINAL-ENCODING*: */
         var uintL bytecount = cslen(O(terminal_encoding),ptr1,charcount);
         begin_system_call();
         var char* ptr2 = (char*) malloc((bytecount+1)*sizeof(char));
-        if (ptr2==NULL) { # malloc fails -> return everything
-          until (ptr==array) { free(*--ptr); }
+        if (ptr2==NULL) { /* malloc fails -> return everything */
+          while (ptr != array) { free(*--ptr); }
           free(array);
           end_system_call();
           unwind_HANDLER_frame();
-          skipSTACK(3+1); # unwind CATCH frame, pop mlist
-          end_callback();
+          skipSTACK(3+1); /* unwind CATCH frame, pop mlist */
+          end_rl_callback();
           return NULL;
         }
         end_system_call();
@@ -9023,10 +9368,10 @@ local maygc char** lisp_completion (char* text, int start, int end) {
       /* Here we need the values of array and ptr. Avoid gcc warnings. */
       unused &array; /* avoid "'array' might be clobbered by 'longjmp'" */
       unused &ptr;   /* avoid "'ptr' might be clobbered by 'longjmp'" */
-      skipSTACK(3); # unwind CATCH frame
+      skipSTACK(3); /* unwind CATCH frame */
       STACK_0 = Cdr(STACK_0);
     }
-    skipSTACK(1); # pop mlist
+    skipSTACK(1); /* pop mlist */
     *ptr = NULL;
   }
   if (*array == NULL) {
@@ -9035,158 +9380,71 @@ local maygc char** lisp_completion (char* text, int start, int end) {
     end_system_call();
     array = NULL;
   }
-  end_callback();
+  end_rl_callback();
   return array;
 }
 #endif
 
-#ifdef NEXTAPP
+#if defined(UNIX) || defined(WIN32_NATIVE)
 
-# Use the interface provided by nxterminal.m, see unix.d.
+/* Functionality:
+ Standard-Input and Standard-Output are accessed.
+ Because of the possibility of Redirection some Functions have to determine, if
+ Standard-Input is a Terminal or not.
+ If Standard-Output is a Terminal or not, is irrelevant in this context.
+ However, it is relevant, if Standard-Input and Standard-Output are the same
+ Terminal; in this case we assume, that after completion of an input line
+ (by NL) of Standard-Input the Cursor of Standard-Output is situated in
+ column 0, and in this case we can also use the
+ GNU readline()-Library.
 
-# UP: Read a character from a Terminal-Stream.
-# rd_ch_terminal(&stream)
-# > stream: Terminal-Stream
-# < object ch: entered character
-local maygc object rd_ch_terminal (const gcv_object_t* stream_) {
-  var int linepos;
-  var uintB ch;
-  begin_call();
-  ch = nxterminal_read_char(&linepos);
-  end_call();
-  TheStream(*stream_)->strm_wr_ch_lpos = fixnum(linepos);
-  return code_char(as_chart(ch)); # FIXME: This should take into account the encoding.
-}
-
-# Determines, if a character is available on a Terminal-Stream.
-# listen_char_terminal(stream)
-# > stream: Terminal-Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
-local maygc signean listen_char_terminal (object stream) {
-  var signean result;
-  begin_call();
-  result = (nxterminal_listen() ? ls_avail : ls_wait);
-  end_call();
-  return result;
-}
-
-# UP: Deletes already entered interactive Input from a Terminal-Stream.
-# clear_input_terminal(stream);
-# > stream: Terminal-Stream
-# < result: true if Input was deleted, else false
-local bool clear_input_terminal (object stream) {
-  # We do not want to delete anything in the input window.
-  return false;
-}
-
-# UP: write a character to a Terminal-Stream.
-# wr_ch_terminal(&stream,ch);
-# > stream: Terminal-Stream
-# > ch: character to be written
-local maygc void wr_ch_terminal (const gcv_object_t* stream_, object ch) {
-  var object stream = *stream_;
-  check_wr_char(stream,ch);
-  begin_call();
-  nxterminal_write_char(char_code(ch));
-  end_call();
-}
-
-# UP: Moves the pending Output of a Terminal-Stream to the destination.
-# finish_output_terminal(stream);
-# > stream: Terminal-Stream
-# can trigger GC
-local maygc void finish_output_terminal (object stream) {
-  begin_call();
-  nxterminal_send_output();
-  end_call();
-}
-
-# UP: Moves the pending Output of a Terminal-Stream to the destination.
-# force_output_terminal(stream);
-# > stream: Terminal-Stream
-# can trigger GC
-#define force_output_terminal(stream)  finish_output_terminal(stream)
-
-# Returns an interactive Terminal-Stream.
-# can trigger GC
-local maygc object make_terminal_stream_ (void) {
-  # allocate a new Stream:
-  var object stream = # Flags: only READ-CHAR and WRITE-CHAR allowed
-    allocate_stream(strmflags_ch_B,strmtype_terminal,strm_len+0,0);
-  # and fill:
-  stream_dummy_fill(stream);
-  var Stream s = TheStream(stream);
-  s->strm_rd_ch = P(rd_ch_terminal); # READ-CHAR-Pseudofunction
-  s->strm_rd_ch_array = P(rd_ch_array_dummy); # READ-CHAR-SEQUENCE-Pseudofunction
-  s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_terminal); # WRITE-CHAR-Pseudofunction
-  s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_dummy); # WRITE-CHAR-SEQUENCE-Pseudofunction
-  return stream;
-}
-
-#endif # NEXTAPP
-
-#if (defined(UNIX) && !defined(NEXTAPP)) || defined(WIN32_NATIVE)
-
-# Functionality:
-# Standard-Input and Standard-Output are accessed.
-# Because of the possibility of Redirection some Functions have to determine, if
-# Standard-Input is a Terminal or not.
-# If Standard-Output is a Terminal or not, is irrelevant in this context.
-# However, it is relevant, if Standard-Input and Standard-Output are the same
-# Terminal; in this case we assume, that after completion of an input line
-# (by NL) of Standard-Input the Cursor of Standard-Output is situated in
-# column 0, and in this case we can also use the
-# GNU readline()-Library.
-
-# There are three possible Variants of the Terminal-Streams:
-# When Standard-Input and Standard-Output are not the same Terminal:
-#   * terminal1 normally,
-#   * terminal2 with per-line-buffering of the input,
-# When Standard-Input and Standard-Output are the same Terminal:
-#   * terminal3 uses the readline()-Library, with per-line-buffering of
-#     Input and Output.
+ There are three possible Variants of the Terminal-Streams:
+ When Standard-Input and Standard-Output are not the same Terminal:
+   * terminal1 normally,
+   * terminal2 with per-line-buffering of the input,
+ When Standard-Input and Standard-Output are the same Terminal:
+   * terminal3 uses the readline()-Library, with per-line-buffering of
+     Input and Output. */
 
 #define HAVE_TERMINAL1
-  # define TERMINAL_LINEBUFFERED  0
-  # define TERMINAL_OUTBUFFERED   0
+/* define TERMINAL_LINEBUFFERED  0
+   define TERMINAL_OUTBUFFERED   0 */
 
 #ifdef GNU_READLINE
-  # We use the GNU Readline-Library. It returns the Input line-by-line,
-  # with possibility for editing, completion and History. unfortunately we
-  # have to save the Output intermediately line-by-line in order to be able to
-  # use the last commenced line as "Prompt".
+/* We use the GNU Readline-Library. It returns the Input line-by-line,
+   with possibility for editing, completion and History. unfortunately we
+   have to save the Output intermediately line-by-line in order to be able to
+   use the last commenced line as "Prompt". */
 #define HAVE_TERMINAL3
-  # define TERMINAL_LINEBUFFERED  1
-  # define TERMINAL_OUTBUFFERED   1
+/* define TERMINAL_LINEBUFFERED  1
+   define TERMINAL_OUTBUFFERED   1 */
 #endif
 
-# Additional Components:
-  # ISATTY : Flag, if stdin is a TTY and if stdin and stdout are identical:
-  #          NIL: stdin is a File or similar.
-  #          T, EQUAL: stdin is a Terminal
-  #          EQUAL: stdin and stdout are the same Terminal
-  #define strm_terminal_isatty   strm_isatty
-  #define strm_terminal_ihandle  strm_ichannel
-  #define strm_terminal_ohandle  strm_ochannel
+/* Additional Components:
+ ISATTY : Flag, if stdin is a TTY and if stdin and stdout are identical:
+            NIL: stdin is a File or similar.
+            T, EQUAL: stdin is a Terminal
+            EQUAL: stdin and stdout are the same Terminal */
+#define strm_terminal_isatty   strm_isatty
+#define strm_terminal_ihandle  strm_ichannel
+#define strm_terminal_ohandle  strm_ochannel
 #if defined(HAVE_TERMINAL2) || defined(HAVE_TERMINAL3)
-  # Components because of TERMINAL_LINEBUFFERED:
-  # INBUFF : input-buffer, a Semi-Simple-String
+  /* Components because of TERMINAL_LINEBUFFERED:
+   INBUFF : input-buffer, a Semi-Simple-String */
   #define strm_terminal_inbuff  strm_field1
-  # COUNT = its Fill-Pointer : number of characters in the input-buffer
-  # INDEX : number of already consumed characters
-  #define strm_terminal_index   strm_other[2]  # FIXME: this is ugly
+  /* COUNT = its Fill-Pointer : number of characters in the input-buffer
+   INDEX : number of already consumed characters */
+  #define strm_terminal_index   strm_other[2]  /* FIXME: this is ugly */
 #endif
 #ifdef HAVE_TERMINAL3
-  # Components because of TERMINAL_OUTBUFFERED:
-  # OUTBUFF : output-buffer, a Semi-Simple-String
+  /* Components because of TERMINAL_OUTBUFFERED:
+   OUTBUFF : output-buffer, a Semi-Simple-String */
   #define strm_terminal_outbuff strm_field2
 #endif
 #define strm_terminal_len  strm_channel_len
 
-# distinction according to type of Terminal-Streams:
-# terminalcase(stream, statement1,statement2,statement3);
+/* distinction according to type of Terminal-Streams:
+ terminalcase(stream, statement1,statement2,statement3); */
 #if defined(HAVE_TERMINAL2) && defined(HAVE_TERMINAL3)
   #define terminalcase(stream,statement1,statement2,statement3) \
     if (nullp(TheStream(stream)->strm_field2)) {                \
@@ -9207,12 +9465,12 @@ local maygc object make_terminal_stream_ (void) {
 
 #ifdef HAVE_TERMINAL1
 
-# read a character from a terminal-stream.
-local object rd_ch_terminal1 (const gcv_object_t* stream_) {
+/* read a character from a terminal-stream. */
+local maygc object rd_ch_terminal1 (const gcv_object_t* stream_) {
   var object ch = rd_ch_unbuffered(stream_);
-  # If both stdin and stdout are the same Terminal,
-  # and we read a NL, we can assume, that afterwards
-  # the cursor is situated in column 0.
+  /* If both stdin and stdout are the same Terminal,
+   and we read a NL, we can assume, that afterwards
+   the cursor is situated in column 0. */
   if (eq(ch,ascii_char(NL))) {
     var object stream = *stream_;
     if (eq(TheStream(stream)->strm_terminal_isatty,S(equal)))
@@ -9221,145 +9479,141 @@ local object rd_ch_terminal1 (const gcv_object_t* stream_) {
   return ch;
 }
 
-# Determines, if a character is available on a Terminal-Stream.
-# listen_char_terminal1(stream)
-# > stream: Terminal-Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
+/* Determines, if a character is available on a Terminal-Stream.
+ listen_char_terminal1(stream)
+ > stream: Terminal-Stream
+ < result: input availability */
 #define listen_char_terminal1  listen_char_unbuffered
 
-# UP: Deletes already entered interactive Input from a Terminal-Stream.
-# clear_input_terminal1(stream);
-# > stream: Terminal-Stream
-# < result: true if Input was deleted, else false
+/* UP: Deletes already entered interactive Input from a Terminal-Stream.
+ clear_input_terminal1(stream);
+ > stream: Terminal-Stream
+ < result: true if Input was deleted, else false */
 #define clear_input_terminal1  clear_input_unbuffered
 
-# UP: write a character to a Terminal-Stream.
-# wr_ch_terminal1(&stream,ch);
-# > stream: Terminal-Stream
-# > ch: character to be written
+/* UP: write a character to a Terminal-Stream.
+ wr_ch_terminal1(&stream,ch);
+ > stream: Terminal-Stream
+ > ch: character to be written */
 #define wr_ch_terminal1  wr_ch_unbuffered_unix
 
-# UP: write several characters on a Terminal-Stream.
-# wr_ch_array_terminal1(&stream,&chararray,start,len);
-# > stream: Terminal-Stream
-# > chararray: not-reallocated Simple-String
-# > start: Startindex
-# > len: number of characters to be written
+/* UP: write several characters on a Terminal-Stream.
+ wr_ch_array_terminal1(&stream,&chararray,start,len);
+ > stream: Terminal-Stream
+ > chararray: not-reallocated Simple-String
+ > start: Startindex
+ > len: number of characters to be written */
 #define wr_ch_array_terminal1  wr_ch_array_unbuffered_unix
 
-# UP: Deletes the pending Output of a Terminal-Stream.
-# clear_output_terminal1(stream);
-# > stream: Terminal-Stream
-# can trigger GC
+/* UP: Deletes the pending Output of a Terminal-Stream.
+ clear_output_terminal1(stream);
+ > stream: Terminal-Stream
+ can trigger GC */
 #define clear_output_terminal1  clear_output_unbuffered
 
-#endif # HAVE_TERMINAL1
+#endif /* HAVE_TERMINAL1 */
 
 #ifdef HAVE_TERMINAL2
 
 #define TERMINAL_LINEBUFFERED  true
 
-# read a character from a terminal-stream.
+/* read a character from a terminal-stream. */
 local maygc object rd_ch_terminal2 (const gcv_object_t* stream_) {
   var object stream = *stream_;
-  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) # EOF already?
+  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) /* EOF already? */
     return eof_value;
   if (!(posfixnum_to_V(TheStream(stream)->strm_terminal_index)
         < TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1])) {
-    # index=count -> must read a whole line from the keyboard:
-    TheStream(stream)->strm_terminal_index = Fixnum_0; # index := 0
-    TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1] = 0; # count := 0
-    loop {
+    /* index=count -> must read a whole line from the keyboard: */
+    TheStream(stream)->strm_terminal_index = Fixnum_0; /* index := 0 */
+    TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1] = 0; /* count := 0 */
+    while (1) {
       var object ch = rd_ch_unbuffered(stream_);
       if (eq(ch,eof_value)) {
         if (TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1] > 0)
-          break; # deliver character of the Buffer, only then return eof_value
+          break; /* deliver character of the Buffer, only then return eof_value */
         else
           return eof_value;
       }
-      # add character ch to the input-line, poss. enlarge the line:
+      /* add character ch to the input-line, poss. enlarge the line: */
       ssstring_push_extend(TheStream(stream)->strm_terminal_inbuff,char_code(ch));
       stream = *stream_;
-      # If both stdin and stdout are the same Terminal,
-      # and we read a NL, we can assume, that afterwards the
-      # Cursor is situated in column 0.
+      /* If both stdin and stdout are the same Terminal,
+       and we read a NL, we can assume, that afterwards the
+       Cursor is situated in column 0. */
       if (chareq(char_code(ch),ascii(NL))) {
         if (eq(TheStream(stream)->strm_terminal_isatty,S(equal)))
           TheStream(stream)->strm_wr_ch_lpos = Fixnum_0;
-        break; # deliver character of the Buffer
+        break; /* deliver character of the Buffer */
       }
     }
     ASSERT(posfixnum_to_V(TheStream(stream)->strm_terminal_index)
            < TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1]);
   }
-  # index<count -> there are still characters in the buffer
+  /* index<count -> there are still characters in the buffer */
   var uintV index =
-    posfixnum_to_V(TheStream(stream)->strm_terminal_index); # Index
+    posfixnum_to_V(TheStream(stream)->strm_terminal_index); /* Index */
   TheStream(stream)->strm_terminal_index =
-    fixnum_inc(TheStream(stream)->strm_terminal_index,1); # increase Index
+    fixnum_inc(TheStream(stream)->strm_terminal_index,1); /* increase Index */
   return code_char(TheSnstring(TheIarray(TheStream(stream)->strm_terminal_inbuff)->data)->data[index]); /* next Character */
 }
 
-# Determines, if a character is available on a Terminal-Stream.
-# listen_char_terminal2(stream)
-# > stream: Terminal-Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
-local maygc signean listen_char_terminal2 (object stream) {
-  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) # EOF already?
-    return ls_eof;
+/* Determines, if a character is available on a Terminal-Stream.
+ listen_char_terminal2(stream)
+ > stream: Terminal-Stream
+ < result: input availability */
+local maygc listen_t listen_char_terminal2 (object stream) {
+  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) /* EOF already? */
+    return LISTEN_EOF;
   if (posfixnum_to_V(TheStream(stream)->strm_terminal_index)
       < TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1])
-    # index<count -> there are still characters in the buffer
-    return ls_avail;
+    /* index<count -> there are still characters in the buffer */
+    return LISTEN_AVAIL;
   return listen_char_unbuffered(stream);
 }
 
-# UP: Deletes already entered interactive Input from a Terminal-Stream.
-# clear_input_terminal2(stream);
-# > stream: Terminal-Stream
-# < result: true if Input was deleted, else false
+/* UP: Deletes already entered interactive Input from a Terminal-Stream.
+ clear_input_terminal2(stream);
+ > stream: Terminal-Stream
+ < result: true if Input was deleted, else false
+ can trigger GC */
 local maygc bool clear_input_terminal2 (object stream) {
-  if (nullp(TheStream(stream)->strm_terminal_isatty)) # File -> do nothing
+  if (nullp(TheStream(stream)->strm_terminal_isatty)) /* File -> do nothing */
     return false;
-  # Terminal
-  clear_input_unbuffered(stream); # forget about past EOF, call clear_tty_input
+  /* Terminal */
+  pushSTACK(stream);              /* save */
+  clear_input_unbuffered(stream); /* forget about past EOF, call clear_tty_input */
  #if TERMINAL_LINEBUFFERED
-  TheStream(stream)->strm_terminal_index = Fixnum_0; # index := 0
-  TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1] = 0; # count := 0
+  TheStream(STACK_0)->strm_terminal_index = Fixnum_0; /* index := 0 */
+  TheIarray(TheStream(STACK_0)->strm_terminal_inbuff)->dims[1] = 0; /* count := 0 */
  #endif
-  pushSTACK(stream);
-  while (ls_avail_p(listen_char_terminal2(STACK_0))) {
+  while (LISTEN_AVAIL == listen_char_terminal2(STACK_0))
     read_char(&STACK_0);
-  }
-  skipSTACK(1);
+  skipSTACK(1);                 /* drop */
   return true;
 }
 
-# UP: Write a character to a Terminal-Stream.
-# wr_ch_terminal2(&stream,ch);
-# > stream: Terminal-Stream
-# > ch: character to be written
+/* UP: Write a character to a Terminal-Stream.
+ wr_ch_terminal2(&stream,ch);
+ > stream: Terminal-Stream
+ > ch: character to be written */
 #define wr_ch_terminal2  wr_ch_unbuffered_dos
 
-# UP: Write several characters to a Terminal-Stream.
-# wr_ch_array_terminal2(&stream,&chararray,start,len);
-# > stream: Terminal-Stream
-# > chararray: not-reallocated Simple-String
-# > start: Startindex
-# > len: number of characters to be written
+/* UP: Write several characters to a Terminal-Stream.
+ wr_ch_array_terminal2(&stream,&chararray,start,len);
+ > stream: Terminal-Stream
+ > chararray: not-reallocated Simple-String
+ > start: Startindex
+ > len: number of characters to be written */
 #define wr_ch_array_terminal2  wr_ch_array_unbuffered_dos
 
-# UP: Deletes the pending Output of a Terminal-Stream.
-# clear_output_terminal2(stream);
-# > stream: Terminal-Stream
-# can trigger GC
+/* UP: Deletes the pending Output of a Terminal-Stream.
+ clear_output_terminal2(stream);
+ > stream: Terminal-Stream
+ can trigger GC */
 #define clear_output_terminal2  clear_output_unbuffered
 
-#endif # HAVE_TERMINAL2
+#endif /* HAVE_TERMINAL2 */
 
 #ifdef HAVE_TERMINAL3
 
@@ -9385,8 +9639,8 @@ local char** lisp_completion_matches (READLINE_CONST char* text,
   return result;
 }
 
-# If the function above returns NULL (no Matches), the following
-# function is called until it returns NULL on its part.
+/* If the function above returns NULL (no Matches), the following
+ function is called until it returns NULL on its part. */
 local char* lisp_completion_more (READLINE_CONST char* text, int state) {
   if (want_filename_completion)
     return READLINE_FILE_COMPLETE(text,state);
@@ -9394,48 +9648,47 @@ local char* lisp_completion_more (READLINE_CONST char* text, int state) {
     return NULL;
 }
 
-# Strip trailing '\r' from the end of STRING.
-# Returns STRING.
-# Borrowed from BASH 2.05
-# we do not strip the initial whitespace
-# since it is needed for indentation.
-# we do not strip the trailing whitespace since this would break
-# READ-LINE on terminal streams: it must not strip whitespace.
+/* Strip trailing '\r' from the end of STRING.
+ Returns STRING.
+ Borrowed from BASH 2.05
+ we do not strip the initial whitespace
+ since it is needed for indentation.
+ we do not strip the trailing whitespace since this would break
+ READ-LINE on terminal streams: it must not strip whitespace. */
 local char * strip_white (char *string) {
   char *end, *beg=string;
   if (beg == NULL) return NULL;
-  # while (ch_blank_p(*beg)) beg++;
+  /* while (ch_blank_p(*beg)) beg++; */
   if (*beg == 0) return beg;
-  for (end = beg + strlen (beg) - 1; end > beg && (*end == '\r'); end--);
+  for (end = beg + strlen (beg) - 1; end > beg && (*end == '\r'); end--) ;
   *++end = '\0';
   return beg;
 }
 
 #ifdef GNU_READLINE
-# prototype here for rd_ch_terminal3()
-# cannot have the whole thing here since they need rl_memory_abort()
-# which calls make_terminal_stream() which is not yet defined
+/* prototype here for rd_ch_terminal3()
+ cannot have the whole thing here since they need rl_memory_abort()
+ which calls make_terminal_stream() which is not yet defined */
 local char* xmalloc (int count);
-local char* xrealloc (void* ptr, int count);
 #endif
 
-# In the implementation of rd_ch_terminal3 and listen_char_terminal3, we
-# should not use the corresponding rd_ch_unbuffered and listen_char_unbuffered
-# functions, because they store intermediately read bytes in
-# UnbufferedStream_bytebuf(stream), where readline() will not see them.
-# As a workaround, we use rl_stuff_char() before calling readline().
+/* In the implementation of rd_ch_terminal3 and listen_char_terminal3, we
+ should not use the corresponding rd_ch_unbuffered and listen_char_unbuffered
+ functions, because they store intermediately read bytes in
+ UnbufferedStream_bytebuf(stream), where readline() will not see them.
+ As a workaround, we use rl_stuff_char() before calling readline().
 
-# However, there is a deeper problem with the rd_ch_terminal3/
-# listen_char_terminal3 implementation: readline() terminates when `rl_done'
-# gets set to 1, whereas listen_char_unbuffered normally returns ls_avail when
-# the user has entered a line of characters followed by #\Newline. Normally
-# this is the same condition, but if the user modifies his readline key
-# bindings so that newline does not always cause `rl_done' to become 1, then
-# rd_ch_terminal3() might block although listen_char_terminal3() returned
-# ls_avail. One possible fix would be to use the READLINE_CALLBACK functions,
-# see readline.dvi p. 29, but in order to get this right, RUN-PROGRAM and
-# MAKE-PIPE-INPUT-STREAM might need to be modified to temporarily turn off
-# readline.
+ However, there is a deeper problem with the rd_ch_terminal3/
+ listen_char_terminal3 implementation: readline() terminates when `rl_done'
+ gets set to 1, whereas listen_char_unbuffered normally returns LISTEN_AVAIL when
+ the user has entered a line of characters followed by #\Newline. Normally
+ this is the same condition, but if the user modifies his readline key
+ bindings so that newline does not always cause `rl_done' to become 1, then
+ rd_ch_terminal3() might block although listen_char_terminal3() returned
+ LISTEN_AVAIL. One possible fix would be to use the READLINE_CALLBACK functions,
+ see readline.dvi p. 29, but in order to get this right, RUN-PROGRAM and
+ MAKE-PIPE-INPUT-STREAM might need to be modified to temporarily turn off
+ readline. */
 
 local HIST_ENTRY * history_last (void)
 { /* get the last history entry and its offset */
@@ -9445,51 +9698,49 @@ local HIST_ENTRY * history_last (void)
   return *(all-1);
 }
 
-# read a character from a terminal-stream.
-# cp. rd_ch_unbuffered() :
+/* read a character from a terminal-stream.
+ cp. rd_ch_unbuffered() : */
 local object rd_ch_terminal3 (const gcv_object_t* stream_) {
   var object stream = *stream_;
-  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) # EOF already?
+  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) /* EOF already? */
     return eof_value;
   if (!(posfixnum_to_V(TheStream(stream)->strm_terminal_index)
         < TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1])) {
-    # index=count -> must read a whole line from the keyboard:
-    TheStream(stream)->strm_terminal_index = Fixnum_0; # index := 0
-    TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1] = 0; # count := 0
-    # Pass bytes that we have already read down into readline's buffer.
+    /* index=count -> must read a whole line from the keyboard: */
+    TheStream(stream)->strm_terminal_index = Fixnum_0; /* index := 0 */
+    TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1] = 0; /* count := 0 */
+    /* Pass bytes that we have already read down into readline's buffer. */
     while (UnbufferedStream_status(stream) > 0) {
       UnbufferedStreamLow_pop_byte(stream,b);
       begin_system_call(); rl_stuff_char(b); end_system_call();
     }
     {
-      var char* prompt; # Prompt: last output line
+      var char* prompt; /* Prompt: last output line */
       {
         var object lastline = string_to_asciz(TheStream(stream)->strm_terminal_outbuff,TheStream(stream)->strm_encoding);
-        begin_system_call();
-        prompt = (char*) malloc(Sbvector_length(lastline)+1);
-        if (prompt!=NULL)
+        prompt = (char*)alloca(Sbvector_length(lastline)+1);
+        if (prompt!=NULL) {
+          begin_system_call();
           strcpy(prompt,TheAsciz(lastline));
-        end_system_call();
+          end_system_call();
+        }
       }
-      # lexema-separating characters: with syntax code whsp,tmac,nmac
-      # (see IO.D, actually depends on the current *READTABLE*):
+      /* lexema-separating characters: with syntax code whsp,tmac,nmac
+       (see IO.D, actually depends on the current *READTABLE*): */
       rl_basic_word_break_characters = "\t\n \"#'(),;`";
       rl_basic_quote_characters = "\"|";
       rl_completer_quote_characters = "\\|";
-      run_time_stop(); # hold run time clock
-      begin_call();
+      run_time_stop(); /* hold run time clock */
+      begin_blocking_system_call();
       rl_already_prompted = true;
       var char* line = strip_white(readline(prompt==NULL ? "" : prompt));
-      end_call();
-      run_time_restart(); # resume run time clock
-      if (!(prompt==NULL)) {
-        begin_system_call(); free(prompt); end_system_call();
-      }
+      end_blocking_system_call();
+      run_time_restart(); /* resume run time clock */
       if (line==NULL)
-        # detect EOF (at the start of line)
+        /* detect EOF (at the start of line) */
         return eof_value;
-      # add read line to the input line:
-     #ifdef UNICODE
+      /* add read line to the input line: */
+     #ifdef ENABLE_UNICODE
       {
         var object inbuff = TheStream(*stream_)->strm_terminal_inbuff;
         var object encoding = TheStream(*stream_)->strm_encoding;
@@ -9508,7 +9759,7 @@ local object rd_ch_terminal3 (const gcv_object_t* stream_) {
      #else
       {
         var const uintB* ptr = (uintB*)line;
-        until (*ptr == '\0') {
+        while (*ptr != '\0') {
           ssstring_push_extend(TheStream(*stream_)->strm_terminal_inbuff,
                                as_chart(*ptr++));
         }
@@ -9516,7 +9767,7 @@ local object rd_ch_terminal3 (const gcv_object_t* stream_) {
      #endif
       ssstring_push_extend(TheStream(*stream_)->strm_terminal_inbuff,
                            ascii(NL));
-      # put into the history if non-empty
+      /* put into the history if non-empty */
       begin_system_call();
       if (line[0] != '\0') {
         var HIST_ENTRY *last = history_last();
@@ -9539,71 +9790,69 @@ local object rd_ch_terminal3 (const gcv_object_t* stream_) {
       end_system_call();
     }
     stream = *stream_;
-    # If both stdin and stdout are the same Terminal, we can assume,
-    # that the Cursor is situated in column 0.
+    /* If both stdin and stdout are the same Terminal, we can assume,
+     that the Cursor is situated in column 0. */
     if (eq(TheStream(stream)->strm_terminal_isatty,S(equal))) {
       TheStream(stream)->strm_wr_ch_lpos = Fixnum_0;
-      TheIarray(TheStream(stream)->strm_terminal_outbuff)->dims[1] = 0; # Fill-Pointer := 0
+      TheIarray(TheStream(stream)->strm_terminal_outbuff)->dims[1] = 0; /* Fill-Pointer := 0 */
     }
     ASSERT(posfixnum_to_V(TheStream(stream)->strm_terminal_index)
            < TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1]);
   }
-  # index<count -> there are still characters in the buffer
+  /* index<count -> there are still characters in the buffer */
   var uintV index =
-    posfixnum_to_V(TheStream(stream)->strm_terminal_index); # Index
+    posfixnum_to_V(TheStream(stream)->strm_terminal_index); /* Index */
   TheStream(stream)->strm_terminal_index =
-    fixnum_inc(TheStream(stream)->strm_terminal_index,1); # increase Index
+    fixnum_inc(TheStream(stream)->strm_terminal_index,1); /* increase Index */
   return code_char(TheSnstring(TheIarray(TheStream(stream)->strm_terminal_inbuff)->data)->data[index]); /* next Character */
 }
 
-# Determines, if a character is available on a Terminal-Stream.
-# listen_char_terminal3(stream)
-# > stream: Terminal-Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
-local signean listen_char_terminal3 (object stream) {
-  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) # EOF already?
-    return ls_eof;
+/* Determines, if a character is available on a Terminal-Stream.
+ listen_char_terminal3(stream)
+ > stream: Terminal-Stream
+ < result: input availability */
+local listen_t listen_char_terminal3 (object stream) {
+  if (eq(TheStream(stream)->strm_rd_ch_last,eof_value)) /* EOF already? */
+    return LISTEN_EOF;
   if (posfixnum_to_V(TheStream(stream)->strm_terminal_index)
       < TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1])
-    # index<count -> there are still characters in the buffer
-    return ls_avail;
+    /* index<count -> there are still characters in the buffer */
+    return LISTEN_AVAIL;
   return listen_char_unbuffered(stream);
 }
 
-# UP: Deletes already entered interactive Input from a Terminal-Stream.
-# clear_input_terminal3(stream);
-# > stream: Terminal-Stream
-# < result: true if Input was deleted, else false
-local bool clear_input_terminal3 (object stream) {
-  if (nullp(TheStream(stream)->strm_terminal_isatty)) # File -> do nothing
+/* UP: Deletes already entered interactive Input from a Terminal-Stream.
+ clear_input_terminal3(stream);
+ > stream: Terminal-Stream
+ < result: true if Input was deleted, else false
+ can trigger GC */
+local maygc bool clear_input_terminal3 (object stream) {
+  if (nullp(TheStream(stream)->strm_terminal_isatty)) /* File -> do nothing */
     return false;
-  # Terminal
-  clear_input_unbuffered(stream); # forget about past EOF, call clear_tty_input
+  /* Terminal */
+  pushSTACK(stream);              /* save */
+  clear_input_unbuffered(stream); /* forget about past EOF, call clear_tty_input */
  #if TERMINAL_LINEBUFFERED
-  TheStream(stream)->strm_terminal_index = Fixnum_0; # index := 0
-  TheIarray(TheStream(stream)->strm_terminal_inbuff)->dims[1] = 0; # count := 0
+  TheStream(STACK_0)->strm_terminal_index = Fixnum_0; /* index := 0 */
+  TheIarray(TheStream(STACK_0)->strm_terminal_inbuff)->dims[1] = 0; /* count := 0 */
  #endif
-  pushSTACK(stream);
-  while (ls_avail_p(listen_char_terminal3(STACK_0))) {
+  while (LISTEN_AVAIL == listen_char_terminal3(STACK_0))
     read_char(&STACK_0);
-  }
-  skipSTACK(1);
+  skipSTACK(1);                 /* drop */
   return true;
 }
 
-# UP: Write a character to a Terminal-Stream.
-# wr_ch_terminal3(&stream,ch);
-# > stream: Terminal-Stream
-# > ch: character to be written
+/* UP: Write a character to a Terminal-Stream.
+ wr_ch_terminal3(&stream,ch);
+ > stream: Terminal-Stream
+ > ch: character to be written */
 local maygc void wr_ch_terminal3 (const gcv_object_t* stream_, object ch) {
   check_wr_char(*stream_,ch);
  #if TERMINAL_OUTBUFFERED
   {
-    var chart c = char_code(ch); # Code of the character
+    var chart c = char_code(ch); /* Code of the character */
     if (chareq(c,ascii(NL)))
-      TheIarray(TheStream(*stream_)->strm_terminal_outbuff)->dims[1] = 0; # Fill-Pointer := 0
+      TheIarray(TheStream(*stream_)->strm_terminal_outbuff)->dims[1] = 0; /* Fill-Pointer := 0 */
     else
       ssstring_push_extend(TheStream(*stream_)->strm_terminal_outbuff,c);
   }
@@ -9620,12 +9869,12 @@ local maygc void wr_ch_terminal3 (const gcv_object_t* stream_, object ch) {
   }
 }
 
-# UP: Write several characters to a Terminal-Stream.
-# wr_ch_array_terminal3(&stream,&chararray,start,len);
-# > stream: Terminal-Stream
-# > chararray: not-reallocated Simple-String
-# > start: Startindex
-# > len: number of characters to be written
+/* UP: Write several characters to a Terminal-Stream.
+ wr_ch_array_terminal3(&stream,&chararray,start,len);
+ > stream: Terminal-Stream
+ > chararray: not-reallocated Simple-String
+ > start: Startindex
+ > len: number of characters to be written */
 local maygc void wr_ch_array_terminal3 (const gcv_object_t* stream_,
                                         const gcv_object_t* chararray_,
                                         uintL start, uintL len) {
@@ -9644,8 +9893,8 @@ local maygc void wr_ch_array_terminal3 (const gcv_object_t* stream_,
     var object string = *chararray_;
     var const chart* ptr;
     unpack_sstring_alloca(string,len,start, ptr =);
-    # characters since the last NL in the Buffer:
-    var uintL pos = 0; # count the number of characters since the last NL
+    /* characters since the last NL in the Buffer: */
+    var uintL pos = 0; /* count the number of characters since the last NL */
     var uintL count;
     ptr += len;
     dotimespL(count,len, {
@@ -9654,25 +9903,25 @@ local maygc void wr_ch_array_terminal3 (const gcv_object_t* stream_,
       pos++;
     });
     if (false) {
-    found_NL: # pos characters since the last NL
+    found_NL: /* pos characters since the last NL */
       ptr++;
-      TheIarray(TheStream(*stream_)->strm_terminal_outbuff)->dims[1] = 0; # Fill-Pointer := 0
+      TheIarray(TheStream(*stream_)->strm_terminal_outbuff)->dims[1] = 0; /* Fill-Pointer := 0 */
     }
     if (pos > 0) {
       SstringCase(string, {
-        # ptr points into the stack, not the string, so it's GC-safe.
+        /* ptr points into the stack, not the string, so it's GC-safe. */
         dotimespL(count,pos, {
           ssstring_push_extend(TheStream(*stream_)->strm_terminal_outbuff,
                                *ptr++);
         });
       },{
-        # ptr points into the stack, not the string, so it's GC-safe.
+        /* ptr points into the stack, not the string, so it's GC-safe. */
         dotimespL(count,pos, {
           ssstring_push_extend(TheStream(*stream_)->strm_terminal_outbuff,
                                *ptr++);
         });
       },{
-        # ptr points into the string, not GC-safe.
+        /* ptr points into the string, not GC-safe. */
         var uintL index = start + len - pos;
         dotimespL(count,pos, {
           ssstring_push_extend(TheStream(*stream_)->strm_terminal_outbuff,
@@ -9687,10 +9936,10 @@ local maygc void wr_ch_array_terminal3 (const gcv_object_t* stream_,
  #endif
 }
 
-# UP: Deletes the pending Output of a Terminal-Stream.
-# clear_output_terminal3(stream);
-# > stream: Terminal-Stream
-# can trigger GC
+/* UP: Deletes the pending Output of a Terminal-Stream.
+ clear_output_terminal3(stream);
+ > stream: Terminal-Stream
+ can trigger GC */
 local maygc void clear_output_terminal3 (object stream) {
  #if TERMINAL_OUTBUFFERED
   pushSTACK(stream);            /* save */
@@ -9698,22 +9947,22 @@ local maygc void clear_output_terminal3 (object stream) {
   clear_output_unbuffered(stream);
  #if TERMINAL_OUTBUFFERED
   stream = popSTACK();          /* restore */
-  TheIarray(TheStream(stream)->strm_terminal_outbuff)->dims[1] = 0; # Fill-Pointer := 0
+  TheIarray(TheStream(stream)->strm_terminal_outbuff)->dims[1] = 0; /* Fill-Pointer := 0 */
  #endif
 }
 
-#endif # HAVE_TERMINAL3
+#endif /* HAVE_TERMINAL3 */
 
-# UP: Moves the pending Output of a Terminal-Stream to the destination.
-# finish_output_terminal(stream);
-# > stream: Terminal-Stream
-# can trigger GC
+/* UP: Moves the pending Output of a Terminal-Stream to the destination.
+ finish_output_terminal(stream);
+ > stream: Terminal-Stream
+ can trigger GC */
 #define finish_output_terminal  finish_output_unbuffered
 
-# UP: Moves the pending Output of a Terminal-Stream to the destination.
-# force_output_terminal(stream);
-# > stream: Terminal-Stream
-# can trigger GC
+/* UP: Moves the pending Output of a Terminal-Stream to the destination.
+ force_output_terminal(stream);
+ > stream: Terminal-Stream
+ can trigger GC */
 #define force_output_terminal  force_output_unbuffered
 
 local bool stdio_same_tty_p (void)
@@ -9745,41 +9994,43 @@ local bool stdio_same_tty_p (void)
 #endif
 }
 
-# Returns an interactive Terminal-Stream.
-# can trigger GC
+/* Returns an interactive Terminal-Stream.
+ can trigger GC */
 local maygc object make_terminal_stream_ (void) {
   begin_system_call();
-  var bool stdin_tty = isatty(stdin_handle); # stdin a Terminal?
-  var bool stdout_tty = isatty(stdout_handle); # stdout a Terminal?
+  var bool stdin_tty = isatty(stdin_handle); /* stdin a Terminal? */
+  var bool stdout_tty = isatty(stdout_handle); /* stdout a Terminal? */
   var bool same_tty = stdin_tty && stdout_tty && stdio_same_tty_p();
   end_system_call();
  #ifdef HAVE_TERMINAL3
-  if (rl_gnu_readline_p && same_tty) { # Build a TERMINAL3-Stream:
-    pushSTACK(make_ssstring(80)); # allocate line-buffer
-    pushSTACK(make_ssstring(80)); # allocate line-buffer
+  /* we handle all signals ourselves */
+  rl_catch_signals = 0;
+  if (rl_gnu_readline_p && same_tty && !disable_readline) { /* Build a TERMINAL3-Stream: */
+    pushSTACK(make_ssstring(80)); /* allocate line-buffer */
+    pushSTACK(make_ssstring(80)); /* allocate line-buffer */
     pushSTACK(allocate_handle(stdout_handle));
     pushSTACK(allocate_handle(stdin_handle));
-    # allocate new Stream:
-    var object stream = # Flags: only READ-CHAR and WRITE-CHAR allowed
+    /* allocate new Stream: */
+    var object stream = /* Flags: only READ-CHAR and WRITE-CHAR allowed */
       allocate_stream(strmflags_ch_B,strmtype_terminal,strm_terminal_len,
                       sizeof(strm_unbuffered_extrafields_t));
-    # and fill:
+    /* and fill: */
     stream_dummy_fill(stream);
     var Stream s = TheStream(stream);
     s->strm_encoding = O(terminal_encoding);
-    s->strm_rd_ch = P(rd_ch_terminal3); # READ-CHAR-Pseudofunction
-    s->strm_rd_ch_array = P(rd_ch_array_dummy); # READ-CHAR-SEQUENCE-Pseudofunction
-    s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_terminal3); # WRITE-CHAR-Pseudofunction
-    s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_terminal3); # WRITE-CHAR-SEQUENCE-Pseudofunction
-    s->strm_terminal_isatty = S(equal); # stdout=stdin
-    s->strm_terminal_ihandle = popSTACK(); # Handle for listen_char_unbuffered()
-    s->strm_terminal_ohandle = popSTACK(); # Handle for Output
-   #if 1 # TERMINAL_LINEBUFFERED
-    s->strm_terminal_inbuff = popSTACK(); # register line buffer, count := 0
-    s->strm_terminal_index = Fixnum_0; # index := 0
+    s->strm_rd_ch = P(rd_ch_terminal3); /* READ-CHAR-Pseudofunction */
+    s->strm_rd_ch_array = P(rd_ch_array_dummy); /* READ-CHAR-SEQUENCE-Pseudofunction */
+    s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_terminal3); /* WRITE-CHAR-Pseudofunction */
+    s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_terminal3); /* WRITE-CHAR-SEQUENCE-Pseudofunction */
+    s->strm_terminal_isatty = S(equal); /* stdout=stdin */
+    s->strm_terminal_ihandle = popSTACK(); /* Handle for listen_char_unbuffered() */
+    s->strm_terminal_ohandle = popSTACK(); /* Handle for Output */
+   #if 1 /* TERMINAL_LINEBUFFERED */
+    s->strm_terminal_inbuff = popSTACK(); /* register line buffer, count := 0 */
+    s->strm_terminal_index = Fixnum_0; /* index := 0 */
    #endif
-   #if 1 # TERMINAL_OUTBUFFERED
-    s->strm_terminal_outbuff = popSTACK(); # register line buffer
+   #if 1 /* TERMINAL_OUTBUFFERED */
+    s->strm_terminal_outbuff = popSTACK(); /* register line buffer */
    #endif
     ChannelStream_buffered(stream) = false;
     ChannelStream_regular(stream) = false;
@@ -9790,28 +10041,28 @@ local maygc object make_terminal_stream_ (void) {
   }
  #endif
  #ifdef HAVE_TERMINAL2
-  if (stdin_tty) { # Build a TERMINAL2-Stream:
-    pushSTACK(make_ssstring(80)); # allocate line-buffer
+  if (stdin_tty) { /* Build a TERMINAL2-Stream: */
+    pushSTACK(make_ssstring(80)); /* allocate line-buffer */
     pushSTACK(allocate_handle(stdout_handle));
     pushSTACK(allocate_handle(stdin_handle));
-    # allocate new Stream:
-    var object stream = # Flags: only READ-CHAR and WRITE-CHAR allowed
+    /* allocate new Stream: */
+    var object stream = /* Flags: only READ-CHAR and WRITE-CHAR allowed */
       allocate_stream(strmflags_ch_B,strmtype_terminal,strm_terminal_len,
                       sizeof(strm_unbuffered_extrafields_t));
-    # and fill:
+    /* and fill: */
     stream_dummy_fill(stream);
     var Stream s = TheStream(stream);
     s->strm_encoding = O(terminal_encoding);
-    s->strm_rd_ch = P(rd_ch_terminal2); # READ-CHAR-Pseudofunction
-    s->strm_rd_ch_array = P(rd_ch_array_dummy); # READ-CHAR-SEQUENCE-Pseudofunction
-    s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_terminal2); # WRITE-CHAR-Pseudofunction
-    s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_terminal2); # WRITE-CHAR-SEQUENCE-Pseudofunction
+    s->strm_rd_ch = P(rd_ch_terminal2); /* READ-CHAR-Pseudofunction */
+    s->strm_rd_ch_array = P(rd_ch_array_dummy); /* READ-CHAR-SEQUENCE-Pseudofunction */
+    s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_terminal2); /* WRITE-CHAR-Pseudofunction */
+    s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_terminal2); /* WRITE-CHAR-SEQUENCE-Pseudofunction */
     s->strm_terminal_isatty = (stdin_tty ? (same_tty ? S(equal) : T) : NIL);
-    s->strm_terminal_ihandle = popSTACK(); # Handle for listen_char_unbuffered()
-    s->strm_terminal_ohandle = popSTACK(); # Handle for Output
-   #if 1 # TERMINAL_LINEBUFFERED
-    s->strm_terminal_inbuff = popSTACK(); # register line buffer, count := 0
-    s->strm_terminal_index = Fixnum_0; # index := 0
+    s->strm_terminal_ihandle = popSTACK(); /* Handle for listen_char_unbuffered() */
+    s->strm_terminal_ohandle = popSTACK(); /* Handle for Output */
+   #if 1 /* TERMINAL_LINEBUFFERED */
+    s->strm_terminal_inbuff = popSTACK(); /* register line buffer, count := 0 */
+    s->strm_terminal_index = Fixnum_0; /* index := 0 */
    #endif
     ChannelStream_buffered(stream) = false;
     ChannelStream_regular(stream) = false;
@@ -9821,25 +10072,25 @@ local maygc object make_terminal_stream_ (void) {
     return stream;
   }
  #endif
-  # Build a TERMINAL1-Stream:
+  /* Build a TERMINAL1-Stream: */
   {
     pushSTACK(allocate_handle(stdout_handle));
     pushSTACK(allocate_handle(stdin_handle));
-    # allocate new Stream:
-    var object stream = # Flags: only READ-CHAR and WRITE-CHAR allowed
+    /* allocate new Stream: */
+    var object stream = /* Flags: only READ-CHAR and WRITE-CHAR allowed */
       allocate_stream(strmflags_ch_B,strmtype_terminal,strm_terminal_len,
                       sizeof(strm_unbuffered_extrafields_t));
-    # and fill:
+    /* and fill: */
     stream_dummy_fill(stream);
     var Stream s = TheStream(stream);
     s->strm_encoding = O(terminal_encoding);
-    s->strm_rd_ch = P(rd_ch_terminal1); # READ-CHAR-Pseudofunction
-    s->strm_rd_ch_array = P(rd_ch_array_dummy); # READ-CHAR-SEQUENCE-Pseudofunction
-    s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_terminal1); # WRITE-CHAR-Pseudofunction
-    s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_terminal1); # WRITE-CHAR-SEQUENCE-Pseudofunction
+    s->strm_rd_ch = P(rd_ch_terminal1); /* READ-CHAR-Pseudofunction */
+    s->strm_rd_ch_array = P(rd_ch_array_dummy); /* READ-CHAR-SEQUENCE-Pseudofunction */
+    s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_terminal1); /* WRITE-CHAR-Pseudofunction */
+    s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_terminal1); /* WRITE-CHAR-SEQUENCE-Pseudofunction */
     s->strm_terminal_isatty = (stdin_tty ? (same_tty ? S(equal) : T) : NIL);
-    s->strm_terminal_ihandle = popSTACK(); # Handle for listen_char_unbuffered()
-    s->strm_terminal_ohandle = popSTACK(); # Handle for Output
+    s->strm_terminal_ihandle = popSTACK(); /* Handle for listen_char_unbuffered() */
+    s->strm_terminal_ohandle = popSTACK(); /* Handle for Output */
     ChannelStream_buffered(stream) = false;
     ChannelStream_regular(stream) = false;
     ChannelStream_init(stream);
@@ -9851,24 +10102,24 @@ local maygc object make_terminal_stream_ (void) {
 
 #ifdef UNIX
 
-# (SYS::TERMINAL-RAW *terminal-io* flag [errorp])
-# flag /= NIL: sets the Terminal in cbreak/noecho-Mode,
-# flag = NIL: sets the Terminal back in nocbreak/echo-Mode.
-# If it is not possible and errorp is specified and is /= NIL, Error is reported.
-# Returns the old Mode.
+/* (SYS::TERMINAL-RAW *terminal-io* flag [errorp])
+ flag /= NIL: sets the Terminal in cbreak/noecho-Mode,
+ flag = NIL: sets the Terminal back in nocbreak/echo-Mode.
+ If it is not possible and errorp is specified and is /= NIL, Error is reported.
+ Returns the old Mode. */
 
-# (SYS::TERMINAL-RAW *terminal-io* t) is essentially
-# (progn
-#   ; no possibilities for editing, no Echo, no CR<-->NL-conversions:
-#   (shell "stty -icanon -echo -icrnl -inlcr")
-#   ; don't catch anything:
-#   ;              C-S   C-Q      Del     C-U       C-W      C-R      C-O      C-V     C-Y     C-C     C-\      C-Q     C-S    C-D
-#   (shell "stty -ixon -ixoff erase ^- kill ^- werase ^- rprnt ^- flush ^- lnext ^- susp ^- intr ^- quit ^- start ^- stop ^- eof ^-")
-#   ; demand 1 character at a time (not 4!):
-#   (shell "stty min 1") ; this has to come at the end, paradoxically...
-# )
-# (SYS::TERMINAL-RAW *terminal-io* nil) is essentially
-# (shell "stty sane")
+/* (SYS::TERMINAL-RAW *terminal-io* t) is essentially
+ (progn
+   ; no possibilities for editing, no Echo, no CR<-->NL-conversions:
+   (shell "stty -icanon -echo -icrnl -inlcr")
+   ; don't catch anything:
+   ;              C-S   C-Q      Del     C-U       C-W      C-R      C-O      C-V     C-Y     C-C     C-\      C-Q     C-S    C-D
+   (shell "stty -ixon -ixoff erase ^- kill ^- werase ^- rprnt ^- flush ^- lnext ^- susp ^- intr ^- quit ^- start ^- stop ^- eof ^-")
+   ; demand 1 character at a time (not 4!):
+   (shell "stty min 1") ; this has to come at the end, paradoxically...
+ )
+ (SYS::TERMINAL-RAW *terminal-io* nil) is essentially
+ (shell "stty sane") */
 
 local void term_raw (void);
 local void term_unraw (void);
@@ -9876,7 +10127,7 @@ local void term_unraw (void);
 local bool oldterm_initialized = false;
 
 #if defined(UNIX_TERM_TERMIOS)
-  local struct termios oldtermio; # original TTY-Mode
+  local struct termios oldtermio; /* original TTY-Mode */
 local void term_raw() {
   if (!oldterm_initialized) {
     if (!( tcgetattr(stdout_handle,&oldtermio) ==0)) {
@@ -9887,7 +10138,7 @@ local void term_raw() {
   var struct termios newtermio;
   newtermio = oldtermio;
   newtermio.c_iflag &= ( /* IXON|IXOFF|IXANY| */ ISTRIP|IGNBRK);
-  /* newtermio.c_oflag &= ~OPOST; */ # Curses is deranged by this!
+  /* newtermio.c_oflag &= ~OPOST; */ /* Curses is deranged by this! */
   newtermio.c_lflag &= ISIG;
   {
     var uintC i;
@@ -9907,17 +10158,17 @@ local void term_unraw() {
     }
   }
 }
-# Some do it like this:
-# define crmode()    (_tty.c_lflag &=~ICANON,_tty.c_cc[VMIN]=1,tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
-# define nocrmode()  (_tty.c_lflag |= ICANON,_tty.c_cc[VEOF] = CEOF,tcsetattr(_tty_ch, TCSAFLUSH,&_tty))
-# define echo()      (_tty.c_lflag |= ECHO, tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
-# define noecho()    (_tty.c_lflag &=~ECHO, tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
-# define nl()        (_tty.c_iflag |= ICRNL,_tty.c_oflag |= ONLCR,tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
-# define nonl()      (_tty.c_iflag &=~ICRNL,_tty.c_oflag &=~ONLCR,tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
-# define savetty()   (tcgetattr(_tty_ch, &_oldtty),tcgetattr(_tty_ch, &_tty))
-# define resetty()   (tcsetattr(_tty_ch, TCSAFLUSH, &_oldtty))
+/* Some do it like this:
+ define crmode()    (_tty.c_lflag &=~ICANON,_tty.c_cc[VMIN]=1,tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
+ define nocrmode()  (_tty.c_lflag |= ICANON,_tty.c_cc[VEOF] = CEOF,tcsetattr(_tty_ch, TCSAFLUSH,&_tty))
+ define echo()      (_tty.c_lflag |= ECHO, tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
+ define noecho()    (_tty.c_lflag &=~ECHO, tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
+ define nl()        (_tty.c_iflag |= ICRNL,_tty.c_oflag |= ONLCR,tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
+ define nonl()      (_tty.c_iflag &=~ICRNL,_tty.c_oflag &=~ONLCR,tcsetattr(_tty_ch, TCSAFLUSH, &_tty))
+ define savetty()   (tcgetattr(_tty_ch, &_oldtty),tcgetattr(_tty_ch, &_tty))
+ define resetty()   (tcsetattr(_tty_ch, TCSAFLUSH, &_oldtty)) */
 #elif defined(UNIX_TERM_TERMIO)
-  local struct termio oldtermio; # original TTY-Mode
+  local struct termio oldtermio; /* original TTY-Mode */
 local void term_raw() {
   if (!oldterm_initialized) {
     if (!( ioctl(stdout_handle,TCGETA,&oldtermio) ==0)) {
@@ -9928,7 +10179,7 @@ local void term_raw() {
   var struct termio newtermio;
   newtermio = oldtermio;
   newtermio.c_iflag &= ( /* IXON|IXOFF|IXANY| */ ISTRIP|IGNBRK);
-  /* newtermio.c_oflag &= ~OPOST; */ # Curses is deranged by this!
+  /* newtermio.c_oflag &= ~OPOST; */ /* Curses is deranged by this! */
   newtermio.c_lflag &= ISIG;
   {
     var uintC i;
@@ -9948,18 +10199,18 @@ local void term_unraw() {
     }
   }
 }
-# Some do it like this:
-# define crmode()    (_tty.c_lflag &=~ICANON,_tty.c_cc[VMIN] = 1,ioctl(_tty_ch,TCSETAF,&_tty))
-# define nocrmode()  (_tty.c_lflag |= ICANON,_tty.c_cc[VEOF] = CEOF,stty(_tty_ch,&_tty))
-# define echo()      (_tty.c_lflag |= ECHO, ioctl(_tty_ch, TCSETA, &_tty))
-# define noecho()    (_tty.c_lflag &=~ECHO, ioctl(_tty_ch, TCSETA, &_tty))
-# define nl()        (_tty.c_iflag |= ICRNL,_tty.c_oflag |= ONLCR,ioctl(_tty_ch, TCSETAW, &_tty))
-# define nonl()      (_tty.c_iflag &=~ICRNL,_tty.c_oflag &=~ONLCR,ioctl(_tty_ch, TCSETAW, &_tty))
+/* Some do it like this:
+ define crmode()    (_tty.c_lflag &=~ICANON,_tty.c_cc[VMIN] = 1,ioctl(_tty_ch,TCSETAF,&_tty))
+ define nocrmode()  (_tty.c_lflag |= ICANON,_tty.c_cc[VEOF] = CEOF,stty(_tty_ch,&_tty))
+ define echo()      (_tty.c_lflag |= ECHO, ioctl(_tty_ch, TCSETA, &_tty))
+ define noecho()    (_tty.c_lflag &=~ECHO, ioctl(_tty_ch, TCSETA, &_tty))
+ define nl()        (_tty.c_iflag |= ICRNL,_tty.c_oflag |= ONLCR,ioctl(_tty_ch, TCSETAW, &_tty))
+ define nonl()      (_tty.c_iflag &=~ICRNL,_tty.c_oflag &=~ONLCR,ioctl(_tty_ch, TCSETAW, &_tty)) */
 #elif defined(UNIX_TERM_SGTTY)
-  local struct sgttyb oldsgttyb; # original TTY-Mode
-  local struct tchars oldtchars; # original control-character
+  local struct sgttyb oldsgttyb; /* original TTY-Mode */
+  local struct tchars oldtchars; /* original control-character */
  #ifdef TIOCSLTC
-  local struct ltchars oldltchars; # original editing-character
+  local struct ltchars oldltchars; /* original editing-character */
  #endif
 local void term_raw() {
   if (!oldterm_initialized) {
@@ -10025,21 +10276,21 @@ local void term_unraw() {
    #endif
   }
 }
-# Some do it like this:
-# define raw()       (_tty.sg_flags|=RAW, stty(_tty_ch,&_tty))
-# define noraw()     (_tty.sg_flags&=~RAW,stty(_tty_ch,&_tty))
-# define crmode()    (_tty.sg_flags |= CBREAK, stty(_tty_ch,&_tty))
-# define nocrmode()  (_tty.sg_flags &= ~CBREAK,stty(_tty_ch,&_tty))
-# define echo()      (_tty.sg_flags |= ECHO, stty(_tty_ch, &_tty))
-# define noecho()    (_tty.sg_flags &= ~ECHO, stty(_tty_ch, &_tty))
-# define nl()        (_tty.sg_flags |= CRMOD,stty(_tty_ch, &_tty))
-# define nonl()      (_tty.sg_flags &= ~CRMOD, stty(_tty_ch, &_tty))
-# define savetty()   (gtty(_tty_ch, &_tty), _res_flg = _tty.sg_flags)
-# define resetty()   (_tty.sg_flags = _res_flg, stty(_tty_ch, &_tty))
+/* Some do it like this:
+ define raw()       (_tty.sg_flags|=RAW, stty(_tty_ch,&_tty))
+ define noraw()     (_tty.sg_flags&=~RAW,stty(_tty_ch,&_tty))
+ define crmode()    (_tty.sg_flags |= CBREAK, stty(_tty_ch,&_tty))
+ define nocrmode()  (_tty.sg_flags &= ~CBREAK,stty(_tty_ch,&_tty))
+ define echo()      (_tty.sg_flags |= ECHO, stty(_tty_ch, &_tty))
+ define noecho()    (_tty.sg_flags &= ~ECHO, stty(_tty_ch, &_tty))
+ define nl()        (_tty.sg_flags |= CRMOD,stty(_tty_ch, &_tty))
+ define nonl()      (_tty.sg_flags &= ~CRMOD, stty(_tty_ch, &_tty))
+ define savetty()   (gtty(_tty_ch, &_tty), _res_flg = _tty.sg_flags)
+ define resetty()   (_tty.sg_flags = _res_flg, stty(_tty_ch, &_tty)) */
 #endif
 
-# We store, if term_raw() or term_unraw() was executed lastly,
-# therewith we can switch back on program-exit.
+/* We store, if term_raw() or term_unraw() was executed lastly,
+ therewith we can switch back on program-exit. */
 local bool terminal_raw = false;
 
 global void terminal_sane (void) {
@@ -10050,19 +10301,24 @@ global void terminal_sane (void) {
 }
 
 LISPFUN(terminal_raw,seclass_default,2,1,norest,nokey,0,NIL) {
-  var object errorp = popSTACK();
+  skipSTACK(1); /* ignore errorp */
   var object flag = popSTACK();
   var object stream = check_stream(popSTACK());
   stream = resolve_synonym_stream(stream);
   value1 = NIL;
-  if (builtin_stream_p(stream)
-      && TheStream(stream)->strmtype == strmtype_terminal) { # Terminal-Stream
-    if (!nullp(TheStream(stream)->strm_terminal_isatty)) { # Terminal
+  if (builtin_stream_p(stream)) {
+    if (((TheStream(stream)->strmtype == strmtype_terminal)  /* Terminal-Stream */
+         && !nullp(TheStream(stream)->strm_terminal_isatty)) /* Terminal */
+   #ifdef KEYBOARD
+        || ((TheStream(stream)->strmtype == strmtype_keyboard)  /* Keyboard-Stream */
+            && !nullp(TheStream(stream)->strm_keyboard_isatty))
+   #endif
+        ) {
       value1 = (terminal_raw ? T : NIL);
       begin_system_call();
-      if (!nullp(flag)) { # switch to cbreak/noecho-Mode:
+      if (!nullp(flag)) { /* switch to cbreak/noecho-Mode: */
         term_raw(); terminal_raw = true;
-      } else { # switch to nocbreak/echo-Mode:
+      } else { /* switch to nocbreak/echo-Mode: */
         term_unraw(); terminal_raw = false;
       }
       end_system_call();
@@ -10071,105 +10327,103 @@ LISPFUN(terminal_raw,seclass_default,2,1,norest,nokey,0,NIL) {
   mv_count=1;
 }
 
-#endif # UNIX
+#endif  /* UNIX */
 
-#endif # (UNIX && !NEXTAPP) || WIN32_NATIVE
+#endif  /* UNIX || WIN32_NATIVE */
 
-#if !(defined(UNIX) && !defined(NEXTAPP))
-
+#if !defined(UNIX)
 LISPFUN(terminal_raw,seclass_default,2,1,norest,nokey,0,NIL) {
   VALUES1(NIL); skipSTACK(3); /* do nothing */
 }
-
 #endif
 
-# Returns an interactive Terminal-Stream.
-# can trigger GC
+/* Returns an interactive Terminal-Stream.
+ can trigger GC */
 local maygc object make_terminal_stream (void) {
   return add_to_open_streams(make_terminal_stream_());
 }
 
 
-# Window-Stream
-# =============
+/* Window-Stream
+   ============= */
 
 #ifdef SCREEN
 
-# Editor-Support:
-# CURSES: A Window-Stream is essentially a Curses-WINDOW.
+/* Editor-Support:
+ CURSES: A Window-Stream is essentially a Curses-WINDOW.
 
-# (SCREEN:MAKE-WINDOW)
-#   returns a Window-Stream. Until it is closed again,
-#   the Terminal is in cbreak-noecho-Mode; further In-/Output via
-#   *terminal-io* should not happen during this period of time.
+ (SCREEN:MAKE-WINDOW)
+   returns a Window-Stream. Until it is closed again,
+   the Terminal is in cbreak-noecho-Mode; further In-/Output via
+   *terminal-io* should not happen during this period of time.
 
-# (SCREEN:WINDOW-SIZE window-stream)
-#   returns the size of the Window,
-#   as 2 values: Height (= Ymax+1), Width (= Xmax+1).
+ (SCREEN:WINDOW-SIZE window-stream)
+   returns the size of the Window,
+   as 2 values: Height (= Ymax+1), Width (= Xmax+1).
 
-# (SCREEN:WINDOW-CURSOR-POSITION window-stream)
-#   returns the Position of the Cursor in the Window
-#   as 2 values: row (>=0, <=Ymax, 0=oben), column (>=0, <=Xmax, 0=links).
+ (SCREEN:WINDOW-CURSOR-POSITION window-stream)
+   returns the Position of the Cursor in the Window
+   as 2 values: row (>=0, <=Ymax, 0=oben), column (>=0, <=Xmax, 0=links).
 
-# (SCREEN:SET-WINDOW-CURSOR-POSITION window-stream line column)
-#   sets the Position of the Cursor in the Window.
+ (SCREEN:SET-WINDOW-CURSOR-POSITION window-stream line column)
+   sets the Position of the Cursor in the Window.
 
-# (SCREEN:CLEAR-WINDOW window-stream)
-#   deletes the content of the Window and
-#   positions the Cursor to the upper left corner
+ (SCREEN:CLEAR-WINDOW window-stream)
+   deletes the content of the Window and
+   positions the Cursor to the upper left corner
 
-# (SCREEN:CLEAR-WINDOW-TO-EOT window-stream)
-#   deletes the content of the Window from Cursor-Position to end of screen
+ (SCREEN:CLEAR-WINDOW-TO-EOT window-stream)
+   deletes the content of the Window from Cursor-Position to end of screen
 
-# (SCREEN:CLEAR-WINDOW-TO-EOL window-stream)
-#   deletes the content of the Window from Cursor-Position to end of line
+ (SCREEN:CLEAR-WINDOW-TO-EOL window-stream)
+   deletes the content of the Window from Cursor-Position to end of line
 
-# (SCREEN:DELETE-WINDOW-LINE window-stream)
-#   deletes the cursor-line, shifts the lines below up one row
-#   and deletes the last line of the screen.
+ (SCREEN:DELETE-WINDOW-LINE window-stream)
+   deletes the cursor-line, shifts the lines below up one row
+   and deletes the last line of the screen.
 
-# (SCREEN:INSERT-WINDOW-LINE window-stream)
-#   inserts a new line at the line of the cursor and thereby shifts down
-#   all lines starting at the cursor by 1.
+ (SCREEN:INSERT-WINDOW-LINE window-stream)
+   inserts a new line at the line of the cursor and thereby shifts down
+   all lines starting at the cursor by 1.
 
-# (SCREEN:HIGHLIGHT-ON window-stream)
-#   switches on "highlighted" output.
+ (SCREEN:HIGHLIGHT-ON window-stream)
+   switches on "highlighted" output.
 
-# (SCREEN:HIGHLIGHT-OFF window-stream)
-#   switches off "highlighted" output again.
+ (SCREEN:HIGHLIGHT-OFF window-stream)
+   switches off "highlighted" output again.
 
-# (SCREEN:WINDOW-CURSOR-ON window-stream)
-#   turns the Cursor(block) visible.
+ (SCREEN:WINDOW-CURSOR-ON window-stream)
+   turns the Cursor(block) visible.
 
-# (SCREEN:WINDOW-CURSOR-OFF window-stream)
-#   turns the Cursor(block) invisible again.
+ (SCREEN:WINDOW-CURSOR-OFF window-stream)
+   turns the Cursor(block) invisible again.
 
-# check that the argument is a window-stream.
+ check that the argument is a window-stream. */
 local object check_window_stream (object stream) {
   if (!(builtin_stream_p(stream)
         && (TheStream(stream)->strmtype == strmtype_window))) {
     pushSTACK(stream);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: argument ~S should be a window stream"));
+    error(error_condition,GETTEXT("~S: argument ~S should be a window stream"));
   }
   return stream;
 }
 
 #ifdef WIN32_NATIVE
 
-# Implementation on top of the Win32 console.
-# Contributed by Arseny Slobodjuck <ampy@crosswinds.net>, 2001-02-14
-# modified on 2001-07-31
+/* Implementation on top of the Win32 console.
+ Contributed by Arseny Slobodjuck <ampy@crosswinds.net>, 2001-02-14
+ modified on 2001-07-31
 
-# The API is documented at
-# http://www.msdn.microsoft.com/library/psdk/winbase/conchar_4svm.htm
-# (Platform SDK documentation -> Base Services -> Files and I/O ->
-#  Consoles and Character-Mode Support -> About Character Mode Support ->
-#  Consoles)
+ The API is documented at
+ http://www.msdn.microsoft.com/library/psdk/winbase/conchar_4svm.htm
+ (Platform SDK documentation -> Base Services -> Files and I/O ->
+  Consoles and Character-Mode Support -> About Character Mode Support ->
+  Consoles)
 
-# console is a kind of channel stream
+ console is a kind of channel stream
 
-# accessor that can be used at the Right Side
+ accessor that can be used at the Right Side */
 #define ConsoleHandleR(stream) TheHandle(TheStream(stream)->strm_ochannel)
 
 typedef struct win32_console_extrafields_t {
@@ -10182,15 +10436,15 @@ typedef struct win32_console_extrafields_t {
 
 #define ConsoleData(stream) ((win32_console_extrafields_t*)&TheStream(stream)->strm_channel_extrafields)
 
-# The following attribute constants are defined in the <wincon.h> header file:
-# FOREGROUND_BLUE
-# FOREGROUND_GREEN
-# FOREGROUND_RED
-# FOREGROUND_INTENSITY
-# BACKGROUND_BLUE
-# BACKGROUND_GREEN
-# BACKGROUND_RED
-# BACKGROUND_INTENSITY
+/* The following attribute constants are defined in the <wincon.h> header file:
+ FOREGROUND_BLUE
+ FOREGROUND_GREEN
+ FOREGROUND_RED
+ FOREGROUND_INTENSITY
+ BACKGROUND_BLUE
+ BACKGROUND_GREEN
+ BACKGROUND_RED
+ BACKGROUND_INTENSITY */
 
 local const WORD attr_table[5] = {
   /* no standout   */
@@ -10218,7 +10472,7 @@ local void move_ccp_by(COORD *pos,COORD sz,int by) {
 }
 
 local void v_move(HANDLE handle,uintW y,uintW x) {
-  # set cursor
+  /* set cursor */
   var COORD pos;
   pos.X = x; pos.Y = y;
   SetConsoleCursorPosition(handle,pos);
@@ -10231,20 +10485,20 @@ local void v_emit_spaces(HANDLE handle,COORD *pos,int nspaces,uintW attr) {
 }
 
 local void v_cb (HANDLE handle) {
-  # cursor have 50 percent fill and visibility
+  /* cursor have 50 percent fill and visibility */
   CONSOLE_CURSOR_INFO ci = { 50, 1 };
   SetConsoleCursorInfo(handle,&ci);
 }
 
 local void v_cs (HANDLE handle) {
-  # cursor have 10 percent fill and 0 visibility
+  /* cursor have 10 percent fill and 0 visibility */
   CONSOLE_CURSOR_INFO ci = { 10, 0 };
   SetConsoleCursorInfo(handle,&ci);
 }
 
 local void v_ce (HANDLE handle,COORD *pos,COORD sz,uintW attr) {
-  # clear to end: get cursor position and emit the appropriate number
-  # of spaces, without moving cursor. attr of spaces set to default.
+  /* clear to end: get cursor position and emit the appropriate number
+   of spaces, without moving cursor. attr of spaces set to default. */
   int nspaces = sz.X - pos->X;
   v_emit_spaces(handle,pos,nspaces,attr);
 }
@@ -10256,7 +10510,7 @@ local void v_cl (HANDLE handle,COORD *pos,COORD sz,uintW attr) {
 }
 
 local void v_cd (HANDLE handle,COORD *pos,COORD sz,uintW attr) {
-  # clear to bottom: get position, clear to eol, clear next line to end
+  /* clear to bottom: get position, clear to eol, clear next line to end */
   int nspaces = (sz.Y - pos->Y) * sz.X - pos->X;
   v_emit_spaces(handle,pos,nspaces,attr);
 }
@@ -10275,24 +10529,24 @@ local void v_scroll (HANDLE handle,int ax,int ay,int bx,int by,
 }
 
 local void v_al (HANDLE handle,COORD *pos,COORD sz,uintW attr) {
-  # add line: scroll rest of screen down
+  /* add line: scroll rest of screen down */
   v_scroll(handle,0,pos->Y+1,sz.X-1,sz.Y-1,1,attr);
 }
 
 local void v_dl (HANDLE handle,COORD *pos,COORD sz,uintW attr) {
-  # delete line: scroll rest up
+  /* delete line: scroll rest up */
   v_scroll(handle,0,pos->Y,sz.X-1,sz.Y-1,-1,attr);
 }
 
 local void v_su (HANDLE handle,COORD *pos,COORD sz,uintW attr) {
-  # not used. why is it here ?
-  # scroll up: scroll whole screen
+  /* not used. why is it here ?
+   scroll up: scroll whole screen */
   v_scroll(handle,0,0,sz.X-1,sz.Y-1,-1,attr);
 }
 
 local uintW v_put(HANDLE handle,uintW ch,COORD *pos,COORD sz,uintW attr) {
-  # put character:
-  # put attribute and char (no scroll!), then update cursor position.
+  /* put character:
+   put attribute and char (no scroll!), then update cursor position. */
   ch &= 0xff;
   if (ch==NL) {
     pos->Y += 1;
@@ -10316,12 +10570,12 @@ local uintW v_put(HANDLE handle,uintW ch,COORD *pos,COORD sz,uintW attr) {
 }
 
 local void v_puts(HANDLE handle,char *s,COORD *pos,COORD sz,uintW attr) {
-  var char * cp    = s;           # cp = current position
-  var char * start = s;           # start of current piece of string
-  var char terminator = 0;        # judgement day
+  var char * cp    = s;           /* cp = current position */
+  var char * start = s;           /* start of current piece of string */
+  var char terminator = 0;        /* judgement day */
   do {
-    # move cp to end of line or newline char or right screen border
-    # set terminator accordingly
+    /* move cp to end of line or newline char or right screen border
+     set terminator accordingly */
     while (1) {
       if (!(*cp) || *cp == NL) {
         terminator = *cp;
@@ -10364,7 +10618,7 @@ local void v_puts(HANDLE handle,char *s,COORD *pos,COORD sz,uintW attr) {
   } while (terminator == NL || terminator == CR);
 }
 
-# Lisp functions:
+/* Lisp functions: */
 
 local maygc void wr_ch_array_window (const gcv_object_t* stream_,
                                      const gcv_object_t* chararray_,
@@ -10387,7 +10641,7 @@ local maygc void wr_ch_array_window (const gcv_object_t* stream_,
     } while (index < end);
     chart_str[strindex] = as_chart(0);
   });
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   var uintB *mb_str = (uintB*)malloc((len + 1)*sizeof(char)*max_bytes_per_chart);
   if (mb_str) {
     var object encoding = TheStream(*stream_)->strm_encoding;
@@ -10397,12 +10651,12 @@ local maygc void wr_ch_array_window (const gcv_object_t* stream_,
     Encoding_wcstombs(encoding)
       (encoding,*stream_,&cptr,chart_str+strindex,
        &bptr,mb_str + len * max_bytes_per_chart);
-    v_puts(handle,(char*)mb_str,&pos,sz,attr); # will work only when multi == 1 in multibytes
+    v_puts(handle,(char*)mb_str,&pos,sz,attr); /* will work only when multi == 1 in multibytes */
     free(mb_str);
   }
  #else
-  for (mbpos=0;chart_str[mbpos];mbpos++)
-    char_str[mbpos] = chart_str[mbpos];
+  for (mbpos=0; as_cint(chart_str[mbpos]); mbpos++)
+    char_str[mbpos] = as_cint(chart_str[mbpos]);
   char_str[mbpos] = 0;
   CharToOem(char_str,char_str);
   v_puts(handle,char_str,&pos,sz,attr);
@@ -10412,10 +10666,10 @@ local maygc void wr_ch_array_window (const gcv_object_t* stream_,
   ConsoleData(*stream_)->cursor_position = pos;
 }
 
-# UP: write a character to a Window-Stream.
-# wr_ch_window(&stream,ch);
-# > stream: Window-Stream
-# > ch: character to be written
+/* UP: write a character to a Window-Stream.
+ wr_ch_window(&stream,ch);
+ > stream: Window-Stream
+ > ch: character to be written */
 local maygc void wr_ch_window (const gcv_object_t* stream_, object ch) {
   var Handle handle = ConsoleHandleR(*stream_);
   var COORD  pos    = ConsoleData(*stream_)->cursor_position;
@@ -10423,7 +10677,7 @@ local maygc void wr_ch_window (const gcv_object_t* stream_, object ch) {
   var uintW  attr   = attr_table[ConsoleData(*stream_)->attribute];
   check_wr_char(*stream_,ch);
   var chart c = char_code(ch);
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   var uintB buf[max_bytes_per_chart];
   var object encoding = TheStream(*stream_)->strm_encoding;
   var const chart* cptr = &c;
@@ -10452,8 +10706,8 @@ LISPFUNN(make_window,0) {
   var object stream =
     allocate_stream(strmflags_wr_ch_B,strmtype_window,strm_channel_len,
                     sizeof(win32_console_extrafields_t));
-  # try to reuse handle on win 95/98
-  # make new handle on NT
+  /* try to reuse handle on win 95/98
+   make new handle on NT */
   var int nt_systemp = 0;
   var bool handle_reused = 1;
   var OSVERSIONINFO osvers;
@@ -10470,7 +10724,7 @@ LISPFUNN(make_window,0) {
                                        CONSOLE_TEXTMODE_BUFFER,
                                        NULL);
     if (handle == INVALID_HANDLE_VALUE)
-      fehler_unwritable(S(make_window),stream);
+      error_unwritable(S(make_window),stream);
     SetConsoleActiveScreenBuffer(handle);
     handle_reused = 0;
   }
@@ -10483,21 +10737,23 @@ LISPFUNN(make_window,0) {
     console_size.X = 80; console_size.Y = 25;
   }
   console_pos.X = 0;console_pos.Y = 0;
-
+  pushSTACK(stream);            /* save */
+  var object handle_object = allocate_handle(handle);
+  stream = popSTACK();          /* restore */
   stream_dummy_fill(stream);
   var Stream s = TheStream(stream);
-  s->strm_wr_ch       = s->strm_wr_ch_npnl       = P(wr_ch_window);       # WRITE-CHAR Pseudofunction
-  s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_window); # WRITE-CHAR-SEQUENCE Pseudofunction
+  s->strm_wr_ch       = s->strm_wr_ch_npnl       = P(wr_ch_window);       /* WRITE-CHAR Pseudofunction */
+  s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_window); /* WRITE-CHAR-SEQUENCE Pseudofunction */
   s->strm_encoding    = O(terminal_encoding);
   s->strm_isatty      = NIL;
   s->strm_ichannel    = NIL;
-  TheStream(stream)->strm_ochannel = allocate_handle(handle);
-  # non GC-ed fields
+  TheStream(stream)->strm_ochannel = handle_object;
+  /* non GC-ed fields */
   ConsoleData(stream)->console_size = console_size;
   ConsoleData(stream)->cursor_position = console_pos;
   ConsoleData(stream)->attribute = 0;
   ConsoleData(stream)->handle_reused = handle_reused;
-  ChannelStream_init(stream);  # iconv extrafields init
+  ChannelStream_init(stream);  /* iconv extrafields init */
   ChannelStream_lineno(stream) = 1;
   ChannelStream_buffered(stream) = false;
   ChannelStream_regular(stream) = false;
@@ -10509,7 +10765,7 @@ LISPFUNN(make_window,0) {
   VALUES1(stream);
 }
 
-# close a window stream.
+/* close a window stream. */
 local void close_window (object stream, uintB abort) {
   close_ochannel(stream,abort);
 }
@@ -10619,49 +10875,49 @@ LISPFUNN(window_cursor_off,1) {
 }
 
 
-#endif # WIN32_NATIVE
+#endif /* WIN32_NATIVE */
 
-#if defined(UNIX) && !defined(NEXTAPP)
+#if defined(UNIX)
 
-# -----------------------------------------------------------------------------
+/* -------------------------------------------------------------------------
 
-# Routines for the Emulation of all VT100-Features on normal Terminals.
-# Idea: Oliver Laumann 1987
-/* Bruno Haible, Tue, 25 Feb 2003 22:23:11 +0100 (CET):
+ Routines for the Emulation of all VT100-Features on normal Terminals.
+ Idea: Oliver Laumann 1987
+ Bruno Haible, Tue, 25 Feb 2003 22:23:11 +0100 (CET):
  libtermcap is a permanent security problem. Better remove it from your
  system, and use libncurses instead.
- See also m4/termcap.m4: we look for these routines in libncurses first. */
+ See also m4/termcap.m4: we look for these routines in libncurses first.
 
-# Uses the TERMCAP Library:
-  # Gets the Capability-Informations for Terminal-Type name.
-  # result: 1 if OK, 0 if name unknown, -1 on other error.
-    extern_C int tgetent (const char* bp, const char* name);
-  # gets the value of a numerical Capability (-1 if not available).
-    extern_C int tgetnum (const char* id);
-  # gets the value of a boolean Capability (1 if available, else 0).
-    extern_C int tgetflag (const char* id);
-  # gets the value of a String-significant Capability and (if area/=NULL)
-  # copies it to *area and further advances *area.
-    extern_C const char* tgetstr (const char* id, char** area);
-  # gets the String, that causes a Cursor-Positioning to (destcol,destline).
-  # (Necessary, because tgetstr("cm") has a special Format!)
-    extern_C const char* tgoto (const char* cm, int destcol, int destline);
-  # Performs a String-Capability. Thereto the output-function *outcharfun
-  # is called for each Character. (Necessary, because String-Capabilities
-  # can contain Padding-Commands!)
-    #ifdef __cplusplus
-      typedef void (*outcharfun_t) (...);
-    #else
-      typedef void (*outcharfun_t) ();
-    #endif
-    extern_C const char* tputs (const char* cp, int affcnt, outcharfun_t outcharfun);
+ Uses the TERMCAP Library:
+  Gets the Capability-Informations for Terminal-Type name.
+   result: 1 if OK, 0 if name unknown, -1 on other error. */
+extern_C int tgetent (const char* bp, const char* name);
+/* gets the value of a numerical Capability (-1 if not available). */
+extern_C int tgetnum (const char* id);
+/* gets the value of a boolean Capability (1 if available, else 0). */
+extern_C int tgetflag (const char* id);
+/* gets the value of a String-significant Capability and (if area/=NULL)
+   copies it to *area and further advances *area. */
+extern_C const char* tgetstr (const char* id, char** area);
+/* gets the String, that causes a Cursor-Positioning to (destcol,destline).
+   (Necessary, because tgetstr("cm") has a special Format!) */
+extern_C const char* tgoto (const char* cm, int destcol, int destline);
+/* Performs a String-Capability. Thereto the output-function *outcharfun
+   is called for each Character. (Necessary, because String-Capabilities
+   can contain Padding-Commands!) */
+#ifdef __cplusplus
+typedef void (*outcharfun_t) (...);
+#else
+typedef void (*outcharfun_t) ();
+#endif
+extern_C const char* tputs (const char* cp, int affcnt, outcharfun_t outcharfun);
 
-# Adjustable settings:
-  #define WANT_INSERT  false  # Insert-Mode
-  #define WANT_SAVE    false  # Save/Restore for the Cursor-Position
-  #define WANT_ATTR    true   # Attributes (bold, reverse etc.)
-  #define WANT_CHARSET false  # Fonts = Charsets
-  # Functions to be defined:
+/* Adjustable settings: */
+  #define WANT_INSERT  false  /* Insert-Mode */
+  #define WANT_SAVE    false  /* Save/Restore for the Cursor-Position */
+  #define WANT_ATTR    true   /* Attributes (bold, reverse etc.) */
+  #define WANT_CHARSET false  /* Fonts = Charsets */
+  /* Functions to be defined: */
   #define WANT_CURSOR_MOVE         false
   #define WANT_CURSOR_BACKSPACE    false
   #define WANT_CURSOR_RETURN       true
@@ -10679,50 +10935,50 @@ LISPFUNN(window_cursor_off,1) {
   #define WANT_DELETE_CHAR         false
   #define WANT_DELETE_LINE         true
   #define WANT_OUTPUT_1CHAR        true
-  # small corrections:
+  /* small corrections: */
   #define WANT_CLEAR_SCREEN        true
   #if WANT_OUTPUT_1CHAR && WANT_INSERT
   #define WANT_INSERT_1CHAR        true
   #endif
 
-# output of a character, directly.
+/* output of a character, directly. */
 local void out_char (uintB c) {
  restart_it: {
-  var int result = write(stdout_handle,&c,1); # try to write character
+  var int result = write(stdout_handle,&c,1); /* try to write character */
   if (result<0) {
     if (errno==EINTR)
       goto restart_it;
     OS_error();
   }
-  if (result==0) { # not successful?
-    pushSTACK(var_stream(S(terminal_io),0)); # FILE-ERROR slot PATHNAME
-    fehler(file_error,GETTEXT("cannot output to standard output"));
+  if (result==0) { /* not successful? */
+    pushSTACK(var_stream(S(terminal_io),0)); /* FILE-ERROR slot PATHNAME */
+    error(file_error,GETTEXT("cannot output to standard output"));
   }
  }
 }
 
-# output of a Capability-String.
+/* output of a Capability-String. */
 local void out_capstring (const char* s) {
-  if (!(s==NULL)) # protection against non-existing Capability
+  if (!(s==NULL)) /* protection against non-existing Capability */
     tputs(s,1,(outcharfun_t) &out_char);
 }
 
-# output of a Capability-String with an Argument.
+/* output of a Capability-String with an Argument. */
 local void out_cap1string (const char* s, int arg) {
-  if (!(s==NULL)) # protection against non-existing Capability
+  if (!(s==NULL)) /* protection against non-existing Capability */
     tputs(tgoto(s,0,arg),1,(outcharfun_t) &out_char);
 }
 
-# costs of execution of a Capability:
+/* costs of execution of a Capability: */
   #define EXPENSIVE 1000
-  local uintC cost_counter; # counter
-# Function, that does not write, but only counts:
+  local uintC cost_counter; /* counter */
+/* Function, that does not write, but only counts: */
 local void count_char (char c) { cost_counter++; }
 
-# calculates the costs of the writing of a Capability:
+/* calculates the costs of the writing of a Capability: */
 local uintC cap_cost (const char* s) {
   if (s==NULL) {
-    return EXPENSIVE; # Capability non-existing
+    return EXPENSIVE; /* Capability non-existing */
   } else {
     cost_counter = 0;
     tputs(s,1,(outcharfun_t) &count_char);
@@ -10730,121 +10986,121 @@ local uintC cap_cost (const char* s) {
   }
 }
 
-# Buffer for Capabilities that I need and Pointer to it:
-  local char tentry[4096];
-  local char* tp = &tentry[0];
-# some chosen Capabilities (NULL or Pointer into tentry):
-  # Insert-Mode:
-  local const char* IMcap; # Enter Insert Mode
-  local uintC IMcost;
-  local const char* EIcap; # End Insert Mode
-  local uintC EIcost;
-  #if WANT_ATTR
-  # Attributes:
-  local const char* SOcap; # Enter standout mode
-  local const char* SEcap; # End standout mode
-  local const char* UScap; # Enter underline mode
-  local const char* UEcap; # End underline mode
-  local const char* MBcap; # Turn on blinking
-  local const char* MDcap; # Turn on bold (extra-bright) mode
-  local const char* MHcap; # Turn on half-bright mode
-  local const char* MRcap; # Turn on reverse mode
-  local const char* MEcap; # Turn off all attributes
-  #endif
-  #if WANT_CHARSET
-  # charsets:
-  local bool ISO2022; # if charset change according to ISO2022 is supported
-  #endif
-  # Cursor-Motion:
-  local const char* CMcap; # Cursor motion, common Cursor-Positioning
-  local const char* TIcap; # Initialize mode where CM is usable
-  local const char* TEcap; # Exit mode where CM is usable
-  local const char* BCcap; # Backspace Cursor
-  local uintC BCcost;
-  local const char* NDcap; # cursor right
-  local uintC NDcost;
-  local const char* DOcap; # cursor down
-  local uintC DOcost;
-  local const char* UPcap; # cursor up
-  local uintC UPcost;
-  local const char* NLcap; # Newline
-  local const char* CRcap; # Carriage Return
-  local uintC CRcost;
-  # Scrolling:
-  local const char* CScap; # change scroll region
-  #if WANT_DELETE_LINE
-  local const char* SFcap; # Scroll (text up)
-  #endif
-  #if WANT_CURSOR_REVLINEFEED || WANT_INSERT_LINE
-  local const char* SRcap; # Scroll reverse (text down)
-  #endif
-  # Others:
-  local const char* IScap; # Terminal Initialization 2
-#  local const char* BLcap; # Bell
-#  local const char* VBcap; # Visible Bell (Flash)
-  local const char* CLcap; # clear screen, cursor home
-  #if WANT_CLEAR_FROM_BOS || WANT_CLEAR_TO_EOS || WANT_CLEAR_LINE || WANT_CLEAR_FROM_BOL || WANT_CLEAR_TO_EOL
-  local const char* CEcap; # clear to end of line
-  #endif
-  #if WANT_CLEAR_TO_EOS
-  local const char* CDcap; # clear to end of screen
-  #endif
-  #if WANT_CURSOR_REVLINEFEED || WANT_INSERT_LINE
-  local const char* ALcap; # add new blank line
-  #endif
-  #if WANT_DELETE_LINE
-  local const char* DLcap; # delete line
-  #endif
-  #if WANT_DELETE_CHAR
-  local const char* DCcap; # delete character
-  #endif
-  #if WANT_INSERT_1CHAR || WANT_INSERT_CHAR
-  local const char* ICcap; # insert character
-  #endif
-  #if WANT_INSERT_CHAR
-  local const char* CICcap; # insert count characters
-  #endif
-  #if WANT_INSERT_LINE
-  local const char* CALcap; # add count blank lines
-  #endif
-  #if WANT_DELETE_CHAR
-  local const char* CDCcap; # delete count chars
-  #endif
-  #if WANT_DELETE_LINE
-  local const char* CDLcap; # delete count lines
-  #endif
-  local bool AM; # automatic margins, if scrolling on right bottom corner (??)
-  local int rows; # number of rows of the screen, >0
-  local int cols; # number of columns of the screen, >0
-  # top row is row 0, bottom row is row rows-1.
-  # left-most column is column 0, right-most column is column cols-1.
-  #if WANT_ATTR || WANT_CHARSET
-  local uintB* null; # Pointer to cols Zeros
-  #endif
-  local uintB* blank; # Pointer to cols Blanks
+/* Buffer for Capabilities that I need and Pointer to it: */
+local char tentry[4096];
+local char* tp = &tentry[0];
+/* some chosen Capabilities (NULL or Pointer into tentry): */
+/* Insert-Mode: */
+local const char* IMcap; /* Enter Insert Mode */
+local uintC IMcost;
+local const char* EIcap; /* End Insert Mode */
+local uintC EIcost;
+#if WANT_ATTR
+/* Attributes: */
+local const char* SOcap; /* Enter standout mode */
+local const char* SEcap; /* End standout mode */
+local const char* UScap; /* Enter underline mode */
+local const char* UEcap; /* End underline mode */
+local const char* MBcap; /* Turn on blinking */
+local const char* MDcap; /* Turn on bold (extra-bright) mode */
+local const char* MHcap; /* Turn on half-bright mode */
+local const char* MRcap; /* Turn on reverse mode */
+local const char* MEcap; /* Turn off all attributes */
+#endif
+#if WANT_CHARSET
+/* charsets: */
+local bool ISO2022; /* if charset change according to ISO2022 is supported */
+#endif
+/* Cursor-Motion: */
+local const char* CMcap; /* Cursor motion, common Cursor-Positioning */
+local const char* TIcap; /* Initialize mode where CM is usable */
+local const char* TEcap; /* Exit mode where CM is usable */
+local const char* BCcap; /* Backspace Cursor */
+local uintC BCcost;
+local const char* NDcap; /* cursor right */
+local uintC NDcost;
+local const char* DOcap; /* cursor down */
+local uintC DOcost;
+local const char* UPcap; /* cursor up */
+local uintC UPcost;
+local const char* NLcap; /* Newline */
+local const char* CRcap; /* Carriage Return */
+local uintC CRcost;
+/* Scrolling: */
+local const char* CScap; /* change scroll region */
+#if WANT_DELETE_LINE
+local const char* SFcap; /* Scroll (text up) */
+#endif
+#if WANT_CURSOR_REVLINEFEED || WANT_INSERT_LINE
+local const char* SRcap; /* Scroll reverse (text down) */
+#endif
+/* Others: */
+local const char* IScap; /* Terminal Initialization 2 */
+/*  local const char* BLcap; - Bell
+    local const char* VBcap; - Visible Bell (Flash) */
+local const char* CLcap; /* clear screen, cursor home */
+#if WANT_CLEAR_FROM_BOS || WANT_CLEAR_TO_EOS || WANT_CLEAR_LINE || WANT_CLEAR_FROM_BOL || WANT_CLEAR_TO_EOL
+local const char* CEcap; /* clear to end of line */
+#endif
+#if WANT_CLEAR_TO_EOS
+local const char* CDcap; /* clear to end of screen */
+#endif
+#if WANT_CURSOR_REVLINEFEED || WANT_INSERT_LINE
+local const char* ALcap; /* add new blank line */
+#endif
+#if WANT_DELETE_LINE
+local const char* DLcap; /* delete line */
+#endif
+#if WANT_DELETE_CHAR
+local const char* DCcap; /* delete character */
+#endif
+#if WANT_INSERT_1CHAR || WANT_INSERT_CHAR
+local const char* ICcap; /* insert character */
+#endif
+#if WANT_INSERT_CHAR
+local const char* CICcap; /* insert count characters */
+#endif
+#if WANT_INSERT_LINE
+local const char* CALcap; /* add count blank lines */
+#endif
+#if WANT_DELETE_CHAR
+local const char* CDCcap; /* delete count chars */
+#endif
+#if WANT_DELETE_LINE
+local const char* CDLcap; /* delete count lines */
+#endif
+local bool AM; /* automatic margins, if scrolling on right bottom corner (??) */
+local int rows; /* number of rows of the screen, >0 */
+local int cols; /* number of columns of the screen, >0 */
+/* top row is row 0, bottom row is row rows-1.
+   left-most column is column 0, right-most column is column cols-1. */
+#if WANT_ATTR || WANT_CHARSET
+local uintB* null; /* Pointer to cols Zeros */
+#endif
+local uintB* blank; /* Pointer to cols Blanks */
 
-# Description of a Terminal-Output-Unit:
+/* Description of a Terminal-Output-Unit: */
 typedef struct {
-  uintB** image; # image[y][x] is the character at Position (x,y)
+  uintB** image; /* image[y][x] is the character at Position (x,y) */
   #if WANT_ATTR
-  uintB** attr;  # attr[y][x] is its Attribute
-  uintB curr_attr; # which Attribut is now the current one
+  uintB** attr;  /* attr[y][x] is its Attribute */
+  uintB curr_attr; /* which Attribut is now the current one */
   #endif
   #if WANT_CHARSET
-  uintB** font;  # font[y][x] is its Font (Charset)
+  uintB** font;  /* font[y][x] is its Font (Charset) */
   #define charset_count 4
-  uintB charsets[charset_count]; # Table of charsets
-  uintC curr_charset; # which of the charsets is the current one
-                      # (>=0, <charset_count)
+  uintB charsets[charset_count]; /* Table of charsets */
+  uintC curr_charset; /* which of the charsets is the current one */
+                      /* (>=0, <charset_count) */
   #endif
-  int x; # Cursorposition (>=0, <=cols)
-  int y; # Cursorposition (>=0, <rows)
-         # (At x=cols the Cursor is displayed in column cols-1.)
-  int top, bot; # Scroll-Region = rows y with top <= y <= bot,
-                # It applies: 0 <= top <= bot <= rows-1.
+  int x; /* Cursorposition (>=0, <=cols) */
+  int y; /* Cursorposition (>=0, <rows) */
+         /* (At x=cols the Cursor is displayed in column cols-1.) */
+  int top, bot; /* Scroll-Region = rows y with top <= y <= bot, */
+                /* It applies: 0 <= top <= bot <= rows-1. */
   #if WANT_INSERT
-  bool insert; # if the Output-Unit works in Insert-Mode
-                  # (then the Terminal is mostly in Insert-Mode)
+  bool insert; /* if the Output-Unit works in Insert-Mode */
+                  /* (then the Terminal is mostly in Insert-Mode) */
   #endif
   #if WANT_SAVE
   bool saved;
@@ -10859,20 +11115,20 @@ typedef struct {
   #endif
 } win;
 
-# current Output-Unit:
-  local win currwin; # there is only one!
-  #define curr (&currwin)
+/* current Output-Unit: */
+local win currwin; /* there is only one! */
+#define curr (&currwin)
 
 #if WANT_INSERT
 
-# switch on/of Insert-Mode:
-# Flag, if the Terminal is in Insert-Mode (if there is one):
+/* switch on/of Insert-Mode:
+ Flag, if the Terminal is in Insert-Mode (if there is one): */
 local bool insert;
 local void set_insert_mode (bool flag) {
-  if (flag) { # switch on
+  if (flag) { /* switch on */
     if (!insert)
       out_capstring(IMcap);
-  } else { # switch off
+  } else { /* switch off */
     if (insert)
       out_capstring(EIcap);
   }
@@ -10883,37 +11139,37 @@ local void set_insert_mode (bool flag) {
 
 #if WANT_ATTR
 
-# toggle the Output-Attributes of the Terminal:
-  local uintB term_attr; # current Attributes of the Terminal
-  # possible Attributes are on ODER off:
-    #define A_SO    bit(0)  # Standout mode
-    #define A_US    bit(1)  # Underscore mode
-    #define A_BL    bit(2)  # Blinking
-    #define A_BD    bit(3)  # Bold mode
-    #define A_DI    bit(4)  # Dim mode
-    #define A_RV    bit(5)  # Reverse mode
+/* toggle the Output-Attributes of the Terminal: */
+local uintB term_attr; /* current Attributes of the Terminal */
+/* possible Attributes are on ODER off: */
+#define A_SO    bit(0)  /* Standout mode */
+#define A_US    bit(1)  /* Underscore mode */
+#define A_BL    bit(2)  /* Blinking */
+#define A_BD    bit(3)  /* Bold mode */
+#define A_DI    bit(4)  /* Dim mode */
+#define A_RV    bit(5)  /* Reverse mode */
 local void change_attr (uintB new_attr) {
   var uintB old_attr = term_attr;
   if (old_attr == new_attr)
     return;
-  if (   ((old_attr & A_SO) && !(new_attr & A_SO))
-         || ((old_attr & A_US) && !(new_attr & A_US))
-         || ((old_attr & A_BL) && !(new_attr & A_BL))
-         || ((old_attr & A_BD) && !(new_attr & A_BD))
-         || ((old_attr & A_DI) && !(new_attr & A_DI))
-         || ((old_attr & A_RV) && !(new_attr & A_RV))) {
-    # Must switch of Attributes.
-    out_capstring(UEcap); # all are off
+  if (((old_attr & A_SO) && !(new_attr & A_SO))
+      || ((old_attr & A_US) && !(new_attr & A_US))
+      || ((old_attr & A_BL) && !(new_attr & A_BL))
+      || ((old_attr & A_BD) && !(new_attr & A_BD))
+      || ((old_attr & A_DI) && !(new_attr & A_DI))
+      || ((old_attr & A_RV) && !(new_attr & A_RV))) {
+    /* Must switch of Attributes. */
+    out_capstring(UEcap); /* all are off */
     out_capstring(SEcap);
     out_capstring(MEcap);
-    if (new_attr & A_SO) out_capstring(SOcap); # and switch on selectively
+    if (new_attr & A_SO) out_capstring(SOcap); /* and switch on selectively */
     if (new_attr & A_US) out_capstring(UScap);
     if (new_attr & A_BL) out_capstring(MBcap);
     if (new_attr & A_BD) out_capstring(MDcap);
     if (new_attr & A_DI) out_capstring(MHcap);
     if (new_attr & A_RV) out_capstring(MRcap);
   } else {
-    # switch on selectively:
+    /* switch on selectively: */
     if ((new_attr & A_SO) && !(old_attr & A_SO)) out_capstring(SOcap);
     if ((new_attr & A_US) && !(old_attr & A_US)) out_capstring(UScap);
     if ((new_attr & A_BL) && !(old_attr & A_BL)) out_capstring(MBcap);
@@ -10928,10 +11184,10 @@ local void change_attr (uintB new_attr) {
 
 #if WANT_CHARSET
 
-# change Output-Charset of the Terminal:
-  local uintB term_charset; # current charset of the Terminal
-                            # = curr->charsets[curr->curr_charset]
-  #define ASCII 0  # abbreviation for the charset 'B'
+/* change Output-Charset of the Terminal: */
+local uintB term_charset; /* current charset of the Terminal */
+/* = curr->charsets[curr->curr_charset] */
+#define ASCII 0  /* abbreviation for the charset 'B' */
 local void change_charset (uintB new) {
   if (term_charset==new)
     return;
@@ -10940,17 +11196,17 @@ local void change_charset (uintB new) {
   }
   term_charset = new;
 }
-# change Charset Nr. n to c:
+/* change Charset Nr. n to c: */
 local void choose_charset (uintB c, uintC n) {
   if (c=='B')
     c = ASCII;
   if (curr->charsets[n] == c)
     return;
   curr->charsets[n] = c;
-  if (curr->curr_charset == n) # the current one?
+  if (curr->curr_charset == n) /* the current one? */
     change_charset(c);
 }
-# make Charset Nr. n the current one:
+/* make Charset Nr. n the current one: */
 local void set_curr_charset (uintC n) {
   if (curr->curr_charset == n)
     return;
@@ -10960,10 +11216,10 @@ local void set_curr_charset (uintC n) {
 
 #endif
 
-# calculate the costs of Redisplay of row y, characters x1..x2-1:
-# (0 <= y < rows, 0 <= x1 <= x2 <= cols)
+/* calculate the costs of Redisplay of row y, characters x1..x2-1:
+ (0 <= y < rows, 0 <= x1 <= x2 <= cols) */
 local uintC rewrite_cost (int y, int x1, int x2) {
-  if (AM && (y==rows-1) && (x2==cols)) # right bottom corner can scroll?
+  if (AM && (y==rows-1) && (x2==cols)) /* right bottom corner can scroll? */
     return EXPENSIVE;
   var int dx = x2-x1;
   if (dx==0)
@@ -10973,7 +11229,7 @@ local uintC rewrite_cost (int y, int x1, int x2) {
     var uintB* p = &curr->attr[y][x1];
     var uintC count;
     dotimespC(count,dx, {
-      if (!(*p++ == term_attr)) # Attribut-Change necessary?
+      if (!(*p++ == term_attr)) /* Attribut-Change necessary? */
         return EXPENSIVE;
     });
   }
@@ -10983,7 +11239,7 @@ local uintC rewrite_cost (int y, int x1, int x2) {
     var uintB* p = &curr->font[y][x1];
     var uintC count;
     dotimespC(count,dx, {
-      if (!(*p++ == term_charset)) # Font-Change necessary?
+      if (!(*p++ == term_charset)) /* Font-Change necessary? */
         return EXPENSIVE;
     });
   }
@@ -10996,14 +11252,14 @@ local uintC rewrite_cost (int y, int x1, int x2) {
   return cost;
 }
 
-# Moves the Cursor from Position (y1,x1) to Position (y2,x2).
-# (x1,y1) = (-1,-1) if the current Position is unknown.
+/* Moves the Cursor from Position (y1,x1) to Position (y2,x2).
+ (x1,y1) = (-1,-1) if the current Position is unknown. */
 local void gofromto (int y1, int x1, int y2, int x2) {
-  if (x2==cols) { # Cursor to the right border?
-    x2--; out_capstring(tgoto(CMcap,x2,y2)); return; # remains in last column
+  if (x2==cols) { /* Cursor to the right border? */
+    x2--; out_capstring(tgoto(CMcap,x2,y2)); return; /* remains in last column */
   }
-  if (x1==cols) { # Cursor is at the right border?
-    out_capstring(tgoto(CMcap,x2,y2)); return; # address in absolute coords
+  if (x1==cols) { /* Cursor is at the right border? */
+    out_capstring(tgoto(CMcap,x2,y2)); return; /* address in absolute coords */
   }
   var int dy = y2-y1;
   var int dx = x2-x1;
@@ -11014,9 +11270,9 @@ local void gofromto (int y1, int x1, int y2, int x2) {
   }
   var enum { MX_NONE, MX_LE, MX_RI, MX_RW, MX_CR } mx = MX_NONE;
   var enum { MY_NONE, MY_UP, MY_DO } my = MY_NONE;
-  # Option 1: with CMcap
+  /* Option 1: with CMcap */
   var uintC CMcost = cap_cost(tgoto(CMcap,x2,y2));
-  # Option 2: with separate x- and y-movements:
+  /* Option 2: with separate x- and y-movements: */
   var uintC xycost = 0;
   if (dx > 0) {
     var uintC cost1 = rewrite_cost(y1,x1,x2);
@@ -11053,12 +11309,12 @@ local void gofromto (int y1, int x1, int y2, int x2) {
       }
       do {
         out_capstring(s);
-      } until (--dx == 0);
+      } while (--dx != 0);
     } else {
       if (mx==MX_CR) {
         out_capstring(CRcap); x1=0;
       }
-      # hereof the costs were calculated with rewrite_cost:
+      /* hereof the costs were calculated with rewrite_cost: */
       if (x1<x2) {
        #if WANT_INSERT
         if (curr->insert)
@@ -11085,16 +11341,16 @@ local void gofromto (int y1, int x1, int y2, int x2) {
     }
     do {
       out_capstring(s);
-    } until (--dy == 0);
+    } while (--dy != 0);
   }
 }
 
-# Redisplay
-# local Variables:
+/* Redisplay
+ local Variables: */
 local int last_x;
 local int last_y;
-# Redisplay a line, that might have changed:
-# pass only Parameters that are really needed:
+/* Redisplay a line, that might have changed:
+ pass only Parameters that are really needed: */
 #if WANT_ATTR && WANT_CHARSET
   #define RHargs(osp,oap,ofp,nsp,nap,nfp,y,x1,x2) (osp,oap,ofp,nsp,nap,nfp,y,x1,x2)
   #define RHparms(osp,oap,ofp,nsp,nap,nfp,y,x1,x2) (osp,oap,ofp,nsp,nap,nfp,y,x1,x2)
@@ -11112,18 +11368,18 @@ local int last_y;
   #define RHparms(osp,oap,ofp,nsp,nap,nfp,y,x1,x2) (osp,nsp,y,x1,x2,oap,ofp,nap,nfp)
 #endif
 #undef RHparms
-#define RHparms  RHargs  # declare correctly
-local void redisplay_help RHparms (uintB* osp, uintB* oap, uintB* ofp, # old
-                                   uintB* nsp, uintB* nap, uintB* nfp, # new
-                                   # line y, from x1 to x2-1
+#define RHparms  RHargs  /* declare correctly */
+local void redisplay_help RHparms (uintB* osp, uintB* oap, uintB* ofp, /* old */
+                                   uintB* nsp, uintB* nap, uintB* nfp, /* new */
+                                   /* line y, from x1 to x2-1 */
                                    int y, int x1, int x2) {
   if (AM && (y == rows-1) && (x2 == cols))
     x2--;
  #if WANT_ATTR
-  var uintB a = term_attr; # last Attribute
+  var uintB a = term_attr; /* last Attribute */
  #endif
  #if WANT_CHARSET
-  var uintB f = term_charset; # last Font
+  var uintB f = term_charset; /* last Font */
  #endif
   var int x = x1;
   osp = &osp[x1]; nsp = &nsp[x1];
@@ -11167,8 +11423,8 @@ local void redisplay_help RHparms (uintB* osp, uintB* oap, uintB* ofp, # old
   }
 }
 #if WANT_INSERT_1CHAR || WANT_INSERT_CHAR || WANT_DELETE_CHAR
-# Redisplay a line:
-# pass only Parameters that are really needed:
+/* Redisplay a line:
+ pass only Parameters that are really needed: */
 #if WANT_ATTR && WANT_CHARSET
   #define RLargs(osp,oap,ofp,y,x1,x2) (osp,oap,ofp,y,x1,x2)
   #define RLparms(osp,oap,ofp,y,x1,x2) (osp,oap,ofp,y,x1,x2)
@@ -11186,9 +11442,9 @@ local void redisplay_help RHparms (uintB* osp, uintB* oap, uintB* ofp, # old
   #define RLparms(osp,oap,ofp,y,x1,x2) (osp,y,x1,x2,oap,ofp)
 #endif
 #undef RHparms
-#define RHparms  RHargs  # declare correctly
-local void redisplay_line RLparms (uintB* osp, uintB* oap, uintB* ofp, # old
-                                   # line y, from x1 to x2-1
+#define RHparms  RHargs  /* declare correctly */
+local void redisplay_line RLparms (uintB* osp, uintB* oap, uintB* ofp, /* old */
+                                   /* line y, from x1 to x2-1 */
                                    int y, int x1, int x2) {
  #if WANT_INSERT
   if (curr->insert)
@@ -11218,7 +11474,7 @@ local void redisplay_line RLparms (uintB* osp, uintB* oap, uintB* ofp, # old
  #endif
 }
 #endif
-# Redisplay the whole screen:
+/* Redisplay the whole screen: */
 local void redisplay (void) {
  #if WANT_INSERT
   set_insert_mode(false);
@@ -11236,10 +11492,10 @@ local void redisplay (void) {
     var uintC y = 0;
     while (y<rows) {
       redisplay_help
-        RHargs(blank,         null,         null,          # old
-               curr->image[y],curr->attr[y],curr->font[y], # new
-               y,                                          # line y
-               0,cols);                                    # all columns
+        RHargs(blank,         null,         null,          /* old */
+               curr->image[y],curr->attr[y],curr->font[y], /* new */
+               y,                                          /* line y */
+               0,cols);                                    /* all columns */
       y++;
     }
   }
@@ -11256,7 +11512,7 @@ local void redisplay (void) {
   gofromto(last_y,last_x,curr->y,curr->x);
 }
 
-# Further Cursor-Movements:
+/* Further Cursor-Movements: */
 #if WANT_CURSOR_MOVE
 
 local void cursor_right (int n) {
@@ -11295,7 +11551,7 @@ local void cursor_down (int n) {
 
 #endif
 
-# Backspace (Cursor to the left by 1, within a line)
+/* Backspace (Cursor to the left by 1, within a line) */
 #if WANT_CURSOR_BACKSPACE
 local void cursor_backspace (void) {
   if (curr->x > 0) {
@@ -11310,7 +11566,7 @@ local void cursor_backspace (void) {
 }
 #endif
 
-# Return (Cursor to the beginning of a line)
+/* Return (Cursor to the beginning of a line) */
 #if WANT_CURSOR_RETURN
 local void cursor_return (void) {
   if (curr->x > 0) {
@@ -11319,11 +11575,11 @@ local void cursor_return (void) {
 }
 #endif
 
-# auxiliary routines for scrolling:
+/* auxiliary routines for scrolling: */
 #if WANT_CURSOR_LINEFEED || WANT_DELETE_LINE
 local void scroll_up_help (uintB** pp, uintB filler) {
-  # shift pp[top..bot] by one to the left,
-  # take out pp[top], delete and insert again as pp[bot]:
+  /* shift pp[top..bot] by one to the left,
+   take out pp[top], delete and insert again as pp[bot]: */
   pp = &pp[curr->top];
   var uintC count;
   var uintB* tmp = *pp;
@@ -11343,8 +11599,8 @@ local void scroll_up (void) {
 #endif
 #if WANT_CURSOR_REVLINEFEED || WANT_INSERT_LINE
 local void scroll_down_help (uintB** pp, uintB filler) {
-  # shift pp[top..bot] by one to the right,
-  # take out pp[top], delete and insert again as pp[bot]:
+  /* shift pp[top..bot] by one to the right,
+   take out pp[top], delete and insert again as pp[bot]: */
   pp = &pp[curr->bot];
   var uintC count;
   var uintB* tmp = *pp;
@@ -11363,7 +11619,7 @@ local void scroll_down (void) {
 }
 #endif
 
-# Linefeed (Cursor down by 1):
+/* Linefeed (Cursor down by 1): */
 #if WANT_CURSOR_LINEFEED
 local void cursor_linefeed (void) {
   if (curr->y == curr->bot)
@@ -11374,7 +11630,7 @@ local void cursor_linefeed (void) {
 }
 #endif
 
-# Reverse Linefeed (Cursor up by 1):
+/* Reverse Linefeed (Cursor up by 1): */
 #if WANT_CURSOR_REVLINEFEED
 local void cursor_revlinefeed (void) {
   if (curr->y == curr->top) {
@@ -11382,9 +11638,9 @@ local void cursor_revlinefeed (void) {
     if (SRcap) {
       out_capstring(SRcap);
     } else if (ALcap) {
-      gofromto(curr->top,curr->x,curr->top,0); # Cursor to the left
+      gofromto(curr->top,curr->x,curr->top,0); /* Cursor to the left */
       out_capstring(ALcap);
-      gofromto(curr->top,0,curr->top,curr->x); # Cursor back again
+      gofromto(curr->top,0,curr->top,curr->x); /* Cursor back again */
     } else {
       redisplay();
     }
@@ -11394,9 +11650,9 @@ local void cursor_revlinefeed (void) {
 }
 #endif
 
-# Deletion-Operations:
+/* Deletion-Operations: */
 
-# delete part of a line:
+/* delete part of a line: */
 #if WANT_CLEAR_SCREEN || WANT_CLEAR_FROM_BOS
 local void cleared_linepart (int y, int x1, int x2) {
   var int n = x2-x1;
@@ -11412,7 +11668,7 @@ local void cleared_linepart (int y, int x1, int x2) {
 }
 #endif
 
-# delete screen:
+/* delete screen: */
 #if WANT_CLEAR_SCREEN
 local void clear_screen (void) {
   out_capstring(CLcap);
@@ -11421,7 +11677,7 @@ local void clear_screen (void) {
 }
 #endif
 
-# delete part of a line:
+/* delete part of a line: */
 #if WANT_CLEAR_FROM_BOS || WANT_CLEAR_TO_EOS || WANT_CLEAR_LINE || WANT_CLEAR_FROM_BOL || WANT_CLEAR_TO_EOL
 local void clear_linepart (int y, int x1, int x2) {
   var int n = x2-x1;
@@ -11474,7 +11730,7 @@ local void clear_linepart (int y, int x1, int x2) {
 }
 #endif
 
-# delete screen up to the Cursor (exclusive):
+/* delete screen up to the Cursor (exclusive): */
 #if WANT_CLEAR_FROM_BOS
 local void clear_from_BOS (void) {
   var int y0 = curr->y;
@@ -11486,7 +11742,7 @@ local void clear_from_BOS (void) {
 }
 #endif
 
-# delete screen starting at cursor (inclusive):
+/* delete screen starting at cursor (inclusive): */
 #if WANT_CLEAR_TO_EOS
 local void clear_to_EOS (void) {
   var int y0 = curr->y;
@@ -11505,7 +11761,7 @@ local void clear_to_EOS (void) {
 }
 #endif
 
-# delete cursor-line:
+/* delete cursor-line: */
 #if WANT_CLEAR_LINE
 local void clear_line (void) {
   var int y0 = curr->y;
@@ -11515,7 +11771,7 @@ local void clear_line (void) {
 }
 #endif
 
-# delete cursor-line up to cursor (exclusive):
+/* delete cursor-line up to cursor (exclusive): */
 #if WANT_CLEAR_FROM_BOL
 local void clear_from_BOL (void) {
   var int y0 = curr->y;
@@ -11525,7 +11781,7 @@ local void clear_from_BOL (void) {
 }
 #endif
 
-# delete cursor-line starting at cursor (inclusive):
+/* delete cursor-line starting at cursor (inclusive): */
 #if WANT_CLEAR_TO_EOL
 local void clear_to_EOL (void) {
   var int y0 = curr->y;
@@ -11535,9 +11791,9 @@ local void clear_to_EOL (void) {
 }
 #endif
 
-# Insertion-Operations:
+/* Insertion-Operations: */
 
-# old content of line:
+/* old content of line: */
 #if WANT_INSERT_1CHAR || WANT_INSERT_CHAR || WANT_DELETE_CHAR
   local uintB* old_image_y;
   #if WANT_ATTR
@@ -11559,20 +11815,20 @@ local void save_line_old (int y) {
 }
 #endif
 
-# insert a character:
+/* insert a character: */
 #if WANT_INSERT_1CHAR
 local void insert_1char (uintB c) {
   var int y = curr->y;
   var int x = curr->x;
   if (x==cols)
-    x--; # do not write beyond right border!
+    x--; /* do not write beyond right border! */
   if (ICcap || IMcap) {
     curr->image[y][x] = c;
    #if WANT_ATTR
     curr->attr[y][x] = curr->curr_attr;
    #endif
    #if WANT_CHARSET
-    curr->font[y][x] = curr->charsets[curr->curr_charset]; # = term_charset
+    curr->font[y][x] = curr->charsets[curr->curr_charset]; /* = term_charset */
    #endif
    #if WANT_INSERT
     if (!curr->insert)
@@ -11585,9 +11841,9 @@ local void insert_1char (uintB c) {
       set_insert_mode(false);
     curr->x = x+1;
   } else {
-    # save old line-content:
+    /* save old line-content: */
     save_line_old(y);
-    # build new line-content:
+    /* build new line-content: */
     {
       var uintB* p1 = &curr->image[y][x];
       *p1++ = c;
@@ -11603,11 +11859,11 @@ local void insert_1char (uintB c) {
    #if WANT_CHARSET
     {
       var uintB* p1 = &curr->font[y][x];
-      *p1++ = term_charset; # = curr->charsets[curr->curr_charset]
+      *p1++ = term_charset; /* = curr->charsets[curr->curr_charset] */
       memcpy(p1,&old_font[x],cols-1-x);
     }
    #endif
-    # display line:
+    /* display line: */
     redisplay_line RLargs(old_image,old_attr,old_font,y,x,cols);
     x++;
     gofromto(last_y,last_x,y,x); curr->x = x;
@@ -11615,7 +11871,7 @@ local void insert_1char (uintB c) {
 }
 #endif
 
-# create room for n characters:
+/* create room for n characters: */
 #if WANT_INSERT_CHAR
 local void insert_char (uintC n) {
   var int y = curr->y;
@@ -11624,9 +11880,9 @@ local void insert_char (uintC n) {
     n = cols-x;
   if (n==0)
     return;
-  # save old line-content:
+  /* save old line-content: */
   save_line_old(y);
-  # build new line-content:
+  /* build new line-content: */
   {
     var uintB* p1 = &curr->image[y][x];
     memset(p1,' ',n);
@@ -11682,7 +11938,7 @@ local void insert_char (uintC n) {
 }
 #endif
 
-# insert lines:
+/* insert lines: */
 #if WANT_INSERT_LINE
 local void insert_line (uintC n) {
   if (n > curr->bot - curr->y + 1)
@@ -11696,7 +11952,7 @@ local void insert_line (uintC n) {
     dotimespC(count,n, { scroll_down(); } );
   }
   if (ALcap || CALcap) {
-    gofromto(curr->y,curr->x,curr->y,0); # to the beginning of the line
+    gofromto(curr->y,curr->x,curr->y,0); /* to the beginning of the line */
     if ((CALcap && (n>1)) || !ALcap) {
       out_cap1string(CALcap,n);
     } else {
@@ -11720,9 +11976,9 @@ local void insert_line (uintC n) {
 }
 #endif
 
-# Deletion-Operations:
+/* Deletion-Operations: */
 
-# delete Characters:
+/* delete Characters: */
 #if WANT_DELETE_CHAR
 local void delete_char (uintC n) {
   var int y = curr->y;
@@ -11731,9 +11987,9 @@ local void delete_char (uintC n) {
     n = cols-x;
   if (n==0)
     return;
-  # save old line-content:
+  /* save old line-content: */
   save_line_old(y);
-  # build new line-content:
+  /* build new line-content: */
   {
     var uintB* p1 = &curr->image[y][x];
     memcpy(p1,&old_image[x],cols-x-n);
@@ -11766,7 +12022,7 @@ local void delete_char (uintC n) {
 
 #endif
 
-# delete lines:
+/* delete lines: */
 #if WANT_DELETE_LINE
 local void delete_line (uintC n) {
   if (n > curr->bot - curr->y + 1)
@@ -11780,7 +12036,7 @@ local void delete_line (uintC n) {
     dotimespC(count,n, { scroll_up(); } );
   }
   if (DLcap || CDLcap) {
-    gofromto(curr->y,curr->x,curr->y,0); # to the beginning of the line
+    gofromto(curr->y,curr->x,curr->y,0); /* to the beginning of the line */
     if ((CDLcap && (n>1)) || !DLcap) {
       out_cap1string(CDLcap,n);
     } else {
@@ -11804,7 +12060,7 @@ local void delete_line (uintC n) {
 }
 #endif
 
-# write a character:
+/* write a character: */
 #if WANT_OUTPUT_1CHAR
 local void output_1char (uintB c) {
  #if WANT_INSERT
@@ -11816,26 +12072,26 @@ local void output_1char (uintB c) {
   var int y = curr->y;
   var int x = curr->x;
   if (x==cols)
-    x--; # do not write beyond right border!
+    x--; /* do not write beyond right border! */
   curr->image[y][x] = c;
  #if WANT_ATTR
   curr->attr[y][x] = curr->curr_attr;
  #endif
  #if WANT_CHARSET
-  curr->font[y][x] = curr->charsets[curr->curr_charset]; # = term_charset
+  curr->font[y][x] = curr->charsets[curr->curr_charset]; /* = term_charset */
  #endif
   x++;
-  if (!(AM && (x==cols) && (curr->y==curr->bot))) # poss. spare right lower corner
-    out_char(c); # write character
-  curr->x = x; # Cursor is advanced by one
-  if (x==cols) # except it was already located rightmost
+  if (!(AM && (x==cols) && (curr->y==curr->bot))) /* poss. spare right lower corner */
+    out_char(c); /* write character */
+  curr->x = x; /* Cursor is advanced by one */
+  if (x==cols) /* except it was already located rightmost */
     gofromto(-1,-1,curr->y,curr->x);
 }
 #endif
 
 #if WANT_SAVE
 
-# stored Cursor-Position:
+/* stored Cursor-Position: */
 local void save_cursor (void) {
   curr->saved_x = curr->x;
   curr->saved_y = curr->y;
@@ -11874,14 +12130,14 @@ local void restore_cursor (void) {
 
 #endif
 
-# Initializes the Terminal.
-# Returns NULL if OK, else returns an error-string.
+/* Initializes the Terminal.
+ Returns NULL if OK, else returns an error-string. */
 local bool term_initialized = false;
 local const char * init_term (void) {
-  var char tbuf[4096]; # internal Buffer for the Termcap-Routines
+  var char tbuf[4096]; /* internal Buffer for the Termcap-Routines */
   if (term_initialized)
-    return NULL; # already initialized -> OK
-  # query Terminal-Type:
+    return NULL; /* already initialized -> OK */
+  /* query Terminal-Type: */
   begin_system_call();
   {
     var const char* s = getenv("TERM");
@@ -11916,7 +12172,7 @@ local const char * init_term (void) {
     return GETTEXT("insufficient terminal: cannot scroll");
   }
   if (!(CLcap = tgetstr("cl",&tp))) {
-    # Could use CLcap = "\n\n\n\n"; as Default ('weird HPs')
+    /* Could use CLcap = "\n\n\n\n"; as Default ('weird HPs') */
     end_system_call();
     return GETTEXT("insufficient terminal: cannot clear screen");
   }
@@ -11924,12 +12180,12 @@ local const char * init_term (void) {
     end_system_call();
     return GETTEXT("insufficient terminal: cannot position cursor randomly");
   }
-  # initialize Capabilities:
+  /* initialize Capabilities: */
   AM = tgetflag("am"); if (tgetflag("LP")) AM = false;
   TIcap = tgetstr("ti",&tp);
   TEcap = tgetstr("te",&tp);
-  # BLcap = tgetstr("bl",&tp); if (!BLcap) BLcap = "\007";
-  # VBcap = tgetstr("vb",&tp);
+  /* BLcap = tgetstr("bl",&tp); if (!BLcap) BLcap = "\007";
+   VBcap = tgetstr("vb",&tp); */
   BCcap = tgetstr("bc",&tp); if (!BCcap) BCcap = (tgetflag("bs") ? "\b" : tgetstr("le",&tp));
   CRcap = tgetstr("cr",&tp); if (!CRcap) CRcap = "\r";
   NLcap = tgetstr("nl",&tp); if (!NLcap) NLcap = "\n";
@@ -11939,8 +12195,8 @@ local const char * init_term (void) {
   IScap = tgetstr("is",&tp);
  #if WANT_ATTR
   if ((tgetnum("sg") > 0) || (tgetnum("ug") > 0)) {
-    # switching to Standout-Mode or switching to
-    # Underline-Mode yields blankspace -> unusable!
+    /* switching to Standout-Mode or switching to
+     Underline-Mode yields blankspace -> unusable! */
     SOcap = NULL; SEcap = NULL; UScap = NULL; UEcap = NULL;
     MBcap = NULL; MDcap = NULL; MHcap = NULL; MRcap = NULL; MEcap = NULL;
   } else {
@@ -11948,24 +12204,24 @@ local const char * init_term (void) {
     SEcap = tgetstr("se",&tp);
     UScap = tgetstr("us",&tp);
     UEcap = tgetstr("ue",&tp);
-    if (!UScap && !UEcap) { # no Underline?
-      UScap = SOcap; UEcap = SEcap; # use Standout as replacement
+    if (!UScap && !UEcap) { /* no Underline? */
+      UScap = SOcap; UEcap = SEcap; /* use Standout as replacement */
     }
     MBcap = tgetstr("mb",&tp);
     MDcap = tgetstr("md",&tp);
     MHcap = tgetstr("mh",&tp);
     MRcap = tgetstr("mr",&tp);
     MEcap = tgetstr("me",&tp);
-    # Does ME also reverse the effect of SO and/or US?  This is not
-    # clearly specified by the termcap manual.
-    # Anyway, we should at least look whether ME/SE/UE are equal:
+    /* Does ME also reverse the effect of SO and/or US?  This is not
+     clearly specified by the termcap manual.
+     Anyway, we should at least look whether ME/SE/UE are equal: */
     if (UEcap && SEcap && asciz_equal(UEcap,SEcap)) UEcap = NULL;
     if (UEcap && MEcap && asciz_equal(UEcap,MEcap)) UEcap = NULL;
     if (SEcap && MEcap && asciz_equal(SEcap,MEcap)) SEcap = NULL;
-    # tgetstr("uc",&tp) returns an underline-character. Then execute
-    # backspace() and out_capstring(UCcap) at a time in redisplay_help()
-    # and output_1char() after out_char().
-    # For which Terminals is this worthwhile??
+    /* tgetstr("uc",&tp) returns an underline-character. Then execute
+     backspace() and out_capstring(UCcap) at a time in redisplay_help()
+     and output_1char() after out_char().
+     For which Terminals is this worthwhile?? */
   }
  #endif
  #if WANT_CHARSET
@@ -12010,7 +12266,7 @@ local const char * init_term (void) {
  #endif
   IMcap = tgetstr("im",&tp);
   EIcap = tgetstr("ei",&tp);
-  if (tgetflag ("in")) { # Insert-Mode unusable?
+  if (tgetflag ("in")) { /* Insert-Mode unusable? */
     IMcap = NULL; EIcap = NULL;
    #if WANT_INSERT_1CHAR || WANT_INSERT_CHAR
     ICcap = NULL;
@@ -12019,27 +12275,27 @@ local const char * init_term (void) {
     CICcap = NULL;
    #endif
   }
-  if (IMcap && (IMcap[0]==0)) IMcap = NULL; # IMcap empty?
-  if (EIcap && (EIcap[0]==0)) EIcap = NULL; # EIcap empty?
+  if (IMcap && (IMcap[0]==0)) IMcap = NULL; /* IMcap empty? */
+  if (EIcap && (EIcap[0]==0)) EIcap = NULL; /* EIcap empty? */
  #if WANT_INSERT_1CHAR || WANT_INSERT_CHAR
-  if (ICcap && (ICcap[0]==0)) ICcap = NULL; # ICcap empty?
+  if (ICcap && (ICcap[0]==0)) ICcap = NULL; /* ICcap empty? */
  #endif
-  # calculate the costs of the Capabilities:
+  /* calculate the costs of the Capabilities: */
   IMcost = cap_cost(IMcap);
   EIcost = cap_cost(EIcap);
   BCcost = cap_cost(BCcap);
   NDcost = cap_cost(NDcap);
   DOcost = cap_cost(DOcap);
  #ifndef NL_HACK
-  # If DOcap writes a LF, it is not sure, if this arrives
-  # at the Terminal as such (and not as CR/LF). In this case we
-  # declare DOcap as unusable. This spares us the NL_HACK.
+  /* If DOcap writes a LF, it is not sure, if this arrives
+   at the Terminal as such (and not as CR/LF). In this case we
+   declare DOcap as unusable. This spares us the NL_HACK. */
   if (DOcap[0]=='\n')
     DOcost = EXPENSIVE;
  #endif
   UPcost = cap_cost(UPcap);
   CRcost = cap_cost(CRcap);
-  # provide Auxiliary-Data-Structures:
+  /* provide Auxiliary-Data-Structures: */
   blank = (uintB*) malloc(cols*sizeof(uintB));
    memset(blank,' ',cols);
 #if WANT_ATTR || WANT_CHARSET
@@ -12066,9 +12322,9 @@ local const char * init_term (void) {
 
 #ifdef NL_HACK
 
-# If NLcap = "\n" , we must execute an "stty -onlcr", because otherwise
-# the NL is converted to CR by the Terminal-Driver, before it
-# arrives at the Terminal.
+/* If NLcap = "\n" , we must execute an "stty -onlcr", because otherwise
+ the NL is converted to CR by the Terminal-Driver, before it
+ arrives at the Terminal. */
   local void term_nlraw (void);
   local void term_nlunraw (uintB abort);
 #if defined(UNIX_TERM_TERMIOS)
@@ -12148,9 +12404,9 @@ local void term_nlunraw (uintB abort) {
 }
 #endif
 
-#endif # NL_HACK
+#endif /* NL_HACK */
 
-# Begin of Processing this Packet:
+/* Begin of Processing this Packet: */
 local void start_term (void) {
  #ifdef NL_HACK
   if (NLcap[0] == '\n')
@@ -12160,13 +12416,13 @@ local void start_term (void) {
   out_capstring (TIcap);
 }
 
-# End of Processing this Packet:
+/* End of Processing this Packet: */
 local void end_term (uintB abort) {
   out_capstring (TEcap);
   out_capstring (IScap);
  #if 0
-  # On ANSI-Terminals with several colors: TEcap resets the colors.
-  out_capstring(CLcap); # delete screen, this time with the normal color
+  /* On ANSI-Terminals with several colors: TEcap resets the colors. */
+  out_capstring(CLcap); /* delete screen, this time with the normal color */
  #endif
  #ifdef NL_HACK
   if (NLcap[0] == '\n')
@@ -12174,7 +12430,7 @@ local void end_term (uintB abort) {
  #endif
 }
 
-# Initializes the Window curr.
+/* Initializes the Window curr. */
 local void init_curr (void) {
   {
     var uintB** ptr = (uintB**) malloc(rows*sizeof(uintB*));
@@ -12189,8 +12445,8 @@ local void init_curr (void) {
     curr->attr = ptr;
     dotimespC(count,rows, { *ptr++ = (uintB*) malloc(cols*sizeof(uintB)); } );
   }
-  # deactivate Attribute:
-  out_capstring(UEcap); # all deactivated
+  /* deactivate Attribute: */
+  out_capstring(UEcap); /* all deactivated */
   out_capstring(SEcap);
   out_capstring(MEcap);
   term_attr = curr->curr_attr = 0;
@@ -12225,19 +12481,19 @@ local void init_curr (void) {
   clear_screen();
 }
 
-# -----------------------------------------------------------------------------
+/* ------------------------------------------------------------------------
 
-# UP: Write character to a Window-Stream.
-# wr_ch_window(&stream,ch);
-# > stream: Window-Stream
-# > ch: character to be written
+ UP: Write character to a Window-Stream.
+ wr_ch_window(&stream,ch);
+ > stream: Window-Stream
+ > ch: character to be written */
 local maygc void wr_ch_window (const gcv_object_t* stream_, object ch) {
   check_wr_char(*stream_,ch);
-  var uintB c = as_cint(char_code(ch)); # FIXME: This should take into account the encoding.
+  var uintB c = as_cint(char_code(ch)); /* FIXME: This should take into account the encoding. */
   begin_system_call();
   if (graphic_char_p(as_chart(c))) {
     if (curr->x == cols) {
-      cursor_return(); cursor_linefeed(); # Wrap!
+      cursor_return(); cursor_linefeed(); /* Wrap! */
     }
     output_1char(c);
   } else if (c == NL) {
@@ -12254,19 +12510,19 @@ local maygc void wr_ch_window (const gcv_object_t* stream_, object ch) {
 }
 
 LISPFUNN(make_window,0) {
-  var object stream = # Flags: only WRITE-CHAR allowed
+  var object stream = /* Flags: only WRITE-CHAR allowed */
     allocate_stream(strmflags_wr_ch_B,strmtype_window,strm_len+1,0);
-  # and fill:
+  /* and fill: */
   stream_dummy_fill(stream);
   var Stream s = TheStream(stream);
-  s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_window); # WRITE-CHAR-Pseudofunction
-  s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_dummy); # WRITE-CHAR-SEQUENCE-Pseudofunction
-  # Initialize:
+  s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_window); /* WRITE-CHAR-Pseudofunction */
+  s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_dummy); /* WRITE-CHAR-SEQUENCE-Pseudofunction */
+  /* Initialize: */
   begin_system_call();
   {
     var const char * result = init_term();
     if (!(result==NULL))
-      fehler(error,result);
+      error(error_condition,result);
   }
   start_term();
   init_curr();
@@ -12274,7 +12530,7 @@ LISPFUNN(make_window,0) {
   VALUES1(stream);
 }
 
-# Closes a Window-Stream.
+/* Closes a Window-Stream. */
 local void close_window (object stream, uintB abort) {
   begin_system_call();
   end_term(abort);
@@ -12283,7 +12539,7 @@ local void close_window (object stream, uintB abort) {
 
 LISPFUNN(window_size,1) {
   check_window_stream(popSTACK());
-  VALUES2(fixnum(rows), # query Variables rows,cols
+  VALUES2(fixnum(rows), /* query Variables rows,cols */
           fixnum(cols));
 }
 
@@ -12299,7 +12555,7 @@ LISPFUNN(set_window_cursor_position,3) {
   var uintV column = posfixnum_to_V(STACK_0);
   if ((line < rows) && (column < cols)) {
     begin_system_call();
-    gofromto(curr->y,curr->x,line,column); # position Cursor
+    gofromto(curr->y,curr->x,line,column); /* position Cursor */
     curr->y = line; curr->x = column;
     end_system_call();
   }
@@ -12364,87 +12620,21 @@ LISPFUNN(highlight_off,1) {
 
 LISPFUNN(window_cursor_on,1) {
   check_window_stream(popSTACK());
-  # Cursor is permanently activated!
+  /* Cursor is permanently activated! */
   VALUES0;
 }
 
 LISPFUNN(window_cursor_off,1) {
   check_window_stream(popSTACK());
-  # not possible, because Cursor is activated permanently!
+  /* not possible, because Cursor is activated permanently! */
   VALUES0;
 }
 
-#endif # UNIX && !NEXTAPP
-
-#if defined(MAYBE_NEXTAPP) && defined(NEXTAPP)
-
-# Everything unimplemented.
-
-# error-message.
-nonreturning_function(local, fehler_screen, (void)) {
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(error,GETTEXT("~S: package SCREEN is not implemented"));
-}
-
-LISPFUNN(make_window,0) {
-  fehler_screen();
-}
-
-#define close_window(stream)  fehler_screen()
-
-LISPFUNN(window_size,1) {
-  fehler_screen();
-}
-
-LISPFUNN(window_cursor_position,1) {
-  fehler_screen();
-}
-
-LISPFUNN(set_window_cursor_position,3) {
-  fehler_screen();
-}
-
-LISPFUNN(clear_window,1) {
-  fehler_screen();
-}
-
-LISPFUNN(clear_window_to_eot,1) {
-  fehler_screen();
-}
-
-LISPFUNN(clear_window_to_eol,1) {
-  fehler_screen();
-}
-
-LISPFUNN(delete_window_line,1) {
-  fehler_screen();
-}
-
-LISPFUNN(insert_window_line,1) {
-  fehler_screen();
-}
-
-LISPFUNN(highlight_on,1) {
-  fehler_screen();
-}
-
-LISPFUNN(highlight_off,1) {
-  fehler_screen();
-}
-
-LISPFUNN(window_cursor_on,1) {
-  fehler_screen();
-}
-
-LISPFUNN(window_cursor_off,1) {
-  fehler_screen();
-}
-
-#endif # NEXTAPP
+#endif  /* UNIX */
 
 #if defined(UNIX) && 0
 
-# Normal CURSES-Package, we use only stdscr.
+/* Normal CURSES-Package, we use only stdscr. */
 
 #undef BS
 #undef CR
@@ -12454,50 +12644,50 @@ LISPFUNN(window_cursor_off,1) {
 #define CR  13
 #define NL  10
 
-# UP: Write character to Window-Stream.
-# wr_ch_window(&stream,ch);
-# > stream: Window-Stream
-# > ch: character to be written
+/* UP: Write character to Window-Stream.
+ wr_ch_window(&stream,ch);
+ > stream: Window-Stream
+ > ch: character to be written */
 local maygc void wr_ch_window (const gcv_object_t* stream_, object ch) {
   check_wr_char(*stream_,ch);
-  var uintB c = as_cint(char_code(ch)); # FIXME: This should take into account the encoding.
+  var uintB c = as_cint(char_code(ch)); /* FIXME: This should take into account the encoding. */
   begin_system_call();
-  if (graphic_char_p(as_chart(c))) { # let only printable characters pass to the screen
+  if (graphic_char_p(as_chart(c))) { /* let only printable characters pass to the screen */
     addch(c);
-  } else if (c == NL) { # convert NL to CR/LF
+  } else if (c == NL) { /* convert NL to CR/LF */
     addch(CR); addch(LF);
-  } else { # write something, for the Cursor-Position to be correct
+  } else { /* write something, for the Cursor-Position to be correct */
     addch('?');
   }
   end_system_call();
 }
 
 LISPFUNN(make_window,0) {
-  var object stream = # Flags: only WRITE-CHAR allowed
+  var object stream = /* Flags: only WRITE-CHAR allowed */
     allocate_stream(strmflags_wr_ch_B,strmtype_window,strm_len+1,0);
-  # and fill:
+  /* and fill: */
   stream_dummy_fill(stream);
   var Stream s = TheStream(stream);
-  s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_window); # WRITE-CHAR-Pseudofunction
-  s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_dummy); # WRITE-CHAR-SEQUENCE-Pseudofunction
+  s->strm_wr_ch = s->strm_wr_ch_npnl = P(wr_ch_window); /* WRITE-CHAR-Pseudofunction */
+  s->strm_wr_ch_array = s->strm_wr_ch_array_npnl = P(wr_ch_array_dummy); /* WRITE-CHAR-SEQUENCE-Pseudofunction */
   begin_system_call();
-  initscr(); # initialize Curses # What, if this crashes?? use newterm()??
-  cbreak(); noecho(); # Input not line-buffered, without Echo
- #if defined(SUN3) || defined(SUN4)
-  keypad(stdscr,true); # activate Function-Key-Detection
+  initscr(); /* initialize Curses - What, if this crashes?? use newterm()?? */
+  cbreak(); noecho(); /* Input not line-buffered, without Echo */
+ #ifdef SUN4
+  keypad(stdscr,true); /* activate Function-Key-Detection */
  #endif
   end_system_call();
   VALUES1(stream);
 }
 
-# Closes a Window-Stream.
+/* Closes a Window-Stream. */
 local void close_window (object stream, uintB abort) {
   begin_system_call();
-  nocbreak(); echo(); # Input is line-buffered again, with Echo
- #if defined(SUN3) || defined(SUN4)
-  keypad(stdscr,false); # deactivate Function-Key-Detection again
+  nocbreak(); echo(); /* Input is line-buffered again, with Echo */
+ #ifdef SUN4
+  keypad(stdscr,false); /* deactivate Function-Key-Detection again */
  #endif
-  endwin(); # deactivate Curses
+  endwin(); /* deactivate Curses */
   end_system_call();
 }
 
@@ -12512,7 +12702,7 @@ LISPFUNN(window_cursor_position,1) {
   var int y;
   var int x;
   begin_system_call();
-  getyx(stdscr,y,x); # (y,x) := cursor position
+  getyx(stdscr,y,x); /* (y,x) := cursor position */
   end_system_call();
   VALUES2(fixnum(y),
           fixnum(x));
@@ -12524,7 +12714,7 @@ LISPFUNN(set_window_cursor_position,3) {
   var uintV column = posfixnum_to_V(STACK_0);
   if ((line < LINES) && (column < COLS)) {
     begin_system_call();
-    move(line,column); refresh(); # position Cursor
+    move(line,column); refresh(); /* position Cursor */
     end_system_call();
   }
   VALUES2(STACK_1, STACK_0); skipSTACK(3);
@@ -12572,9 +12762,9 @@ LISPFUNN(insert_window_line,1) {
 
 LISPFUNN(highlight_on,1) {
   check_window_stream(popSTACK());
-#ifdef A_STANDOUT # only works, if Curses manages the Attributes
+#ifdef A_STANDOUT /* only works, if Curses manages the Attributes */
   begin_system_call();
-  attron(A_STANDOUT); # add Attribut A_STANDOUT with OR at addch()
+  attron(A_STANDOUT); /* add Attribut A_STANDOUT with OR at addch() */
   end_system_call();
 #endif
   VALUES0;
@@ -12582,9 +12772,9 @@ LISPFUNN(highlight_on,1) {
 
 LISPFUNN(highlight_off,1) {
   check_window_stream(popSTACK());
- #ifdef A_STANDOUT # only works, if Curses manages the Attributes
+ #ifdef A_STANDOUT /* only works, if Curses manages the Attributes */
   begin_system_call();
-  attroff(A_STANDOUT); # don't add Attribute with OR at addch()
+  attroff(A_STANDOUT); /* don't add Attribute with OR at addch() */
   end_system_call();
  #endif
   VALUES0;
@@ -12592,28 +12782,28 @@ LISPFUNN(highlight_off,1) {
 
 LISPFUNN(window_cursor_on,1) {
   check_window_stream(popSTACK());
-  # Cursor is permanently activated!
+  /* Cursor is permanently activated! */
   VALUES0;
 }
 
 LISPFUNN(window_cursor_off,1) {
   check_window_stream(popSTACK());
-  # not possible, because Cursor is activated permanently!
+  /* not possible, because Cursor is activated permanently! */
   VALUES0;
 }
 
-#endif # UNIX
+#endif /* UNIX */
 
-#endif # SCREEN
+#endif /* SCREEN */
 
 
 #ifdef PIPES
 
-# Pipe-Input-Stream, Pipe-Output-Stream
-# =====================================
+/* Pipe-Input-Stream, Pipe-Output-Stream
+   =====================================
 
-# Additional Components:
-  # define strm_pipe_pid  strm_field1   # Process-Id, a Fixnum >=0
+ Additional Components:
+ define strm_pipe_pid  strm_field1   - Process-Id, a Fixnum >=0 */
 
 #if defined(UNIX) || defined(WIN32_NATIVE)
   #define low_close_pipe  low_close_handle
@@ -12621,24 +12811,28 @@ LISPFUNN(window_cursor_off,1) {
 
 #if defined(HAVE_SIGNALS) && defined(SIGPIPE)
 
-# Be careful to disable SIGPIPE during write() to a subprocess.
+/* Be careful to disable SIGPIPE during write() to a subprocess. */
 
-local void low_flush_buffered_pipe (object stream, uintL bufflen) {
+local maygc void low_flush_buffered_pipe (object stream, uintL bufflen) {
   begin_system_call();
-  writing_to_subprocess = true;
-  var ssize_t result =          /* flush Buffer */
-    full_write(TheHandle(BufferedStream_channel(stream)),
-               BufferedStream_buffer_address(stream,0),
-               bufflen);
-  writing_to_subprocess = false;
-  if (result == bufflen) { # everything was written correctly
+  var Handle fd = TheHandle(BufferedStream_channel(stream));
+  var uintB* buff = BufferedStream_buffer_address(stream,0);
+  pin_unprotect_varobject(BufferedStream_buffer(stream),PROT_READ);
+  pushSTACK(stream);
+  START_WRITING_TO_SUBPROCESS;
+  var ssize_t result;
+  GC_SAFE_CALL(result=, full_write(fd,buff,bufflen));
+  STOP_WRITING_TO_SUBPROCESS;
+  stream = popSTACK();
+  unpin_varobject(BufferedStream_buffer(stream));
+  if (result == bufflen) { /* everything was written correctly */
     end_system_call(); BufferedStream_modified(stream) = false;
-  } else { # not everything was written
-    if (result<0) { # Error?
+  } else { /* not everything was written */
+    if (result<0) { /* Error? */
       end_system_call(); OS_filestream_error(stream);
     }
     end_system_call();
-    fehler_unwritable(TheSubr(subr_self)->name,stream);
+    error_unwritable(TheSubr(subr_self)->name,stream);
   }
 }
 
@@ -12653,82 +12847,82 @@ local void low_flush_buffered_pipe (object stream, uintL bufflen) {
     BufferedStreamLow_flush(stream) = &low_flush_buffered_pipe; \
   }
 
-# Pipe-Input-Stream
-# =================
+/* Pipe-Input-Stream
+   =================
 
-# Low-level.
+ Low-level. */
 
   #define UnbufferedPipeStream_input_init(stream)  UnbufferedHandleStream_input_init(stream)
 
 local inline void create_input_pipe (const char* command) {
   var int child;
  #ifdef UNIX
-  var int handles[2]; # two Handles for the pipe
+  var int handles[2]; /* two Handles for the pipe */
   {
-    # As shell we always use the Command-Shell.
-    # copy command to Stack:
+    /* As shell we always use the Command-Shell.
+     copy command to Stack: */
     var uintL command_length = asciz_length(command)+1;
     var DYNAMIC_ARRAY(command_data,char,command_length);
     begin_system_call();
     memcpy(command_data,command,command_length);
     begin_want_sigcld();
-    # build pipe:
+    /* build pipe: */
     if (!( pipe(handles) ==0)) {
       FREE_DYNAMIC_ARRAY(command_data);
       end_want_sigcld(); OS_error();
     }
-    # Everything, that is stuffed in handles[1], resurfaces at handles[0]
-    # again. We will utilize this as follows:
-    #       write            system            read
-    # child  ->   handles[1]   ->   handles[0]  ->  parent
-    # start a new process:
+    /* Everything, that is stuffed in handles[1], resurfaces at handles[0]
+     again. We will utilize this as follows:
+           write            system            read
+     child  ->   handles[1]   ->   handles[0]  ->  parent
+     start a new process: */
     if ((child = vfork()) ==0) {
-      # this piece of code is executed by the child-process:
-      if ( dup2(handles[1],stdout_handle) >=0) # redirect standard-output
-        if ( CLOSE(handles[1]) ==0) # we want to write only via stdout_handle
-          if ( CLOSE(handles[0]) ==0) { # we do not want to read from the pipe
-            # (I have to tell this the operating system. Then - if the Child
-            # has filled the pipe - the parent-process is called
-            # in order to empty the pipe (and not the child-process).)
-            # turn child-process into a background process:
-            SETSID(); # it receives its own process group
+      /* this piece of code is executed by the child-process: */
+      if ( dup2(handles[1],stdout_handle) >=0) /* redirect standard-output */
+        if ( CLOSE(handles[1]) ==0) /* we want to write only via stdout_handle */
+          if ( CLOSE(handles[0]) ==0) { /* we do not want to read from the pipe */
+            /* (I have to tell this the operating system. Then - if the Child
+             has filled the pipe - the parent-process is called
+             in order to empty the pipe (and not the child-process).)
+             turn child-process into a background process: */
+            SETSID(); /* it receives its own process group */
             close_all_fd();
-            execl(SHELL,            # call shell
-                  SHELL,            # =: argv[0]
-                  "-c",             # =: argv[1]
-                  &command_data[0], # =: argv[2]
+            execl(SHELL,            /* call shell */
+                  SHELL,            /* =: argv[0] */
+                  "-c",             /* =: argv[1] */
+                  &command_data[0], /* =: argv[2] */
                   NULL);
           }
-      _exit(-1); # if this fails, finish child-process
+      _exit(-1); /* if this fails, finish child-process */
     }
-    # This piece of code is again executed by the caller:
+    /* This piece of code is again executed by the caller: */
     end_want_sigcld();
     if (child==-1)
-      # Something failed, either on vfork or on execl.
-      # In both cases errno was set.
+      /* Something failed, either on vfork or on execl.
+       In both cases errno was set. */
       OS_error_saving_errno({
         CLOSE(handles[1]); CLOSE(handles[0]);
         FREE_DYNAMIC_ARRAY(command_data);
       });
-    # We only want to read from the pipe, not write:
+    /* We only want to read from the pipe, not write: */
     if (!( CLOSE(handles[1]) ==0))
       OS_error_saving_errno({
         CLOSE(handles[0]);
         FREE_DYNAMIC_ARRAY(command_data);
       });
-    # (I have to tell this the operating system. Then - if the parent-process
-    # has emptied the pipe - the child-process is called in order to fill the
-    # pipe again (and not the parent-process).)
+    /* (I have to tell this the operating system. Then - if the parent-process
+     has emptied the pipe - the child-process is called in order to fill the
+     pipe again (and not the parent-process).) */
     end_system_call();
     FREE_DYNAMIC_ARRAY(command_data);
   }
  #endif
  #ifdef WIN32_NATIVE
-  var Handle handles[2]; # two Handles for the pipe
+  var Handle handles[2]; /* two Handles for the pipe */
   {
     begin_system_call();
     var Handle child_write_handle;
-    # Create a pipe and make one of the two handles inheritable.
+    /* Create a pipe and make one of the two handles inheritable. */
     if (!CreatePipe(&handles[0],&handles[1],NULL,0)) { OS_error(); }
     if (!DuplicateHandle(GetCurrentProcess(),handles[1],
                          GetCurrentProcess(),&child_write_handle,
@@ -12745,8 +12939,8 @@ local inline void create_input_pipe (const char* command) {
     if (!MyCreateProcess((TCHAR*)command,stdinput,child_write_handle,
                          stderror,&pinfo))
       { OS_error(); }
-    # Close our copy of the child's handle, so that the OS knows
-    # that we won't write on it.
+    /* Close our copy of the child's handle, so that the OS knows
+     that we won't write on it. */
     if (!CloseHandle(child_write_handle)) { OS_error(); }
     if (!CloseHandle(pinfo.hThread)) { OS_error(); }
     if (!CloseHandle(pinfo.hProcess)) { OS_error(); }
@@ -12760,91 +12954,99 @@ local inline void create_input_pipe (const char* command) {
   pushSTACK(allocate_handle(handles[0]));
 }
 
-# (MAKE-PIPE-INPUT-STREAM command [:element-type] [:external-format] [:buffered])
-# calls a shell, that executes command, whereby its Standard-Output
-# is directed into our pipe.
-LISPFUN(make_pipe_input_stream,seclass_default,1,0,norest,key,3,
-        (kw(element_type),kw(external_format),kw(buffered)) ) {
+/* forward declaration */
+local maygc object make_pipe (buffered_t, direction_t, decoded_el_t*);
+
+/* UP: The common part of MAKE-PIPE-INPUT-STREAM & MAKE-PIPE-OUTPUT-STREAM
+ > STACK_0: :buffered
+ > STACK_1: :external-format
+ > STACK_2: :element-type
+ > STACK_3: command line
+ < value1: pipe stream
+ cleans up the STACK
+ can trigger GC */
+local maygc Values make_pipe_stream (direction_t direction,
+                                     void create_pipe (const char*)) {
   var decoded_el_t eltype;
-  var signean buffered;
-  # check command:
-  pushSTACK(STACK_3); funcall(L(string),1); # (STRING command)
-  STACK_3 = value1;
-  # Check and canonicalize the :BUFFERED argument:
-  buffered = test_buffered_arg(STACK_0); # default is NIL
-  # Check and canonicalize the :ELEMENT-TYPE argument:
+  var buffered_t buffered;
+  STACK_3 = check_string(STACK_3); /* check command */
+  /* Check and canonicalize the :BUFFERED argument: */
+  buffered = test_buffered_arg(STACK_0);
+  /* Check and canonicalize the :ELEMENT-TYPE argument: */
   test_eltype_arg(&STACK_2,&eltype);
   STACK_2 = canon_eltype(&eltype);
-  if (buffered < 0) { check_unbuffered_eltype(&eltype); }
-  # Check and canonicalize the :EXTERNAL-FORMAT argument:
+  CHECK_UNBUFFERED_ELTYPE(buffered,direction,eltype);
+  /* Check and canonicalize the :EXTERNAL-FORMAT argument: */
   STACK_1 = test_external_format_arg(STACK_1);
-  # Now create the pipe.
-  with_string_0(STACK_3,O(misc_encoding),command_asciz, {
-    create_input_pipe(command_asciz);
-  });
-  # allocate Stream:
-  var object stream;
-  if (buffered < 0) {
-    stream = make_unbuffered_stream(strmtype_pipe_in,DIRECTION_INPUT,
-                                    &eltype,false,false);
-    UnbufferedPipeStream_input_init(stream);
-  } else {
-    stream = make_buffered_stream(strmtype_pipe_in,DIRECTION_INPUT,
-                                  &eltype,false,false);
-    BufferedPipeStream_init(stream);
-  }
-  ChannelStreamLow_close(stream) = &low_close_pipe;
-  TheStream(stream)->strm_pipe_pid = popSTACK(); # Child-Pid
+  /* Now create the pipe. */
+  with_string_0(STACK_3,O(misc_encoding),command_asciz,
+                { create_pipe(command_asciz); });
+  /* allocate Stream: */
+  var object stream = make_pipe(buffered,direction,&eltype);
+  TheStream(stream)->strm_pipe_pid = popSTACK(); /* Child-Pid */
   skipSTACK(4);
-  VALUES1(add_to_open_streams(stream)); /* return stream */
+  VALUES1(stream); /* return stream */
 }
 
+/* (MAKE-PIPE-INPUT-STREAM command [:element-type] [:external-format] [:buffered])
+ calls a shell, that executes command, whereby its Standard-Output
+ is directed into our pipe. */
+LISPFUN(make_pipe_input_stream,seclass_default,1,0,norest,key,3,
+        (kw(element_type),kw(external_format),kw(buffered)) )
+{ make_pipe_stream(DIRECTION_INPUT,create_input_pipe); }
 
-# Pipe-Output-Stream
-# ==================
+/* Pipe-Output-Stream
+ ================== */
 
-# Low-level.
+/* Low-level. */
 
 #if defined(HAVE_SIGNALS) && defined(SIGPIPE)
 
-  # Be careful to disable SIGPIPE during write() to a subprocess.
+  /* Be careful to disable SIGPIPE during write() to a subprocess. */
 
-local void low_write_unbuffered_pipe (object stream, uintB b) {
+local maygc void low_write_unbuffered_pipe (object stream, uintB b) {
   var Handle handle = TheHandle(TheStream(stream)->strm_ochannel);
  restart_it:
   begin_system_call();
-  # Try to output the byte.
-  writing_to_subprocess = true;
-  var int result = write(handle,&b,1);
-  writing_to_subprocess = false;
+  /* Try to output the byte. */
+  pushSTACK(stream);
+  START_WRITING_TO_SUBPROCESS;
+  var int result;
+  GC_SAFE_CALL(result=, write(handle,&b,1));
+  STOP_WRITING_TO_SUBPROCESS;
+  stream = popSTACK();
   if (result<0) {
-    if (errno==EINTR) { # Break (poss. by Ctrl-C) ?
+    if (errno==EINTR) { /* Break (poss. by Ctrl-C) ? */
       end_system_call();
-      interruptp({ fehler_interrupt(); });
+      interruptp({ error_interrupt(); });
       goto restart_it;
     }
     OS_error();
   }
   end_system_call();
-  if (result==0) # not successful?
-    fehler_unwritable(TheSubr(subr_self)->name,stream);
+  if (result==0) /* not successful? */
+    error_unwritable(TheSubr(subr_self)->name,stream);
 }
 
-local const uintB* low_write_array_unbuffered_pipe (object stream,
-                                                    const uintB* byteptr,
-                                                    uintL len,
-                                                    perseverance_t persev) {
+local maygc const uintB* low_write_array_unbuffered_pipe (object stream,
+                                                          const uintB* byteptr,
+                                                          uintL len,
+                                                          perseverance_t persev)
+{
   var Handle handle = TheHandle(TheStream(stream)->strm_ochannel);
   begin_system_call();
-  writing_to_subprocess = true;
-  var ssize_t result = fd_write(handle,byteptr,len,persev);
-  writing_to_subprocess = false;
+  pushSTACK(stream);
+  START_WRITING_TO_SUBPROCESS;
+  var ssize_t result;
+  GC_SAFE_CALL(result=, fd_write(handle,byteptr,len,persev));
+  STOP_WRITING_TO_SUBPROCESS;
+  stream = popSTACK();
   if (result<0) { OS_error(); }
   end_system_call();
   /* Safety check whether persev argument was respected or EOWF was reached: */
   if ((persev == persev_full && !(result==(sintL)len))
       || (persev == persev_partial && !(result>0)))
-    fehler_unwritable(TheSubr(subr_self)->name,stream);
+    error_unwritable(TheSubr(subr_self)->name,stream);
   return byteptr+result;
 }
 
@@ -12855,29 +13057,50 @@ local const uintB* low_write_array_unbuffered_pipe (object stream,
 
 #endif
 
-local void low_finish_output_unbuffered_pipe (object stream) {} # do nothing
-local void low_force_output_unbuffered_pipe (object stream) {} # do nothing
-local void low_clear_output_unbuffered_pipe (object stream) {} # do nothing
+local void low_finish_output_unbuffered_pipe (object stream) {} /* do nothing */
+local void low_force_output_unbuffered_pipe (object stream) {} /* do nothing */
+local void low_clear_output_unbuffered_pipe (object stream) {} /* do nothing */
 
-#define UnbufferedPipeStream_output_init(stream)                        \
-  { UnbufferedStreamLow_write(stream) = &low_write_unbuffered_pipe;     \
-    UnbufferedStreamLow_write_array(stream) =                           \
-      &low_write_array_unbuffered_pipe;                                 \
-    UnbufferedStreamLow_finish_output(stream) =                         \
-      &low_finish_output_unbuffered_pipe;                               \
-    UnbufferedStreamLow_force_output(stream) =                          \
-      &low_force_output_unbuffered_pipe;                                \
-    UnbufferedStreamLow_clear_output(stream) =                          \
-      &low_clear_output_unbuffered_pipe;                                \
+/* make, init, and register pipe stream object
+ > buffered
+ > direction
+ > eltype
+ < stream object
+ can trigger GC */
+local maygc object make_pipe (buffered_t buffered, direction_t direction,
+                              decoded_el_t *eltype) {
+  var object stream;
+  var uintB type = (direction == DIRECTION_INPUT
+                    ? strmtype_pipe_in : strmtype_pipe_out);
+  if (buffered == BUFFERED_NIL) {
+    stream = make_unbuffered_stream(type,direction,eltype,false,false);
+    if (READ_P(direction)) UnbufferedPipeStream_input_init(stream);
+    if (WRITE_P(direction)) { /*UnbufferedPipeStream_output_init(stream);*/
+      UnbufferedStreamLow_write(stream) = &low_write_unbuffered_pipe;
+      UnbufferedStreamLow_write_array(stream) =
+        &low_write_array_unbuffered_pipe;
+      UnbufferedStreamLow_finish_output(stream) =
+        &low_finish_output_unbuffered_pipe;
+      UnbufferedStreamLow_force_output(stream) =
+        &low_force_output_unbuffered_pipe;
+      UnbufferedStreamLow_clear_output(stream) =
+        &low_clear_output_unbuffered_pipe;
+    }
+  } else {
+    stream = make_buffered_stream(type,direction,eltype,false,false);
+    BufferedPipeStream_init(stream);
   }
+  ChannelStreamLow_close(stream) = &low_close_pipe;
+  return add_to_open_streams(stream);
+}
 
 local inline void create_output_pipe (const char* command) {
   var int child;
  #ifdef UNIX
-  var int handles[2]; # two Handles for the pipe
+  var int handles[2]; /* two Handles for the pipe */
   {
-    # As shell we always use the Command-Shell.
-    # copy command to Stack:
+    /* As shell we always use the Command-Shell.
+     copy command to Stack: */
     var uintL command_length = asciz_length(command)+1;
     var DYNAMIC_ARRAY(command_data,char,command_length);
     begin_system_call();
@@ -12887,58 +13110,58 @@ local inline void create_output_pipe (const char* command) {
       FREE_DYNAMIC_ARRAY(command_data);
       end_want_sigcld(); OS_error();
     }
-    # Everything, that is stuffed in handles[1], resurfaces at handles[0]
-    # again. We will utilize this as follows:
-    #        write            system            read
-    # parent  ->   handles[1]   ->   handles[0]  ->  child
-    # start a new process:
+    /* Everything, that is stuffed in handles[1], resurfaces at handles[0]
+     again. We will utilize this as follows:
+            write            system            read
+     parent  ->   handles[1]   ->   handles[0]  ->  child
+     start a new process: */
     if ((child = vfork()) ==0) {
-      # this piece of code is executed by the child-process:
-      if ( dup2(handles[0],stdin_handle) >=0) # redirect standard-input
-        if ( CLOSE(handles[0]) ==0) # we want to read only via stdin_handle
-          if ( CLOSE(handles[1]) ==0) { # we do not want to write to the pipe
-            # (I have to tell this the operating system, so that - when the
-            # Child has emptied the pipe - the parent-process and not the
-            # child-process is called, in order to fill the pipe again.)
-            # turn child-process into a background process:
-            SETSID(); # it receives its own process group
+      /* this piece of code is executed by the child-process: */
+      if ( dup2(handles[0],stdin_handle) >=0) /* redirect standard-input */
+        if ( CLOSE(handles[0]) ==0) /* we want to read only via stdin_handle */
+          if ( CLOSE(handles[1]) ==0) { /* we do not want to write to the pipe */
+            /* (I have to tell this the operating system, so that - when the
+             Child has emptied the pipe - the parent-process and not the
+             child-process is called, in order to fill the pipe again.)
+             turn child-process into a background process: */
+            SETSID(); /* it receives its own process group */
             close_all_fd();
-            execl(SHELL,            # call shell
-                  SHELL,            # =: argv[0]
-                  "-c",             # =: argv[1]
-                  &command_data[0], # =: argv[2]
+            execl(SHELL,            /* call shell */
+                  SHELL,            /* =: argv[0] */
+                  "-c",             /* =: argv[1] */
+                  &command_data[0], /* =: argv[2] */
                   NULL);
           }
-      _exit(-1); # if this fails, finish child-process
+      _exit(-1); /* if this fails, finish child-process */
     }
-    # This piece of code is again executed by the caller:
+    /* This piece of code is again executed by the caller: */
     end_want_sigcld();
     if (child==-1)
-      # Something failed, either on vfork or on execl.
-      # In both cases errno was set.
+      /* Something failed, either on vfork or on execl.
+       In both cases errno was set. */
       OS_error_saving_errno({
         CLOSE(handles[1]); CLOSE(handles[0]);
         FREE_DYNAMIC_ARRAY(command_data);
       });
-    # We only want to write to the pipe, not read:
+    /* We only want to write to the pipe, not read: */
     if (!( CLOSE(handles[0]) ==0))
       OS_error_saving_errno({
         CLOSE(handles[1]);
         FREE_DYNAMIC_ARRAY(command_data);
       });
-    # (I have to tell this the operating system, so that - when the
-    # parent-process has filled the pipe - the child-process and not the
-    # parent-process is called, in order to empty the pipe again.)
+    /* (I have to tell this the operating system, so that - when the
+     parent-process has filled the pipe - the child-process and not the
+     parent-process is called, in order to empty the pipe again.) */
     end_system_call();
     FREE_DYNAMIC_ARRAY(command_data);
   }
  #endif
  #ifdef WIN32_NATIVE
-  var Handle handles[2]; # two Handles for the Pipe
+  var Handle handles[2]; /* two Handles for the Pipe */
   {
     begin_system_call();
     var Handle child_read_handle;
-    # Create a pipe and make one of the two handles inheritable.
+    /* Create a pipe and make one of the two handles inheritable. */
     if (!CreatePipe(&handles[0],&handles[1],NULL,0)) { OS_error(); }
     if (!DuplicateHandle(GetCurrentProcess(),handles[0],
                          GetCurrentProcess(),&child_read_handle,
@@ -12955,8 +13178,8 @@ local inline void create_output_pipe (const char* command) {
     if (!MyCreateProcess((TCHAR*)command,child_read_handle,stdoutput,
                          stderror,&pinfo))
       { OS_error(); }
-    # Close our copy of the child's handle, so that the OS knows
-    # that we won't read from it.
+    /* Close our copy of the child's handle, so that the OS knows
+     that we won't read from it. */
     if (!CloseHandle(child_read_handle)) { OS_error(); }
     if (!CloseHandle(pinfo.hThread)) { OS_error(); }
     if (!CloseHandle(pinfo.hProcess)) { OS_error(); }
@@ -12970,133 +13193,64 @@ local inline void create_output_pipe (const char* command) {
   pushSTACK(allocate_handle(handles[1]));
 }
 
-# (MAKE-PIPE-OUTPUT-STREAM command [:element-type] [:external-format] [:buffered])
-# calls a shell, that executes command, whereby our Pipe is redirected
-# into the standard-input of the command.
+/* (MAKE-PIPE-OUTPUT-STREAM command [:element-type] [:external-format] [:buffered])
+ calls a shell, that executes command, whereby our Pipe is redirected
+ into the standard-input of the command. */
 LISPFUN(make_pipe_output_stream,seclass_default,1,0,norest,key,3,
-        (kw(element_type),kw(external_format),kw(buffered)) ) {
-  var decoded_el_t eltype;
-  var signean buffered;
-  # check command:
-  pushSTACK(STACK_3); funcall(L(string),1); # (STRING command)
-  STACK_3 = value1;
-  # Check and canonicalize the :BUFFERED argument:
-  buffered = test_buffered_arg(STACK_0); # default is NIL
-  # Check and canonicalize the :ELEMENT-TYPE argument:
-  test_eltype_arg(&STACK_2,&eltype);
-  STACK_2 = canon_eltype(&eltype);
-  if (buffered <= 0) { check_unbuffered_eltype(&eltype); }
-  # Check and canonicalize the :EXTERNAL-FORMAT argument:
-  STACK_1 = test_external_format_arg(STACK_1);
-  # Now create the pipe.
-  with_string_0(STACK_3,O(misc_encoding),command_asciz, {
-    create_output_pipe(command_asciz);
-  });
-  # allocate Stream:
-  var object stream;
-  if (buffered <= 0) {
-    stream = make_unbuffered_stream(strmtype_pipe_out,DIRECTION_OUTPUT,
-                                    &eltype,false,false);
-    UnbufferedPipeStream_output_init(stream);
-  } else {
-    stream = make_buffered_stream(strmtype_pipe_out,DIRECTION_OUTPUT,
-                                  &eltype,false,false);
-    BufferedPipeStream_init(stream);
-  }
-  ChannelStreamLow_close(stream) = &low_close_pipe;
-  TheStream(stream)->strm_pipe_pid = popSTACK(); # Child-Pid
-  skipSTACK(4);
-  VALUES1(add_to_open_streams(stream)); /* return stream */
-}
+        (kw(element_type),kw(external_format),kw(buffered)) )
+{ make_pipe_stream(DIRECTION_OUTPUT,create_output_pipe); }
 
-/* mkops_from_handles(pipe,process_id)
-   Make a PIPE-OUTPUT-STREAM from pipe handle and a process-id
-   > STACK_0: buffered
-   > STACK_1: element-type
-   > STACK_2: encoding
-   < STACK_0: result - a PIPE-OUTPUT-STREAM
-   Used in LAUNCH
-   Can trigger GC */
-global maygc void mkops_from_handles (Handle opipe, int process_id) {
+/* mk_pipe_from_handle(pipe,process_id,dir)
+ Make a PIPE-OUTPUT-STREAM from pipe handle and a process-id
+ > STACK_0: buffered
+ > STACK_1: element-type
+ > STACK_2: encoding
+ > pipe: input or output pipe, depending on direction
+ > process_id: PID of the underlying process
+ > direction: pipe stream direction
+ < result - a PIPE-OUTPUT-STREAM
+ Used in LAUNCH
+ can trigger GC */
+extern maygc object mk_pipe_from_handle (Handle pipe, int process_id,
+                                         direction_t direction) {
   var decoded_el_t eltype;
-  var signean buffered;
-  # Check and canonicalize the :BUFFERED argument:
-  buffered = test_buffered_arg(STACK_0); # default is NIL
-  # Check and canonicalize the :ELEMENT-TYPE argument:
+  var buffered_t buffered;
+  /* Check and canonicalize the :BUFFERED argument: */
+  buffered = test_buffered_arg(STACK_0);
+  /* Check and canonicalize the :ELEMENT-TYPE argument: */
   test_eltype_arg(&STACK_1,&eltype);
   STACK_1 = canon_eltype(&eltype);
-  if (buffered <= 0) { check_unbuffered_eltype(&eltype); }
-  # Check and canonicalize the :EXTERNAL-FORMAT argument:
+  CHECK_UNBUFFERED_ELTYPE(buffered,direction,eltype);
+  /* Check and canonicalize the :EXTERNAL-FORMAT argument: */
   STACK_2 = test_external_format_arg(STACK_2);
-  STACK_0 = allocate_handle(opipe);
-  if (buffered > 0) {
-    pushSTACK(make_buffered_stream(strmtype_pipe_out,DIRECTION_OUTPUT,
-                                  &eltype,false,false));
-    BufferedPipeStream_init(STACK_0);
-  } else {
-    pushSTACK(make_unbuffered_stream(strmtype_pipe_out,DIRECTION_OUTPUT,
-                                    &eltype,false,false));
-    UnbufferedPipeStream_output_init(STACK_0);
-  }
-  ChannelStreamLow_close(STACK_0) = &low_close_pipe;
-  TheStream(STACK_0)->strm_pipe_pid = UL_to_I(process_id);
-  add_to_open_streams(STACK_0); /* return stream */
-}
-
-/* mkips_from_handles(pipe,process_id)
-   Make a PIPE-INPUT-STREAM from pipe handle and a process-id
-   > STACK_0: buffered
-   > STACK_1: element-type
-   > STACK_2: encoding
-   < STACK_0: result - a PIPE-INPUT-STREAM
-   Used in LAUNCH
-   Can trigger GC */
-global maygc void mkips_from_handles (Handle ipipe, int process_id) {
-  var decoded_el_t eltype;
-  var signean buffered;
-  # Check and canonicalize the :BUFFERED argument:
-  buffered = test_buffered_arg(STACK_0); # default is NIL
-  # Check and canonicalize the :ELEMENT-TYPE argument:
-  test_eltype_arg(&STACK_1,&eltype);
-  STACK_1 = canon_eltype(&eltype);
-  if (buffered < 0) { check_unbuffered_eltype(&eltype); }
-  # Check and canonicalize the :EXTERNAL-FORMAT argument:
-  STACK_2 = test_external_format_arg(STACK_2);
-  STACK_0 = allocate_handle(ipipe);
-  if (buffered >= 0) {
-    pushSTACK(make_buffered_stream(strmtype_pipe_in,DIRECTION_INPUT,
-                                  &eltype,false,false));
-    BufferedPipeStream_init(STACK_0);
-  } else {
-    pushSTACK(make_unbuffered_stream(strmtype_pipe_in,DIRECTION_INPUT,
-                                    &eltype,false,false));
-    UnbufferedPipeStream_input_init(STACK_0);
-  }
-  ChannelStreamLow_close(STACK_0) = &low_close_pipe;
-  TheStream(STACK_0)->strm_pipe_pid = UL_to_I(process_id);
-  add_to_open_streams(STACK_0); /* return stream */
+  STACK_0 = allocate_handle(pipe);
+  var object stream = make_pipe(buffered,direction,&eltype);
+  pushSTACK(stream);
+  var object pid = UL_to_I(process_id);
+  TheStream(STACK_0)->strm_pipe_pid = pid;
+  return popSTACK(); /* return stream */
 }
 
 
 #ifdef PIPES2
 
-# Bidirectional Pipes
-# ====================
+/* Bidirectional Pipes
+ ==================== */
 
 local inline void create_io_pipe (const char* command) {
   var int child;
  #ifdef UNIX
-  var int in_handles[2]; # two Handles for the Pipe to the Input-Stream
-  var int out_handles[2]; # two Handles for the Pipe to the Output-Stream
+  var int in_handles[2]; /* two Handles for the Pipe to the Input-Stream */
+  var int out_handles[2]; /* two Handles for the Pipe to the Output-Stream */
   {
-    # As shell we always use the Command-Shell.
-    # copy command to Stack:
+    /* As shell we always use the Command-Shell.
+     copy command to Stack: */
     var uintL command_length = asciz_length(command)+1;
     var DYNAMIC_ARRAY(command_data,char,command_length);
     begin_system_call();
     memcpy(command_data,command,command_length);
     begin_want_sigcld();
-    # build Pipes:
+    /* build Pipes: */
     if (pipe(in_handles))
       OS_error_saving_errno({
         FREE_DYNAMIC_ARRAY(command_data);
@@ -13108,82 +13262,82 @@ local inline void create_io_pipe (const char* command) {
         end_want_sigcld();
         CLOSE(in_handles[1]); CLOSE(in_handles[0]);
       });
-    # Everything, that is stuffed in handles[1], resurfaces at handles[0]
-    # again. We will utilize this as follows:
-    #        write                system                read
-    # parent  ->   out_handles[1]   ->   out_handles[0]  ->   child
-    # parent  <-   in_handles[0]    <-   in_handles[1]   <-   child
-    #        read                 system                write
-    # start a new process:
+    /* Everything, that is stuffed in handles[1], resurfaces at handles[0]
+     again. We will utilize this as follows:
+            write                system                read
+     parent  ->   out_handles[1]   ->   out_handles[0]  ->   child
+     parent  <-   in_handles[0]    <-   in_handles[1]   <-   child
+            read                 system                write
+     start a new process: */
     if ((child = vfork()) ==0) {
-      # this piece of code is executed by the child-process:
-      if ( dup2(out_handles[0],stdin_handle) >=0) # redirect Standard-Input
-        if ( dup2(in_handles[1],stdout_handle) >=0) # redirect Standard-Output
-          if ( CLOSE(out_handles[0]) ==0) # read only via stdin_handle
-            if ( CLOSE(in_handles[1]) ==0) # write only via stdout_handle
-              if ( CLOSE(out_handles[1]) ==0) # do not write to the pipe
-                # (I have to tell this the operating system, so that -
-                # when the child-process has emptied the pipe -
-                # the parent-process and not the child-process is called,
-                # in order to fill the pipe again.)
-                if ( CLOSE(in_handles[0]) ==0) { # do not to read from the pipe
-                  # (I have to tell this the operating system, so that -
-                  # when the child-process has filled the pipe -
-                  # the parent-process and not the child-process is called,
-                  # in order to empty the pipe.)
-                  # turn child-process into a background process:
-                  SETSID(); # it receives its own process group
+      /* this piece of code is executed by the child-process: */
+      if ( dup2(out_handles[0],stdin_handle) >=0) /* redirect Standard-Input */
+        if ( dup2(in_handles[1],stdout_handle) >=0) /* redirect Standard-Output */
+          if ( CLOSE(out_handles[0]) ==0) /* read only via stdin_handle */
+            if ( CLOSE(in_handles[1]) ==0) /* write only via stdout_handle */
+              if ( CLOSE(out_handles[1]) ==0) /* do not write to the pipe */
+                /* (I have to tell this the operating system, so that -
+                 when the child-process has emptied the pipe -
+                 the parent-process and not the child-process is called,
+                 in order to fill the pipe again.) */
+                if ( CLOSE(in_handles[0]) ==0) { /* do not to read from the pipe */
+                  /* (I have to tell this the operating system, so that -
+                   when the child-process has filled the pipe -
+                   the parent-process and not the child-process is called,
+                   in order to empty the pipe.)
+                   turn child-process into a background process: */
+                  SETSID(); /* it receives its own process group */
                   close_all_fd();
-                  execl(SHELL,            # call shell
-                        SHELL,            # =: argv[0]
-                        "-c",             # =: argv[1]
-                        &command_data[0], # =: argv[2]
+                  execl(SHELL,            /* call shell */
+                        SHELL,            /* =: argv[0] */
+                        "-c",             /* =: argv[1] */
+                        &command_data[0], /* =: argv[2] */
                         NULL);
                 }
-      _exit(-1); # if this fails, finish child-process
+      _exit(-1); /* if this fails, finish child-process */
     }
-    # This piece of code is again executed by the caller:
+    /* This piece of code is again executed by the caller: */
     end_want_sigcld();
     if (child==-1)
-      # Something failed, either on vfork or on execl.
-      # In both cases errno was set.
+      /* Something failed, either on vfork or on execl.
+       In both cases errno was set. */
       OS_error_saving_errno({
         CLOSE(in_handles[1]); CLOSE(in_handles[0]);
         CLOSE(out_handles[1]); CLOSE(out_handles[0]);
         FREE_DYNAMIC_ARRAY(command_data);
       });
-    # We only want to write to the pipe, not read:
+    /* We only want to write to the pipe, not read: */
     if (!( CLOSE(out_handles[0]) ==0))
       OS_error_saving_errno({
         CLOSE(in_handles[1]); CLOSE(in_handles[0]);
         CLOSE(out_handles[1]);
         FREE_DYNAMIC_ARRAY(command_data);
       });
-    # (I have to tell this the operating system, so that - when the
-    # parent-process has filled the pipe - the child-process and not the
-    # parent-process is called, in order to empty the pipe again.)
-    # We only want to read from the pipe, not write:
+    /* (I have to tell this the operating system, so that - when the
+     parent-process has filled the pipe - the child-process and not the
+     parent-process is called, in order to empty the pipe again.)
+     We only want to read from the pipe, not write: */
     if (!( CLOSE(in_handles[1]) ==0))
       OS_error_saving_errno({
         CLOSE(in_handles[0]); CLOSE(out_handles[1]);
         FREE_DYNAMIC_ARRAY(command_data);
       });
-    # (I have to tell this the operating system, so that - when the
-    # parent-process has emptied the pipe - the child-process and not the
-    # parent-process is called, in order to fill the pipe again.)
+    /* (I have to tell this the operating system, so that - when the
+     parent-process has emptied the pipe - the child-process and not the
+     parent-process is called, in order to fill the pipe again.) */
     end_system_call();
     FREE_DYNAMIC_ARRAY(command_data);
   }
  #endif
  #ifdef WIN32_NATIVE
-  var Handle in_handles[2]; # two Handles for the Pipe to the Input-Stream
-  var Handle out_handles[2]; # two Handles for the Pipe to the Output-Stream
+  var Handle in_handles[2]; /* two Handles for the Pipe to the Input-Stream */
+  var Handle out_handles[2]; /* two Handles for the Pipe to the Output-Stream */
   {
     begin_system_call();
     var Handle child_read_handle;
     var Handle child_write_handle;
     var Handle stderror;
-    # Create two pipes and make two of the four handles inheritable.
+    /* Create two pipes and make two of the four handles inheritable. */
     if (!CreatePipe(&in_handles[0],&in_handles[1],NULL,0)) { OS_error(); }
     if (!DuplicateHandle(GetCurrentProcess(),in_handles[1],
                          GetCurrentProcess(),&child_write_handle,
@@ -13202,8 +13356,8 @@ local inline void create_io_pipe (const char* command) {
     if (!MyCreateProcess((TCHAR*)command,child_read_handle,child_write_handle,
                          stderror,&pinfo))
       { OS_error(); }
-    # Close our copies of the child's handles, so that the OS knows
-    # that we won't use them.
+    /* Close our copies of the child's handles, so that the OS knows
+     that we won't use them. */
     if (!CloseHandle(child_read_handle)) { OS_error(); }
     if (!CloseHandle(child_write_handle)) { OS_error(); }
     if (!CloseHandle(pinfo.hThread)) { OS_error(); }
@@ -13217,111 +13371,95 @@ local inline void create_io_pipe (const char* command) {
   pushSTACK(allocate_handle(out_handles[1]));
 }
 
-# (MAKE-PIPE-IO-STREAM command [:element-type] [:external-format] [:buffered])
-# calls a shell, that executes command, whereby the output of our pipe
-# is redirected into the standard-input of command and its standard-output
-# is redirected into our pipe.
+/* (MAKE-PIPE-IO-STREAM command [:element-type] [:external-format] [:buffered])
+ calls a shell, that executes command, whereby the output of our pipe
+ is redirected into the standard-input of command and its standard-output
+ is redirected into our pipe. */
 LISPFUN(make_pipe_io_stream,seclass_default,1,0,norest,key,3,
         (kw(element_type),kw(external_format),kw(buffered)) ) {
   var decoded_el_t eltype;
-  var signean buffered;
-  # check command:
-  pushSTACK(STACK_3); funcall(L(string),1); # (STRING command)
+  var buffered_t buffered;
+  /* check command: */
+  pushSTACK(STACK_3); funcall(L(string),1); /* (STRING command) */
   STACK_3 = value1;
-  # Check and canonicalize the :BUFFERED argument:
-  buffered = test_buffered_arg(STACK_0); # default is NIL
-  # Check and canonicalize the :ELEMENT-TYPE argument:
+  /* Check and canonicalize the :BUFFERED argument: */
+  buffered = test_buffered_arg(STACK_0);
+  /* Check and canonicalize the :ELEMENT-TYPE argument: */
   test_eltype_arg(&STACK_2,&eltype);
   STACK_2 = canon_eltype(&eltype);
   if (buffered <= 0) { check_unbuffered_eltype(&eltype); }
-  # Check and canonicalize the :EXTERNAL-FORMAT argument:
+  /* Check and canonicalize the :EXTERNAL-FORMAT argument: */
   STACK_1 = test_external_format_arg(STACK_1);
-  # Now create the pipe.
+  /* Now create the pipe. */
   with_string_0(STACK_3,O(misc_encoding),command_asciz, {
     create_io_pipe(command_asciz);
   });
-  # allocate Input-Stream:
+  /* allocate Input-Stream: */
   {
-    pushSTACK(STACK_(1+3)); # encoding
-    pushSTACK(STACK_(2+3+1)); # eltype
+    pushSTACK(STACK_(1+3)); /* encoding */
+    pushSTACK(STACK_(2+3+1)); /* eltype */
     pushSTACK(STACK_(1+2));
-    var object stream;
-    if (buffered < 0) {
-      stream = make_unbuffered_stream(strmtype_pipe_in,DIRECTION_INPUT,
-                                      &eltype,false,false);
-      UnbufferedPipeStream_input_init(stream);
-    } else {
-      stream = make_buffered_stream(strmtype_pipe_in,DIRECTION_INPUT,
-                                    &eltype,false,false);
-      BufferedPipeStream_init(stream);
-    }
-    ChannelStreamLow_close(stream) = &low_close_pipe;
-    TheStream(stream)->strm_pipe_pid = STACK_2; # Child-Pid
-    STACK_1 = add_to_open_streams(stream);
+    var object stream = make_pipe(buffered,DIRECTION_INPUT,&eltype);
+    TheStream(stream)->strm_pipe_pid = STACK_2; /* Child-Pid */
+    STACK_1 = stream;
   }
-  # allocate Output-Stream:
+  /* allocate Output-Stream: */
   {
-    pushSTACK(STACK_(1+3)); # encoding
-    pushSTACK(STACK_(2+3+1)); # eltype
+    pushSTACK(STACK_(1+3)); /* encoding */
+    pushSTACK(STACK_(2+3+1)); /* eltype */
     pushSTACK(STACK_(0+2));
-    var object stream;
-    if (buffered <= 0) {
-      stream = make_unbuffered_stream(strmtype_pipe_out,DIRECTION_OUTPUT,
-                                      &eltype,false,false);
-      UnbufferedPipeStream_output_init(stream);
-    } else {
-      stream = make_buffered_stream(strmtype_pipe_out,DIRECTION_OUTPUT,
-                                    &eltype,false,false);
-      BufferedPipeStream_init(stream);
-    }
-    ChannelStreamLow_close(stream) = &low_close_pipe;
-    TheStream(stream)->strm_pipe_pid = STACK_2; # Child-Pid
-    STACK_0 = add_to_open_streams(stream);
+    var object stream = make_pipe(buffered,DIRECTION_OUTPUT,&eltype);
+    TheStream(stream)->strm_pipe_pid = STACK_2; /* Child-Pid */
+    STACK_0 = stream;
   }
-  # 3 values:
-  # (make-two-way-stream input-stream output-stream), input-stream, output-stream.
+  /* 3 values:
+   (make-two-way-stream input-stream output-stream), input-stream, output-stream. */
   STACK_2 = make_twoway_stream(STACK_1,STACK_0);
-  funcall(L(values),3);
+  STACK_to_mv(3);
   skipSTACK(4);
 }
 
-#endif # PIPES2
+#endif /* PIPES2 */
 
-#endif # PIPES
+#endif /* PIPES */
 
 
 #if defined(X11SOCKETS) || defined(SOCKET_STREAMS)
 
-# X11-Socket-Stream, Socket-Stream
-# ================================
+/* X11-Socket-Stream, Socket-Stream
+   ================================
 
-# Socket streams are just like handle streams (unbuffered file streams),
-# except that on UNIX_BEOS and WIN32_NATIVE, the low-level functions are
-# different.
+ Socket streams are just like handle streams (unbuffered file streams),
+ except that on UNIX_BEOS and WIN32_NATIVE, the low-level functions are
+ different.
 
-# Both sides
-# ----------
+ Both sides
+ ----------
 
-# Closes a socket handle.
+ Closes a socket handle. */
 #if defined(UNIX_BEOS) || defined(WIN32_NATIVE)
 local void low_close_socket (object stream, object handle, uintB abort) {
   begin_system_call();
-  if (!( closesocket(TheSocket(handle)) ==0) && !abort) { SOCK_error(); }
+  var int closed;
+  var SOCKET socket = TheSocket(handle);
+  GC_SAFE_CALL(closed=, closesocket(socket));
+  if (!(closed == 0) && !abort)
+    { SOCK_error(); }
   end_system_call();
 }
 #else
   #define low_close_socket  low_close_handle
 #endif
 
-# Input side
-# ----------
+/* Input side
+ ---------- */
 
 #if defined(UNIX_BEOS) || defined(WIN32_NATIVE)
 
 #ifdef WIN32_NATIVE
   #define CHECK_INTERRUPT                                        \
     if (WSAGetLastError()==WSAEINTR) /* Break by Ctrl-C ?*/      \
-      { end_system_call(); fehler_interrupt(); }
+      { end_system_call(); error_interrupt(); }
 #else
   #define CHECK_INTERRUPT
 #endif
@@ -13329,21 +13467,25 @@ local void low_close_socket (object stream, object handle, uintB abort) {
 #define SYSCALL(result,call)                         \
   do {                                               \
     begin_system_call();                             \
+    begin_blocking_call();                           \
     result = (call);                                 \
+    end_blocking_call();                             \
     if (result<0) { CHECK_INTERRUPT; SOCK_error(); } \
     end_system_call();                               \
   } while(0)
 
-local sintL low_read_unbuffered_socket (object stream) {
-  if (UnbufferedStream_status(stream) < 0) # already EOF?
+local maygc sintL low_read_unbuffered_socket (object stream) {
+  if (UnbufferedStream_status(stream) < 0) /* already EOF? */
     return -1;
-  if (UnbufferedStream_status(stream) > 0) { # bytebuf contains valid bytes?
+  if (UnbufferedStream_status(stream) > 0) { /* bytebuf contains valid bytes? */
     UnbufferedStreamLow_pop_byte(stream,b); return b;
   }
   var SOCKET handle = TheSocket(TheStream(stream)->strm_ichannel);
   var uintB b;
   var ssize_t result;
-  SYSCALL(result,sock_read(handle,&b,1,persev_full)); # try to read a byte
+  pushSTACK(stream);
+  SYSCALL(result,sock_read(handle,&b,1,persev_full)); /* try to read a byte */
+  stream = popSTACK();
   if (result==0) {
     ASSERT(error_eof_p()); /* no byte available -> must be EOF */
     UnbufferedStream_status(stream) = -1; return -1;
@@ -13352,22 +13494,21 @@ local sintL low_read_unbuffered_socket (object stream) {
   }
 }
 
-local signean low_listen_unbuffered_socket (object stream) {
-  if (UnbufferedStream_status(stream) < 0) # already EOF?
-    return ls_eof;
-  if (UnbufferedStream_status(stream) > 0) # bytebuf contains valid bytes?
-    return ls_avail;
+local listen_t low_listen_unbuffered_socket (object stream) {
+  if (UnbufferedStream_status(stream) < 0) /* already EOF? */
+    return LISTEN_EOF;
+  if (UnbufferedStream_status(stream) > 0) /* bytebuf contains valid bytes? */
+    return LISTEN_AVAIL;
   var SOCKET handle = TheSocket(TheStream(stream)->strm_ichannel);
-  # Use select() with readfds = singleton set {handle}
-  # and timeout = zero interval.
-  var fd_set handle_set; # set of handles := {handle}
-  var struct timeval zero_time; # time interval := 0
+  /* Use select() with readfds = singleton set {handle}
+   and timeout = zero interval. */
+  var fd_set handle_set; /* set of handles := {handle} */
+  var struct timeval zero_time; /* time interval := 0 */
   begin_system_call();
   FD_ZERO(&handle_set); FD_SET(handle,&handle_set);
  restart_select:
   zero_time.tv_sec = 0; zero_time.tv_usec = 0;
-  var int result;
-  result = select(FD_SETSIZE,&handle_set,NULL,NULL,&zero_time);
+  var int result = select(FD_SETSIZE,&handle_set,NULL,NULL,&zero_time);
   if (result<0) {
     CHECK_INTERRUPT;
    #ifdef UNIX_BEOS
@@ -13376,15 +13517,16 @@ local signean low_listen_unbuffered_socket (object stream) {
    #endif
     SOCK_error();
   } else {
-    # result = number of handles in handle_set for which read() would
-    # return without blocking.
+    /* result = number of handles in handle_set for which read() would
+     return without blocking. */
     if (result==0) {
-      end_system_call(); return ls_wait;
+      end_system_call(); return LISTEN_WAIT;
     }
-    # result=1
-    # When read() returns a result without blocking, this can also be EOF!
-    # try to read a byte:
+    /* result=1
+     When read() returns a result without blocking, this can also be EOF!
+     try to read a byte: */
     var uintB b;
+    /* read will not block */
     var ssize_t result = sock_read(handle,&b,1,persev_full);
     if (result<0) {
       CHECK_INTERRUPT;
@@ -13393,82 +13535,91 @@ local signean low_listen_unbuffered_socket (object stream) {
     end_system_call();
     if (result==0) {
       ASSERT(error_eof_p());
-      UnbufferedStream_status(stream) = -1; return ls_eof;
+      UnbufferedStream_status(stream) = -1; return LISTEN_EOF;
     } else {
-      # Stuff the read byte into the buffer, for next low_read call.
+      /* Stuff the read byte into the buffer, for next low_read call. */
       UnbufferedStreamLow_push_byte(stream,b);
-      return ls_avail;
+      return LISTEN_AVAIL;
     }
   }
 }
 
 local bool low_clear_input_unbuffered_socket (object stream) {
-  # This is not called anyway, because TheStream(stream)->strm_isatty = NIL.
-  return false; # Not sure whether this is the correct behaviour??
+  /* This is not called anyway, because TheStream(stream)->strm_isatty = NIL. */
+  return false; /* Not sure whether this is the correct behaviour?? */
 }
 
-local uintB* low_read_array_unbuffered_socket (object stream, uintB* byteptr,
-                                               uintL len, perseverance_t persev)
+local maygc uintB* low_read_array_unbuffered_socket (object stream,
+                                                     uintB* byteptr,
+                                                     uintL len,
+                                                     perseverance_t persev)
 {
-  if (UnbufferedStream_status(stream) < 0) # already EOF?
+  if (UnbufferedStream_status(stream) < 0) /* already EOF? */
     return byteptr;
   byteptr = UnbufferedStream_pop_all(stream,byteptr,&len);
   if (len == 0) return byteptr;
   var SOCKET handle = TheSocket(TheStream(stream)->strm_ichannel);
   var ssize_t result;
+  pushSTACK(stream);
   SYSCALL(result,sock_read(handle,byteptr,len,persev));
+  stream = popSTACK();
   if (result==0 && error_eof_p())
     UnbufferedStream_status(stream) = -1;
   return byteptr+result;
 }
 
-# Initializes the input side fields of a socket stream.
-# UnbufferedSocketStream_input_init(stream);
-#define UnbufferedSocketStream_input_init(stream)                       \
-  { UnbufferedStreamLow_read(stream) = &low_read_unbuffered_socket;     \
-    UnbufferedStreamLow_listen(stream) = &low_listen_unbuffered_socket; \
-    UnbufferedStreamLow_clear_input(stream) =                           \
-      &low_clear_input_unbuffered_socket;                               \
-    UnbufferedStreamLow_read_array(stream) =                            \
-      &low_read_array_unbuffered_socket;                                \
-    UnbufferedHandleStream_input_init_data(stream);                     \
-  }
+/* Initializes the input side fields of a socket stream.
+ UnbufferedSocketStream_input_init(stream); */
+#define UnbufferedSocketStream_input_init(stream)   do {                \
+  UnbufferedStreamLow_read(stream) = &low_read_unbuffered_socket;       \
+  UnbufferedStreamLow_listen(stream) = &low_listen_unbuffered_socket;   \
+  UnbufferedStreamLow_clear_input(stream) =                             \
+    &low_clear_input_unbuffered_socket;                                 \
+  UnbufferedStreamLow_read_array(stream) =                              \
+    &low_read_array_unbuffered_socket;                                  \
+  UnbufferedHandleStream_input_init_data(stream);                       \
+ } while (0)
 
 #else
 
   #define UnbufferedSocketStream_input_init(stream)  \
     UnbufferedHandleStream_input_init(stream)
 
-#endif # UNIX_BEOS || WIN32_NATIVE
+#endif /* UNIX_BEOS || WIN32_NATIVE */
 
-# Output side
-# -----------
+/* Output side
+   ----------- */
 
 #if defined(UNIX_BEOS) || defined(WIN32_NATIVE)
 
-local void low_write_unbuffered_socket (object stream, uintB b) {
+local maygc void low_write_unbuffered_socket (object stream, uintB b) {
   var SOCKET handle = TheSocket(TheStream(stream)->strm_ochannel);
   var ssize_t result;
-  SYSCALL(result,sock_write(handle,&b,1,persev_full)); # Try to output the byte.
-  if (result==0) # not successful?
-    fehler_unwritable(TheSubr(subr_self)->name,stream);
+  pushSTACK(stream);
+  SYSCALL(result,sock_write(handle,&b,1,persev_full)); /* Try to output the byte. */
+  stream = popSTACK();
+  if (result==0) /* not successful? */
+    error_unwritable(TheSubr(subr_self)->name,stream);
 }
 
-local const uintB* low_write_array_unbuffered_socket (object stream, const uintB* byteptr, uintL len, perseverance_t persev) {
+local maygc const uintB* low_write_array_unbuffered_socket
+(object stream, const uintB* byteptr, uintL len, perseverance_t persev) {
   var SOCKET handle = TheSocket(TheStream(stream)->strm_ochannel);
   var ssize_t result;
+  pushSTACK(stream);
   SYSCALL(result,sock_write(handle,byteptr,len,persev));
+  stream = popSTACK();
   /* Safety check whether persev argument was respected or EOWF was reached: */
   if ((persev == persev_full && !(result==(sintL)len))
       || (persev == persev_partial && !(result>0)))
-    fehler_unwritable(TheSubr(subr_self)->name,stream);
+    error_unwritable(TheSubr(subr_self)->name,stream);
   return byteptr+result;
 }
 
-#endif # UNIX_BEOS || WIN32_NATIVE
+#endif /* UNIX_BEOS || WIN32_NATIVE */
 
-# Initializes the output side fields of a socket stream.
-# UnbufferedSocketStream_output_init(stream);
+/* Initializes the output side fields of a socket stream.
+ UnbufferedSocketStream_output_init(stream); */
 #if defined(UNIX_BEOS) || defined(WIN32_NATIVE)
   #define UnbufferedSocketStream_output_init(stream)                    \
     { UnbufferedStreamLow_write(stream) = &low_write_unbuffered_socket; \
@@ -13482,8 +13633,8 @@ local const uintB* low_write_array_unbuffered_socket (object stream, const uintB
         &low_clear_output_unbuffered_pipe;                              \
     }
 #else
-# Use low_write_unbuffered_pipe, not low_write_unbuffered_handle, here because
-# writing to a closed socket generates a SIGPIPE signal, just like for pipes.
+/* Use low_write_unbuffered_pipe, not low_write_unbuffered_handle, here because
+ writing to a closed socket generates a SIGPIPE signal, just like for pipes. */
   #define UnbufferedSocketStream_output_init(stream)  \
     { UnbufferedStreamLow_write(stream) = &low_write_unbuffered_pipe;   \
       UnbufferedStreamLow_write_array(stream) =                         \
@@ -13495,87 +13646,88 @@ local const uintB* low_write_array_unbuffered_socket (object stream, const uintB
       UnbufferedStreamLow_clear_output(stream) =                        \
         &low_clear_output_unbuffered_pipe;                              \
     }
-#endif # UNIX_BEOS || WIN32_NATIVE
+#endif /* UNIX_BEOS || WIN32_NATIVE */
 
-#endif # X11SOCKETS || SOCKET_STREAMS
+#endif /* X11SOCKETS || SOCKET_STREAMS */
 
 
 #ifdef X11SOCKETS
 
-# X11-Socket-Stream
-# =================
+/* X11-Socket-Stream
+   =================
 
-# usage: for X-Windows.
+ usage: for X-Windows.
 
-# Additional Components:
-  # define strm_x11socket_connect strm_field1 # List (host display)
+ Additional Components:
+ define strm_x11socket_connect strm_field1 - List (host display) */
 
-extern SOCKET connect_to_x_server (const char* host, int display); # a piece X-Source...
+extern SOCKET connect_to_x_server (const char* host, int display); /* a piece X-Source... */
 
-# (SYS::MAKE-SOCKET-STREAM host display)
-# returns an X11-Socket-Stream for X-Windows or NIL.
+/* (SYS::MAKE-SOCKET-STREAM host display)
+ returns an X11-Socket-Stream for X-Windows or NIL. */
 LISPFUNN(make_x11socket_stream,2) {
   if (!stringp(STACK_1)) {
-    pushSTACK(STACK_1);   # TYPE-ERROR slot DATUM
-    pushSTACK(S(string)); # TYPE-ERROR slot EXPECTED-TYPE
+    pushSTACK(STACK_1);   /* TYPE-ERROR slot DATUM */
+    pushSTACK(S(string)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(STACK_(1+2));
-    fehler(type_error,GETTEXT("host should be string, not ~S"));
+    error(type_error,GETTEXT("host should be string, not ~S"));
   }
   if (!uint16_p(STACK_0)) {
-    pushSTACK(STACK_0);        # TYPE-ERROR slot DATUM
-    pushSTACK(O(type_uint16)); # TYPE-ERROR slot EXPECTED-TYPE
+    pushSTACK(STACK_0);        /* TYPE-ERROR slot DATUM */
+    pushSTACK(O(type_uint16)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(STACK_(0+2));
-    fehler(type_error,
+    error(type_error,
            GETTEXT("display should be a small nonnegative integer, not ~S"));
   }
-  var const char* host = TheAsciz(string_to_asciz(STACK_1,O(misc_encoding)));
-  begin_system_call();
-  var SOCKET handle = connect_to_x_server(host,I_to_uint16(STACK_0));
-  end_system_call();
+  var int display = I_to_uint16(STACK_0);
+  var SOCKET handle;
+  with_string_0(STACK_1,O(misc_encoding),host, {
+    GC_SAFE_SYSTEM_CALL(handle=, connect_to_x_server(host,display));
+  });
   if (handle == INVALID_SOCKET) { SOCK_error(); }
-  # build list:
+  /* build list: */
   { var object list = listof(2); pushSTACK(list); }
   pushSTACK(test_external_format_arg(S(Kunix)));
   pushSTACK(O(strmtype_ubyte8));
   pushSTACK(allocate_socket(handle));
-  # allocate Stream:
+  /* allocate Stream: */
   var decoded_el_t eltype = { eltype_iu, 8 };
   var object stream = make_unbuffered_stream(strmtype_x11socket,DIRECTION_IO,
                                              &eltype,false,false);
   UnbufferedSocketStream_input_init(stream);
   UnbufferedSocketStream_output_init(stream);
   ChannelStreamLow_close(stream) = &low_close_socket;
-  TheStream(stream)->strm_x11socket_connect = popSTACK(); # two-element list
+  TheStream(stream)->strm_x11socket_connect = popSTACK(); /* two-element list */
   VALUES1(add_to_open_streams(stream)); /* return stream */
 }
 
-# The two following functions should
-# 1. not only work for Handle- and Socket-Streams, but also for Synonym-
-#    and Concatenated-Streams, ideally for File-Streams, too.
-# 2. also accept non-simple Byte-Vectors.
-# For CLX this implementation is sufficient.
+/* The two following functions should
+ 1. not only work for Handle- and Socket-Streams, but also for Synonym-
+    and Concatenated-Streams, ideally for File-Streams, too.
+ 2. also accept non-simple Byte-Vectors.
+ For CLX this implementation is sufficient.
 
-# (SYS::READ-N-BYTES stream vector start count)
-# reads n Bytes at once.
-# Source:
-#   stream: Handle- or Socket-Stream
-# Destination: (aref vector start), ..., (aref vector (+ start (- count 1))),
-#  whereby
-#   vector: semi-simple 8Bit-Byte-Vector
-#   start: Start-Index in the Vector
-#   count: Number of bytes
+ (SYS::READ-N-BYTES stream vector start count)
+ reads n Bytes at once.
+ Source:
+   stream: Handle- or Socket-Stream
+ Destination: (aref vector start), ..., (aref vector (+ start (- count 1))),
+  whereby
+   vector: semi-simple 8Bit-Byte-Vector
+   start: Start-Index in the Vector
+   count: Number of bytes
 
-# (SYS::WRITE-N-BYTES stream vector start count)
-# writes n Bytes at once.
-# Source: (aref vector start), ..., (aref vector (+ start (- count 1))),
-#  whereby
-#   vector: semi-simple 8Bit-Byte-Vector
-#   start: Start-Index in the Vector
-#   count: Number of Bytes
-# Destination:
-#   stream: Handle- or Socket-Stream
+ (SYS::WRITE-N-BYTES stream vector start count)
+ writes n Bytes at once.
+ Source: (aref vector start), ..., (aref vector (+ start (- count 1))),
+  whereby
+   vector: semi-simple 8Bit-Byte-Vector
+   start: Start-Index in the Vector
+   count: Number of Bytes
+ Destination:
+   stream: Handle- or Socket-Stream
 
-/* Argument-Checks:
+ Argument-Checks:
  Returns the Index in *index_, the count in *count_, the data-vector in the
  Stack instead of the vector, and cleans up the Stack by 2.
  can trigger GC */
@@ -13591,19 +13743,29 @@ local maygc void test_n_bytes_args (uintL* index_, uintL* count_) {
   STACK_0 = array_displace_check(check_byte_vector(STACK_0),*count_,index_);
 }
 
+/* UP: report END-OF-FILE error
+ > stream: the stream that has reached EOS */
+nonreturning_function(local, error_eos, (object stream)) {
+  pushSTACK(stream);            /* STREAM-ERROR slot STREAM */
+  pushSTACK(stream); pushSTACK(TheSubr(subr_self)->name);
+  error(end_of_file,GETTEXT("~S: input stream ~S has reached its end"));
+}
+#define HANDLE_EOF(eof_e_p,eofval,skip_stack)                           \
+  if (nullp(eof_e_p)) { /* handle EOF: */                               \
+    value1 = eofval;                                                    \
+    if (!boundp(value1)) value1 = NIL; /* Default is NIL */             \
+    mv_count = 1; skipSTACK(skip_stack); /* return eofval */            \
+  } else               /* eof-error-p /= NIL (e.g. = #<UNBOUND>) ? */   \
+    error_eos(STACK_2);
+
 LISPFUNN(read_n_bytes,4) {
   var uintL startindex;
   var uintL totalcount;
   test_n_bytes_args(&startindex,&totalcount);
-  if (!(totalcount==0)) {
-    if (read_byte_array(&STACK_1,&STACK_0,startindex,totalcount,persev_full)
-        != totalcount) {
-      pushSTACK(STACK_1); # STREAM-ERROR slot STREAM
-      pushSTACK(STACK_(1+1)); # Stream
-      pushSTACK(S(read_n_bytes));
-      fehler(end_of_file,GETTEXT("~S: input stream ~S has reached its end"));
-    }
-  }
+  if (totalcount !=0
+      && (read_byte_array(&STACK_1,&STACK_0,startindex,totalcount,persev_full)
+          != totalcount))
+    error_eos(STACK_1);
   skipSTACK(2);
   VALUES1(T);
 }
@@ -13619,22 +13781,22 @@ LISPFUNN(write_n_bytes,4) {
   VALUES1(T);
 }
 
-#endif # X11SOCKETS
+#endif /* X11SOCKETS */
 
 
 #ifdef SOCKET_STREAMS
 
-# Socket-Streams
-# ==============
+/* Socket-Streams
+   ==============
 
-  # define strm_socket_port strm_field1 # port, a fixnum >=0
-  # define strm_socket_host strm_field2 # host, NIL or a string
+   define strm_socket_port strm_field1 - port, a fixnum >=0
+   define strm_socket_host strm_field2 - host, NIL or a string */
 
 #define SocketChannel(stream)                                              \
  TheSocket(ChannelStream_buffered(stream) ? BufferedStream_channel(stream) \
            : ChannelStream_ichannel(stream))
 
-# Low-level functions for buffered socket streams.
+/* Low-level functions for buffered socket streams. */
 
 #if defined(UNIX_BEOS) || defined(WIN32_NATIVE)
 
@@ -13643,45 +13805,49 @@ LISPFUNN(write_n_bytes,4) {
  > stream: (open) byte-based socket stream
  > persev: one of persev_partial, persev_immediate, persev_bonus
  < result: number of bytes read */
-local uintL low_fill_buffered_socket (object stream, perseverance_t persev) {
+local maygc uintL low_fill_buffered_socket (object stream,
+                                            perseverance_t persev) {
+  var SOCKET handle=TheSocket(BufferedStream_channel(stream));
+  var uintB *buff=BufferedStream_buffer_address(stream,0);
+  pin_unprotect_varobject(BufferedStream_buffer(stream),PROT_READ_WRITE);
+  pushSTACK(stream);
   var ssize_t result;
-  SYSCALL(result,sock_read(TheSocket(BufferedStream_channel(stream)),
-                           BufferedStream_buffer_address(stream,0),
-                           strm_buffered_bufflen,
-                           persev));
+  SYSCALL(result,sock_read(handle,buff,strm_buffered_bufflen,persev));
+  stream = popSTACK();
+  unpin_varobject(BufferedStream_buffer(stream));
   if (result==0 && error_eof_p())
     BufferedStream_have_eof_p(stream) = true;
   return result;
 }
 
-# UP: Finshes the Write-Back of the Buffer.
-# low_flush_buffered_socket(stream,bufflen);
-# > stream : (open) Byte-based File-Stream.
-# > bufflen : number of bytes to be written
-# < modified_flag von stream : deleted
-# changed in stream: index
-local void low_flush_buffered_socket (object stream, uintL bufflen) {
+/* UP: Finshes the Write-Back of the Buffer.
+ low_flush_buffered_socket(stream,bufflen);
+ > stream : (open) Byte-based File-Stream.
+ > bufflen : number of bytes to be written
+ < modified_flag von stream : deleted
+ changed in stream: index */
+local maygc void low_flush_buffered_socket (object stream, uintL bufflen) {
   begin_system_call();
- #if defined(HAVE_SIGNALS) && defined(SIGPIPE)
-  writing_to_subprocess = true;
- #endif
-  var ssize_t result =          /* flush Buffer */
-    sock_write(TheSocket(BufferedStream_channel(stream)),
-               BufferedStream_buffer_address(stream,0),
-               bufflen,persev_full);
- #if defined(HAVE_SIGNALS) && defined(SIGPIPE)
-  writing_to_subprocess = false;
- #endif
+  START_WRITING_TO_SUBPROCESS;
+  var SOCKET handle=TheSocket(BufferedStream_channel(stream));
+  var uintB *buff=BufferedStream_buffer_address(stream,0);
+  pin_unprotect_varobject(BufferedStream_buffer(stream),PROT_READ);
+  pushSTACK(stream);
+  var ssize_t result;        /* flush Buffer */
+  GC_SAFE_CALL(result=, sock_write(handle,buff,bufflen,persev_full));
+  stream = popSTACK();
+  unpin_varobject(BufferedStream_buffer(stream));
+  STOP_WRITING_TO_SUBPROCESS;
   if (result==bufflen) {
-    # everything written correctly
+    /* everything written correctly */
     end_system_call(); BufferedStream_modified(stream) = false;
-  } else { # not everything written
+  } else { /* not everything written */
     if (result<0) {
       CHECK_INTERRUPT;
       SOCK_error();
     }
     end_system_call();
-    fehler_unwritable(TheSubr(subr_self)->name,stream);
+    error_unwritable(TheSubr(subr_self)->name,stream);
   }
 }
 
@@ -13690,8 +13856,8 @@ local void low_flush_buffered_socket (object stream, uintL bufflen) {
 
 #else
 
-# Use low_flush_buffered_pipe, not low_flush_buffered_handle, here because
-# writing to a closed socket generates a SIGPIPE signal, just like for pipes.
+/* Use low_flush_buffered_pipe, not low_flush_buffered_handle, here because
+ writing to a closed socket generates a SIGPIPE signal, just like for pipes. */
   #define low_fill_buffered_socket  low_fill_buffered_handle
   #define low_flush_buffered_socket  low_flush_buffered_pipe
 
@@ -13702,27 +13868,28 @@ local void low_flush_buffered_socket (object stream, uintL bufflen) {
     BufferedStreamLow_flush(stream) = &low_flush_buffered_socket; \
   }
 
-# Twoway-Socket-Streams are twoway streams with both input and output side
-# being socket streams. (They are needed because the input and output side
-# need different buffers. Sockets are not regular files.)
-  # define strm_twoway_socket_input  strm_twoway_input  # input side, a socket stream
-  #define strm_twoway_socket_output  strm_twoway_output # output side, a socket stream
+/* Twoway-Socket-Streams are twoway streams with both input and output side
+ being socket streams. (They are needed because the input and output side
+ need different buffers. Sockets are not regular files.)
+ define strm_twoway_socket_input  strm_twoway_input  - input side, a socket stream */
+#define strm_twoway_socket_output  strm_twoway_output /* output side, a socket stream */
 
-# Hack for avoiding that the handle is closed twice.
+/* Hack for avoiding that the handle is closed twice. */
 local void low_close_socket_nop (object stream, object handle, uintB abort) {}
 
-# Creates a socket stream.
-# > STACK_2: element-type
-# > STACK_1: encoding
+/* Creates a socket stream.
+ > STACK_2: element-type
+ > STACK_1: encoding */
 local object make_socket_stream (SOCKET handle, decoded_el_t* eltype,
-                                 signean buffered, object host, object port) {
+                                 buffered_t buffered, object host, object port)
+{
   pushSTACK(host);
-  pushSTACK(STACK_(1+1)); # encoding
-  pushSTACK(STACK_(2+2)); # eltype
+  pushSTACK(STACK_(1+1)); /* encoding */
+  pushSTACK(STACK_(2+2)); /* eltype */
   pushSTACK(allocate_socket(handle));
-  # allocate stream:
+  /* allocate stream: */
   var object stream;
-  if (buffered < 0) {
+  if (buffered == BUFFERED_NIL) {
     stream = make_unbuffered_stream(strmtype_socket,DIRECTION_IO,
                                     eltype,false,false);
     UnbufferedSocketStream_input_init(stream);
@@ -13731,7 +13898,7 @@ local object make_socket_stream (SOCKET handle, decoded_el_t* eltype,
     TheStream(stream)->strm_socket_port = port;
     TheStream(stream)->strm_socket_host = popSTACK();
   } else {
-    # allocate Input-Stream:
+    /* allocate Input-Stream: */
     pushSTACK(STACK_2); pushSTACK(STACK_(1+1)); pushSTACK(STACK_(0+2));
     stream = make_buffered_stream(strmtype_socket,DIRECTION_INPUT,
                                   eltype,false,false);
@@ -13740,9 +13907,9 @@ local object make_socket_stream (SOCKET handle, decoded_el_t* eltype,
     TheStream(stream)->strm_socket_port = port;
     TheStream(stream)->strm_socket_host = STACK_3;
     pushSTACK(stream);
-    # allocate Output-Stream:
+    /* allocate Output-Stream: */
     pushSTACK(STACK_(2+1)); pushSTACK(STACK_(1+2)); pushSTACK(STACK_(0+3));
-    if (buffered <= 0) {
+    if (buffered != BUFFERED_T) {
       stream = make_unbuffered_stream(strmtype_socket,DIRECTION_OUTPUT,
                                       eltype,false,false);
       UnbufferedSocketStream_output_init(stream);
@@ -13755,7 +13922,7 @@ local object make_socket_stream (SOCKET handle, decoded_el_t* eltype,
     TheStream(stream)->strm_socket_port = port;
     TheStream(stream)->strm_socket_host = STACK_(3+1);
     pushSTACK(stream);
-    # Allocate a Two-Way-Socket-Stream:
+    /* Allocate a Two-Way-Socket-Stream: */
     stream = allocate_stream(strmflags_rdwr_B,strmtype_twoway_socket,
                              strm_len+2,0);
     TheStream(stream)->strm_rd_by = P(rd_by_twoway);
@@ -13784,27 +13951,33 @@ local void test_socket_server (object obj, bool check_open) {
     pushSTACK(S(socket_server)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(S(socket_server)); pushSTACK(obj);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: ~S is not a ~S"));
+    error(type_error,GETTEXT("~S: ~S is not a ~S"));
   }
   if (check_open && nullp(TheSocketServer(obj)->socket_handle)) {
     pushSTACK(obj);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S on ~S is illegal"));
+    error(error_condition,GETTEXT("~S on ~S is illegal"));
   }
 }
 
-# Called when some socket server dies.
+/* Called when some socket server dies. */
 LISPFUNN(socket_server_close,1) {
   test_socket_server(STACK_0,false);
-  var object ss = popSTACK();
+  var object ss = STACK_0;
   if (!nullp(TheSocketServer(ss)->socket_handle)) {
     var SOCKET s = TheSocket(TheSocketServer(ss)->socket_handle);
     begin_system_call();
-    while (closesocket(s) < 0)
+    while (1) {
+      var int closed;
+      GC_SAFE_CALL(closed=, closesocket(s));
+      if (closed >= 0) break;
       if (!sock_errno_is(EINTR)) { SOCK_error(); }
+    }
     end_system_call();
+    ss = STACK_0;
     TheSocketServer(ss)->socket_handle = NIL;
   }
+  skipSTACK(1);
   VALUES1(NIL);
 }
 
@@ -13826,7 +13999,7 @@ local object test_socket_stream (object obj, bool check_open) {
           pushSTACK(S(stream)); /* TYPE-ERROR slot EXPECTED-TYPE */
           pushSTACK(obj);
           pushSTACK(TheSubr(subr_self)->name);
-          fehler(type_error,
+          error(type_error,
                  GETTEXT("~S: argument ~S is not an open SOCKET-STREAM"));
         }
         return obj;
@@ -13838,7 +14011,7 @@ local object test_socket_stream (object obj, bool check_open) {
   pushSTACK(S(stream));         /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not a SOCKET-STREAM"));
+  error(type_error,GETTEXT("~S: argument ~S is not a SOCKET-STREAM"));
 }
 
 /* (SOCKET-SERVER &optional port &key backlog interface)
@@ -13848,37 +14021,38 @@ LISPFUN(socket_server,seclass_default,0,1,norest,key,2,
   var unsigned int port=0;              /* port to be used */
   var int backlog=1;                    /* parameter for listen(2) */
   var SOCKET sock = INVALID_SOCKET;     /* interface to be bound, as peer */
-  if (!missingp (STACK_1))
+  if (!missingp (STACK_1))              /* backlog */
     backlog = I_to_sint32(check_sint32(STACK_1));
-  if (!missingp(STACK_2)) {
+  if (!missingp(STACK_2)) {     /* port */
     if (builtin_stream_p(STACK_2)) {
       pushSTACK(CLSTEXT("WARNING: (socket-server <socket>) is deprecated, use (socket-server <port> :interface <socket>)"));
       funcall(S(warn),1);
-      stream_handles(test_socket_stream(STACK_2, true), true, NULL,
-                     &sock, NULL);
+      stream_handles(test_socket_stream(STACK_2,true),true,NULL,&sock,NULL);
     } else /* Leave this last, so that type error talks about integer */
       port = I_to_uint16(check_uint16(STACK_2));
   }
   {
-    var SOCKET sk;
+    var SOCKET sk = INVALID_SOCKET;
     var host_data_t myname;
-    if (!missingp(STACK_0)) {
-      if (builtin_stream_p(STACK_0))
-        stream_handles(test_socket_stream(STACK_0, true), true, NULL,
-                       &sock, NULL);
-      else /* Leave this last, so that type error talks about string */
+    if (!missingp(STACK_0)) {   /* interface */
+      if (builtin_stream_p(STACK_0)) {
+        stream_handles(test_socket_stream(STACK_0,true),true,NULL,&sock,NULL);
+      } else { /* Leave this last, so that type error talks about string */
         with_string_0(check_string(STACK_0),O(misc_encoding),interfacez, {
-          begin_system_call();
+          begin_blocking_system_call();
           sk = create_server_socket_by_string(&myname,interfacez,port,backlog);
-          end_system_call();
+          end_blocking_system_call();
         });
+        goto got_sk;
+      }
     }
-    begin_system_call();
+    begin_blocking_system_call();
     if (sock != INVALID_SOCKET)
-      sk = create_server_socket_by_socket(&myname, sock, port, backlog);
+      sk = create_server_socket_by_socket(&myname,sock,port,backlog);
     else
-      sk = create_server_socket_by_string(&myname,"127.0.0.1",port,backlog);
-    end_system_call();
+      sk = create_server_socket_by_string(&myname,"0.0.0.0",port,backlog);
+    end_blocking_system_call();
+   got_sk:
     if (sk == INVALID_SOCKET) { SOCK_error(); }
     pushSTACK(allocate_socket(sk));
     pushSTACK(allocate_socket_server());
@@ -13896,14 +14070,14 @@ LISPFUN(socket_server,seclass_default,0,1,norest,key,2,
   }
 }
 
-# (SOCKET-SERVER-PORT socket-server)
+/* (SOCKET-SERVER-PORT socket-server) */
 LISPFUNN(socket_server_port,1) {
   test_socket_server(STACK_0,false);
   VALUES1(TheSocketServer(STACK_0)->port);
   skipSTACK(1);
 }
 
-# (SOCKET-SERVER-HOST socket-server)
+/* (SOCKET-SERVER-HOST socket-server) */
 LISPFUNN(socket_server_host,1) {
   test_socket_server(STACK_0,false);
   VALUES1(TheSocketServer(STACK_0)->host);
@@ -13914,19 +14088,19 @@ LISPFUNN(socket_server_host,1) {
  sec = posfixnum or (SEC . USEC) or (SEC USEC) or float or ratio or nil/unbound
  usec = posfixnum or nil/unbound
  can trigger GC */
-global maygc struct timeval * sec_usec (object sec, object usec,
-                                        struct timeval *tv) {
+modexp maygc struct timeval * sec_usec
+(object sec, object usec, struct timeval *tv) {
   if (missingp(sec)) {
     return NULL;
   } else if (consp(sec)) {
     if (!nullp(Cdr(sec)) && !boundp(usec))
       usec = (consp(Cdr(sec)) ? Car(Cdr(sec)) : Cdr(sec));
     sec = Car(sec);
-  } else if (floatp(sec) || ratiop(sec)) { # sec = sec mod 1
+  } else if (floatp(sec) || ratiop(sec)) { /* sec = sec mod 1 */
     pushSTACK(sec); funcall(L(floor),1);
     sec = value1;
     if (!boundp(usec)) { /* usec = round(sec*1000000) */
-      pushSTACK(value2); pushSTACK(fixnum(1000000)); funcall(L(mal),2);
+      pushSTACK(value2); pushSTACK(fixnum(1000000)); funcall(L(star),2);
       pushSTACK(value1); funcall(L(round),1);
       usec = value1;
     }
@@ -13947,15 +14121,16 @@ global maygc struct timeval * sec_usec (object sec, object usec,
  can trigger GC */
 #if defined(SIZEOF_STRUCT_TIMEVAL) && SIZEOF_STRUCT_TIMEVAL == 16
 #define TO_INT(x)  uint64_to_I(x)
-global maygc object sec_usec_number (uint64 sec, uint64 usec, bool abs_p)
+modexp maygc object sec_usec_number (uint64 sec, uint64 usec, bool abs_p)
 #else
 #define TO_INT(x)  uint32_to_I(x)
-global maygc object sec_usec_number (uint32 sec, uint32 usec, bool abs_p)
+modexp maygc object sec_usec_number (uint32 sec, uint32 usec, bool abs_p)
 #endif
 {
   pushSTACK(TO_INT((abs_p ? UNIX_LISP_TIME_DIFF : 0) + sec));
   if (usec) {
-    pushSTACK(TO_INT(usec)); pushSTACK(fixnum(1000000)); funcall(L(durch),2);
+    /* this is likely to end up as a ratio... */
+    pushSTACK(TO_INT(usec)); pushSTACK(fixnum(1000000)); funcall(L(slash),2);
     pushSTACK(value1); funcall(L(plus),2);
     return value1;
   } else
@@ -13964,10 +14139,10 @@ global maygc object sec_usec_number (uint32 sec, uint32 usec, bool abs_p)
 #undef TO_INT
 
 #if defined(HAVE_SELECT) || defined(WIN32_NATIVE)
-# wait for the socket server to have a connection ready
-# returns true iff socket_accept will return immediately
-local bool socket_server_wait (object sose, struct timeval *tvp) {
-  var SOCKET handle = TheSocket(TheSocketServer(sose)->socket_handle);
+/* wait for the socket server to have a connection ready
+ returns true if socket_accept will return immediately */
+local maygc bool socket_server_wait (gcv_object_t *sose_, struct timeval *tvp) {
+  var SOCKET handle = TheSocket(TheSocketServer(*sose_)->socket_handle);
  #if defined(WIN32_NATIVE)
   return interruptible_socket_wait(handle,socket_wait_read,tvp);
  #else
@@ -13976,7 +14151,7 @@ local bool socket_server_wait (object sose, struct timeval *tvp) {
   var int ret;
   var fd_set handle_set;
   FD_ZERO(&handle_set); FD_SET(handle,&handle_set);
-  ret = select(FD_SETSIZE,&handle_set,NULL,NULL,tvp);
+  GC_SAFE_CALL(ret=, select(FD_SETSIZE,&handle_set,NULL,NULL,tvp));
   if (ret < 0) {
     if (sock_errno_is(EINTR)) {
       end_system_call(); goto restart_select;
@@ -13985,14 +14160,14 @@ local bool socket_server_wait (object sose, struct timeval *tvp) {
   }
   end_system_call();
   return (ret != 0);
- #endif # WIN32_NATIVE
+ #endif /* WIN32_NATIVE */
 }
 #endif
 
 extern SOCKET accept_connection (SOCKET socket_handle);
 
-# (SOCKET-ACCEPT socket-server [:element-type] [:external-format] [:buffered]
-#                [:timeout])
+/* (SOCKET-ACCEPT socket-server [:element-type] [:external-format] [:buffered]
+                [:timeout]) */
 LISPFUN(socket_accept,seclass_default,1,0,norest,key,4,
         (kw(element_type),kw(external_format),kw(buffered),kw(timeout)) ) {
   var struct timeval tv;
@@ -14000,28 +14175,28 @@ LISPFUN(socket_accept,seclass_default,1,0,norest,key,4,
 
   test_socket_server(STACK_3,true);
 
-  # Check and canonicalize the :BUFFERED argument:
-  var signean buffered = test_buffered_arg(STACK_0);
+  /* Check and canonicalize the :BUFFERED argument: */
+  var buffered_t buffered = test_buffered_arg(STACK_0);
 
-  # Check and canonicalize the :ELEMENT-TYPE argument:
+  /* Check and canonicalize the :ELEMENT-TYPE argument: */
   var decoded_el_t eltype;
   test_eltype_arg(&STACK_2,&eltype);
   STACK_2 = canon_eltype(&eltype);
-  if (buffered <= 0) { check_unbuffered_eltype(&eltype); }
+  if (buffered != BUFFERED_T) { check_unbuffered_eltype(&eltype); }
 
-  # Check and canonicalize the :EXTERNAL-FORMAT argument:
+  /* Check and canonicalize the :EXTERNAL-FORMAT argument: */
   STACK_1 = test_external_format_arg(STACK_1);
 
  #if defined(HAVE_SELECT) || defined(WIN32_NATIVE)
-  if (tvp && !socket_server_wait(STACK_3,tvp)) { # handle :TIMEOUT
+  if (tvp && !socket_server_wait(&STACK_3,tvp)) { /* handle :TIMEOUT */
     skipSTACK(4); sock_set_errno(ETIMEDOUT); OS_error();
   }
  #endif
 
   var SOCKET sock = TheSocket(TheSocketServer(STACK_3)->socket_handle);
-  begin_system_call();
+  begin_blocking_system_call();
   var SOCKET handle = accept_connection (sock);
-  end_system_call();
+  end_blocking_system_call();
   if (handle == INVALID_SOCKET) { SOCK_error(); }
   value1 = make_socket_stream(handle,&eltype,buffered,
                               TheSocketServer(STACK_3)->host,
@@ -14030,13 +14205,13 @@ LISPFUN(socket_accept,seclass_default,1,0,norest,key,4,
   skipSTACK(4);
 }
 
-# (SOCKET-WAIT socket-server [seconds [microseconds]])
+/* (SOCKET-WAIT socket-server [seconds [microseconds]]) */
 LISPFUN(socket_wait,seclass_default,1,2,norest,nokey,0,NIL) {
   test_socket_server(STACK_2,true);
  #if defined(HAVE_SELECT) || defined(WIN32_NATIVE)
   var struct timeval timeout;
   var struct timeval * timeout_ptr = sec_usec(STACK_1,STACK_0,&timeout);
-  VALUES_IF(socket_server_wait(STACK_2,timeout_ptr));
+  VALUES_IF(socket_server_wait(&STACK_2,timeout_ptr));
  #else
   VALUES1(NIL);
  #endif
@@ -14046,8 +14221,8 @@ LISPFUN(socket_wait,seclass_default,1,2,norest,nokey,0,NIL) {
 extern SOCKET create_client_socket (const char* host, unsigned int port,
                                     void* timeout);
 
-# (SOCKET-CONNECT port [host] [:element-type] [:external-format] [:buffered]
-#                 [:timeout])
+/* (SOCKET-CONNECT port [host] [:element-type] [:external-format] [:buffered]
+                 [:timeout]) */
 LISPFUN(socket_connect,seclass_default,1,1,norest,key,4,
         (kw(element_type),kw(external_format),kw(buffered),kw(timeout)) ) {
   var struct timeval tv;
@@ -14055,39 +14230,40 @@ LISPFUN(socket_connect,seclass_default,1,1,norest,key,4,
 
   STACK_4 = check_uint16(STACK_4);
 
-  # Check and canonicalize the :BUFFERED argument:
-  var signean buffered = test_buffered_arg(STACK_0);
+  /* Check and canonicalize the :BUFFERED argument: */
+  var buffered_t buffered = test_buffered_arg(STACK_0);
 
-  # Check and canonicalize the :ELEMENT-TYPE argument:
+  /* Check and canonicalize the :ELEMENT-TYPE argument: */
   var decoded_el_t eltype;
   test_eltype_arg(&STACK_2,&eltype);
   STACK_2 = canon_eltype(&eltype);
-  if (buffered <= 0) { check_unbuffered_eltype(&eltype); }
+  if (buffered != BUFFERED_T) { check_unbuffered_eltype(&eltype); }
 
-  # Check and canonicalize the :EXTERNAL-FORMAT argument:
+  /* Check and canonicalize the :EXTERNAL-FORMAT argument: */
   STACK_1 = test_external_format_arg(STACK_1);
 
-  var char *hostname;
+  /* ensure that we have host name*/
   if (missingp(STACK_3))
-    hostname = "localhost";
-  else
-    hostname = TheAsciz(string_to_asciz(check_string(STACK_3),
-                                        O(misc_encoding)));
+    STACK_3 = asciz_to_string("localhost",O(misc_encoding));
 
-  begin_system_call();
-  var SOCKET handle = create_client_socket(hostname,I_to_uint16(STACK_4),tvp);
+  var SOCKET handle;
+  begin_blocking_system_call();
+  /* instead to pin the host name object in the heap - let's allocate it
+     on the stack.*/
+  with_string_0(STACK_3,O(misc_encoding),hostname, {
+    handle = create_client_socket(hostname,I_to_uint16(STACK_4),tvp);
+  });
+  end_blocking_system_call();
   if (handle == INVALID_SOCKET) { SOCK_error(); }
-  end_system_call();
-  value1 = make_socket_stream(handle,&eltype,buffered,
-                              asciz_to_string(hostname,O(misc_encoding)),
-                              STACK_4);
+
+  value1 = make_socket_stream(handle,&eltype,buffered,STACK_3,STACK_4);
   VALUES1(add_to_open_streams(value1));
   skipSTACK(5);
 }
 
 /* check whether the object is a handle stream or a socket-server
  and return its socket-like handle(s) */
-global void stream_handles (object obj, bool check_open, bool* char_p,
+modexp void stream_handles (object obj, bool check_open, bool* char_p,
                             SOCKET* in_sock, SOCKET* out_sock) {
   if (uint_p(obj)) {
     if (in_sock)   *in_sock = (SOCKET)I_to_uint(obj);
@@ -14106,7 +14282,7 @@ global void stream_handles (object obj, bool check_open, bool* char_p,
     pushSTACK(S(stream));       /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(obj);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: argument ~S is not an open stream"));
+    error(type_error,GETTEXT("~S: argument ~S is not an open stream"));
   }
  restart_stream_handles:
   switch (TheStream(obj)->strmtype) {
@@ -14168,35 +14344,35 @@ global void stream_handles (object obj, bool check_open, bool* char_p,
       if (char_p) *char_p = eq(TheStream(obj)->strm_eltype,S(character));
       return;
     }
-    default: fehler_illegal_streamop(TheSubr(subr_self)->name,obj);
+    default: error_illegal_streamop(TheSubr(subr_self)->name,obj);
   }
 }
 
-/* extract socket, direction and status place
-   from the SOCKET-STATUS argument */
-local gcv_object_t* parse_sock_list (object obj,object *sock,direction_t *dir)
+/* extract socket, direction and status place from the SOCKET-STATUS
+   argument. returns the cons which cdr should be changed with the status */
+local object parse_sock_list (object obj,object *sock,direction_t *dir)
 {
   if (consp(obj)) { /* (sock ...) */
     *sock = (object)Car(obj);
     if (nullp(Cdr(obj))) { /* (sock) */
       *dir = DIRECTION_IO;
-      return &Cdr(obj);
+      return obj;
     } else if (consp(Cdr(obj))) { /* (sock dir . place) */
       *dir = check_direction(Car(Cdr(obj)));
-      return &Cdr(Cdr(obj));
+      return Cdr(obj);
     } else { /* (sock . dir) or (server . place) */
       if (socket_server_p(*sock)) { /* (server . place) */
         *dir = DIRECTION_INPUT;
-        return &Cdr(obj);
+        return obj;
       } else {                  /* (sock . dir) */
         *dir = check_direction(Cdr(obj));
-        return NULL;
+        return NIL;
       }
     }
   } else { /* sock */
     *sock = obj;
     *dir = DIRECTION_IO;
-    return NULL;
+    return NIL;
   }
 }
 
@@ -14215,7 +14391,7 @@ local uintL handle_set (object socket, fd_set *readfds, fd_set *writefds,
   var SOCKET in_sock = INVALID_SOCKET;
   var SOCKET out_sock = INVALID_SOCKET;
   var uintL ret = 0, avail = 0;
-  if (NULL==parse_sock_list(socket,&sock,&dir) && need_new_list)
+  if (nullp(parse_sock_list(socket,&sock,&dir)) && need_new_list)
     *need_new_list = true;
   stream_handles(sock,true,NULL,
                  READ_P(dir)  ? &in_sock  : NULL,
@@ -14244,11 +14420,11 @@ local maygc object handle_isset (object socket, fd_set *readfds,
                                  fd_set *writefds, fd_set *errorfds) {
   var object sock, ret;
   var direction_t dir;
-  var gcv_object_t *place = parse_sock_list(socket,&sock,&dir);
+  var object status_cons = parse_sock_list(socket,&sock,&dir);
   var SOCKET in_sock = INVALID_SOCKET;
   var SOCKET out_sock = INVALID_SOCKET;
   var bool char_p = true, wr = false;
-  var signean rd = ls_wait;
+  var listen_t rd = LISTEN_WAIT;
   stream_handles(sock,true,&char_p,
                  READ_P(dir)  ? &in_sock  : NULL,
                  WRITE_P(dir) ? &out_sock : NULL);
@@ -14256,24 +14432,29 @@ local maygc object handle_isset (object socket, fd_set *readfds,
     if (FD_ISSET(in_sock,errorfds)) return S(Kerror);
     if (socket_server_p(sock)) {
       ret = FD_ISSET(in_sock,readfds) ? T : NIL;
-      if (place) *place = ret;
+      if (!nullp(status_cons)) Cdr(status_cons) = ret;
       return ret;
     } else if (uint_p(sock)) {
-      if (FD_ISSET(in_sock,readfds)) rd = ls_avail;
+      if (FD_ISSET(in_sock,readfds)) rd = LISTEN_AVAIL;
     } else {                    /* stream */
-      if (FD_ISSET(in_sock,readfds) || (stream_isbuffered(sock) & bit(1)))
+      if (FD_ISSET(in_sock,readfds) || (stream_isbuffered(sock) & bit(1))) {
+        pushSTACK(status_cons);
         rd = (char_p ? listen_char(sock) : listen_byte(sock));
+        status_cons = popSTACK();
+      }
     }
   }
   if (out_sock != INVALID_SOCKET) {
     if (FD_ISSET(out_sock,errorfds)) return S(Kerror);
     wr = FD_ISSET(out_sock,writefds);
   }
-  if      (ls_avail_p(rd)) ret = wr ? S(Kio)     : S(Kinput);
-  else if (ls_eof_p(rd))   ret = wr ? S(Kappend) : S(Keof);
-  else if (ls_wait_p(rd))  ret = wr ? S(Koutput) : NIL;
-  else NOTREACHED;
-  if (place) *place = ret;
+  switch (rd) {
+    case LISTEN_AVAIL: ret = wr ? S(Kio)     : S(Kinput); break;
+    case LISTEN_EOF:   ret = wr ? S(Kappend) : S(Keof); break;
+    case LISTEN_WAIT:  ret = wr ? S(Koutput) : NIL; break;
+    case LISTEN_ERROR: ret = S(Kerror); break;
+  }
+  if (!nullp(status_cons)) Cdr(status_cons) = ret;
   return ret;
 }
 
@@ -14299,8 +14480,10 @@ local maygc object handle_isset (object socket, fd_set *readfds,
        <i1>   <i2>     <i3>
   <o1> :IO    :APPEND  :OUTPUT
   <o2> :INPUT :EOF     NIL
- may cons the list (and thus can trigger GC) if the list does not
- provide space for the return values. */
+ The second value is the number of "actionable" objects, i.e.,
+  the number of arguments for which non-NIL is returned (or set).
+ May cons the list (and thus can trigger GC) if the list does not
+  provide space for the return values. */
 LISPFUN(socket_status,seclass_default,1,2,norest,nokey,0,NIL) {
  #if defined(HAVE_SELECT) || defined(WIN32_NATIVE)
   var struct timeval timeout;
@@ -14319,14 +14502,14 @@ LISPFUN(socket_status,seclass_default,1,2,norest,nokey,0,NIL) {
       var object list = all;
       var int index = 0;
       for(; !nullp(list); list = Cdr(list)) {
-        if (!listp(list)) fehler_list(list);
+        if (!listp(list)) error_list(list);
         index += handle_set(Car(list),&readfds,&writefds,&errorfds,
                             &need_new_list,&non_empty_buffers_p);
         if (index > FD_SETSIZE) {
           pushSTACK(fixnum(FD_SETSIZE));
           pushSTACK(all);
           pushSTACK(S(socket_status));
-          fehler(error,GETTEXT("~S: list ~S is too long (~S maximum)"));
+          error(error_condition,GETTEXT("~S: list ~S is too long (~S maximum)"));
         }
       }
     } else
@@ -14338,10 +14521,13 @@ LISPFUN(socket_status,seclass_default,1,2,norest,nokey,0,NIL) {
       timeout_ptr = &timeout;
       timeout.tv_sec = timeout.tv_usec = 0;
     }
-    if (select(FD_SETSIZE,&readfds,&writefds,&errorfds,timeout_ptr) < 0) {
+    var int selectret;
+    GC_SAFE_CALL(selectret=, select(FD_SETSIZE,&readfds,&writefds,&errorfds,timeout_ptr));
+    if (selectret < 0) {
       if (sock_errno_is(EINTR)) { end_system_call(); goto restart_select; }
       if (!sock_errno_is(EBADF)) { SOCK_error(); }
     }
+    all=STACK_2; /* reload */
     if (many_sockets_p) {
       var object list = all;
       var uintL index = 0, count = 0;
@@ -14378,7 +14564,7 @@ LISPFUN(socket_status,seclass_default,1,2,norest,nokey,0,NIL) {
 local void sock_opt_bool (SOCKET handle, int option, object value)
 {
   var int val;
-  var SOCKLEN_T len = sizeof(val);
+  var CLISP_SOCKLEN_T len = sizeof(val);
   #ifdef HAVE_GETSOCKOPT
   if (-1 == getsockopt(handle,SOL_SOCKET,option,(char*)&val,&len))
     OS_error();
@@ -14397,7 +14583,7 @@ local void sock_opt_bool (SOCKET handle, int option, object value)
 local maygc void sock_opt_int (SOCKET handle, int option, object value)
 {
   var unsigned int val;
-  var SOCKLEN_T len = sizeof(val);
+  var CLISP_SOCKLEN_T len = sizeof(val);
   #ifdef HAVE_GETSOCKOPT
   if (-1 == getsockopt(handle,SOL_SOCKET,option,(char*)&val,&len))
     OS_error();
@@ -14416,7 +14602,7 @@ local maygc void sock_opt_int (SOCKET handle, int option, object value)
 local maygc void sock_opt_time (SOCKET handle, int option, object value)
 {
   var struct timeval val;
-  var SOCKLEN_T len = sizeof(val);
+  var CLISP_SOCKLEN_T len = sizeof(val);
   #ifdef HAVE_GETSOCKOPT
   if (-1 == getsockopt(handle,SOL_SOCKET,option,(char *)&val,&len)) OS_error();
   if (val.tv_usec) {
@@ -14454,7 +14640,7 @@ LISPFUN(socket_options,seclass_default,1,0,rest,nokey,0,NIL) {
     var object kwd = NEXT(arg_p);
     var object arg = Next(arg_p);
     if (count && !(symbolp(arg) && keywordp(arg))) {
-      NEXT(arg_p);
+      (void)NEXT(arg_p);
       count--;
     } else
       arg = nullobj;
@@ -14492,7 +14678,7 @@ LISPFUN(socket_options,seclass_default,1,0,rest,nokey,0,NIL) {
    #ifdef SO_LINGER
     else if (eq(kwd,S(Kso_linger))) {
       struct linger val;
-      var SOCKLEN_T len = sizeof(val);
+      var CLISP_SOCKLEN_T len = sizeof(val);
       #ifdef HAVE_GETSOCKOPT
       if (-1 == getsockopt(handle,SOL_SOCKET,SO_LINGER,(char*)&val,&len))
         OS_error();
@@ -14553,7 +14739,7 @@ LISPFUN(socket_options,seclass_default,1,0,rest,nokey,0,NIL) {
       pushSTACK(O(type_socket_option)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(O(type_socket_option));
       pushSTACK(kwd); pushSTACK(S(socket_options));
-      fehler(type_error,GETTEXT("~S: argument ~S should be of type ~S."));
+      error(type_error,GETTEXT("~S: argument ~S should be of type ~S."));
     }
     end_system_call();
   }
@@ -14584,8 +14770,8 @@ LISPFUNN(socket_stream_host,1)
 typedef host_data_t * host_data_fetcher_t (SOCKET, host_data_t *, bool);
 extern host_data_fetcher_t socket_getpeername, socket_getlocalname;
 
-local void publish_host_data (host_data_fetcher_t* func) {
-  var bool resolve_p = !nullp(STACK_0);
+local maygc void publish_host_data (host_data_fetcher_t* func) {
+  var bool resolve_p = missingp(STACK_0);
   var SOCKET sk;
   var host_data_t hd;
   var object hostname;
@@ -14596,7 +14782,9 @@ local void publish_host_data (host_data_fetcher_t* func) {
   }
   skipSTACK(2);                 /* drop the arguments */
   begin_system_call();
-  if ((*func)(sk,&hd,resolve_p) == NULL) { SOCK_error(); }
+  begin_blocking_call();
+  if ((*func)(sk,&hd,resolve_p) == NULL) { end_blocking_call(); SOCK_error(); }
+  end_blocking_call();
   end_system_call();
   if (hd.truename[0] == '\0') {
     hostname = asciz_to_string(hd.hostname,O(misc_encoding));
@@ -14718,10 +14906,14 @@ LISPFUNN(socket_stream_shutdown,2) {
     }
   }
   begin_system_call();
-  if (shutdown(handle,shutdown_how))
-    { SOCK_error(); }
+  begin_blocking_call();
+  if (shutdown(handle,shutdown_how)) {
+    end_blocking_call();
+    SOCK_error();
+  }
+  end_blocking_call();
   end_system_call();
-  value1 = NIL;
+  { value1 = NIL; }
  done:
   skipSTACK(1);
   mv_count = 1;
@@ -14731,8 +14923,136 @@ LISPFUNN(socket_stream_shutdown,2) {
 #endif  /* SOCKET_STREAMS */
 
 
-# Streams in general
-# ==================
+/* Streams in general
+   ================== */
+
+#if defined(WIN32_NATIVE)
+/* http://msdn.microsoft.com/en-us/library/ms804359.aspx */
+#include <ddk/ntifs.h>
+typedef NTSTATUS (*QueryInformationFile_t)
+(IN HANDLE FileHandle, OUT PIO_STATUS_BLOCK IoStatusBlock,
+ OUT PVOID FileInformation, IN ULONG Length,
+ IN FILE_INFORMATION_CLASS FileInformationClass);
+static QueryInformationFile_t qif = (QueryInformationFile_t) -1;
+static QueryInformationFile_t get_qif (void) {
+  if (qif == NULL) return qif;
+  var HMODULE ntdll = LoadLibrary("ntdll.dll");
+  if (ntdll == NULL) return (qif = NULL);
+  return (qif = (QueryInformationFile_t)
+          GetProcAddress(ntdll, "NtQueryInformationFile"));
+}
+#endif
+
+/* UP: find out whether the direction is compatible with the handle
+ > fd: file handle
+ > dir: direction
+ > true is the direction is compatible with the handle */
+local bool handle_direction_compatible (Handle fd, direction_t dir) {
+ #if defined(UNIX)
+  begin_blocking_system_call();
+  var int fcntl_flags = fcntl(fd,F_GETFL,0);
+  end_blocking_system_call();
+  if (fcntl_flags < 0)
+    return false;           /* closed handle? errno is probably EBADF */
+  var bool ret =
+    !(    (READ_P(dir) && ((fcntl_flags & O_ACCMODE) == O_WRONLY))
+      || (WRITE_P(dir) && ((fcntl_flags & O_ACCMODE) == O_RDONLY)));
+  DEBUG_OUT(("\nhandle_direction_compatible(%d,%d): 0x%x => %d\n",
+             fd,dir,fcntl_flags,ret));
+  return ret;
+ #elif defined(WIN32_NATIVE)
+  var bool ret = true;          /* assume compatibility */
+  /* http://groups.google.com/group/microsoft.public.win32.programmer.kernel/browse_thread/thread/a446be4fb332aeba */
+  begin_blocking_system_call();
+  switch (GetFileType(fd)) {
+    case FILE_TYPE_DISK: {
+      var QueryInformationFile_t qif = get_qif();
+      if (qif != NULL) {
+        var IO_STATUS_BLOCK iosb;
+        var FILE_ACCESS_INFORMATION fai;
+        var NTSTATUS s = qif(fd,&iosb,(void*)&fai,sizeof(fai),
+                             FileAccessInformation);
+        ret = (s == STATUS_SUCCESS
+               && (!READ_P(dir) || fai.AccessFlags & FILE_READ_DATA)
+               && (!WRITE_P(dir) || fai.AccessFlags & FILE_WRITE_DATA));
+        DEBUG_OUT(("\nhandle_direction_compatible(%d,%d)D: 0x%x 0x%x => %d\n",
+                   fd,dir,s,fai.AccessFlags,ret));
+      }
+    } break;
+    case FILE_TYPE_CHAR: if (READ_P(dir)) {
+      var DWORD nevents = -1, nr = 0;
+      if (GetNumberOfConsoleInputEvents(fd,&nevents)) { /* It's a console. */
+        var INPUT_RECORD ir;
+        ret = PeekConsoleInput(fd,&ir,1,&nr);
+      } else switch (GetLastError()) {
+          case ERROR_INVALID_HANDLE: case ERROR_ACCESS_DENIED:
+          case ERROR_INVALID_FUNCTION: ret = false;
+      }
+      DEBUG_OUT(("\nhandle_direction_compatible(%d,%d)C: %d %d => %d (%d)\n",
+                 fd,dir,nevents,nr,ret,GetLastError()));
+    } break;
+    case FILE_TYPE_PIPE: if (READ_P(dir)) {
+      var DWORD nbytes;
+      ret = PeekNamedPipe(fd,NULL,0,NULL,&nbytes,NULL);
+      DEBUG_OUT(("\nhandle_direction_compatible(%d,%d)P: %d => %d (%d)\n",
+                 fd,dir,nbytes,ret,GetLastError()));
+    } break;
+    case FILE_TYPE_REMOTE:
+      break;                    /* assume compatibility */
+    case FILE_TYPE_UNKNOWN:
+      /* GetFileType failed => handle was invalid */
+      if (GetLastError() != NO_ERROR) ret = false;
+  }
+  end_blocking_system_call();
+  return ret;
+ #else
+  return true;                  /* assume compatibility */
+ #endif
+}
+
+/* UP: find the pathname corresponding to the given handle
+ > fd: file handle
+ < pathname or NIL
+ can trigger GC */
+local maygc object handle_pathname (Handle fd) {
+ #if defined(UNIX)
+  var char buf[20];
+  begin_system_call();
+  sprintf(buf,"/dev/fd/%d",fd);
+  end_system_call();
+  pushSTACK(ascii_to_string(buf)); funcall(L(pathname),1);
+  return value1;
+ #elif defined(WIN32_NATIVE)
+  var NTSTATUS s = ~STATUS_SUCCESS;
+  var WCHAR wbuf[MAXPATHLEN + sizeof(ULONG)];
+  begin_blocking_system_call();
+  switch (GetFileType(fd)) {
+    case FILE_TYPE_DISK: {
+      var QueryInformationFile_t qif = get_qif();
+      if (qif != NULL) {
+        var IO_STATUS_BLOCK iosb;
+        s = qif(fd,&iosb,(void*)wbuf,MAXPATHLEN + sizeof(ULONG),
+                FileNameInformation);
+      }
+    } break;
+    case FILE_TYPE_CHAR: case FILE_TYPE_PIPE: case FILE_TYPE_REMOTE:
+    case FILE_TYPE_UNKNOWN: break;
+  }
+  end_blocking_system_call();
+  if (s == STATUS_SUCCESS) {
+    var FILE_NAME_INFORMATION *fni = (FILE_NAME_INFORMATION*)&wbuf;
+    var char abuf[2 * MAXPATHLEN];
+    var int n = WideCharToMultiByte(CP_ACP,0,fni->FileName,
+                                    fni->FileNameLength/sizeof(WCHAR),
+                                    abuf,2 * MAXPATHLEN,NULL,NULL);
+    pushSTACK(n_char_to_string(abuf,n,O(pathname_encoding)));
+    funcall(L(pathname),1);
+    return value1;
+  } else return NIL;
+ #else
+  return NIL;
+ #endif
+}
 
 /* Create a stream based on a handle
  can trigger GC */
@@ -14746,29 +15066,15 @@ local maygc object handle_to_stream (Handle fd, object direction, object buff_p,
   pushSTACK(eltype);
   pushSTACK(allocate_handle(handle_dup(fd)));
   dir = check_direction(direction);
- #ifdef UNIX
-  { /* set Filename to /dev/fd/<fd> */
-    var char buf[20];
-    begin_system_call();
-    sprintf(buf,"/dev/fd/%d",fd);
-    end_system_call();
-    pushSTACK(ascii_to_string(buf)); funcall(L(pathname),1);
-    STACK_5 = value1;
+  STACK_5 = handle_pathname(fd);
+  if (!handle_direction_compatible(fd,dir)) {
+    var condition_t errortype = nullp(STACK_5)
+      ? (pushSTACK(STACK_0), error_condition)
+      : (pushSTACK(STACK_5), /* FILE-ERROR slot PATHNAME */
+         pushSTACK(STACK_0), file_error);
+    pushSTACK(direction);
+    error(errortype,GETTEXT("Invalid direction ~S for accessing ~S"));
   }
-  { /* check that direction is compatible with the handle */
-    begin_system_call();
-    var int fcntl_flags = fcntl(fd,F_GETFL,0);
-    end_system_call();
-    if (fcntl_flags < 0)
-      OS_error();
-    if (   (READ_P(dir)  && ((fcntl_flags & O_ACCMODE) == O_WRONLY))
-        || (WRITE_P(dir) && ((fcntl_flags & O_ACCMODE) == O_RDONLY))) {
-      pushSTACK(STACK_5); /* FILE-ERROR slot PATHNAME */
-      pushSTACK(STACK_0); pushSTACK(direction);
-      fehler(file_error,GETTEXT("Invalid direction ~S for accessing ~S"));
-    }
-  }
- #endif
   return make_file_stream(dir,false,dir == DIRECTION_IO);
 }
 
@@ -14795,7 +15101,7 @@ LISPFUN(make_stream,seclass_default,1,0,norest,key,4,
     pushSTACK(NIL); /* no PLACE */
     pushSTACK(S(Kerror)); pushSTACK(S(Koutput)); pushSTACK(S(Kinput));
     pushSTACK(STACK_(4+4)); pushSTACK(TheSubr(subr_self)->name);
-    check_value(error,GETTEXT("~S: ~S should be a handle, handle stream, or one of ~S, ~S, ~S"));
+    check_value(error_condition,GETTEXT("~S: ~S should be a handle, handle stream, or one of ~S, ~S, ~S"));
     STACK_4 = value1;
     goto restart_make_stream;
   }
@@ -14809,27 +15115,25 @@ LISPFUN(make_stream,seclass_default,1,0,norest,key,4,
 /* Allocates the equivalent of the C stream stdin.
  can trigger GC */
 local inline maygc object make_standard_input_file_stream (void) {
+  if (!handle_direction_compatible(stdin_handle,DIRECTION_INPUT))
+    /* no stdin: nohup or embedded */
+    return make_concatenated_stream(NIL); /* empty stream */
   /* This uses the external-format :default, not O(terminal_encoding),
      because this stream is used when *terminal-io* is not interactive. */
   return handle_to_stream(stdin_handle,S(Kinput),S(Kdefault),S(Kdefault),
                           S(character));
 }
 
-/* Allocates the equivalent of the C stream stdout.
+/* Allocates the equivalent of the C stream stdout/stderr.
+ > handle : file descriptor (stdout_handle or stderr_handle)
  can trigger GC */
-local inline maygc object make_standard_output_file_stream (void) {
+local inline maygc object make_standard_output_file_stream (Handle handle) {
+  if (!handle_direction_compatible(handle,DIRECTION_OUTPUT))
+    /* no stdout/stderr: nohup or embedded */
+    return make_broadcast_stream(NIL); /* empty stream */
   /* This uses the external-format :default, not O(terminal_encoding),
      because this stream is used when *terminal-io* is not interactive. */
-  return handle_to_stream(stdout_handle,S(Koutput),S(Kdefault),S(Kdefault),
-                          S(character));
-}
-
-/* Allocates the equivalent of the C stream stderr.
- can trigger GC */
-local inline maygc object make_standard_error_file_stream (void) {
-  /* This uses the external-format :default, not O(terminal_encoding),
-     because this stream is used when *terminal-io* is not interactive. */
-  return handle_to_stream(stderr_handle,S(Koutput),S(Kdefault),S(Kdefault),
+  return handle_to_stream(handle,S(Koutput),S(Kdefault),S(Kdefault),
                           S(character));
 }
 
@@ -14838,9 +15142,9 @@ local inline maygc object make_standard_error_file_stream (void) {
    of these streams would not see that some output has been sent to another
    of these streams and would therefore not print a newline when it should.
    (FRESH-LINE is only allowed to err in the other direction: It may output
-   a newline although it is not needed.) */
+   a newline although it is not needed.)
 
-/* Returns the equivalent of the C stream stdin.
+ Returns the equivalent of the C stream stdin.
  can trigger GC */
 local maygc object get_standard_input_file_stream (void) {
   if (nullp(O(standard_input_file_stream)))
@@ -14851,9 +15155,9 @@ local maygc object get_standard_input_file_stream (void) {
 /* Returns the equivalent of the C stream stdout.
  can trigger GC */
 local maygc object get_standard_output_file_stream (void) {
-  #if (defined(UNIX) && !defined(NEXTAPP)) || defined(WIN32_NATIVE)
-  # On these systems make_terminal_stream() uses stdout_handle.
-  var object terminal_stream = Symbol_value(S(terminal_io)); # *TERMINAL-IO*
+  #if defined(UNIX) || defined(WIN32_NATIVE)
+  /* On these systems make_terminal_stream() uses stdout_handle. */
+  var object terminal_stream = Symbol_value(S(terminal_io)); /* *TERMINAL-IO* */
   if (builtin_stream_p(terminal_stream)
       && (TheStream(terminal_stream)->strmflags & strmflags_open_B)
       && (TheStream(terminal_stream)->strmflags & strmflags_wr_ch_B)
@@ -14865,7 +15169,8 @@ local maygc object get_standard_output_file_stream (void) {
   }
   #endif
   if (nullp(O(standard_output_file_stream)))
-    O(standard_output_file_stream) = make_standard_output_file_stream();
+    O(standard_output_file_stream) =
+      make_standard_output_file_stream(stdout_handle);
   return O(standard_output_file_stream);
 }
 
@@ -14873,8 +15178,8 @@ local maygc object get_standard_output_file_stream (void) {
  can trigger GC */
 local maygc object get_standard_error_file_stream (void) {
   #if 0
-  # On these systems make_terminal_stream() uses stderr_handle.
-  var object terminal_stream = Symbol_value(S(terminal_io)); # *TERMINAL-IO*
+  /* On these systems make_terminal_stream() uses stderr_handle. */
+  var object terminal_stream = Symbol_value(S(terminal_io)); /* *TERMINAL-IO* */
   if (builtin_stream_p(terminal_stream)
       && (TheStream(terminal_stream)->strmflags & strmflags_open_B)
       && (TheStream(terminal_stream)->strmflags & strmflags_wr_ch_B)
@@ -14889,61 +15194,67 @@ local maygc object get_standard_error_file_stream (void) {
     O(standard_error_file_stream) =
       (same_handle_p(stderr_handle,stdout_handle)
        ? get_standard_output_file_stream()
-       : make_standard_error_file_stream());
+       : make_standard_output_file_stream(stderr_handle));
   return O(standard_error_file_stream);
 }
 
-# UP: Returns the default value for *terminal-io*.
-# can trigger GC
+/* UP: Returns the default value for *terminal-io*.
+ can trigger GC */
 local maygc object make_terminal_io (void) {
-  # If stdin or stdout is a file, use a buffered stream instead of an
-  # unbuffered terminal stream. For the ud2cd program used as filter,
-  # this reduces the runtime on Solaris from 165 sec to 47 sec.
-  var bool stdin_file = regular_handle_p(stdin_handle);
-  var bool stdout_file = regular_handle_p(stdout_handle);
-  if (stdin_file || stdout_file) {
-    /* Input side: */
-    var object istream =
-      (stdin_file ? get_standard_input_file_stream() : make_terminal_stream());
+  /* If stdin or stdout is a file, use a buffered stream instead of an
+   unbuffered terminal stream. For the ud2cd program used as filter,
+   this reduces the runtime on Solaris from 165 sec to 47 sec. */
+  var bool stdin_terminal =
+    handle_direction_compatible(stdin_handle,DIRECTION_INPUT)
+    && !pipe_file_handle_p(stdin_handle);
+  var bool stdout_terminal =
+    handle_direction_compatible(stdout_handle,DIRECTION_OUTPUT)
+    && !pipe_file_handle_p(stdout_handle);
+  DEBUG_OUT(("\nmake_terminal_io: %d %d\n",stdin_terminal,stdout_terminal));
+  /* note that if a stream is incompatible, handle_direction_compatible
+     will be called again by get_standard_*_file_stream;
+     this is an extra system call on startup; should not be a big deal */
+  if (!stdin_terminal || !stdout_terminal) {
+    var object istream = stdin_terminal ? /* Input side */
+      make_terminal_stream() : get_standard_input_file_stream();
     pushSTACK(istream);
-    /* Output side: */
-    var object ostream =
-      (stdout_file ? get_standard_output_file_stream() : make_terminal_stream());
+    var object ostream = stdout_terminal ? /* Output side */
+      make_terminal_stream() : get_standard_output_file_stream();
     /* Build a two-way-stream: */
     return make_twoway_stream(popSTACK(),ostream);
   }
   return make_terminal_stream();
 }
 
-# UP: Returns the input side of *TERMINAL-IO*.
-# Defaults to a (make-synonym-stream '*terminal-io*).
-# > preallocated_default: (make-synonym-stream '*terminal-io*) or unbound
-# < result: a stream that can be used for *STANDARD-INPUT*
-# can trigger GC - if preallocated_default is unbound
+/* UP: Returns the input side of *TERMINAL-IO*.
+ Defaults to a (make-synonym-stream '*terminal-io*).
+ > preallocated_default: (make-synonym-stream '*terminal-io*) or unbound
+ < result: a stream that can be used for *STANDARD-INPUT*
+ can trigger GC - if preallocated_default is unbound */
 local /*maygc*/ object terminal_io_input_stream (object preallocated_default) {
-  GCTRIGGER_IF(eq(preallocated_default,unbound), GCTRIGGER());
+  GCTRIGGER_IF(!boundp(preallocated_default), GCTRIGGER());
   var object terminal_io = Symbol_value(S(terminal_io));
   /* Optimization: Extract the input side if possible. */
   if (stream_twoway_p(terminal_io))
     return TheStream(terminal_io)->strm_twoway_input;
   /* General case: Use a synonym stream. */
-  return (!eq(preallocated_default,unbound) ? preallocated_default :
+  return (boundp(preallocated_default) ? preallocated_default :
           make_synonym_stream(S(terminal_io)));
 }
 
-# UP: Returns the output side of *TERMINAL-IO*.
-# Defaults to a (make-synonym-stream '*terminal-io*).
-# > preallocated_default: (make-synonym-stream '*terminal-io*) or unbound
-# < result: a stream that can be used for *STANDARD-OUTPUT*
-# can trigger GC - if preallocated_default is unbound
+/* UP: Returns the output side of *TERMINAL-IO*.
+ Defaults to a (make-synonym-stream '*terminal-io*).
+ > preallocated_default: (make-synonym-stream '*terminal-io*) or unbound
+ < result: a stream that can be used for *STANDARD-OUTPUT*
+ can trigger GC - if preallocated_default is unbound */
 local /*maygc*/ object terminal_io_output_stream (object preallocated_default) {
-  GCTRIGGER_IF(eq(preallocated_default,unbound), GCTRIGGER());
+  GCTRIGGER_IF(!boundp(preallocated_default), GCTRIGGER());
   var object terminal_io = Symbol_value(S(terminal_io));
   /* Optimization: Extract the output side if possible. */
   if (stream_twoway_p(terminal_io))
     return TheStream(terminal_io)->strm_twoway_output;
   /* General case: Use a synonym stream. */
-  return (!eq(preallocated_default,unbound) ? preallocated_default :
+  return (boundp(preallocated_default) ? preallocated_default :
           make_synonym_stream(S(terminal_io)));
 }
 
@@ -14966,7 +15277,7 @@ local int next_line_virtual (int count, int key) {
     if (rl_point>=len) rl_point = len-1;
   } else if (count < 0)
     return previous_line_virtual(-count,key);
-  # else rl_variable_dumper(1);
+  /* else rl_variable_dumper(1); */
   return 0;
 }
 local int previous_line_virtual (int count, int key) {
@@ -14980,7 +15291,7 @@ local int previous_line_virtual (int count, int key) {
     rl_point += col+1;
   } else if (count < 0)
     return next_line_virtual(-count,key);
-  # else rl_variable_dumper(1);
+  /* else rl_variable_dumper(1); */
   return 0;
 }
 #endif
@@ -14992,133 +15303,141 @@ local int previous_line_virtual (int count, int key) {
             (deviates from the standard)
  can trigger GC */
 global maygc void init_streamvars (bool batch_p) {
-  #ifdef GNU_READLINE
+ #ifdef GNU_READLINE
   begin_call();
- #if HAVE_DECL_RL_READLINE_NAME
+  #if HAVE_DECL_RL_READLINE_NAME
   { /* we could have used a string literal, but then readline:readline-name
        would have to be read-only because one cannot free() a string literal */
     var char* name = (char*)malloc(6); strcpy(name,"CLISP");
     rl_readline_name = name;
   }
- #endif
+  #endif
   if (ilisp_mode) {
-    # Simulate the following instruction in .inputrc:
-    #   Control-i: self-insert
+    /* Simulate the following instruction in .inputrc:
+       Control-i: self-insert */
     rl_bind_key(CTRL('I'),rl_named_function("self-insert"));
   }
   rl_attempted_completion_function = &lisp_completion_matches;
   rl_completion_entry_function = &lisp_completion_more;
   rl_variable_bind("comment-begin",";");
   rl_variable_bind("blink-matching-paren","on");
-  # rl_set_paren_blink_timeout(1000000); # = 1 sec [default 0.5 sec]
+  /* rl_set_paren_blink_timeout(1000000);  == 1 sec [default 0.5 sec] */
   rl_add_defun("next-line-virtual",&next_line_virtual,META('n'));
   rl_add_defun("previous-line-virtual",&previous_line_virtual,META('p'));
   end_call();
+ #endif  /* GNU_READLINE */
+ #ifdef MULTITHREAD
+  /* clear per thread binding */
+  #define def_var(sym,val) do {                                         \
+    define_variable(sym,val);                                           \
+    current_thread()->_ptr_symvalues[TheSymbol(sym)->tls_index]=SYMVALUE_EMPTY;\
+  } while(0)
+  #else
+  #define def_var(sym,val) define_variable(sym,val)
   #endif
   {
     var object stream = make_terminal_io();
-    define_variable(S(terminal_io),stream);  # *TERMINAL-IO*
+    def_var(S(terminal_io),stream);  /* *TERMINAL-IO* */
   }
   {
     var object stream = make_synonym_stream(S(terminal_io));
-    define_variable(S(query_io),stream);         # *QUERY-IO*
-    define_variable(S(debug_io),stream);         # *DEBUG-IO*
-    define_variable(S(trace_output),stream);     # *TRACE-OUTPUT*
-    define_variable(S(standard_input),           # *STANDARD-INPUT*
-      batch_p ? get_standard_input_file_stream() : terminal_io_input_stream(stream));
-    define_variable(S(standard_output),          # *STANDARD-OUTPUT*
-      batch_p ? get_standard_output_file_stream() : terminal_io_output_stream(stream));
-    define_variable(S(error_output),             # *ERROR-OUTPUT*
-      batch_p ? get_standard_error_file_stream() : (object)Symbol_value(S(standard_output)));
+    def_var(S(query_io),stream);         /* *QUERY-IO* */
+    def_var(S(debug_io),stream);         /* *DEBUG-IO* */
+    def_var(S(trace_output),stream);     /* *TRACE-OUTPUT* */
+    def_var(S(standard_input),           /* *STANDARD-INPUT* */
+                    batch_p ? get_standard_input_file_stream()
+                    : terminal_io_input_stream(stream));
+    def_var(S(standard_output),          /* *STANDARD-OUTPUT* */
+                    batch_p ? get_standard_output_file_stream()
+                    : terminal_io_output_stream(stream));
+    def_var(S(error_output),             /* *ERROR-OUTPUT* */
+                    batch_p ? get_standard_error_file_stream()
+                    : (object)Symbol_value(S(standard_output)));
   }
   #ifdef KEYBOARD
-  # Initialize the *KEYBOARD-INPUT* stream. This can fail in some cases,
-  # therefore we do it after the standard streams are in place, so that
-  # the user will get a reasonable error message.
+  /* Initialize the *KEYBOARD-INPUT* stream. This can fail in some cases,
+   therefore we do it after the standard streams are in place, so that
+   the user will get a reasonable error message. */
   #ifdef UNIX
-  # Building the keyboard stream is a costly operation. Delay it
-  # until we really need it.
-  define_variable(S(keyboard_input),NIL);     # *KEYBOARD-INPUT*
+  /* Building the keyboard stream is a costly operation. Delay it
+   until we really need it. */
+  def_var(S(keyboard_input),NIL);     /* *KEYBOARD-INPUT* */
   #else
   {
     var object stream = make_keyboard_stream();
-    define_variable(S(keyboard_input),stream); # *KEYBOARD-INPUT*
+    def_var(S(keyboard_input),stream); /* *KEYBOARD-INPUT* */
   }
   #endif
   #endif
+  #undef def_var
 }
 
-# Returns error-message, if the value of the symbol sym is not a stream.
-local void fehler_value_stream (object sym) {
-  # Possibly repair before the error-message
-  # (initialized as in init_streamvars resp. init_pathnames):
+/* Returns error-message, if the value of the symbol sym is not a stream. */
+local void error_value_stream (object sym) {
+  /* Possibly repair before the error-message
+   (initialized as in init_streamvars resp. init_pathnames): */
   var object stream;
-  pushSTACK(sym); # save sym
+  pushSTACK(sym); /* save sym */
   #ifdef KEYBOARD
-  if (eq(sym,S(keyboard_input))) { # Keyboard-Stream as Default
+  if (eq(sym,S(keyboard_input))) { /* Keyboard-Stream as Default */
     stream = make_keyboard_stream();
   } else
   #endif
   if (eq(sym,S(terminal_io))) {
-    # Terminal-Stream as Default
-    # (Use make_terminal_stream() here, not make_terminal_io(), because
-    # that might have been a file stream and got closed when the disk
-    # became full.)
+    /* Terminal-Stream as Default
+     (Use make_terminal_stream() here, not make_terminal_io(), because
+     that might have been a file stream and got closed when the disk
+     became full.) */
     stream = make_terminal_stream();
   } else if (eq(sym,S(query_io)) || eq(sym,S(debug_io))
              || eq(sym,S(error_output)) || eq(sym,S(trace_output))) {
-    # Synonym-Stream to *TERMINAL-IO* as Default
+    /* Synonym-Stream to *TERMINAL-IO* as Default */
     stream = make_synonym_stream(S(terminal_io));
   } else if (eq(sym,S(standard_input))) {
     stream = terminal_io_input_stream(unbound);
   } else if (eq(sym,S(standard_output))) {
     stream = terminal_io_output_stream(unbound);
   } else {
-    # other Symbol, not fixable -> instant error-message:
-    pushSTACK(Symbol_value(sym)); # TYPE-ERROR slot DATUM
-    pushSTACK(S(stream));         # TYPE-ERROR slot EXPECTED-TYPE
-    pushSTACK(Symbol_value(sym)); # variable value
-    pushSTACK(sym); # variable
+    /* other Symbol, not fixable -> instant error-message: */
+    pushSTACK(Symbol_value(sym)); /* TYPE-ERROR slot DATUM */
+    pushSTACK(S(stream));         /* TYPE-ERROR slot EXPECTED-TYPE */
+    pushSTACK(Symbol_value(sym)); /* variable value */
+    pushSTACK(sym); /* variable */
+    pushSTACK(TheSubr(subr_self)->name);
     if (!streamp(Symbol_value(sym))) {
-      fehler(type_error,GETTEXT("The value of ~S is not a stream: ~S"));
+      error(type_error,GETTEXT("~S: The value of ~S is not a stream: ~S"));
     } else {
-      fehler(type_error,GETTEXT("The value of ~S is not an appropriate stream: ~S"));
+      error(type_error,GETTEXT("~S: The value of ~S is not an appropriate stream: ~S"));
     }
   }
   sym = popSTACK();
-  # repair finished: stream is the new value of sym.
+  /* repair finished: stream is the new value of sym. */
   var object oldvalue = Symbol_value(sym);
   Symbol_value(sym) = stream;
-  pushSTACK(oldvalue);  # TYPE-ERROR slot DATUM
-  pushSTACK(S(stream)); # TYPE-ERROR slot EXPECTED-TYPE
-  pushSTACK(stream); # new variable value
-  pushSTACK(oldvalue); # old variable value
-  pushSTACK(sym); # Variable
-  fehler(type_error,GETTEXT("The value of ~S was not an appropriate stream: ~S. It has been changed to ~S."));
+  pushSTACK(oldvalue);  /* TYPE-ERROR slot DATUM */
+  pushSTACK(S(stream)); /* TYPE-ERROR slot EXPECTED-TYPE */
+  pushSTACK(stream); /* new variable value */
+  pushSTACK(oldvalue); /* old variable value */
+  pushSTACK(sym); /* Variable */
+  pushSTACK(TheSubr(subr_self)->name);
+  error(type_error,GETTEXT("~S: The value of ~S was not an appropriate stream: ~S. It has been changed to ~S."));
 }
 
 #ifdef GNU_READLINE
-# Auxiliary functions for the GNU ReadLine Library:
+/* Auxiliary functions for the GNU ReadLine Library: */
 nonreturning_function(local, rl_memory_abort, (void)) {
-  # when there is no more memory for the ReadLine
-  # drop it and replace the *TERMINAL-IO* with another
-  # terminal-stream without ReadLine
-  rl_deprep_terminal(); # cancel all ioctl()s
-  begin_callback(); # reset STACK to a reasonable value
+  /* when there is no more memory for the ReadLine
+   drop it and replace the *TERMINAL-IO* with another
+   terminal-stream without ReadLine */
+  rl_deprep_terminal(); /* cancel all ioctl()s */
+  begin_rl_callback(); /* reset STACK to a reasonable value */
   rl_gnu_readline_p = false;
   Symbol_value(S(terminal_io)) = make_terminal_stream();
-  fehler(storage_condition,GETTEXT("readline library: out of memory."));
+  error(storage_condition,GETTEXT("readline library: out of memory."));
 }
 
 local char* xmalloc (int count) {
   char* tmp = (char*)malloc(count);
-  if (tmp) return tmp;
-  else     rl_memory_abort();
-}
-
-local char* xrealloc (void* ptr, int count) {
-  char* tmp = (ptr==NULL ? (char*)malloc(count) :
-               (char*)realloc((char*)ptr,count));
   if (tmp) return tmp;
   else     rl_memory_abort();
 }
@@ -15143,16 +15462,16 @@ LISPFUNNR(output_stream_p,1)
   VALUES_IF(output_stream_p(stream));
 }
 
-# (SYS::STREAM-ELEMENT-TYPE-EQ T0 T1)
-# this function is used for `stream-element-type' type merging
-# it does not handle types not seen as stream element types
-# it should be reasonably fast, so we are not using `canonicalize-type'
-# (defun stream-element-type-eq (t0 t1)
-#   (or (eq t0 t1)
-#       (and (consp t0) (consp t1)
-#            (eq (car t0) (car t1))
-#            (member (car t0) '(unsigned-byte signed-byte))
-#            (eql (cadr t0) (cadr t1)))))
+/* (SYS::STREAM-ELEMENT-TYPE-EQ T0 T1)
+ this function is used for `stream-element-type' type merging
+ it does not handle types not seen as stream element types
+ it should be reasonably fast, so we are not using `canonicalize-type'
+ (defun stream-element-type-eq (t0 t1)
+   (or (eq t0 t1)
+       (and (consp t0) (consp t1)
+            (eq (car t0) (car t1))
+            (member (car t0) '(unsigned-byte signed-byte))
+            (eql (cadr t0) (cadr t1))))) */
 LISPFUNN(stream_element_type_eq,2) {
   object t0 = popSTACK();
   object t1 = popSTACK();
@@ -15178,7 +15497,7 @@ local maygc object combine_stream_element_types (uintL numarg) {
       Car(tmp) = *arg_ptr;
       *arg_ptr = tmp;
     }
-    BEFORE(arg_ptr);
+    (void)BEFORE(arg_ptr);
   } while (--count);
   funcall(L(append),numarg);
   pushSTACK(value1); pushSTACK(S(Ktest));
@@ -15194,20 +15513,20 @@ local maygc object combine_stream_element_types (uintL numarg) {
   } else return value1; /* NIL */
 }
 
-# (SYS::BUILT-IN-STREAM-ELEMENT-TYPE stream)
-# returns CHARACTER or INTEGER or T
-# or (more specific) (UNSIGNED-BYTE n) or (SIGNED-BYTE n).
+/* (SYS::BUILT-IN-STREAM-ELEMENT-TYPE stream)
+ returns CHARACTER or INTEGER or T
+ or (more specific) (UNSIGNED-BYTE n) or (SIGNED-BYTE n). */
 LISPFUNNR(built_in_stream_element_type,1) {
   var object stream = popSTACK();
   var object eltype;
   CHECK_builtin_stream(stream);
  start:
   switch (TheStream(stream)->strmtype) {
-    case strmtype_synonym: # Synonym-Stream: follow further
+    case strmtype_synonym: /* Synonym-Stream: follow further */
       resolve_as_synonym(stream);
       if (builtin_stream_p(stream))
         goto start;
-      else { # Call (STREAM-ELEMENT-TYPE stream):
+      else { /* Call (STREAM-ELEMENT-TYPE stream): */
         pushSTACK(stream); funcall(S(stream_element_type),1);
         return;
       }
@@ -15218,23 +15537,22 @@ LISPFUNNR(built_in_stream_element_type,1) {
         return;
       } else eltype = T; /* empty stream list */
       break;
-    # first the stream-types with restricted element-types:
-    case strmtype_str_out:      /* could be (VECTOR NIL) */
+    /* first the stream-types with restricted element-types: */
+    case strmtype_str_out: {    /* could be (VECTOR NIL) */
       eltype = (((Iarray_flags(TheStream(stream)->strm_str_out_string)
                   & arrayflags_atype_mask) == Atype_NIL)
                 ? NIL : S(character));
-      break;
+    } break;
     case strmtype_str_in:
     case strmtype_str_push:
     case strmtype_pphelp:
     case strmtype_buff_in:
     case strmtype_buff_out:
-      # CHARACTER
-      eltype = S(character); break;
+      /* CHARACTER */
+      { eltype = S(character); } break;
    #ifdef KEYBOARD
     case strmtype_keyboard:
-      eltype = T;
-      break;
+      { eltype = T; } break;
    #endif
     case strmtype_terminal:
    #ifdef SCREEN
@@ -15243,8 +15561,8 @@ LISPFUNNR(built_in_stream_element_type,1) {
    #ifdef PRINTER
     case strmtype_printer:
    #endif
-      # CHARACTER
-      eltype = S(character); break;
+      /* CHARACTER */
+      { eltype = S(character); } break;
     case strmtype_file:
    #ifdef PIPES
     case strmtype_pipe_in:
@@ -15256,11 +15574,11 @@ LISPFUNNR(built_in_stream_element_type,1) {
    #ifdef SOCKET_STREAMS
     case strmtype_socket:
    #endif
-      # CHARACTER or ([UN]SIGNED-BYTE n)
+      /* CHARACTER or ([UN]SIGNED-BYTE n) */
       eltype = TheStream(stream)->strm_eltype; break;
    #ifdef SOCKET_STREAMS
     case strmtype_twoway_socket:
-      # CHARACTER or ([UN]SIGNED-BYTE n)
+      /* CHARACTER or ([UN]SIGNED-BYTE n) */
       stream = TheStream(stream)->strm_twoway_socket_input;
       eltype = TheStream(stream)->strm_eltype; break;
    #endif
@@ -15309,20 +15627,19 @@ LISPFUNNR(built_in_stream_element_type,1) {
         *stream_list_ = Cdr(*stream_list_);
       }
       switch (count) {
-        case 0: eltype = T; skipSTACK(1); break; /* no streams */
-        case 1: eltype = STACK_0; skipSTACK(2); break;
-        default: eltype = combine_stream_element_types(count);
-          skipSTACK(1); break;
+        case 0: { eltype = NIL; skipSTACK(1); } break; /* no streams */
+        case 1: { eltype = STACK_0; skipSTACK(2); } break;
+        default: eltype = combine_stream_element_types(count); skipSTACK(1);
       }
     } break;
-      # then the general streams:
+      /* then the general streams: */
    #ifdef GENERIC_STREAMS
     case strmtype_generic:
    #endif
     default: {
       var uintB flags = TheStream(stream)->strmflags;
       if (flags & strmflags_by_B) {
-        if (flags & strmflags_ch_B) { # (OR CHARACTER INTEGER)
+        if (flags & strmflags_ch_B) { /* (OR CHARACTER INTEGER) */
           pushSTACK(S(or)); pushSTACK(S(character)); pushSTACK(S(integer));
           eltype = listof(3);
         } else eltype = S(integer);
@@ -15335,20 +15652,20 @@ LISPFUNNR(built_in_stream_element_type,1) {
   VALUES1(eltype);
 }
 
-# UP: reset the stream for the eltype and flush out the missing LF.
-# IF the stream is unbuffered, AND ignore_next_LF is true, THEN
-# this can block (we will try to read the next LF) and trigger GC
-# > stream: a channel-stream
-# < result: the same stream
-# can trigger GC
+/* UP: reset the stream for the eltype and flush out the missing LF.
+ IF the stream is unbuffered, AND ignore_next_LF is true, THEN
+ this can block (we will try to read the next LF) and trigger GC
+ > stream: a channel-stream
+ < result: the same stream
+ can trigger GC */
 local maygc object stream_reset_eltype (object stream, decoded_el_t* eltype_) {
   if (ChannelStream_buffered(stream)) {
     fill_pseudofuns_buffered(stream,eltype_);
   } else {
-    if (UnbufferedStream_ignore_next_LF(stream)
+    if (ChannelStream_ignore_next_LF(stream)
         && eq(TheStream(stream)->strm_eltype,S(character))) {
       pushSTACK(stream);
-      UnbufferedStream_ignore_next_LF(stream) = false; # do not skip LF!
+      ChannelStream_ignore_next_LF(stream) = false; /* do not skip LF! */
       var object ch = read_char(&STACK_0);
       if (!eq(ch,eof_value) && !chareq(char_code(ch),ascii(LF)))
         unread_char(&STACK_0,ch);
@@ -15359,26 +15676,46 @@ local maygc object stream_reset_eltype (object stream, decoded_el_t* eltype_) {
   return stream;
 }
 
-# (SYSTEM::BUILT-IN-STREAM-SET-ELEMENT-TYPE stream element-type)
+/* (SYSTEM::BUILT-IN-STREAM-SET-ELEMENT-TYPE stream element-type) */
 LISPFUNN(built_in_stream_set_element_type,2) {
   var object stream = STACK_1;
   var decoded_el_t eltype;
   CHECK_builtin_stream(stream);
   test_eltype_arg(&STACK_0,&eltype);
   pushSTACK(canon_eltype(&eltype));
-  # Stack contents: stream, element-type, canon-element-type.
+  /* Stack contents: stream, element-type, canon-element-type. */
   stream = STACK_2;
  start:
   switch (TheStream(stream)->strmtype) {
-    case strmtype_synonym: # Synonym-Stream: follow further
+    case strmtype_synonym: /* Synonym-Stream: follow further */
       resolve_as_synonym(stream);
       if (builtin_stream_p(stream))
         goto start;
-      else { # Call ((SETF STREAM-ELEMENT-TYPE) element-type stream):
+      else { /* Call ((SETF STREAM-ELEMENT-TYPE) element-type stream): */
         pushSTACK(STACK_1); pushSTACK(stream);
         funcall(O(setf_stream_element_type),2);
         return;
       }
+    case strmtype_broad:        /* Recurse. */
+      check_SP(); check_STACK();
+      pushSTACK(TheStream(stream)->strm_broad_list);
+      while (consp(STACK_0)) {
+        pushSTACK(Car(STACK_0)); pushSTACK(STACK_(1+2));
+        C_built_in_stream_set_element_type();
+        STACK_0 = Cdr(STACK_0);
+      }
+      skipSTACK(1);
+      break;
+    case strmtype_concat:       /* Recurse. */
+      check_SP(); check_STACK();
+      pushSTACK(TheStream(stream)->strm_concat_totallist);
+      while (consp(STACK_0)) {
+        pushSTACK(Car(STACK_0)); pushSTACK(STACK_(1+2));
+        C_built_in_stream_set_element_type();
+        STACK_0 = Cdr(STACK_0);
+      }
+      skipSTACK(1);
+      break;
     case strmtype_file:
    #ifdef PIPES
     case strmtype_pipe_in:
@@ -15387,49 +15724,49 @@ LISPFUNN(built_in_stream_set_element_type,2) {
    #ifdef SOCKET_STREAMS
     case strmtype_socket:
    #endif
-      if (!equal(STACK_0,TheStream(stream)->strm_eltype)) {# nothing to change?
-        # Check eltype.
+      if (!equal(STACK_0,TheStream(stream)->strm_eltype)) {/* nothing to change? */
+        /* Check eltype. */
         if (!ChannelStream_buffered(stream))
           check_unbuffered_eltype(&eltype);
-        # The FILE-POSITION return value is constrained by CLHS to
-        #   - be an integer,
-        #   - represent a position into the file (and therefore be
-        #     independent of the stream's current element type),
-        #   - increment by 1 when READ-BYTE or WRITE-BYTE is called.
-        # In order to achieve these constraints altogether, we allow
-        # switching only (UNSIGNED-BYTE n) and (SIGNED-BYTE n) with
-        # the same n, and between ([UN]SIGNED-BYTE 8) and CHARACTER.
-        # Reading (UNSIGNED-BYTE 8) and (UNSIGNED-BYTE 16) and
-        # (UNSIGNED-BYTE 32) values from the same stream in succession
-        # can be achieved through READ-INTEGER and WRITE-INTEGER.
+        /* The FILE-POSITION return value is constrained by CLHS to
+           - be an integer,
+           - represent a position into the file (and therefore be
+             independent of the stream's current element type),
+           - increment by 1 when READ-BYTE or WRITE-BYTE is called.
+         In order to achieve these constraints altogether, we allow
+         switching only (UNSIGNED-BYTE n) and (SIGNED-BYTE n) with
+         the same n, and between ([UN]SIGNED-BYTE 8) and CHARACTER.
+         Reading (UNSIGNED-BYTE 8) and (UNSIGNED-BYTE 16) and
+         (UNSIGNED-BYTE 32) values from the same stream in succession
+         can be achieved through READ-INTEGER and WRITE-INTEGER. */
         if ((ChannelStream_bitsize(stream) > 0 ?
              ChannelStream_bitsize(stream) : 8)
             != (eltype.size > 0 ? eltype.size : 8)) {
-          # canon-element-type in STACK_0.
+          /* canon-element-type in STACK_0. */
           pushSTACK(TheStream(stream)->strm_eltype);
           pushSTACK(stream);
           pushSTACK(S(Kelement_type));
           pushSTACK(O(setf_stream_element_type));
-          fehler(error,
-                 GETTEXT("~S: The ~S of ~S cannot be changed from ~S to ~S."));
+          error(error_condition,
+                GETTEXT("~S: The ~S of ~S cannot be changed from ~S to ~S."));
         }
-        # Transform the lastchar back, if possible.
-        if (TheStream(stream)->strmflags & strmflags_open_B) # stream open?
+        /* Transform the lastchar back, if possible. */
+        if (TheStream(stream)->strmflags & strmflags_open_B) /* stream open? */
           if (eltype.size > 0)
-            # New element type is an integer type.
+            /* New element type is an integer type. */
             if (ChannelStream_bitsize(stream) == 0) {
-              # Old element type was CHARACTER.
-              # Transform the lastchar back to bytes.
+              /* Old element type was CHARACTER.
+               Transform the lastchar back to bytes. */
               if (charp(TheStream(stream)->strm_rd_ch_last)
                   && (TheStream(stream)->strmflags & strmflags_unread_B)) {
-                # FIXME: This should take into account the encoding.
+                /* FIXME: This should take into account the encoding. */
                 var uintB b = as_cint(char_code(TheStream(stream)->strm_rd_ch_last));
                 if (ChannelStream_buffered(stream)) {
                   if ((BufferedStream_index(stream) > 0)
                       && (BufferedStream_position(stream) > 0)
                       && (*BufferedStream_buffer_address(stream,BufferedStream_index(stream)-1)
                           == b)) {
-                    # decrement index and position:
+                    /* decrement index and position: */
                     BufferedStream_index(stream) -= 1;
                     BufferedStream_position(stream) -= 1;
                     TheStream(stream)->strm_rd_ch_last = NIL;
@@ -15438,25 +15775,25 @@ LISPFUNN(built_in_stream_set_element_type,2) {
                 } else {
                   if (UnbufferedStream_status(stream) == 0) {
                     UnbufferedStreamLow_push_byte(stream,b);
-                    UnbufferedStream_ignore_next_LF(stream) = false;
+                    ChannelStream_ignore_next_LF(stream) = false;
                     TheStream(stream)->strm_rd_ch_last = NIL;
                     TheStream(stream)->strmflags &= ~strmflags_unread_B;
                   }
                 }
               }
             }
-        { # Actually change the stream's element type.
+        { /* Actually change the stream's element type. */
           var uintB flags = TheStream(stream)->strmflags;
           flags = (flags & ~strmflags_rdwr_B)
             | (flags & strmflags_rd_B ? strmflags_rd_B : 0)
             | (flags & strmflags_wr_B ? strmflags_wr_B : 0);
           ChannelStream_bitsize(stream) = eltype.size;
           if (eltype.kind == eltype_ch) {
-            # New element type is CHARACTER.
+            /* New element type is CHARACTER. */
             flags &= ~(strmflags_rdwr_B & ~strmflags_ch_B);
           } else {
-            # New element type is an integer type.
-            # allocate Bitbuffer:
+            /* New element type is an integer type.
+             allocate Bitbuffer: */
             pushSTACK(stream);
             var object bitbuffer = allocate_bit_vector(Atype_Bit,eltype.size);
             stream = popSTACK();
@@ -15470,18 +15807,18 @@ LISPFUNN(built_in_stream_set_element_type,2) {
       }
       break;
    #ifdef SOCKET_STREAMS
-    case strmtype_twoway_socket:
-      # Apply to the input and output side individually.
-      pushSTACK(TheStream(STACK_2)->strm_twoway_socket_input); # stream
+    case strmtype_twoway_socket: {
+      /* Apply to the input and output side individually. */
+      pushSTACK(TheStream(STACK_2)->strm_twoway_socket_input); /* stream */
       pushSTACK(STACK_(0+1));
       funcall(L(built_in_stream_set_element_type),2);
-      pushSTACK(TheStream(STACK_2)->strm_twoway_socket_output); # stream
+      pushSTACK(TheStream(STACK_2)->strm_twoway_socket_output); /* stream */
       pushSTACK(STACK_(0+1));
       funcall(L(built_in_stream_set_element_type),2);
-      break;
+    } break;
    #endif
     default:
-      fehler_illegal_streamop(O(setf_stream_element_type),stream);
+      error_illegal_streamop(O(setf_stream_element_type),stream);
   }
   VALUES1(STACK_1);
   skipSTACK(3);
@@ -15493,9 +15830,34 @@ LISPFUNNR(stream_external_format,1)
  start:
   if (builtin_stream_p(stream))
     switch (TheStream(stream)->strmtype) {
-      case strmtype_synonym: # Synonym-Stream: follow further
+      case strmtype_synonym: /* Synonym-Stream: follow further */
         resolve_as_synonym(stream);
         goto start;
+     #ifdef SOCKET_STREAMS
+      case strmtype_twoway_socket:
+        pushSTACK(TheStream(stream)->strm_twoway_socket_input);
+        pushSTACK(TheStream(stream)->strm_twoway_socket_output);
+        goto stream_external_format_strmtype_twoway;
+     #endif
+      case strmtype_twoway:
+      case strmtype_echo:
+        pushSTACK(TheStream(stream)->strm_twoway_input);
+        pushSTACK(TheStream(stream)->strm_twoway_output);
+      stream_external_format_strmtype_twoway:
+        C_stream_external_format();
+        if (eq(value1,S(Kdefault))) {
+          skipSTACK(1);         /* drop input stream */
+          return;               /* return :DEFAULT */
+        }
+        pushSTACK(STACK_0);     /* input stream */
+        STACK_1 = value1;       /* save output external format */
+        C_stream_external_format();
+        { object output_ex_fmt = popSTACK();
+          if (equalp(value1,output_ex_fmt)) /* same ex fmt for input & output */
+            return;             /* return this same ex fmt */
+          VALUES1(S(Kdefault));
+        }
+        break;
       case strmtype_file:
      #ifdef PIPES
       case strmtype_pipe_in:
@@ -15507,10 +15869,17 @@ LISPFUNNR(stream_external_format,1)
      #ifdef SOCKET_STREAMS
       case strmtype_socket:
      #endif
-     #if ((defined(UNIX) && !defined(NEXTAPP)) || defined(WIN32_NATIVE)) && defined(UNICODE)
+     #if (defined(UNIX) || defined(WIN32_NATIVE)) && defined(ENABLE_UNICODE)
       case strmtype_terminal:
      #endif
         VALUES1(TheStream(stream)->strm_encoding); break;
+      case strmtype_concat:
+        stream = TheStream(stream)->strm_concat_list;
+        if (consp(stream)) {
+          pushSTACK(Car(stream)); funcall(L(stream_external_format),1);
+          return;
+        }
+        VALUES1(S(Kdefault)); break;
       case strmtype_broad:
         stream = broadcast_stream_last(stream);
         if (streamp(stream)) {
@@ -15524,24 +15893,25 @@ LISPFUNNR(stream_external_format,1)
     VALUES1(S(Kdefault));
 }
 
-# (SYSTEM::SET-STREAM-EXTERNAL-FORMAT stream external-format [direction])
-# direction can be :INPUT or :OUTPUT or NIL.
-# If no direction is given, the operation is nonrecursive.
+/* (SYSTEM::SET-STREAM-EXTERNAL-FORMAT stream external-format [direction])
+ direction can be :INPUT or :OUTPUT or NIL.
+ If no direction is given, the operation is nonrecursive. */
 LISPFUN(set_stream_external_format,seclass_default,2,1,norest,nokey,0,NIL) {
   STACK_2 = check_stream(STACK_2);
-  var object encoding = STACK_1 = test_external_format_arg(STACK_1);
+  var object encoding = STACK_1 =
+    check_encoding(STACK_1,&O(default_file_encoding),false);
   var object stream = STACK_2;
   var object direction = STACK_0;
  start:
   if (builtin_stream_p(stream))
     switch (TheStream(stream)->strmtype) {
-      case strmtype_synonym: # Synonym-Stream: follow further
+      case strmtype_synonym: /* Synonym-Stream: follow further */
         resolve_as_synonym(stream);
         goto start;
       case strmtype_broad:
         if (eq(direction,S(Kinput)))
           goto done;
-        if (eq(direction,S(Koutput))) { # Recurse.
+        if (eq(direction,S(Koutput))) { /* Recurse. */
           check_SP(); check_STACK();
           pushSTACK(TheStream(stream)->strm_broad_list);
           while (consp(STACK_0)) {
@@ -15555,7 +15925,7 @@ LISPFUN(set_stream_external_format,seclass_default,2,1,norest,nokey,0,NIL) {
         }
         goto unchangeable_external_format;
       case strmtype_concat:
-        if (eq(direction,S(Kinput))) { # Recurse.
+        if (eq(direction,S(Kinput))) { /* Recurse. */
           check_SP(); check_STACK();
           pushSTACK(TheStream(stream)->strm_concat_totallist);
           while (consp(STACK_0)) {
@@ -15569,15 +15939,6 @@ LISPFUN(set_stream_external_format,seclass_default,2,1,norest,nokey,0,NIL) {
         }
         if (eq(direction,S(Koutput)))
           goto done;
-        goto unchangeable_external_format;
-      case strmtype_twoway:
-      case strmtype_echo:
-        if (eq(direction,S(Kinput))) { # Recurse.
-          stream = TheStream(stream)->strm_twoway_input; goto start;
-        }
-        if (eq(direction,S(Koutput))) { # Recurse.
-          stream = TheStream(stream)->strm_twoway_output; goto start;
-        }
         goto unchangeable_external_format;
       case strmtype_str_in:
       case strmtype_str_out:
@@ -15607,22 +15968,29 @@ LISPFUN(set_stream_external_format,seclass_default,2,1,norest,nokey,0,NIL) {
           STACK_2 = stream; /* save stream */
           test_eltype_arg(&TheStream(stream)->strm_eltype,&eltype);
           stream = STACK_2; /* restore stream */
-          ChannelStream_fini(stream);
+          ChannelStream_fini(stream,0);
           stream = stream_reset_eltype(stream,&eltype);
           encoding = STACK_1; /* restore encoding */
-          value1 = TheStream(stream)->strm_encoding = encoding;
+          TheStream(stream)->strm_encoding = encoding;
+          /* reset pseudofunctions in case line terminator changed */
+          stream_reset_eltype(stream,&eltype);
+          stream = STACK_2;     /* restore stream */
           ChannelStream_init(stream);
+          VALUES1(TheStream(stream)->strm_encoding);
         }
         break;
      #ifdef SOCKET_STREAMS
       case strmtype_twoway_socket:
-        if (eq(direction,S(Kinput))) { # Recurse.
+     #endif
+      case strmtype_twoway:
+      case strmtype_echo:
+        if (eq(direction,S(Kinput))) { /* Recurse. */
           stream = TheStream(stream)->strm_twoway_input; goto start;
         }
-        if (eq(direction,S(Koutput))) { # Recurse.
+        if (eq(direction,S(Koutput))) { /* Recurse. */
           stream = TheStream(stream)->strm_twoway_output; goto start;
         }
-        # Recurse twice.
+        /* Recurse twice. */
         pushSTACK(TheStream(stream)->strm_twoway_output);
         pushSTACK(STACK_(1+1)); pushSTACK(STACK_(0+2));
         pushSTACK(TheStream(stream)->strm_twoway_input);
@@ -15631,7 +15999,6 @@ LISPFUN(set_stream_external_format,seclass_default,2,1,norest,nokey,0,NIL) {
         C_set_stream_external_format();
         encoding = STACK_1;
         goto done;
-     #endif
       default:
         if (eq(direction,S(Kinput)))
           if ((TheStream(stream)->strmflags & strmflags_rd_B) == 0)
@@ -15641,7 +16008,7 @@ LISPFUN(set_stream_external_format,seclass_default,2,1,norest,nokey,0,NIL) {
             goto done;
     unchangeable_external_format:
         if (!eq(encoding,S(Kdefault)))
-          fehler_illegal_streamop(S(set_stream_external_format),stream);
+          error_illegal_streamop(S(set_stream_external_format),stream);
     done:
         VALUES1(encoding); break;
     }
@@ -15653,29 +16020,29 @@ LISPFUN(set_stream_external_format,seclass_default,2,1,norest,nokey,0,NIL) {
       if (!instanceof(stream,O(class_fundamental_output_stream)))
         goto done2;
     if (!eq(encoding,S(Kdefault)))
-      fehler_illegal_streamop(S(set_stream_external_format),stream);
+      error_illegal_streamop(S(set_stream_external_format),stream);
   done2:
     VALUES1(encoding);
   }
   skipSTACK(3);
 }
 
-#ifdef UNICODE
+#ifdef ENABLE_UNICODE
 
-# Changes a terminal stream's external format.
-# > stream: a stream
-# > encoding: an encoding
-# can trigger GC
+/* Changes a terminal stream's external format.
+ > stream: a stream
+ > encoding: an encoding
+ can trigger GC */
 global maygc void set_terminalstream_external_format (object stream,
                                                       object encoding) {
   if (builtin_stream_p(stream)
       && TheStream(stream)->strmtype == strmtype_terminal
       && eq(TheStream(stream)->strm_encoding,O(terminal_encoding))) {
-    # This is the only place which is allowed to modify the terminal
-    # stream's encoding.
-    # The terminal stream's end-of-line coding is hardwired, therefore we
-    # don't need to do the equivalent of fill_pseudofuns_unbuffered here.
-    ChannelStream_fini(stream);
+    /* This is the only place which is allowed to modify the terminal
+     stream's encoding.
+     The terminal stream's end-of-line coding is hardwired, therefore we
+     don't need to do the equivalent of fill_pseudofuns_unbuffered here. */
+    ChannelStream_fini(stream,0);
     TheStream(stream)->strm_encoding = encoding;
     ChannelStream_init(stream);
   } else {
@@ -15686,42 +16053,42 @@ global maygc void set_terminalstream_external_format (object stream,
 
 #endif
 
-# UP: Determines, if a Stream is "interactive", i.e. if Input of Stream
-# will presumably depend on a previously printed prompt.
-# interactive_stream_p(stream)
-# > stream: Stream
-# NB: Relation between clear_input, listen, interactive_stream_p:
-#   If ls_wait_p(listen_char(stream)) is true after clear_input(stream)
-#   (i.e. no more character available and no EOF), then
-#   interactive_stream_p(stream) is true.
-#   (Because then stream is effectively a Keyboard-Stream, Terminal-Stream,
-#   Handle-Stream with !regular_handle_p(ihandle), Pipe-Input-Stream,
-#   X11-Socket-Stream, Socket-Stream or Generic-Stream.)
-#   (For a Concatenated-Stream, which is at the end of a non-interactive
-#   Sub-Stream and where the next Sub-Stream is non-interactive, this is
-#   possibly not valid. But this can be caught by inserting a
-#   listen_char(stream) before the query.)
-#   But not vice-versa: For Streams of type strmtype_pipe_in,
-#   strmtype_x11socket, strmtype_socket (that comply with
-#   interactive_stream_p(stream)) clear_input(stream) does nothing,
-#   and listen_char(stream) can return ls_avail.
+/* UP: Determines, if a Stream is "interactive", i.e. if Input of Stream
+ will presumably depend on a previously printed prompt.
+ interactive_stream_p(stream)
+ > stream: Stream
+ NB: Relation between clear_input, listen, interactive_stream_p:
+   If LISTEN_WAIT==listen_char(stream) after clear_input(stream)
+   (i.e. no more character available and no EOF), then
+   interactive_stream_p(stream) is true.
+   (Because then stream is effectively a Keyboard-Stream, Terminal-Stream,
+   Handle-Stream with !regular_handle_p(ihandle), Pipe-Input-Stream,
+   X11-Socket-Stream, Socket-Stream or Generic-Stream.)
+   (For a Concatenated-Stream, which is at the end of a non-interactive
+   Sub-Stream and where the next Sub-Stream is non-interactive, this is
+   possibly not valid. But this can be caught by inserting a
+   listen_char(stream) before the query.)
+   But not vice-versa: For Streams of type strmtype_pipe_in,
+   strmtype_x11socket, strmtype_socket (that comply with
+   interactive_stream_p(stream)) clear_input(stream) does nothing,
+   and listen_char(stream) can return LISTEN_AVAIL. */
 global bool interactive_stream_p (object stream) {
  start:
-  if (!builtin_stream_p(stream)) # Assume the worst.
+  if (!builtin_stream_p(stream)) /* Assume the worst. */
     return true;
   if ((TheStream(stream)->strmflags & strmflags_rd_B) == 0)
-    # Stream is closed for Input
+    /* Stream is closed for Input */
     return false;
-  # Stream open
+  /* Stream open */
   switch (TheStream(stream)->strmtype) {
-    case strmtype_synonym: # Synonym-Stream: follow further
+    case strmtype_synonym: /* Synonym-Stream: follow further */
       resolve_as_synonym(stream);
       goto start;
     case strmtype_concat:
-      # Here one could call listen_char(stream) in order to ignore Streams,
-      # that arrived at EOF. But it is no good for
-      # interactive_stream_p to do system-calls and I/O.??
-      # Query the first of the streams:
+      /* Here one could call listen_char(stream) in order to ignore Streams,
+       that arrived at EOF. But it is no good for
+       interactive_stream_p to do system-calls and I/O.??
+       Query the first of the streams: */
       {
         var object streamlist = TheStream(stream)->strm_concat_list;
         if (consp(streamlist)) {
@@ -15732,7 +16099,7 @@ global bool interactive_stream_p (object stream) {
       }
     case strmtype_twoway:
     case strmtype_echo:
-      # Two-Way-Stream or Echo-Stream: look at Input-Stream
+      /* Two-Way-Stream or Echo-Stream: look at Input-Stream */
       stream = TheStream(stream)->strm_twoway_input;
       goto start;
     case strmtype_str_in:
@@ -15742,22 +16109,17 @@ global bool interactive_stream_p (object stream) {
     case strmtype_generic:
     #endif
       return true;
-    #if !defined(NEXTAPP)
     case strmtype_terminal:
-    #endif
     case strmtype_file:
       if (ChannelStream_buffered(stream))
-        # Buffered file streams are not considered to be interactive.
+        /* Buffered file streams are not considered to be interactive. */
         return false;
       if (nullp(TheStream(stream)->strm_isatty))
-        # regular files are for sure not interactive.
+        /* regular files are for sure not interactive. */
         if (regular_handle_p(TheHandle(TheStream(stream)->strm_ichannel)))
           return false;
     #ifdef KEYBOARD
     case strmtype_keyboard:
-    #endif
-    #if defined(NEXTAPP)
-    case strmtype_terminal:
     #endif
     #ifdef PIPES
     case strmtype_pipe_in:
@@ -15775,38 +16137,42 @@ global bool interactive_stream_p (object stream) {
   }
 }
 
-# (INTERACTIVE-STREAM-P stream), CLTL2 p. 507/508
-# determines, if stream is interactive.
+/* (INTERACTIVE-STREAM-P stream), CLTL2 p. 507/508
+ determines, if stream is interactive. */
 LISPFUNN(interactive_stream_p,1) {
   var object arg = check_stream(popSTACK());
   VALUES_IF(interactive_stream_p(arg));
 }
 
 /* UP: Closes a Stream.
- builtin_stream_close(&stream);
+ builtin_stream_close(&stream, abort);
  > stream: Builtin-Stream
  > abort: flag: non-0 => ignore errors: may be called from GC & quit()
+    -- if abort is non-0, we end up calling close(2) on the underlying object
+       no matter what else might have failed (iconv, buffer flushing &c)
+    -- even if abort is non-0, we do try to flush buffers et al, but we do that
+       under IGNORE-ERRORS, i.e., some output might be silently lost
  < stream: Builtin-Stream
  can trigger GC */
-global maygc void builtin_stream_close (const gcv_object_t* stream_,
-                                        uintB abort) {
-  if ((TheStream(*stream_)->strmflags & strmflags_open_B) == 0) # Stream already closed?
+modexp maygc void builtin_stream_close
+(const gcv_object_t* stream_, uintB abort) {
+  if ((TheStream(*stream_)->strmflags & strmflags_open_B) == 0) /* Stream already closed? */
     return;
-  harden_elastic_newline(stream_);
+  if (!abort) harden_elastic_newline(stream_);
   var object stream = *stream_;
-  # call type-specific routine (can trigger GC):
+  /* call type-specific routine (can trigger GC): */
   switch (TheStream(stream)->strmtype) {
     case strmtype_synonym:
       close_synonym(stream,abort); break; /* X3J13_014 says: non-recursive */
-    case strmtype_broad:  break; # non-recursive
-    case strmtype_concat: break; # non-recursive
-    case strmtype_twoway: break; # non-recursive
-    case strmtype_echo:   break; # non-recursive
-    case strmtype_str_in:  close_str_in(stream,abort); break;
+    case strmtype_broad:  break; /* non-recursive */
+    case strmtype_concat: break; /* non-recursive */
+    case strmtype_twoway: break; /* non-recursive */
+    case strmtype_echo:   break; /* non-recursive */
+    case strmtype_str_in:  close_str_in(stream); break;
     case strmtype_str_out:  break;
     case strmtype_str_push: break;
     case strmtype_pphelp:   break;
-    case strmtype_buff_in:  close_buff_in(stream,abort);  break;
+    case strmtype_buff_in:  close_buff_in(stream);  break;
     case strmtype_buff_out: close_buff_out(stream,abort); break;
     #ifdef GENERIC_STREAMS
     case strmtype_generic: close_generic(stream,abort); break;
@@ -15829,13 +16195,13 @@ global maygc void builtin_stream_close (const gcv_object_t* stream_,
           close_ochannel(stream,abort);
         else
           close_ichannel(stream,abort);
-        # remove stream from the List of all open File-Streams:
-        O(open_files) = deleteq(O(open_files),stream);
+        /* remove stream from the List of all open File-Streams: */
+        remove_from_open_streams(*stream_);
       }
       break;
     #ifdef SOCKET_STREAMS
     case strmtype_twoway_socket:
-      # Close the two substreams, but close the handle once only.
+      /* Close the two substreams, but close the handle once only. */
       ChannelStreamLow_close(TheStream(stream)->strm_twoway_socket_input) =
         &low_close_socket_nop;
       pushSTACK(TheStream(stream)->strm_twoway_socket_input);
@@ -15854,7 +16220,7 @@ global maygc void builtin_stream_close (const gcv_object_t* stream_,
     #endif
     default: NOTREACHED;
   }
-  # enter dummys:
+  /* enter dummys: */
   close_dummys(*stream_);
 }
 
@@ -15863,112 +16229,104 @@ global maygc void builtin_stream_close (const gcv_object_t* stream_,
  > list: list of open Builtin-Streams
  can trigger GC */
 global maygc void close_some_files (object list) {
-  pushSTACK(NIL); # dummy
-  pushSTACK(list); # list
+  pushSTACK(NIL); /* dummy */
+  pushSTACK(list); /* list */
   while (mconsp(STACK_0)) {
     var object streamlist = STACK_0;
-    STACK_0 = Cdr(streamlist); # remaining streams
-    STACK_1 = Car(streamlist); # a stream from the list
+    STACK_0 = Cdr(streamlist); /* remaining streams */
+    STACK_1 = Car(streamlist); /* a stream from the list */
     builtin_stream_close(&STACK_1,1); /* close -- no errors! */
   }
   skipSTACK(2);
 }
 
-# UP: Closes all open files.
-# close_all_files();
-# can trigger GC
+/* UP: Closes all open files.
+ close_all_files();
+ can trigger GC */
 global maygc void close_all_files (void) {
-  close_some_files(O(open_files)); # list of all open File-Streams
+  /* NB: no locking on O(open_files). it is used only when exitting process.*/
+  close_some_files(O(open_files)); /* list of all open File-Streams */
 }
 
-# UP: Declares all open File-Streams as closed.
-# closed_all_files();
+/* UP: Declares all open File-Streams as closed.
+ closed_all_files(); */
 global void closed_all_files (void) {
-  var object streamlist = O(open_files); # list of all open File-Streams
+  /* NB: no locking on O(open_files). it is used only during runtime
+     initialization (loadmem()). */
+  var object streamlist = O(open_files); /* list of all open File-Streams */
   while (consp(streamlist)) {
-    var object stream = Car(streamlist); # a Stream from the list
-    if (TheStream(stream)->strmtype == strmtype_file) { # File-Stream ?
-      if (!nullp(BufferedStream_channel(stream))) # with Handle /= NIL ?
-        # yes: Stream still open
+    var object stream = Car(streamlist); /* a Stream from the list */
+    if (TheStream(stream)->strmtype == strmtype_file) { /* File-Stream ? */
+      if (!nullp(BufferedStream_channel(stream))) /* with Handle /= NIL ? */
+        /* yes: Stream still open */
         closed_buffered(stream);
     }
     close_dummys(stream);
-    streamlist = Cdr(streamlist); # remaining Streams
+    streamlist = Cdr(streamlist); /* remaining Streams */
   }
-  O(open_files) = NIL; # no more open Files
+  O(open_files) = NIL; /* no more open Files */
 }
 
-# (SYS::BUILT-IN-STREAM-CLOSE stream :abort)
+/* (SYS::BUILT-IN-STREAM-CLOSE stream :abort) */
 LISPFUN(built_in_stream_close,seclass_default,1,0,norest,key,1, (kw(abort)) ) {
   var uintB abort = !missingp(STACK_0); skipSTACK(1);
-  var object stream = STACK_0; # Argument
-  CHECK_builtin_stream(stream); # must be a Stream
+  var object stream = STACK_0; /* Argument */
+  CHECK_builtin_stream(stream); /* must be a Stream */
   builtin_stream_close(&STACK_0,abort);
   skipSTACK(1);
-  VALUES1(T); # T as result
+  VALUES1(T); /* T as result */
 }
 
-# Reads a line of characters from a stream.
-# read_line(&stream,&buffer)
-# > stream: stream
-# > buffer: a semi-simple string
-# < stream: stream
-# < buffer: contains the read characters, excluding the terminating #\Newline
-# < result: true if EOF was seen before newline, else false
-# can trigger GC
-global maygc bool read_line (const gcv_object_t* stream_, const gcv_object_t* buffer_) {
+/* Reads a line of characters from a stream.
+ read_line(&stream,&buffer)
+ > stream: stream
+ > buffer: a semi-simple string
+ < stream: stream
+ < buffer: contains the read characters, excluding the terminating #\Newline
+ < result: true if EOF was seen before newline, else false
+ can trigger GC */
+local inline maygc bool push_ch (object ch, object buffer) {
+  if (!charp(ch)) {
+    if (eq(subr_self,L(read_line))) error_char(ch);
+    else with_saved_back_trace_subr(L(read_line),STACK STACKop -4,-1,
+                                    error_char(ch));
+  }
+  if (eq(ch,ascii_char(NL)))
+    return false;
+  ssstring_push_extend(buffer,char_code(ch));
+  return true;
+}
+global maygc bool read_line (const gcv_object_t* stream_,
+                             const gcv_object_t* buffer_) {
   var object stream = *stream_;
   if (builtin_stream_p(stream)) {
-    if (TheStream(stream)->strmflags & strmflags_unread_B) { # Char after UNREAD ?
-      # yes -> delete Flagbit and fetch last character:
+    if (TheStream(stream)->strmflags & strmflags_unread_B) { /* Char after UNREAD ? */
+      /* yes -> delete Flagbit and fetch last character: */
       TheStream(stream)->strmflags &= ~strmflags_unread_B;
-      var object ch = TheStream(stream)->strm_rd_ch_last;
-      if (!charp(ch)) {
-        if (eq(subr_self,L(read_line)))
-          fehler_char(ch);
-        else
-          with_saved_back_trace_subr(L(read_line),STACK STACKop -4,-1,
-            fehler_char(ch); );
-      }
-      if (eq(ch,ascii_char(NL)))
+      if (!push_ch(TheStream(stream)->strm_rd_ch_last,*buffer_))
         return false;
-      ssstring_push_extend(*buffer_,char_code(ch));
-      stream = *stream_;
     }
-    var uintL oldfillptr = TheIarray(*buffer_)->dims[1];
     var bool eofp;
     switch (TheStream(stream)->strmtype) {
       case strmtype_synonym:
         eofp = read_line_synonym(stream,buffer_);
         break;
       case strmtype_twoway:
-       #ifdef SOCKET_STREAMS
+     #ifdef SOCKET_STREAMS
       case strmtype_twoway_socket:
-      #endif
+     #endif
         eofp = read_line_twoway(stream,buffer_);
         break;
-        # No special-casing of strmtype_echo, because the echo-stream may
-        # be interactive, and delaying the echo in this case is undesirable.
+        /* No special-casing of strmtype_echo, because the echo-stream may
+         be interactive, and delaying the echo in this case is undesirable. */
       default:
-        loop {
-          var object ch = rd_ch(*stream_)(stream_); # read next character
-          if (eq(ch,eof_value)) { # EOF ?
+        do {
+          var object ch = rd_ch(*stream_)(stream_); /* read next character */
+          if (eq(ch,eof_value)) { /* EOF ? */
             eofp = true; break;
           }
-          # else check for Character:
-          if (!charp(ch)) {
-            if (eq(subr_self,L(read_line)))
-              fehler_char(ch);
-            else
-              with_saved_back_trace_subr(L(read_line),STACK STACKop -4,-1,
-                fehler_char(ch); );
-          }
-          if (eq(ch,ascii_char(NL))) { # NL -> End of Line
-            eofp = false; break;
-          }
-          # write other Character in the Buffer:
-          ssstring_push_extend(*buffer_,char_code(ch));
-        }
+          eofp = push_ch(ch,*buffer_);
+        } while (eofp);
         break;
     }
     stream = *stream_;
@@ -15977,49 +16335,47 @@ global maygc bool read_line (const gcv_object_t* stream_, const gcv_object_t* bu
     return eofp;
   } else {
     pushSTACK(stream);
-    # Call the generic function (STREAM-READ-LINE stream):
+    /* Call the generic function (STREAM-READ-LINE stream): */
     pushSTACK(stream); funcall(S(stream_read_line),1);
     if (!stringp(value1)) {
-      pushSTACK(value1);    # TYPE-ERROR slot DATUM
-      pushSTACK(S(string)); # TYPE-ERROR slot EXPECTED-TYPE
+      pushSTACK(value1);    /* TYPE-ERROR slot DATUM */
+      pushSTACK(S(string)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(S(stream_read_line));
       pushSTACK(value1);
-      fehler(type_error,GETTEXT("Return value ~S of call to ~S is not a string."));
+      error(type_error,GETTEXT("Return value ~S of call to ~S is not a string."));
     }
     var bool eofp = (mv_count >= 2 && !nullp(value2));
-    # Add the line to the buffer:
+    /* Add the line to the buffer: */
     var uintL len;
     var uintL offset;
     var object srcstring = unpack_string_ro(value1,&len,&offset);
     if (len > 0) {
-      if (simple_nilarray_p(srcstring)) fehler_nilarray_retrieve();
+      if (simple_nilarray_p(srcstring)) error_nilarray_retrieve();
       ssstring_append_extend(*buffer_,srcstring,offset,len);
     }
-    # Set the stream's $lastchar := #\Newline or #<EOF>:
+    /* Set the stream's $lastchar := #\Newline or #<EOF>: */
     stream_set_lastchar(popSTACK(), eofp ? eof_value : ascii_char(NL));
     return eofp;
   }
 }
 
-# UP: Determines, if a character is instantly available in the Stream stream.
-# listen_char(stream)
-# > stream: Stream
-# < result:   ls_avail if a character is available,
-#             ls_eof   if EOF is reached,
-#             ls_wait  if no character is available, but not because of EOF
-# can trigger GC
-global maygc signean listen_char (object stream) {
+/* UP: Determines, if a character is instantly available in the Stream stream.
+ listen_char(stream)
+ > stream: Stream
+ < result: input availability
+ can trigger GC */
+global maygc listen_t listen_char (object stream) {
   if (builtin_stream_p(stream)) {
     check_SP(); check_STACK();
-    if (TheStream(stream)->strmflags & strmflags_unread_B) { # Char after UNREAD ?
-      return ls_avail; # yes -> available
+    if (TheStream(stream)->strmflags & strmflags_unread_B) { /* Char after UNREAD ? */
+      return LISTEN_AVAIL; /* yes -> available */
     } else {
-      # else branch according to Streamtype.
-      # Each single routine can trigger GC. Except for Keyboard-Stream
-      # or Terminal-Stream this is a pure EOF-Test.
+      /* else branch according to Streamtype.
+       Each single routine can trigger GC. Except for Keyboard-Stream
+       or Terminal-Stream this is a pure EOF-Test. */
       switch (TheStream(stream)->strmtype) {
         case strmtype_synonym:  return listen_char_synonym(stream);
-        case strmtype_broad:    return ls_eof; # no READ-CHAR
+        case strmtype_broad:    return LISTEN_EOF; /* no READ-CHAR */
         case strmtype_concat:   return listen_char_concat(stream);
         case strmtype_twoway:
         case strmtype_echo:
@@ -16028,11 +16384,11 @@ global maygc signean listen_char (object stream) {
         #endif
           return listen_char_twoway(stream);
         case strmtype_str_in:   return listen_char_str_in(stream);
-        case strmtype_str_out:  return ls_eof; # no READ-CHAR
-        case strmtype_str_push: return ls_eof; # no READ-CHAR
-        case strmtype_pphelp:   return ls_eof; # no READ-CHAR
+        case strmtype_str_out:  return LISTEN_EOF; /* no READ-CHAR */
+        case strmtype_str_push: return LISTEN_EOF; /* no READ-CHAR */
+        case strmtype_pphelp:   return LISTEN_EOF; /* no READ-CHAR */
         case strmtype_buff_in:  return listen_char_buff_in(stream);
-        case strmtype_buff_out: return ls_eof; # no READ-CHAR
+        case strmtype_buff_out: return LISTEN_EOF; /* no READ-CHAR */
         #ifdef GENERIC_STREAMS
         case strmtype_generic:  return listen_char_generic(stream);
         #endif
@@ -16053,16 +16409,13 @@ global maygc signean listen_char (object stream) {
             else
               return listen_char_unbuffered(stream);
           } else {
-            return ls_eof; # no READ-CHAR
+            return LISTEN_EOF; /* no READ-CHAR */
           }
         #ifdef KEYBOARD
         case strmtype_keyboard: return listen_char_keyboard(stream);
         #endif
         case strmtype_terminal:
-        #if defined(NEXTAPP)
-          return listen_char_terminal(stream);
-        #endif
-        #if (defined(UNIX) && !defined(NEXTAPP)) || defined(WIN32_NATIVE)
+        #if defined(UNIX) || defined(WIN32_NATIVE)
           terminalcase(stream,
           { return listen_char_terminal1(stream); },
           { return listen_char_terminal2(stream); },
@@ -16070,53 +16423,53 @@ global maygc signean listen_char (object stream) {
         #endif
           NOTREACHED;
         #ifdef SCREEN
-        case strmtype_window:   return ls_eof; # no READ-CHAR
+        case strmtype_window:   return LISTEN_EOF; /* no READ-CHAR */
         #endif
         #ifdef PRINTER
-        case strmtype_printer:  return ls_eof; # no READ-CHAR
+        case strmtype_printer:  return LISTEN_EOF; /* no READ-CHAR */
         #endif
-        default: # in general: query only for EOF
+        default: /* in general: query only for EOF */
           if (TheStream(stream)->strmflags & strmflags_rd_ch_B) {
             pushSTACK(stream);
             var object nextchar = peek_char(&STACK_0);
             skipSTACK(1);
             if (eq(nextchar,eof_value))
-              return ls_eof; # EOF reached
+              return LISTEN_EOF; /* EOF reached */
             else
-              return ls_avail;
+              return LISTEN_AVAIL;
           } else {
-            return ls_eof; # no READ-CHAR
+            return LISTEN_EOF; /* no READ-CHAR */
           }
       }
     }
   } else {
-    # Call the generic function (STREAM-READ-CHAR-WILL-HANG-P stream),
-    # then call (PEEK-CHAR NIL STREAM):
+    /* Call the generic function (STREAM-READ-CHAR-WILL-HANG-P stream),
+     then call (PEEK-CHAR NIL STREAM): */
     pushSTACK(stream);
     pushSTACK(stream); funcall(S(stream_read_char_will_hang_p),1);
     if (!nullp(value1)) {
-      skipSTACK(1); return ls_wait;
+      skipSTACK(1); return LISTEN_WAIT;
     }
     var object nextchar = peek_char(&STACK_0);
     skipSTACK(1);
     if (eq(nextchar,eof_value))
-      return ls_eof;
+      return LISTEN_EOF;
     else
-      return ls_avail;
+      return LISTEN_AVAIL;
   }
 }
 
-# UP: Deletes already entered interactive Input from a Stream stream.
-# clear_input(stream)
-# > stream: Stream
-# < result: true if Input was deleted
-# can trigger GC
+/* UP: Deletes already entered interactive Input from a Stream stream.
+ clear_input(stream)
+ > stream: Stream
+ < result: true if Input was deleted
+ can trigger GC */
 global maygc bool clear_input (object stream) {
   check_SP(); check_STACK();
-  pushSTACK(stream); # save Stream
-  # call type-specific Routine (can trigger GC).
+  pushSTACK(stream); /* save Stream */
+  /* call type-specific Routine (can trigger GC). */
   if (builtin_stream_p(stream)) {
-    # Only for Keyboard-Stream and Terminal-Stream something is done.
+    /* Only for Keyboard-Stream and Terminal-Stream something is done. */
     var bool result;
     switch (TheStream(stream)->strmtype) {
       case strmtype_synonym:
@@ -16150,17 +16503,14 @@ global maygc bool clear_input (object stream) {
             && !ChannelStream_buffered(stream))
           result = clear_input_unbuffered(stream);
         else
-          result = false;
+          result = clear_input_buffered(stream);
         break;
       #ifdef KEYBOARD
       case strmtype_keyboard:
         result = clear_input_keyboard(stream); break;
       #endif
       case strmtype_terminal:
-      #if defined(NEXTAPP)
-        result = clear_input_terminal(stream);
-      #endif
-      #if (defined(UNIX) && !defined(NEXTAPP)) || defined(WIN32_NATIVE)
+      #if defined(UNIX) || defined(WIN32_NATIVE)
         terminalcase(stream,
         { result = clear_input_terminal1(stream); },
         { result = clear_input_terminal2(stream); },
@@ -16172,36 +16522,34 @@ global maygc bool clear_input (object stream) {
     }
     stream = popSTACK();
     if (result) {
-      # Input was deleted -> also the Lastchar has to be deleted.
-      # An already seen EOF will be forgotten thereby.
+      /* Input was deleted -> also the Lastchar has to be deleted.
+       An already seen EOF will be forgotten thereby. */
       TheStream(stream)->strm_rd_ch_last = NIL;
       TheStream(stream)->strmflags &= ~strmflags_unread_B;
     }
     return result;
   } else {
-    # Call the generic function (STREAM-CLEAR-INPUT stream):
+    /* Call the generic function (STREAM-CLEAR-INPUT stream): */
     funcall(S(stream_clear_input),1);
     return !nullp(value1);
   }
 }
 
-# UP: Determines whether a stream has a byte immediately available.
-# listen_byte(stream)
-# > stream: a stream with element-type ([UN]SIGNED-BYTE 8)
-# < result: ls_avail if a byte is available,
-#           ls_eof   if EOF is reached,
-#           ls_wait  if no byte is available, but not because of EOF
-# can trigger GC
-global maygc signean listen_byte (object stream) {
+/* UP: Determines whether a stream has a byte immediately available.
+ listen_byte(stream)
+ > stream: a stream with element-type ([UN]SIGNED-BYTE 8)
+ < result: input availability
+ can trigger GC */
+global maygc listen_t listen_byte (object stream) {
   if (builtin_stream_p(stream)) {
-    if (TheStream(stream)->strmflags & strmflags_rd_B) { # Input-Stream?
+    if (TheStream(stream)->strmflags & strmflags_rd_B) { /* Input-Stream? */
       check_SP(); check_STACK();
-      # branch according to Streamtype.
-      # Each single routine can trigger GC. Except for Sockets
-      # this is a pure EOF-Test.
+      /* branch according to Streamtype.
+       Each single routine can trigger GC. Except for Sockets
+       this is a pure EOF-Test. */
       switch (TheStream(stream)->strmtype) {
         case strmtype_synonym:  return listen_byte_synonym(stream);
-        case strmtype_broad:    return ls_eof; # no READ-BYTE
+        case strmtype_broad:    return LISTEN_EOF; /* no READ-BYTE */
         case strmtype_concat:   return listen_byte_concat(stream);
         case strmtype_twoway:
         case strmtype_echo:
@@ -16209,15 +16557,26 @@ global maygc signean listen_byte (object stream) {
         case strmtype_twoway_socket:
         #endif
           return listen_byte_twoway(stream);
-        case strmtype_str_in:   return ls_eof; # no READ-BYTE
-        case strmtype_str_out:  return ls_eof; # no READ-BYTE
-        case strmtype_str_push: return ls_eof; # no READ-BYTE
-        case strmtype_pphelp:   return ls_eof; # no READ-BYTE
-        case strmtype_buff_in:  return ls_eof; # no READ-BYTE
-        case strmtype_buff_out: return ls_eof; # no READ-BYTE
+        case strmtype_str_in:
+        case strmtype_str_out:
+        case strmtype_str_push:
+        case strmtype_pphelp:
+        case strmtype_buff_in:
+        case strmtype_buff_out:
         #ifdef GENERIC_STREAMS
-        case strmtype_generic:  return ls_eof; # unsupported functionality
+        case strmtype_generic: /* unsupported functionality */
         #endif
+        #ifdef KEYBOARD
+        case strmtype_keyboard:
+        #endif
+        case strmtype_terminal:
+        #ifdef SCREEN
+        case strmtype_window:
+        #endif
+        #ifdef PRINTER
+        case strmtype_printer:
+        #endif
+          return LISTEN_EOF; /* no READ-BYTE */
         case strmtype_file:
         #ifdef PIPES
         case strmtype_pipe_in:
@@ -16230,55 +16589,45 @@ global maygc signean listen_byte (object stream) {
         case strmtype_socket:
         #endif
           if (TheStream(stream)->strmflags & strmflags_rd_by_B) {
-            # Only 8-bit element types. A general LISTEN-BYTE function
-            # would be hairy (at least the case where you want to know
-            # whether a multibyte integer is pending, and the stream is
-            # unbuffered). For CLX and most applications, it is sufficient
-            # to deal with a socket stream with 8-bit element types.
+            /* Only 8-bit element types. A general LISTEN-BYTE function
+             would be hairy (at least the case where you want to know
+             whether a multibyte integer is pending, and the stream is
+             unbuffered). For CLX and most applications, it is sufficient
+             to deal with a socket stream with 8-bit element types. */
             if (ChannelStream_buffered(stream))
               return listen_byte_ia8_buffered(stream);
             else
               return listen_byte_ia8_unbuffered(stream);
           } else {
-            return ls_eof; # no READ-BYTE
+            return LISTEN_EOF; /* no READ-BYTE */
           }
-        #ifdef KEYBOARD
-        case strmtype_keyboard: return ls_eof; # no READ-BYTE
-        #endif
-        case strmtype_terminal: return ls_eof; # no READ-BYTE
-        #ifdef SCREEN
-        case strmtype_window:   return ls_eof; # no READ-BYTE
-        #endif
-        #ifdef PRINTER
-        case strmtype_printer:  return ls_eof; # no READ-BYTE
-        #endif
         default: NOTREACHED;
       }
     } else {
-      return ls_eof; # no READ-BYTE
+      return LISTEN_EOF; /* no READ-BYTE */
     }
-  } else { # Call the generic function (STREAM-READ-BYTE-LOOKAHEAD stream):
+  } else { /* Call the generic function (STREAM-READ-BYTE-LOOKAHEAD stream): */
     pushSTACK(stream); funcall(S(stream_read_byte_lookahead),1);
     if (nullp(value1))
-      return ls_wait;
+      return LISTEN_WAIT;
     else if (eq(value1,S(Keof)))
-      return ls_eof;
+      return LISTEN_EOF;
     else
-      return ls_avail;
+      return LISTEN_AVAIL;
   }
 }
 
-# UP: Move the pending Output of a Stream to the destination.
-# finish_output(stream);
-# > stream: Stream
-# can trigger GC
+/* UP: Move the pending Output of a Stream to the destination.
+ finish_output(stream);
+ > stream: Stream
+ can trigger GC */
 global maygc void finish_output (object stream) {
   pushSTACK(stream);
   harden_elastic_newline(&STACK_0);
   stream = popSTACK();
   if (builtin_stream_p(stream)) {
-    if (TheStream(stream)->strmflags & strmflags_wr_B) { # Output-Stream?
-      # no -> finished, yes -> branch according to Stream-Type:
+    if (TheStream(stream)->strmflags & strmflags_wr_B) { /* Output-Stream? */
+      /* no -> finished, yes -> branch according to Stream-Type: */
       switch (TheStream(stream)->strmtype) {
         case strmtype_synonym:
           finish_output_synonym(stream); break;
@@ -16314,26 +16663,26 @@ global maygc void finish_output (object stream) {
           break;
         case strmtype_terminal:
           finish_output_terminal(stream); break;
-        default: # do nothing
+        default: /* do nothing */
           break;
       }
     }
-  } else { # Call the generic function (STREAM-FINISH-OUTPUT stream):
+  } else { /* Call the generic function (STREAM-FINISH-OUTPUT stream): */
     pushSTACK(stream); funcall(S(stream_finish_output),1);
   }
 }
 
-# UP: Move the pending Output of a Stream to the destination.
-# force_output(stream);
-# > stream: Stream
-# can trigger GC
+/* UP: Move the pending Output of a Stream to the destination.
+ force_output(stream);
+ > stream: Stream
+ can trigger GC */
 global maygc void force_output (object stream) {
   pushSTACK(stream);
   harden_elastic_newline(&STACK_0);
   stream = popSTACK();
   if (builtin_stream_p(stream)) {
-    if (TheStream(stream)->strmflags & strmflags_wr_B) { # Output-Stream?
-      # no -> finished, yes -> branch according to Stream-Type:
+    if (TheStream(stream)->strmflags & strmflags_wr_B) { /* Output-Stream? */
+      /* no -> finished, yes -> branch according to Stream-Type: */
       switch (TheStream(stream)->strmtype) {
         case strmtype_synonym:
           force_output_synonym(stream); break;
@@ -16369,26 +16718,26 @@ global maygc void force_output (object stream) {
           break;
         case strmtype_terminal:
           force_output_terminal(stream); break;
-        default: # do nothing
+        default: /* do nothing */
           break;
       }
     }
-  } else { # Call the generic function (STREAM-FORCE-OUTPUT stream):
+  } else { /* Call the generic function (STREAM-FORCE-OUTPUT stream): */
     pushSTACK(stream); funcall(S(stream_force_output),1);
   }
 }
 
-# UP: Delete pending Output of a Stream.
-# clear_output(stream);
-# > stream: Stream
-# can trigger GC
+/* UP: Delete pending Output of a Stream.
+ clear_output(stream);
+ > stream: Stream
+ can trigger GC */
 global maygc void clear_output (object stream) {
-  # On DOS nothing actually has to be done for File- or Terminal-Streams,
-  # but we cannot take advantage of that, because clear_output on
-  # Buffered-Output-Streams always works.
+  /* On DOS nothing actually has to be done for File- or Terminal-Streams,
+   but we cannot take advantage of that, because clear_output on
+   Buffered-Output-Streams always works. */
   if (builtin_stream_p(stream)) {
-    if (TheStream(stream)->strmflags & strmflags_wr_B) { # Output-Stream?
-      # no -> finished, yes -> branch according to Stream-Type:
+    if (TheStream(stream)->strmflags & strmflags_wr_B) { /* Output-Stream? */
+      /* no -> finished, yes -> branch according to Stream-Type: */
       switch (TheStream(stream)->strmtype) {
         case strmtype_synonym:
           clear_output_synonym(stream); break;
@@ -16418,73 +16767,73 @@ global maygc void clear_output (object stream) {
         case strmtype_socket:
         #endif
           if (ChannelStream_buffered(stream)) {
-            # File: do nothing (would disturb the File-Management)
+            /* File: do nothing (would disturb the File-Management) */
           } else {
             clear_output_unbuffered(stream);
           }
           break;
         case strmtype_terminal:
-          #if (defined(UNIX) && !defined(NEXTAPP)) || defined(WIN32_NATIVE)
+          #if defined(UNIX) || defined(WIN32_NATIVE)
           terminalcase(stream,
           { clear_output_terminal1(stream); },
           { clear_output_terminal2(stream); },
           { clear_output_terminal3(stream); });
           #endif
           break;
-        default: # do nothing
+        default: /* do nothing */
           break;
       }
     }
-  } else { # Call the generic function (STREAM-CLEAR-OUTPUT stream):
+  } else { /* Call the generic function (STREAM-CLEAR-OUTPUT stream): */
     pushSTACK(stream); funcall(S(stream_clear_output),1);
   }
 }
 
-# UP: Returns the Line-Position of a Stream.
-# get_line_position(stream)
-# > stream: Stream
-# < result: Line-Position (Fixnum >=0 or NIL)
-# can trigger GC
+/* UP: Returns the Line-Position of a Stream.
+ get_line_position(stream)
+ > stream: Stream
+ < result: Line-Position (Fixnum >=0 or NIL)
+ can trigger GC */
 global maygc object get_line_position (object stream) {
   check_SP();
  start:
   if (builtin_stream_p(stream))
     switch (TheStream(stream)->strmtype) {
-      case strmtype_synonym: # Synonym-Stream: follow further
+      case strmtype_synonym: /* Synonym-Stream: follow further */
         resolve_as_synonym(stream);
         goto start;
-      case strmtype_broad: # Broadcast-Stream:
-        # Maximum of Line-Positions of the single Streams
+      case strmtype_broad: /* Broadcast-Stream: */
+        /* Maximum of Line-Positions of the single Streams */
         {
           pushSTACK(TheStream(stream)->strm_broad_list);
-          var uintV maximum = 0; # previous Maximum := 0
+          var uintV maximum = 0; /* previous Maximum := 0 */
           while (consp(STACK_0)) {
-            var object next = # Line-Position of the next substream
+            var object next = /* Line-Position of the next substream */
               get_line_position(Car(STACK_0));
             if (nullp(next)) {
               skipSTACK(1); return NIL;
             }
             if (posfixnum_to_V(next) > maximum)
-              maximum = posfixnum_to_V(next); # take Maximum
+              maximum = posfixnum_to_V(next); /* take Maximum */
             STACK_0 = Cdr(STACK_0);
           }
-          skipSTACK(1); return fixnum(maximum); # Maximum as result
+          skipSTACK(1); return fixnum(maximum); /* Maximum as result */
         }
       case strmtype_twoway:
       case strmtype_echo:
       #ifdef SOCKET_STREAMS
       case strmtype_twoway_socket:
       #endif
-        # Two-Way-Stream or Echo-Stream: look at Output-Stream
+        /* Two-Way-Stream or Echo-Stream: look at Output-Stream */
         stream = TheStream(stream)->strm_twoway_output;
-        /* return get_line_position(stream); */ # without recursion:
+        /* return get_line_position(stream); */ /* without recursion: */
         goto start;
-      default: # normal Stream
+      default: /* normal Stream */
         return TheStream(stream)->strm_wr_ch_lpos;
     }
   else {
     pushSTACK(stream);
-    # Test (SLOT-VALUE stream '$penl):
+    /* Test (SLOT-VALUE stream '$penl): */
     var object stream_forwarded = stream;
     instance_un_realloc(stream_forwarded);
     instance_update(stream,stream_forwarded);
@@ -16492,89 +16841,96 @@ global maygc object get_line_position (object stream) {
     var object clas = TheClassVersion(cv)->cv_class;
     var object slotinfo = gethash(S(penl),TheClass(clas)->slot_location_table,false);
     if (!nullp(TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)])) {
-      # A newline is pending. The line position is already 0.
+      /* A newline is pending. The line position is already 0. */
       skipSTACK(1);
       return Fixnum_0;
     } else {
-      # Call the generic function (STREAM-LINE-COLUMN stream):
+      /* Call the generic function (STREAM-LINE-COLUMN stream): */
       funcall(S(stream_line_column),1);
       if (!(posfixnump(value1) || nullp(value1))) {
         pushSTACK(S(stream_line_column));
         pushSTACK(value1);
-        fehler(error,GETTEXT("Return value ~S of call to ~S is not a fixnum >= 0 or NIL."));
+        error(error_condition,GETTEXT("Return value ~S of call to ~S is not a fixnum >= 0 or NIL."));
       }
       return value1;
     }
   }
 }
 
-# Tests whether the stream has an elastic newline pending.
-# elastic_newline_pending_p(stream)
-# > stream: Stream
-# < result: true if a newline should be output first
-# can trigger GC
-local maygc bool elastic_newline_pending_p (object stream) {
+/* do the actual legwork of fresh_line
+ fresh_line_low(stream)
+ > stream: Stream
+ < result: true if a newline has been output
+ can trigger GC */
+local maygc bool fresh_line_low (const gcv_object_t* stream_) {
+  /* Test whether an elastic newline is pending, so that
+   (ELASTIC-NEWLINE stream) followed by (FRESH-LINE stream) always leads
+   to exactly one newline being output. */
+ #define TERPRI_IF(cond) return cond ? (terpri(stream_), true) : false
+  var object stream = *stream_;
   check_SP();
  start:
   if (builtin_stream_p(stream))
     switch (TheStream(stream)->strmtype) {
-      case strmtype_synonym: # Synonym-Stream: follow further
+      case strmtype_synonym: /* Synonym-Stream: follow further */
         resolve_as_synonym(stream);
         goto start;
-      case strmtype_broad: # Broadcast-Stream:
-        # The OR of the individual streams.
-        {
-          pushSTACK(TheStream(stream)->strm_broad_list);
-          while (consp(STACK_0)) {
-            if (elastic_newline_pending_p(Car(STACK_0))) {
-              skipSTACK(1);
-              return true;
-            }
-            STACK_0 = Cdr(STACK_0);
-          }
+      case strmtype_broad: { /* Broadcast-Stream: */
+        /* FRESH-LINE is a "control", not an "output" operation,
+           so do it one by one on the individual constituent streams. */
+        var bool ret = false;
+        pushSTACK(TheStream(stream)->strm_broad_list);
+        while (consp(STACK_0)) {
+          pushSTACK(Car(STACK_0));
+          ret = fresh_line_low(&STACK_0);
           skipSTACK(1);
-          return false;
+          STACK_0 = Cdr(STACK_0);
         }
+        skipSTACK(1);
+        return ret;
+      }
       case strmtype_twoway:
       case strmtype_echo:
       #ifdef SOCKET_STREAMS
       case strmtype_twoway_socket:
       #endif
-        # Two-Way-Stream or Echo-Stream: look at Output-Stream
+        /* Two-Way-Stream or Echo-Stream: look at Output-Stream */
         stream = TheStream(stream)->strm_twoway_output;
         goto start;
-      default: # normal stream
-        return eq(TheStream(stream)->strm_wr_ch,P(wr_ch_pending_newline));
+      default: /* normal stream */
+        TERPRI_IF(eq(TheStream(stream)->strm_wr_ch,P(wr_ch_pending_newline))
+                  || !eq(get_line_position(*stream_),Fixnum_0));
     }
-  else {
-    # Test (SLOT-VALUE stream '$penl):
+  else { /* Test (SLOT-VALUE stream '$penl): */
     var object stream_forwarded = stream;
     instance_un_realloc(stream_forwarded);
     instance_update(stream,stream_forwarded);
     var object cv = TheInstance(stream_forwarded)->inst_class_version;
     var object clas = TheClassVersion(cv)->cv_class;
     var object slotinfo = gethash(S(penl),TheClass(clas)->slot_location_table,false);
-    return !nullp(TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)]);
+    TERPRI_IF(!nullp(TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)])
+              || !eq(get_line_position(stream_forwarded),Fixnum_0));
   }
+ #undef TERPRI_IF
 }
 
-# Writes a newline on a stream, if it is not already positioned at column 0.
-# fresh_line(&stream);
-# > stream: Stream
-# < stream: Stream
-# < result: true if did output a newline
-# can trigger GC
+/* Writes a newline on a stream, if it is not already positioned at column 0.
+ fresh_line(&stream);
+ > stream: Stream
+ < stream: Stream
+ < result: true if did output a newline
+ can trigger GC */
 global maygc bool fresh_line (const gcv_object_t* stream_) {
-  { # Special hack that acknowledges the fact that sometimes *standard-output*
-    # and *error-output* go to the same device, although they are different.
-    # For example, in batch mode
-    #   $ ./clisp -x '(progn (format *standard-output* "~&line1~.") (format *error-output* "~&line2~."))' | cat
-    # or on Cygwin in Windows2000, when clisp is launched from the "cmd" shell,
-    # the same_handle_p function fails to recognize the two outputs as
-    # identical.
-    # (unless (eq *standard-output* *error-output*)
-    #   (cond ((eq stream *standard-output*) (finish-output *error-output*))
-    #         ((eq stream *error-output*) (finish-output *standard-output*))))
+  { /* Special hack that acknowledges the fact that sometimes *standard-output* */
+    /* and *error-output* go to the same device, although they are different.
+     For example, in batch mode
+       $ ./clisp -x '(progn (format *standard-output* "~&line1~.") (format *error-output* "~&line2~."))' | cat
+     or on Cygwin in Windows2000, when clisp is launched from the "cmd" shell,
+     the same_handle_p function fails to recognize the two outputs as
+     identical.
+     (unless (eq *standard-output* *error-output*)
+       (cond ((eq stream *standard-output*) (finish-output *error-output*))
+             ((eq stream *error-output*) (finish-output *standard-output*)))) */
     var object stream1 = Symbol_value(S(standard_output));
     var object stream2 = Symbol_value(S(error_output));
     if (!eq(stream1,stream2)) {
@@ -16591,34 +16947,25 @@ global maygc bool fresh_line (const gcv_object_t* stream_) {
       }
     }
   }
-  # Test whether an elastic newline is pending, so that
-  # (ELASTIC-NEWLINE stream) followed by (FRESH-LINE stream) always leads
-  # to exactly one newline being output.
-  if (elastic_newline_pending_p(*stream_)
-      || !eq(get_line_position(*stream_),Fixnum_0)) {
-    terpri(stream_);
-    return true;
-  } else {
-    return false;
-  }
+  return fresh_line_low(stream_);
 }
 
-# Writes a newline on a stream, delayed and nullified if the next character
-# written would be a newline anyway.
-# elastic_newline(&stream);
-# > stream: Stream
-# < stream: Stream
-# can trigger GC
+/* Writes a newline on a stream, delayed and nullified if the next character
+ written would be a newline anyway.
+ elastic_newline(&stream);
+ > stream: Stream
+ < stream: Stream
+ can trigger GC */
 global maygc void elastic_newline (const gcv_object_t* stream_) {
   check_SP();
   var object stream = *stream_;
  start:
   if (builtin_stream_p(stream))
     switch (TheStream(stream)->strmtype) {
-      case strmtype_synonym: # Synonym-Stream: follow further
+      case strmtype_synonym: /* Synonym-Stream: follow further */
         resolve_as_synonym(stream);
         goto start;
-      case strmtype_broad: # Broadcast-Stream: dispatch
+      case strmtype_broad: /* Broadcast-Stream: dispatch */
         {
           pushSTACK(TheStream(stream)->strm_broad_list);
           pushSTACK(NIL);
@@ -16635,17 +16982,17 @@ global maygc void elastic_newline (const gcv_object_t* stream_) {
       #ifdef SOCKET_STREAMS
       case strmtype_twoway_socket:
       #endif
-        # Two-Way-Stream or Echo-Stream: look at Output-Stream
+        /* Two-Way-Stream or Echo-Stream: look at Output-Stream */
         stream = TheStream(stream)->strm_twoway_output;
         goto start;
-      default: # normal stream
+      default: /* normal stream */
         TheStream(stream)->strm_wr_ch = P(wr_ch_pending_newline);
         TheStream(stream)->strm_wr_ch_array = P(wr_ch_array_pending_newline);
         TheStream(stream)->strm_wr_ch_lpos = Fixnum_0;
         break;
     }
   else {
-    # (SETF (SLOT-VALUE stream '$penl) T):
+    /* (SETF (SLOT-VALUE stream '$penl) T): */
     var object stream_forwarded = stream;
     instance_un_realloc(stream_forwarded);
     instance_update(stream,stream_forwarded);
@@ -16656,22 +17003,22 @@ global maygc void elastic_newline (const gcv_object_t* stream_) {
   }
 }
 
-# UP: Check an element-type for READ-INTEGER/WRITE-INTEGER.
-# check_multiple8_eltype(&eltype);
-# > eltype: Element-Type in decoded form
+/* UP: Check an element-type for READ-INTEGER/WRITE-INTEGER.
+ check_multiple8_eltype(&eltype);
+ > eltype: Element-Type in decoded form */
 local void check_multiple8_eltype (const decoded_el_t* eltype) {
   if (!((eltype->size > 0) && ((eltype->size % 8) == 0))) {
     pushSTACK(canon_eltype(eltype));
     pushSTACK(S(Kelement_type));
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S needs an ~S with a bit size being a multiple of 8, not ~S"));
+    error(error_condition,GETTEXT("~S needs an ~S with a bit size being a multiple of 8, not ~S"));
   }
 }
 
-# UP: Check an element-type for READ-FLOAT/WRITE-FLOAT.
-# check_float_eltype(&eltype)
-# > object eltype: argument (in the STACK)
-# < result: sizeof(ffloatjanus) or sizeof(dfloatjanus)
+/* UP: Check an element-type for READ-FLOAT/WRITE-FLOAT.
+ check_float_eltype(&eltype)
+ > object eltype: argument (in the STACK)
+ < result: sizeof(ffloatjanus) or sizeof(dfloatjanus) */
 local uintL check_float_eltype (gcv_object_t* eltype_) {
   var object arg = *eltype_;
   if (eq(arg,S(single_float)))
@@ -16680,13 +17027,13 @@ local uintL check_float_eltype (gcv_object_t* eltype_) {
     return sizeof(dfloatjanus);
   var bool is_ffloat_subtype;
   var bool is_dfloat_subtype;
-  # First of all, make it a little more canonical (so then the different
-  # SUBTYPEP do not have to do the same thing twice):
-  pushSTACK(arg); funcall(S(canonicalize_type),1); # (SYS::CANONICALIZE-TYPE arg)
-  pushSTACK(value1); # save canon-arg
-  pushSTACK(STACK_0); pushSTACK(S(single_float)); funcall(S(subtypep),2); # (SUBTYPEP canon-arg 'SINGLE-FLOAT)
+  /* First of all, make it a little more canonical (so then the different
+   SUBTYPEP do not have to do the same thing twice): */
+  pushSTACK(arg); funcall(S(canonicalize_type),1); /* (SYS::CANONICALIZE-TYPE arg) */
+  pushSTACK(value1); /* save canon-arg */
+  pushSTACK(STACK_0); pushSTACK(S(single_float)); funcall(S(subtypep),2); /* (SUBTYPEP canon-arg 'SINGLE-FLOAT) */
   is_ffloat_subtype = !nullp(value1);
-  pushSTACK(S(double_float)); funcall(S(subtypep),2); # (SUBTYPEP canon-arg 'DOUBLE-FLOAT)
+  pushSTACK(S(double_float)); funcall(S(subtypep),2); /* (SUBTYPEP canon-arg 'DOUBLE-FLOAT) */
   is_dfloat_subtype = !nullp(value1);
   if (is_ffloat_subtype) {
     if (!is_dfloat_subtype)
@@ -16695,9 +17042,7 @@ local uintL check_float_eltype (gcv_object_t* eltype_) {
     if (is_dfloat_subtype)
       return sizeof(dfloatjanus);
   }
-  pushSTACK(*eltype_); pushSTACK(S(Kelement_type));
-  pushSTACK(TheSubr(subr_self)->name);
-  fehler(error,GETTEXT("~S: illegal ~S argument ~S"));
+  error_illegal_arg(*eltype_,nullobj,S(Kelement_type));
 }
 
 /* UP: Check an endianness argument.
@@ -16731,36 +17076,54 @@ local bool maygc check_endianness_arg (object arg) {
  < int * handletype 0:reserved, 1:file, 2:socket
  < Handle result - extracted handle
  can trigger GC */
-global maygc Handle stream_lend_handle (gcv_object_t *stream_, bool inputp,
-                                        int * handletype)
-{
-  var int errkind;
+modexp maygc Handle stream_lend_handle
+(gcv_object_t *stream_, bool inputp, int * handletype) {
+  var int errkind = 0;
   var object stream = *stream_;
  restart_stream_lend_handle:
-  errkind = 0;
   /* TODO: use finish-output ? */
   if (builtin_stream_p(stream)) {
     switch (TheStream(stream)->strmtype) {
+     #ifdef X11SOCKETS
+      case strmtype_x11socket:
+     #endif
+     #ifdef SOCKET_STREAMS
+      case strmtype_socket:
+     #endif
+       #if defined(X11SOCKETS) || defined(SOCKET_STREAMS)
+        if (handletype) *handletype = 2;
+        /* it is not clear that buffered sockets should be supported,
+           cf strmtype_pipe_in below */
+        if (ChannelStream_buffered(stream))
+          return TheHandle(TheStream(stream)->strm_buffered_channel);
+        else if (inputp) return TheHandle(TheStream(stream)->strm_ichannel);
+        else return TheHandle(TheStream(stream)->strm_ochannel);
+       #endif
       case strmtype_file:
+        if (handletype) *handletype = 1;
         if (inputp && TheStream(stream)->strmflags & strmflags_rd_B) {
-          if (handletype) *handletype = 1;
           if (ChannelStream_buffered(stream)) {
             sync_file_buffered(stream);
-            return TheHandle(TheStream(stream)->strm_buffered_channel);
+            return TheHandle(TheStream(*stream_)->strm_buffered_channel);
           }
           return TheHandle(TheStream(stream)->strm_ichannel);
         } else if (!inputp && TheStream(stream)->strmflags & strmflags_wr_B) {
-          if (handletype) *handletype = 1;
           if (ChannelStream_buffered(stream)) {
             /* reposition index back to not yet read position */
             sync_file_buffered(stream);
-            return TheHandle(TheStream(stream)->strm_buffered_channel);
+            return TheHandle(TheStream(*stream_)->strm_buffered_channel);
           }
           return TheHandle(TheStream(stream)->strm_ochannel);
         } else {
           errkind = 2; /* wrong direction */
           goto show_error;
         }
+     #ifdef SOCKET_STREAMS
+      case strmtype_twoway_socket:
+        stream = inputp ? TheStream(stream)->strm_twoway_socket_input
+          : TheStream(stream)->strm_twoway_socket_output;
+        goto restart_stream_lend_handle;
+     #endif
       case strmtype_twoway:
       case strmtype_echo:
         stream = TheStream(stream)->strm_twoway_input;
@@ -16770,7 +17133,7 @@ global maygc Handle stream_lend_handle (gcv_object_t *stream_, bool inputp,
         goto restart_stream_lend_handle;
       #ifdef KEYBOARD
       case strmtype_keyboard:
-       #if (defined(UNIX) && !defined(NEXTAPP)) || defined(WIN32_NATIVE)
+       #if defined(UNIX) || defined(WIN32_NATIVE)
         if (inputp) {
           if (handletype) *handletype = 1;
           return TheHandle(TheStream(stream)->strm_keyboard_handle);
@@ -16786,6 +17149,7 @@ global maygc Handle stream_lend_handle (gcv_object_t *stream_, bool inputp,
         if (handletype) *handletype = 1;
         return TheHandle(inputp?TheStream(stream)->strm_terminal_ihandle:
                          TheStream(stream)->strm_terminal_ohandle);
+     #ifdef PIPES
       case strmtype_pipe_in:
         if (inputp) {
           if (ChannelStream_buffered(stream)) {
@@ -16816,6 +17180,7 @@ global maygc Handle stream_lend_handle (gcv_object_t *stream_, bool inputp,
           goto show_error;
         }
         break;
+     #endif
       default:
         break;
     }
@@ -16834,106 +17199,80 @@ global maygc Handle stream_lend_handle (gcv_object_t *stream_, bool inputp,
   goto restart_stream_lend_handle;
 }
 
-# (READ-BYTE stream [eof-error-p [eof-value]]), CLTL p. 382
+/* (READ-BYTE stream [eof-error-p [eof-value]]), CLTL p. 382 */
 LISPFUN(read_byte,seclass_default,1,2,norest,nokey,0,NIL) {
   var object stream = check_stream(STACK_2);
-  # read Integer:
+  /* read Integer: */
   var object obj = read_byte(stream);
-  if (eq(obj,eof_value)) { # EOF-treatment
-    if (!nullp(STACK_1)) { # eof-error-p /= NIL (e.g. = #<UNBOUND>) ?
-      # report error:
-      pushSTACK(STACK_2); # STREAM-ERROR slot STREAM
-      pushSTACK(STACK_(2+1)); # Stream
-      pushSTACK(S(read_byte));
-      fehler(end_of_file,GETTEXT("~S: input stream ~S has reached its end"));
-    } else { # handle EOF:
-      var object eofval = STACK_0;
-      if (!boundp(eofval))
-        eofval = NIL; # Default is NIL
-      VALUES1(eofval); skipSTACK(3); /* return eofval */
-    }
+  if (eq(obj,eof_value)) { /* EOF-treatment */
+    HANDLE_EOF(STACK_1, STACK_0, 3);
   } else {
     VALUES1(obj); skipSTACK(3); /* return obj */
   }
 }
 
-# (READ-BYTE-LOOKAHEAD stream)
+/* (READ-BYTE-LOOKAHEAD stream) */
 LISPFUNN(read_byte_lookahead,1) {
   var object stream = check_stream(popSTACK());
-  # Query the status:
-  var signean status = listen_byte(stream);
-  if (ls_wait_p(status))
-    value1 = NIL;
-  else if (ls_eof_p(status))
-    value1 = S(Keof);
-  else # ls_avail_p(status)
-    value1 = T;
+  /* Query the status: */
+  switch (listen_byte(stream)) {
+    case LISTEN_WAIT: value1 = NIL; break;
+    case LISTEN_EOF: value1 = S(Keof); break;
+    case LISTEN_AVAIL: value1 = T; break;
+    case LISTEN_ERROR: OS_filestream_error(stream);
+  }
   mv_count=1;
 }
 
-# (READ-BYTE-WILL-HANG-P stream)
+/* (READ-BYTE-WILL-HANG-P stream) */
 LISPFUNN(read_byte_will_hang_p,1) {
   var object stream = check_stream(popSTACK());
-  # Query the status:
-  var signean status = listen_byte(stream);
-  VALUES_IF(ls_wait_p(status));
+  /* Query the status: */
+  VALUES_IF(LISTEN_WAIT == listen_byte(stream));
 }
 
-# (READ-BYTE-NO-HANG stream [eof-error-p [eof-value]])
+/* (READ-BYTE-NO-HANG stream [eof-error-p [eof-value]]) */
 LISPFUN(read_byte_no_hang,seclass_default,1,2,norest,nokey,0,NIL) {
-  var object stream = check_stream(STACK_2);
-  # Query the status:
-  var signean status = listen_byte(stream);
-  if (ls_wait_p(status)) {
-    # Return NIL.
-    VALUES1(NIL); skipSTACK(3);
-    return;
-  } else if (!ls_eof_p(status)) {
-    # Read a byte:
-    var object obj = read_byte(stream);
-    if (!eq(obj,eof_value)) {
-      # Return the read integer.
-      VALUES1(obj); skipSTACK(3);
+  var object stream = STACK_2 = check_stream(STACK_2);
+  /* Query the status: */
+  switch (listen_byte(stream)) {
+    case LISTEN_WAIT: /* Return NIL. */
+      VALUES1(NIL); skipSTACK(3);
       return;
+    case LISTEN_EOF: HANDLE_EOF(STACK_1, STACK_0, 3); break;
+    case LISTEN_AVAIL: { /* Read a byte: */
+      var object obj = read_byte(stream);
+      if (!eq(obj,eof_value)) {
+        /* Return the read integer. */
+        VALUES1(obj); skipSTACK(3);
+        return;
+      }
     }
-  }
-  # EOF handling.
-  if (!nullp(STACK_1)) { # eof-error-p /= NIL (e.g. = #<UNBOUND>) ?
-    # report error:
-    pushSTACK(STACK_2); # STREAM-ERROR slot STREAM
-    pushSTACK(STACK_(2+1)); # Stream
-    pushSTACK(S(read_byte_no_hang));
-    fehler(end_of_file,GETTEXT("~S: input stream ~S has reached its end"));
-  } else {
-    # handle EOF:
-    var object eofval = STACK_0;
-    if (!boundp(eofval))
-      eofval = NIL; # Default is NIL
-    VALUES1(eofval); skipSTACK(3); /* return eofval */
+    case LISTEN_ERROR: OS_filestream_error(STACK_2);
   }
 }
 
-# (READ-INTEGER stream element-type [endianness [eof-error-p [eof-value]]])
-# is a generalized READ-BYTE.
+/* (READ-INTEGER stream element-type [endianness [eof-error-p [eof-value]]])
+ is a generalized READ-BYTE. */
 LISPFUN(read_integer,seclass_default,2,3,norest,nokey,0,NIL) {
   /* check Element-Type */
   var decoded_el_t eltype;
   test_eltype_arg(&STACK_3,&eltype);
   check_multiple8_eltype(&eltype);
   var bool endianness = check_endianness_arg(STACK_2); /* check Endianness */
-  var object stream = check_stream(STACK_4);
+  STACK_4 = check_stream(STACK_4);
   var uintL bitsize = eltype.size;
   var uintL bytesize = bitsize/8;
   var DYNAMIC_8BIT_VECTOR(bitbuffer,bytesize);
   pushSTACK(bitbuffer);
-  # Stack layout: stream, element-type, endianness, eof-error-p, eof-value, bitbuffer.
-  # Read the data.
+  /* Stack layout: stream, element-type, endianness, eof-error-p, eof-value, bitbuffer.
+   Read the data. */
   if (read_byte_array(&STACK_5,&STACK_0,0,bytesize,persev_full) != bytesize)
     goto eof;
   bitbuffer = STACK_0;
   if (endianness) /* byte swap */
     elt_nreverse(bitbuffer,0,bytesize);
-  { # The data is now in little-endian order. Convert it to an integer.
+  { /* The data is now in little-endian order. Convert it to an integer. */
     var object result;
     switch (eltype.kind) {
       case eltype_iu:
@@ -16949,38 +17288,26 @@ LISPFUN(read_integer,seclass_default,2,3,norest,nokey,0,NIL) {
     skipSTACK(6);
     return;
   }
-  # EOF-Treatment
- eof:
-  if (!nullp(STACK_2)) { # eof-error-p /= NIL (e.g. = #<UNBOUND>) ?
-    # report error:
-    pushSTACK(STACK_5); # STREAM-ERROR slot STREAM
-    pushSTACK(STACK_(5+1)); # Stream
-    pushSTACK(S(read_integer));
-    fehler(end_of_file,GETTEXT("~S: input stream ~S has reached its end"));
-  } else { # handle EOF:
-    var object eofval = STACK_1;
-    if (!boundp(eofval))
-      eofval = NIL; # Default is NIL
-    VALUES1(eofval); skipSTACK(6); /* return eofval */
-  }
+ eof: /* EOF-Treatment */
+  HANDLE_EOF(STACK_2, STACK_1, 6);
 }
 
-# (READ-FLOAT stream element-type [endianness [eof-error-p [eof-value]]])
-# reads a float in IEEE binary representation.
+/* (READ-FLOAT stream element-type [endianness [eof-error-p [eof-value]]])
+ reads a float in IEEE binary representation. */
 LISPFUN(read_float,seclass_default,2,3,norest,nokey,0,NIL) {
   var uintL bytesize = check_float_eltype(&STACK_3); /* check Element-Type */
   var bool endianness = check_endianness_arg(STACK_2); /* check Endianness */
-  var object stream = check_stream(STACK_4);
+  STACK_4 = check_stream(STACK_4);
   var DYNAMIC_8BIT_VECTOR(bitbuffer,bytesize);
   pushSTACK(bitbuffer);
-  # Stack layout: stream, element-type, endianness, eof-error-p, eof-value, bitbuffer.
-  # Read the data.
+  /* Stack layout: stream, element-type, endianness, eof-error-p, eof-value, bitbuffer.
+   Read the data. */
   if (read_byte_array(&STACK_5,&STACK_0,0,bytesize,persev_full) != bytesize)
     goto eof;
   bitbuffer = STACK_0;
   if (BIG_ENDIAN_P ? !endianness : endianness) /* byte swap */
     elt_nreverse(bitbuffer,0,bytesize);
-  # The data is now in machine-dependent order. Convert it to a float.
+  /* The data is now in machine-dependent order. Convert it to a float. */
   switch (bytesize) {
     case sizeof(ffloatjanus):
       if (((varobject_alignment % alignof(ffloatjanus)) == 0)
@@ -17008,107 +17335,92 @@ LISPFUN(read_float,seclass_default,2,3,norest,nokey,0,NIL) {
   mv_count=1;
   skipSTACK(6);
   return;
-  # EOF-Treatment
- eof:
-  if (!nullp(STACK_2)) { # eof-error-p /= NIL (e.g. = #<UNBOUND>) ?
-    # report error:
-    pushSTACK(STACK_5); # STREAM-ERROR slot STREAM
-    pushSTACK(STACK_(5+1)); # Stream
-    pushSTACK(S(read_float));
-    fehler(end_of_file,GETTEXT("~S: input stream ~S has reached its end"));
-  } else {
-    # handle EOF:
-    var object eofval = STACK_1;
-    if (!boundp(eofval))
-      eofval = NIL; # Default is NIL
-    VALUES1(eofval); skipSTACK(6); /* return eofval */
-  }
+ eof: /* EOF-Treatment */
+  HANDLE_EOF(STACK_2, STACK_1, 6);
 }
 
-# (WRITE-BYTE integer stream), CLTL p. 385
+/* (WRITE-BYTE integer stream), CLTL p. 385 */
 LISPFUNN(write_byte,2) {
   var object stream = check_stream(STACK_0);
   var object obj = STACK_1;
   ASSERT_wr_int(stream,obj);
-  # write Integer:
+  /* write Integer: */
   write_byte(stream,obj);
   VALUES1(STACK_1); skipSTACK(2); /* return obj */
 }
 
-# (WRITE-INTEGER integer stream element-type [endianness])
-# is a generalized WRITE-BYTE.
+/* (WRITE-INTEGER integer stream element-type [endianness])
+ is a generalized WRITE-BYTE. */
 LISPFUN(write_integer,seclass_default,3,1,norest,nokey,0,NIL) {
   /* check Element-Type */
   var decoded_el_t eltype;
   test_eltype_arg(&STACK_1,&eltype);
   check_multiple8_eltype(&eltype);
   var bool endianness = check_endianness_arg(STACK_0); /* check Endianness */
-  var object stream = check_stream(STACK_2);
-  # check Integer:
+  STACK_2 = check_stream(STACK_2);
+  /* check Integer: */
   var uintL bitsize = eltype.size;
   var uintL bytesize = bitsize/8;
-  var object obj = STACK_3;
-  ASSERT_wr_int(stream,obj);
+  ASSERT_wr_int(STACK_2,STACK_3);
   var DYNAMIC_8BIT_VECTOR(bitbuffer,bytesize);
   pushSTACK(bitbuffer);
-  # Stack layout: obj, stream, element-type, endianness, bitbuffer.
-  obj = STACK_4;
-  # Copy the integer's data into the buffer.
+  /* Stack layout: obj, stream, element-type, endianness, bitbuffer. */
+  /* Copy the integer's data into the buffer. */
   switch (eltype.kind) {
     case eltype_iu:
-      bitbuff_ixu_sub(STACK_3,bitbuffer,bitsize,obj);
+      bitbuff_ixu_sub(STACK_3,STACK_0,bitsize,STACK_4);
       break;
     case eltype_is:
-      bitbuff_ixs_sub(STACK_3,bitbuffer,bitsize,obj);
+      bitbuff_ixs_sub(STACK_3,STACK_0,bitsize,STACK_4);
       break;
     default: NOTREACHED;
   }
-  # The data is now in little-endian order.
+  /* The data is now in little-endian order. */
   if (endianness) /* byte swap */
-    elt_nreverse(bitbuffer,0,bytesize);
-  # Write the data.
+    elt_nreverse(STACK_0,0,bytesize);
+  /* Write the data. */
   write_byte_array(&STACK_3,&STACK_0,0,bytesize,persev_full);
   FREE_DYNAMIC_8BIT_VECTOR(STACK_0);
   VALUES1(STACK_4); /* return obj */
   skipSTACK(5);
 }
 
-# (WRITE-FLOAT float stream element-type [endianness])
-# writes a float in IEEE binary representation.
+/* (WRITE-FLOAT float stream element-type [endianness])
+ writes a float in IEEE binary representation. */
 LISPFUN(write_float,seclass_default,3,1,norest,nokey,0,NIL) {
   var uintL bytesize = check_float_eltype(&STACK_1); /* check Element-Type */
   var bool endianness = check_endianness_arg(STACK_0); /* check Endianness */
-  var object stream = check_stream(STACK_2);
-  # check Float:
+  STACK_2 = check_stream(STACK_2);
+  /* check Float: */
   var object obj = STACK_3;
   switch (bytesize) {
     case sizeof(ffloatjanus):
       if (!single_float_p(obj)) {
-        pushSTACK(obj);             # TYPE-ERROR slot DATUM
-        pushSTACK(S(single_float)); # TYPE-ERROR slot EXPECTED-TYPE
+        pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
+        pushSTACK(S(single_float)); /* TYPE-ERROR slot EXPECTED-TYPE */
         pushSTACK(STACK_(2+2));
         pushSTACK(S(single_float));
         pushSTACK(obj);
-        fehler(type_error,GETTEXT("~S is not a ~S, cannot be output onto ~S"));
+        error(type_error,GETTEXT("~S is not a ~S, cannot be output onto ~S"));
       }
       break;
     case sizeof(dfloatjanus):
       if (!double_float_p(obj)) {
-        pushSTACK(obj);             # TYPE-ERROR slot DATUM
-        pushSTACK(S(double_float)); # TYPE-ERROR slot EXPECTED-TYPE
+        pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
+        pushSTACK(S(double_float)); /* TYPE-ERROR slot EXPECTED-TYPE */
         pushSTACK(STACK_(2+2));
         pushSTACK(S(double_float));
         pushSTACK(obj);
-        fehler(type_error,GETTEXT("~S is not a ~S, cannot be output onto ~S"));
+        error(type_error,GETTEXT("~S is not a ~S, cannot be output onto ~S"));
       }
       break;
     default: NOTREACHED;
   }
   var DYNAMIC_8BIT_VECTOR(bitbuffer,bytesize);
   pushSTACK(bitbuffer);
-  # Stack layout: obj, stream, element-type, endianness, bitbuffer.
+  /* Stack layout: obj, stream, element-type, endianness, bitbuffer. */
   obj = STACK_4;
-  # Copy the float's data into the buffer.
+  /* Copy the float's data into the buffer. */
   switch (bytesize) {
     case sizeof(ffloatjanus):
       if (((varobject_alignment % alignof(ffloatjanus)) == 0)
@@ -17132,58 +17444,83 @@ LISPFUN(write_float,seclass_default,3,1,norest,nokey,0,NIL) {
       break;
     default: NOTREACHED;
   }
-  # The data is now in machine-dependent order.
+  /* The data is now in machine-dependent order. */
   if (BIG_ENDIAN_P ? !endianness : endianness) /* byte swap */
     elt_nreverse(bitbuffer,0,bytesize);
-  # Write the data.
+  /* Write the data. */
   write_byte_array(&STACK_3,&STACK_0,0,bytesize,persev_full);
   FREE_DYNAMIC_8BIT_VECTOR(STACK_0);
   VALUES1(STACK_4); /* return obj */
   skipSTACK(5);
 }
 
-# UP: Checks, if an Argument is an open File-Stream.
-# check_open_file_stream(obj);
-# > obj: Argument
-# < result: open File-Stream
-local object check_open_file_stream (object obj, bool strict_p) {
+/* UP: Checks, if an Argument is an open File-Stream.
+ check_open_file_stream(obj);
+ > obj: Argument
+ > permissive_p: return nullobj instead of signaling an error
+ < result: open File-Stream (or maybe nullobj if permissive_p was true) */
+local object check_open_file_stream (object obj, bool permissive_p) {
  check_open_file_stream_restart:
   obj = resolve_synonym_stream(obj);
   if (streamp(obj) && TheStream(obj)->strmtype == strmtype_broad) {
     var object last_stream = broadcast_stream_last(obj);
     if (eq(last_stream,nullobj)) {
-      if (strict_p) goto fehler_bad_obj;
+      if (permissive_p) return nullobj;
       else return last_stream;
     } else obj = last_stream;
     goto check_open_file_stream_restart;
   }
-  if (!builtin_stream_p(obj)) # Stream ?
-    goto fehler_bad_obj;
-  if (!(TheStream(obj)->strmtype == strmtype_file)) # Streamtyp File-Stream ?
-    goto fehler_bad_obj;
-  if ((TheStream(obj)->strmflags & strmflags_open_B) == 0) # Stream open ?
-    goto fehler_bad_obj;
-  if (nullp(BufferedStream_channel(obj))) # and Handle /= NIL ?
-    goto fehler_bad_obj;
-  return obj; # yes -> OK
- fehler_bad_obj:
-  pushSTACK(obj);                      # TYPE-ERROR slot DATUM
-  pushSTACK(O(type_open_file_stream)); # TYPE-ERROR slot EXPECTED-TYPE
+  if (!builtin_stream_p(obj)) /* Stream ? */
+    goto error_bad_obj;
+  if (!(TheStream(obj)->strmtype == strmtype_file)) /* Streamtyp File-Stream ? */
+    goto error_bad_obj;
+  if ((TheStream(obj)->strmflags & strmflags_open_B) == 0) /* Stream open ? */
+    goto error_bad_obj;
+  if (nullp(BufferedStream_channel(obj))) /* and Handle /= NIL ? */
+    goto error_bad_obj;
+  return obj; /* yes -> OK */
+ error_bad_obj:
+  if (permissive_p) return nullobj;
+  pushSTACK(obj);                      /* TYPE-ERROR slot DATUM */
+  pushSTACK(O(type_open_file_stream)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(type_error,GETTEXT("~S: argument ~S is not an open file stream"));
+  error(type_error,GETTEXT("~S: argument ~S is not an open file stream"));
 }
 
 /* extract the OS file handle from the file stream
  > stream: open Lisp file stream
  < fd: OS file handle
+ > permissive_p: return nullobj instead of signaling an error
  < result: either stream, or a corrected stream in case stream was invalid
+           or nullobj if permissive_p was true and the stream was invalid
  for syscall module
  can trigger GC */
-global maygc object open_file_stream_handle (object stream, Handle *fd) {
-  stream = check_open_file_stream(stream,true);
-  *fd = ChannelStream_ihandle(stream);
+modexp maygc object open_file_stream_handle
+(object stream, Handle *fd, bool permissive_p) {
+  stream = check_open_file_stream(stream,permissive_p);
+  if (!eq(stream,nullobj))
+    *fd = ChannelStream_ihandle(stream);
   return stream;
+}
+
+/* return the OS's idea of the stream length for the file stream
+ > stream_: for error reporting - point to GC safe location
+ > fd: OS file handle
+ < result: the length of the stream
+ should be wrapped in begin_blocking_system_call()/end_blocking_system_call()
+ for gdbm module */
+modexp maygc off_t handle_length (gcv_object_t *stream_, Handle fd) {
+  off_t len, pos;
+  fd_lseek(stream_,fd,0,SEEK_CUR,pos=); /* save current location */
+  fd_lseek(stream_,fd,0,SEEK_END,len=); /* get EOF location */
+  /* if the above call fails, we may be screwed now:
+     the file position was modified but not restored.
+     However, this would indicate a bug in the underlying lseek()
+     implementation, see the list of ERRORS in
+     http://www.opengroup.org/onlinepubs/009695399/functions/lseek.html */
+  fd_lseek(stream_,fd,pos,SEEK_SET,); /* restore the original location */
+  return len;
 }
 
 typedef enum { POS_QUERY, POS_SET_START, POS_SET_END, POS_SET_OFF } pos_arg_t;
@@ -17206,7 +17543,7 @@ LISPFUN(file_position,seclass_default,1,1,norest,nokey,0,NIL)
       pushSTACK(O(type_position)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(position); pushSTACK(S(Kend)); pushSTACK(S(Kstart));
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(type_error,GETTEXT("~S: position argument should be ~S or ~S or a nonnegative integer, not ~S"));
+      error(type_error,GETTEXT("~S: position argument should be ~S or ~S or a nonnegative integer, not ~S"));
     }
   }
  restart_file_position:
@@ -17217,16 +17554,17 @@ LISPFUN(file_position,seclass_default,1,1,norest,nokey,0,NIL)
         goto restart_file_position;
       case strmtype_broad:      /* Broadcast-Stream: */
         stream = broadcast_stream_last(stream);
-        if (eq(stream,nullobj)) /* empty BROADCAST-STREAM */
+        if (eq(stream,nullobj)) { /* empty BROADCAST-STREAM? */
           /* http://www.lisp.org/HyperSpec/Body/syscla_broadcast-stream.html */
           VALUES1(Fixnum_0); break;
+        }
         goto restart_file_position;
       case strmtype_str_in: {
         STACK_1 = stream;
         var stringarg arg;
         pushSTACK(TheStream(stream)->strm_str_in_string);
         switch (pos_type) {
-          case POS_SET_END:     /* :END */
+          case POS_SET_END: {   /* :END */
             pushSTACK(TheStream(stream)->strm_str_in_begindex);
             pushSTACK(TheStream(stream)->strm_str_in_endindex);
             test_string_limits_ro(&arg);
@@ -17234,28 +17572,28 @@ LISPFUN(file_position,seclass_default,1,1,norest,nokey,0,NIL)
             TheStream(stream)->strm_str_in_index =
               TheStream(stream)->strm_str_in_endindex;
             value1 = fixnum(arg.len);
-            break;
-          case POS_SET_START:   /* :START */
+          } break;
+          case POS_SET_START: { /* :START */
             TheStream(stream)->strm_str_in_index =
               TheStream(stream)->strm_str_in_begindex;
             value1 = Fixnum_0;
             skipSTACK(1);
-            break;
-          case POS_SET_OFF:     /* OFFSET */
+          } break;
+          case POS_SET_OFF: {   /* OFFSET */
             pushSTACK(TheStream(stream)->strm_str_in_begindex);
             pushSTACK(fixnum_inc(STACK_0,pos_off));
             test_string_limits_ro(&arg);
             stream = STACK_1; /* restore */
             TheStream(stream)->strm_str_in_index = fixnum(arg.index+arg.len);
             value1 = fixnum(arg.len); /* == pos */
-            break;
-          case POS_QUERY:       /* ask for position */
+          } break;
+          case POS_QUERY: {     /* ask for position */
             pushSTACK(TheStream(stream)->strm_str_in_begindex);
             pushSTACK(TheStream(stream)->strm_str_in_index);
             test_string_limits_ro(&arg);
             stream = STACK_1; /* restore */
             pos_off = arg.len;
-            goto get_position_common;
+          } goto get_position_common;
           default: NOTREACHED;
         }
        set_position_common:   /* value1 is pre-set! */
@@ -17276,7 +17614,7 @@ LISPFUN(file_position,seclass_default,1,1,norest,nokey,0,NIL)
               TheIarray(ssstring)->dims[1] = pos_off;
             } else {
               pushSTACK(fixnum(pos_off));
-              fehler_index_range(ssstring,TheIarray(ssstring)->dims[1]);
+              error_index_range(ssstring,TheIarray(ssstring)->dims[1]);
             }
             break;
           case POS_QUERY:
@@ -17290,7 +17628,7 @@ LISPFUN(file_position,seclass_default,1,1,norest,nokey,0,NIL)
       case strmtype_str_push: {
         var object string = TheStream(stream)->strm_str_push_string;
         switch (pos_type) {
-          case POS_SET_END:     /* :END */
+          case POS_SET_END: {   /* :END */
             /* Pretend that the "end" of the stream corresponds to the current
                fill-pointer. The array-dimension 0 wouldn't be the right choice
                because it depends on how the implementation increases the size
@@ -17300,14 +17638,14 @@ LISPFUN(file_position,seclass_default,1,1,norest,nokey,0,NIL)
                this is hairy to implement correctly. */
             value1 = fixnum(vector_length(string));
             /* No need to call set-fill-pointer because it would be a nop. */
-            break;
+          } break;
           case POS_SET_START:        /* :START, pos_off==0 already */
-          case POS_SET_OFF:          /* OFFSET */
+          case POS_SET_OFF: {        /* OFFSET */
             pushSTACK(string); pushSTACK(fixnum(pos_off)); C_set_fill_pointer();
-            break;
-          case POS_QUERY:
+          } break;
+          case POS_QUERY: {
             pos_off = vector_length(string);
-            goto get_position_common;
+          } goto get_position_common;
           default: NOTREACHED;
         }
         goto set_position_common;
@@ -17315,19 +17653,56 @@ LISPFUN(file_position,seclass_default,1,1,norest,nokey,0,NIL)
       case strmtype_file:
         stream = check_open_file_stream(stream,false); /* check open */
         if (!ChannelStream_buffered(stream)) {
-          /* cannot deal with the file position on unbuffered streams. */
-          VALUES1(NIL);
-        } else {
+          Handle fd = TheHandle(TheStream(stream)->strmflags & strmflags_wr_B
+                                ? ChannelStream_ochannel(stream)
+                                : ChannelStream_ichannel(stream));
+          pushSTACK(stream);
           switch (pos_type) {
             case POS_SET_END:   /* :END */
-              VALUES1(uoff_to_I(logical_position_file_end(stream))); break;
+              begin_blocking_system_call();
+              handle_lseek(&STACK_0,fd,0,SEEK_END,pos_off=);
+              stream = popSTACK();
+              end_blocking_system_call();
+              goto get_position_pos_off;
             case POS_SET_START: /* :START */
-              VALUES1(uoff_to_I(logical_position_file_start(stream))); break;
+              begin_blocking_system_call();
+              handle_lseek(&STACK_0,fd,0,SEEK_SET,pos_off=);
+              stream = popSTACK();
+              end_blocking_system_call();
+              goto get_position_pos_off;
+            case POS_SET_OFF:   /* OFFSET */
+              begin_blocking_system_call();
+              handle_lseek(&STACK_0,fd,pos_off,SEEK_SET,pos_off=);
+              stream = popSTACK();
+              end_blocking_system_call();
+            get_position_pos_off:
+              VALUES1(uoff_to_I(pos_off)); break;
+            case POS_QUERY:
+              begin_blocking_system_call();
+              handle_lseek(&STACK_0,fd,0,SEEK_CUR,pos_off=);
+              stream = popSTACK();
+              end_blocking_system_call();
+              goto get_position_common;
+            default: NOTREACHED;
+          }
+        } else {
+          pushSTACK(stream);
+          switch (pos_type) {
+            case POS_SET_END:   /* :END */
+              VALUES1(uoff_to_I(logical_position_file_end(stream)));
+              stream = popSTACK();
+              break;
+            case POS_SET_START: /* :START */
+              VALUES1(uoff_to_I(logical_position_file_start(stream)));
+              stream = popSTACK();
+              break;
             case POS_SET_OFF:   /* OFFSET */
               VALUES1(uoff_to_I(logical_position_file(stream,pos_off)));
+              stream = popSTACK();
               break;
             case POS_QUERY:
               pos_off = BufferedStream_position(stream);
+              stream = popSTACK();
               /* if a character has been unread, decrement position
                  so that PEEK-CHAR does not modify FILE-POSITION */
             get_position_common:
@@ -17338,7 +17713,7 @@ LISPFUN(file_position,seclass_default,1,1,norest,nokey,0,NIL)
           }
         }
         break;
-      default: file_position_failed: /* do not know what to do ==> NIL */
+      default: /* do not know what to do ==> NIL */
         VALUES1(NIL); break;
     }
     skipSTACK(2);
@@ -17350,24 +17725,31 @@ LISPFUN(file_position,seclass_default,1,1,norest,nokey,0,NIL)
 
 LISPFUNNR(file_length,1)
 { /* (FILE-LENGTH file-stream), CLTL p. 425 */
-  var object stream = popSTACK();
+  var object stream = STACK_0;
   stream = check_open_file_stream(stream,false); /* check stream */
   if (eq(stream,nullobj)) { /* empty BROADCAST-STREAM */
     /* http://www.lisp.org/HyperSpec/Body/syscla_broadcast-stream.html */
+    skipSTACK(1);
     VALUES1(Fixnum_0); return;
   }
   if (!ChannelStream_buffered(stream)) {
-    # Don't know how to deal with the file position on unbuffered streams.
-    VALUES1(NIL);
+    off_t len;
+    Handle fd=ChannelStream_ihandle(stream);
+    begin_blocking_system_call();
+    len = handle_length(&STACK_0,fd);
+    end_blocking_system_call();
+    VALUES1(off_to_I(len));
   } else {
-    # memorize Position:
+    /* memorize Position: */
     var uoff_t position = BufferedStream_position(stream);
-    # set position to end and memorize End-Position:
+    /* set position to end and memorize End-Position: */
     var uoff_t endposition = logical_position_file_end(stream);
-    # set back to old position:
+    stream = STACK_0;
+    /* set back to old position: */
     logical_position_file(stream,position);
     VALUES1(uoff_to_I(endposition)); /* return End-Position */
   }
+  skipSTACK(1);
 }
 
 LISPFUNN(file_string_length,2)
@@ -17380,25 +17762,25 @@ LISPFUNN(file_string_length,2)
     VALUES1(Fixnum_1); return;
   }
   if (!(TheStream(stream)->strmflags & strmflags_wr_ch_B))
-    fehler_illegal_streamop(S(file_string_length),stream);
+    error_illegal_streamop(S(file_string_length),stream);
   var object encoding = TheStream(stream)->strm_encoding;
- #if defined(UNICODE) && defined(HAVE_GOOD_ICONV)
+ #if defined(ENABLE_UNICODE) && defined(HAVE_GOOD_ICONV)
   if (simple_string_p(TheEncoding(encoding)->enc_charset)) {
-    # iconv-based encodings have state. Since we cannot duplicate an iconv_t
-    # we have no way to know for sure how many bytes the string will span.
+    /* iconv-based encodings have state. Since we cannot duplicate an iconv_t
+     we have no way to know for sure how many bytes the string will span. */
     if (stringp(obj)) {
       VALUES1(vector_length(obj) == 0 ? Fixnum_0 : NIL);
     } else if (charp(obj)) {
       VALUES1(NIL);
     } else
-      fehler_write(stream,obj,S(character));
+      error_write(stream,obj,S(character));
     return;
   }
  #endif
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   if (TheEncoding(encoding)->min_bytes_per_char !=
       TheEncoding(encoding)->max_bytes_per_char) {
-    # Have to look at each character individually.
+    /* Have to look at each character individually. */
     var const chart* charptr;
     var uintL len;
     var chart auxch;
@@ -17409,13 +17791,13 @@ LISPFUNN(file_string_length,2)
     } else if (charp(obj)) {
       auxch = char_code(obj); charptr = &auxch; len = 1;
     } else
-      fehler_write(stream,obj,S(character));
+      error_write(stream,obj,S(character));
     if (eq(TheEncoding(encoding)->enc_eol,S(Kunix))) {
-      # Treat all the characters all at once.
+      /* Treat all the characters all at once. */
       var uintL result = cslen(encoding,charptr,len);
       VALUES1(UL_to_I(result)); return;
     } else {
-      # Treat line-by-line.
+      /* Treat line-by-line. */
       var const chart* eol_charptr;
       var uintL eol_len;
       if (eq(TheEncoding(encoding)->enc_eol,S(Kmac))) {
@@ -17430,20 +17812,20 @@ LISPFUNN(file_string_length,2)
       var const chart* endptr = charptr+len;
       var uintL result = 0;
       while (charptr < endptr) {
-        # Search the next NL.
+        /* Search the next NL. */
         var const chart* ptr = charptr;
         while (!chareq(*ptr,ascii(NL))) {
           ptr++;
           if (ptr == endptr)
             break;
         }
-        # Count the bytes needed for the characters before the NL.
+        /* Count the bytes needed for the characters before the NL. */
         if (!(ptr == charptr))
           result += cslen(encoding,charptr,ptr-charptr);
         charptr = ptr;
-        # Count the bytes needed for the NL.
+        /* Count the bytes needed for the NL. */
         if (charptr < endptr) {
-          # *charptr is ascii(NL).
+          /* *charptr is ascii(NL). */
           result += cslen(encoding,eol_charptr,eol_len);
           charptr++;
         }
@@ -17451,7 +17833,7 @@ LISPFUNN(file_string_length,2)
       VALUES1(UL_to_I(result)); return;
     }
   }
-  # Now the easy case: a fixed number of bytes per character.
+  /* Now the easy case: a fixed number of bytes per character. */
   var uintL bytes_per_char = TheEncoding(encoding)->min_bytes_per_char;
  #else
   #define bytes_per_char  1
@@ -17464,10 +17846,10 @@ LISPFUNN(file_string_length,2)
     } else if (charp(obj)) {
       VALUES1(fixnum(bytes_per_char)); return;
     } else
-      fehler_write(stream,obj,S(character));
+      error_write(stream,obj,S(character));
   }
   if (eq(TheEncoding(encoding)->enc_eol,S(Kdos))) {
-    # Take into account the NL -> CR/LF translation.
+    /* Take into account the NL -> CR/LF translation. */
     if (stringp(obj)) {
       var uintL len;
       var uintL offset;
@@ -17490,7 +17872,7 @@ LISPFUNN(file_string_length,2)
         result++;
       VALUES1(fixnum(result*bytes_per_char)); return;
     } else
-      fehler_write(stream,obj,S(character));
+      error_write(stream,obj,S(character));
   }
   NOTREACHED;
   #undef bytes_per_char
@@ -17540,120 +17922,103 @@ local uintB stream_isbuffered_low (object stream, uintL *avail) {
 global uintB stream_isbuffered (object stream)
 { return stream_isbuffered_low(stream,NULL); }
 
-# UP: Returns the current line number of a stream.
-# stream_line_number(stream)
-# > stream: a stream
-# < result: an integer or NIL
-# can trigger GC
+/* UP: Returns the current line number of a stream.
+ stream_line_number(stream)
+ > stream: a stream
+ < result: an integer or NIL
+ can trigger GC */
 global maygc object stream_line_number (object stream) {
   return (builtin_stream_p(stream)
           && TheStream(stream)->strmtype == strmtype_file
           && eq(TheStream(stream)->strm_eltype,S(character))
-          ? UL_to_I(ChannelStream_lineno(stream)) # current line-number
-          : NIL);                                 # NIL if unknown
+          ? UL_to_I(ChannelStream_lineno(stream)) /* current line-number */
+          : NIL);                                 /* NIL if unknown */
 }
 
-# (SYS::LINE-NUMBER stream) returns the current line-number (if stream
-# is a Character-File-Input-Stream, which was only used for reading).
+/* (SYS::LINE-NUMBER stream) returns the current line-number (if stream
+ is a Character-File-Input-Stream, which was only used for reading). */
 LISPFUNN(line_number,1) {
   var object stream = check_stream(popSTACK());
   VALUES1(stream_line_number(stream));
 }
 
-# Function: Returns true if a stream allows read-eval.
-# stream_get_read_eval(stream)
-# > stream: a stream
-# < result: true if read-eval is allowed from the stream, else false
-# can trigger GC
-global maygc bool stream_get_read_eval (object stream) {
+/* Function: Returns true if a stream is a FASL stream:
+   "i/o consistency is more important than ANSI compliance"
+ == read-eval is allowed regardless of *READ-EVAL*
+ == #\Return in strings and symbols is printed as \r
+ == #\Newline in strings and symbols is printed as \n
+ == literal newline inside strings is ignored on input
+ stream_get_read_eval(stream)
+ > stream: a stream
+ < result: true if read-eval is allowed from the stream, else false
+ can trigger GC */
+global maygc bool stream_get_fasl (object stream) {
   if (builtin_stream_p(stream)) {
-    return ((TheStream(stream)->strmflags & strmflags_reval_B) != 0);
+    return ((TheStream(stream)->strmflags & strmflags_fasl_B) != 0);
   } else {
-    # (SLOT-VALUE stream '$reval):
+    /* (SLOT-VALUE stream '$fasl): */
     var object stream_forwarded = stream;
     instance_un_realloc(stream_forwarded);
     instance_update(stream,stream_forwarded);
     var object cv = TheInstance(stream_forwarded)->inst_class_version;
     var object clas = TheClassVersion(cv)->cv_class;
-    var object slotinfo = gethash(S(reval),TheClass(clas)->slot_location_table,false);
+    var object slotinfo = gethash(S(fasl),TheClass(clas)->slot_location_table,false);
     var object value = TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)];
     return !nullp(value);
   }
 }
 
-# Function: Changes the read-eval state of a stream.
-# stream_set_read_eval(stream,value);
-# > stream: a stream
-# > value: true if read-eval shall be allowed from the stream, else false
-# can trigger GC
-global maygc void stream_set_read_eval (object stream, bool value) {
+/* Function: Changes the FASL state of a stream.
+ stream_set_read_eval(stream,value);
+ > stream: a stream
+ > value: true if the stream should be a FASL stream, else false
+ can trigger GC */
+global maygc void stream_set_fasl (object stream, bool value) {
   if (builtin_stream_p(stream)) {
     if (value)
-      TheStream(stream)->strmflags |= strmflags_reval_B;
+      TheStream(stream)->strmflags |= strmflags_fasl_B;
     else
-      TheStream(stream)->strmflags &= ~strmflags_reval_B;
+      TheStream(stream)->strmflags &= ~strmflags_fasl_B;
   } else {
-    # (SETF (SLOT-VALUE stream '$reval) value):
+    /* (SETF (SLOT-VALUE stream '$fasl) value): */
     var object stream_forwarded = stream;
     instance_un_realloc(stream_forwarded);
     instance_update(stream,stream_forwarded);
     var object cv = TheInstance(stream_forwarded)->inst_class_version;
     var object clas = TheClassVersion(cv)->cv_class;
-    var object slotinfo = gethash(S(reval),TheClass(clas)->slot_location_table,false);
+    var object slotinfo = gethash(S(fasl),TheClass(clas)->slot_location_table,false);
     TheSrecord(stream_forwarded)->recdata[posfixnum_to_V(slotinfo)] = (value ? T : NIL);
   }
 }
 
-# (SYS::ALLOW-READ-EVAL stream) returns the stream's READ-EVAL flag.
-# (SYS::ALLOW-READ-EVAL stream flag) sets the stream's READ-EVAL flag.
-# T means #. is allowed regardless of the value of *READ-EVAL*, NIL
-# (the default) means that *READ-EVAL* is respected.
-LISPFUN(allow_read_eval,seclass_default,1,1,norest,nokey,0,NIL) {
+/* (SYS::STREAM-FASL-P stream) returns the stream's FASL flag.
+ (SYS::STREAM-FASL-P stream flag) sets the stream's FASL flag. */
+LISPFUN(stream_fasl_p,seclass_default,1,1,norest,nokey,0,NIL) {
   var object stream = check_stream(STACK_1);
   var object flag = STACK_0;
-  if (eq(flag,unbound)) {
-    value1 = (stream_get_read_eval(stream) ? T : NIL);
+  if (!boundp(flag)) {
+    value1 = (stream_get_fasl(stream) ? T : NIL);
   } else {
     if (nullp(flag)) {
-      stream_set_read_eval(stream,false); value1 = NIL;
+      stream_set_fasl(stream,false); value1 = NIL;
     } else {
-      stream_set_read_eval(stream,true); value1 = T;
+      stream_set_fasl(stream,true); value1 = T;
     }
   }
   skipSTACK(2); mv_count=1;
 }
 
-# (SYS::%DEFGRAY fundamental-stream-classes)
-# Initializes O(class_fundamental*_stream).
+/* (SYS::%DEFGRAY fundamental-stream-classes)
+ Initializes O(class_fundamental*_stream). */
 LISPFUNN(defgray,1) {
   copy_mem_o(&O(class_fundamental_stream),&TheSvector(STACK_0)->data[0],
              Svector_length(STACK_0));
   VALUES0; skipSTACK(1);
 }
 
-# =============================================================================
+/* ====================================================================== */
 
-# achieve binary compatibility between .mem-Files with and without NEXTAPP:
-  #ifdef MAYBE_NEXTAPP
-    #ifndef NEXTAPP
-      #define wr_ch_terminal  wr_ch_error
-      #define rd_ch_terminal  rd_ch_error
-    #else
-      #define wr_ch_terminal1  wr_ch_error
-      #define rd_ch_terminal1  rd_ch_error
-      #define wr_ch_array_terminal1  wr_ch_array_dummy
-    #endif
-    #ifndef GNU_READLINE
-      #define wr_ch_terminal3  wr_ch_error
-      #define rd_ch_terminal3  rd_ch_error
-      #define wr_ch_array_terminal3  wr_ch_array_dummy
-    #endif
-    #ifdef NEXTAPP
-      #define wr_ch_window  wr_ch_error
-    #endif
-  #endif
-
-# table of all pseudo-functions
+/* table of all pseudo-functions */
 global struct pseudocode_tab_ pseudocode_tab = {
   #define PSEUDO  PSEUDO_D
   #include "pseudofun.c"
@@ -17663,16 +18028,16 @@ global struct pseudodata_tab_ pseudodata_tab = {
   #define PSEUDO  PSEUDO_E
   #include "pseudofun.c"
   #undef PSEUDO
-  #if defined(MICROSOFT) && !defined(UNICODE)
+  #if defined(MICROSOFT) && !defined(ENABLE_UNICODE)
    (Pseudofun) NULL
   #endif
 };
 
-# =============================================================================
+/* ====================================================================== */
 
-# protect filestatus/if_file_exists, file_datetime by break_sem_4??
-# Signal-Handling on EXECUTE, SHELL, MAKE-PIPE-INPUT-STREAM, MAKE-PIPE-OUTPUT-STREAM, MAKE-PIPE-IO-STREAM ??
-# naming of file/handle/buffered/b_file/unbuffered stuff
-# do not access strm_file_truename on pipe and socket streams
-# implement FILE-POSITION for unbuffered file-streams (regular handle, direction != 5)
-# LISTEN on unbuffered (non-regular) file and socket streams can cause the process to block
+/* protect filestatus/if_file_exists, file_datetime by break_sem_4??
+ Signal-Handling on EXECUTE, SHELL, MAKE-PIPE-INPUT-STREAM, MAKE-PIPE-OUTPUT-STREAM, MAKE-PIPE-IO-STREAM ??
+ naming of file/handle/buffered/b_file/unbuffered stuff
+ do not access strm_file_truename on pipe and socket streams
+ implement FILE-POSITION for unbuffered file-streams (regular handle, direction != 5)
+ LISTEN on unbuffered (non-regular) file and socket streams can cause the process to block */

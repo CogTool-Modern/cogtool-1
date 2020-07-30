@@ -2,7 +2,8 @@
 
 /* DEBUG_SPVW_ASSERT(expression) is an assertion used to debug SPVW. */
 #ifdef DEBUG_SPVW
-  #define DEBUG_SPVW_ASSERT(expression)  if (!(expression)) abort(); else (void)0/*;*/
+  /* print the failed assertion before abort() as is and with expanded macros */
+  #define DEBUG_SPVW_ASSERT(expression)  if (!(expression)) {fprintf(stderr,"\n[%s:%d] assertion failure:\n" #expression "\n" STRING(expression) "\n",__FILE__,__LINE__); abort();} else (void)0/*;*/
 #else
   #define DEBUG_SPVW_ASSERT(expression)  (void)0/*;*/
 #endif
@@ -11,9 +12,9 @@
 local const char hex_table[] = "0123456789ABCDEF";
 local void mem_hex_out (const void* buf, uintL count) {
   if (count > 0) {
-    var DYNAMIC_ARRAY(cbuf,char,3*count+1);
-    var const uintB* ptr1 = (const uintB*) buf;
-    var char* ptr2 = &cbuf[0];
+    DYNAMIC_ARRAY(cbuf,char,3*count+1);
+    const uintB* ptr1 = (const uintB*) buf;
+    char* ptr2 = &cbuf[0];
     dotimespL(count,count, {
       *ptr2++ = ' ';
       *ptr2++ = hex_table[floor(*ptr1,16)]; *ptr2++ = hex_table[*ptr1 % 16];
@@ -27,16 +28,16 @@ local void mem_hex_out (const void* buf, uintL count) {
 
 /* Output a lisp object in lisp notation to standard output.
  can trigger GC */
-global maygc object object_out (object obj) {
+modexp maygc object object_out (object obj) {
   pushSTACK(obj);
-  pushSTACK(var_stream(S(terminal_io),strmflags_wr_ch_B)); # *TERMINAL-IO*
-  prin1(&STACK_0,STACK_1); # output the object
-  terpri(&STACK_0); # output a newline
+  pushSTACK(var_stream(S(terminal_io),strmflags_wr_ch_B)); /* *TERMINAL-IO* */
+  prin1(&STACK_0,STACK_1);      /* output the object */
+  terpri(&STACK_0);             /* output a newline */
   skipSTACK(1);
-  return popSTACK(); # return the same object
+  return popSTACK();            /* return the same object */
 }
 
-#ifdef UNICODE
+#ifdef ENABLE_UNICODE
 /* see string_to_asciz() */
 local void string_out_ (FILE* out, object str, object encoding) {
   var uintL len;
@@ -52,7 +53,7 @@ local void string_out_ (FILE* out, object str, object encoding) {
   FREE_DYNAMIC_ARRAY(buffer);
 }
 #define string_out(o,s) string_out_(o,s,O(terminal_encoding))
-#else /* no UNICODE */
+#else /* no ENABLE_UNICODE */
 local void string_out (FILE* out, object str) {
   var uintL len;
   var uintL offset;
@@ -79,24 +80,25 @@ local void nobject_out1 (FILE* out, object obj, int level) {
     string_out(out,obj);
     fputc('"',out);
   } else if (charp(obj)) {
-    var object name = char_name(char_code(obj));
+    object name = char_name(char_code(obj));
     fprintf(out,"[%c]",as_cint(char_code(obj)));
     if (!nullp(name)) {
       fputs("=#\\",out);
       string_out(out,name);
     }
   } else if (symbolp(obj)) {
-    var object pack = Symbol_package(obj);
+    object symbol = symbol_without_flags(obj);
+    object pack = Symbol_package(symbol);
     if (nullp(pack)) fputs("#:",out); /* uninterned symbol */
     else if (eq(pack,O(keyword_package))) fputc(':',out);
     else {
       string_out(out,ThePackage(pack)->pack_shortest_name);
       fputs("::",out);
     }
-    string_out(out,Symbol_name(obj));
+    string_out(out,Symbol_name(symbol));
   } else if (simple_vector_p(obj)) {
-    var uintL len = vector_length(obj);
-    var uintL elt_index = 0;
+    uintL len = vector_length(obj);
+    uintL elt_index = 0;
     fputs("#(",out);
     while (elt_index < len) {
       if (elt_index) fputc(' ',out);
@@ -105,7 +107,7 @@ local void nobject_out1 (FILE* out, object obj, int level) {
     fputc(')',out);
   } else if (consp(obj)) {
     fputc('(',out);
-    loop {
+    while (1) {
       XOUT(Car(obj));
       obj = Cdr(obj);
       if (atomp(obj)) break;
@@ -116,6 +118,11 @@ local void nobject_out1 (FILE* out, object obj, int level) {
       XOUT(obj);
     }
     fputc(')',out);
+  } else if (arrayp(obj)) {
+    fprintf(out,"#<array %d",Array_type(obj));
+    if (mdarrayp(obj)) fprintf(out," rank=%d",Iarray_rank(obj));
+    else fprintf(out," len=%d",vector_length(obj));
+    fprintf(out," 0x%lx>",as_oint(obj));
   } else if (functionp(obj)) {
     fputs("#<",out);
     if (subrp(obj)) {
@@ -133,12 +140,14 @@ local void nobject_out1 (FILE* out, object obj, int level) {
       obj = Closure_name(obj);
     }
     #ifdef DYNAMIC_FFI
-      else if (ffunctionp(obj)) {
+    else if (ffunctionp(obj)) {
+      if (!fp_validp(TheFpointer(TheFaddress(TheFfunction(obj)->ff_address)->fa_base)))
+        string_out(out,O(printstring_invalid));
       string_out(out,O(printstring_ffunction));
       obj = TheFfunction(obj)->ff_name;
     }
     #endif
-      else { /* interpreted closure */
+    else { /* interpreted closure */
       string_out(out,O(printstring_closure));
       obj = TheIclosure(obj)->clos_name;
     }
@@ -175,20 +184,20 @@ local void nobject_out1 (FILE* out, object obj, int level) {
    #endif
   } else if (hash_table_p(obj)) {
     fputs("#(",out); XOUT(S(hash_table));
-    fprintf(out," size=%u maxcount=%u mincount=%u free=",
+    fprintf(out," size=%u maxcount=%u mincount=%u\n",
             TheHashtable(obj)->ht_size,
             (uintL)posfixnum_to_V(TheHashtable(obj)->ht_maxcount),
             (uintL)posfixnum_to_V(TheHashtable(obj)->ht_mincount));
-    fputs("\n  test=",out);
+    fputs("  test=",out);
     if (ht_test_code_user_p(ht_test_code(record_flags(TheHashtable(obj))))) {
       XOUT(TheHashtable(obj)->ht_test); fputc('/',out);
       XOUT(TheHashtable(obj)->ht_hash);
     } else {
       switch (ht_test_code(record_flags(TheHashtable(obj))) & (bit(1)|bit(0))) {
-        case 0: XOUT(S(eq)); break;
-        case 1: XOUT(S(eql)); break;
-        case 2: XOUT(S(equal)); break;
-        case 3: XOUT(S(equalp)); break;
+        case 0: { XOUT(S(eq)); break; }
+        case 1: { XOUT(S(eql)); break; }
+        case 2: { XOUT(S(equal)); break; }
+        case 3: { XOUT(S(equalp)); break; }
         default: abort();
       }
     }
@@ -213,9 +222,9 @@ local void nobject_out1 (FILE* out, object obj, int level) {
     fputs("#<",out);
     if (!fp_validp(TheFpointer(obj))) string_out(out,O(printstring_invalid));
     string_out(out,O(printstring_fpointer));
-    fprintf(out," 0x%lx>",TheFpointer(obj)->fp_pointer);
+    fprintf(out," 0x%lx>",(uintP)TheFpointer(obj)->fp_pointer);
   } else if (structurep(obj)) {
-    var uintL ii;
+    uintL ii;
     fputs("#<structure",out);
     for(ii=0; ii<Structure_length(obj); ii++) {
       fputc(' ',out);
@@ -226,7 +235,7 @@ local void nobject_out1 (FILE* out, object obj, int level) {
     fputs("#<instance ",out);
     XOUT(TheInstance(obj)->inst_class_version);
     fprintf(out," 0x%lx>",as_oint(obj));
-  } else if (fixnump(obj)) fprintf(out,"%d",fixnum_to_V(obj));
+  } else if (fixnump(obj)) fprintf(out,"%ld",fixnum_to_V(obj));
   else if (eq(obj,unbound))   string_out(out,O(printstring_unbound));
   else if (eq(obj,nullobj))   fputs("#<NULLOBJ>",out);
   else if (eq(obj,disabled))  string_out(out,O(printstring_disabled_pointer));
@@ -235,12 +244,15 @@ local void nobject_out1 (FILE* out, object obj, int level) {
   else if (eq(obj,dot_value)) string_out(out,O(printstring_dot));
 #if defined(DYNAMIC_FFI)
   else if (faddressp(obj)) {
-    fputs("#<",out); string_out(out,O(printstring_faddress)); fputs(" ",out);
+    fputs("#<",out);
+    if (!fp_validp(TheFpointer(TheFaddress(obj)->fa_base)))
+      string_out(out,O(printstring_invalid));
+    string_out(out,O(printstring_faddress)); fputs(" ",out);
     XOUT(TheFaddress(obj)->fa_base);
     fprintf(out," + 0x%lx>",TheFaddress(obj)->fa_offset);
   }
 #endif
-  else if (as_oint(obj) & wbit(frame_bit_o)) {
+  else if (framepointerp(obj)) {
     fputs("#<frame ",out);
     switch (framecode(obj)) {
       case DYNBIND_frame_info: fputs("DYNBIND",out); break;
@@ -271,9 +283,10 @@ local void nobject_out1 (FILE* out, object obj, int level) {
       case DRIVER_frame_info: fputs("DRIVER",out); break;
       default: fputs("**UNKNOWN**",out);
     }
-    fprintf(out," 0x%lx>",as_oint(obj));
+    fprintf(out," %d>",STACK_item_count(uTheFramepointer(obj),
+                                        (gcv_object_t*)STACK_start));
   } else if (builtin_stream_p(obj)) {
-    fprintf(out,"#<built-in-stream type=%d flags=%d len=%d xlen=%d slen=%d",
+    fprintf(out,"#<built-in-stream type=%d flags=%d len=%d xlen=%d slen=%ld",
             TheStream(obj)->strmtype,TheStream(obj)->strmflags,
             Stream_length(obj),Stream_xlength(obj),strm_len);
     switch (TheStream(obj)->strmtype) {
@@ -303,7 +316,7 @@ local void nobject_out1 (FILE* out, object obj, int level) {
     fputs("#<encoding eol=",out); XOUT(TheEncoding(obj)->enc_eol);
     fputs(" wce=",out); XOUT(TheEncoding(obj)->enc_towcs_error);
     fputs(" mbe=",out); XOUT(TheEncoding(obj)->enc_tombs_error);
-   #ifdef UNICODE
+   #ifdef ENABLE_UNICODE
     fputs(" cs=",out); XOUT(TheEncoding(obj)->enc_charset);
    #endif
     fprintf(out," 0x%lx>",as_oint(obj));
@@ -311,18 +324,18 @@ local void nobject_out1 (FILE* out, object obj, int level) {
   #ifndef TYPECODES
   else if (varobjectp(obj))
     fprintf(out,"#<varobject type=%d address=0x%lx>",
-            varobject_type(TheVarobject(obj)),ThePointer(obj));
+            varobject_type(TheVarobject(obj)),(uintP)ThePointer(obj));
   #endif
-  else fprintf(out,"#<huh?! address=0x%lx>",ThePointer(obj));
+  else fprintf(out,"#<huh?! address=0x%lx>",(uintP)ThePointer(obj));
  #undef XOUT
 }
 
 /* non-consing, STACK non-modifying */
+local int nobject_out_level = 5; /* for debugging */
 global object nobject_out (FILE* out, object obj) {
-  var local int level = 5; /* for debugging */
   begin_system_call();
   if (out == NULL) out = stdout;
-  nobject_out1(out,obj,level);
+  nobject_out1(out,obj,nobject_out_level);
   fflush(out);
   end_system_call();
   return obj;
@@ -331,9 +344,9 @@ global object nobject_out (FILE* out, object obj) {
 /* use (struct backtrace_t*) and not p_backtrace_t
    so that this is useable from the p_backtrace_t C++ definition */
 local int back_trace_depth (const struct backtrace_t *bt) {
-  var uintL bt_index = 0;
-  var const struct backtrace_t *bt_fast = (bt ? bt : back_trace);
-  var const struct backtrace_t *bt_slow = bt_fast;
+  uintL bt_index = 0;
+  const struct backtrace_t *bt_fast = (bt ? bt : back_trace);
+  const struct backtrace_t *bt_slow = bt_fast;
   while (bt_fast) {
     bt_fast = bt_fast->bt_next; bt_index++;
     if (bt_fast == bt_slow) return -bt_index;
@@ -347,22 +360,25 @@ local int back_trace_depth (const struct backtrace_t *bt) {
 /* print a single struct backtrace_t object
  the caller must do begin_system_call()/end_system_call() ! */
 local void bt_out (FILE* out, const struct backtrace_t *bt, uintL bt_index) {
-  fprintf(out,"[%d/0x%lx]%s ",bt_index,bt,bt_beyond_stack_p(bt,STACK)?"<":">");
+  fprintf(out,"[%d/0x%lx]%s ",bt_index,(uintP)bt,
+          bt_beyond_stack_p(bt,STACK)?"<":">");
   nobject_out(out,bt->bt_function);
   if (bt->bt_num_arg >= 0)
     fprintf(out," %d args",bt->bt_num_arg);
   if (bt->bt_next)
-    fprintf(out," delta: STACK=%d; SP=%d",
-            STACK_item_count(top_of_back_trace_frame(bt),top_of_back_trace_frame(bt->bt_next)),
-            (((long)((char*)(bt->bt_next) - (char*)bt) ^ SPoffset) - SPoffset) / sizeof(SPint));
-  fputc('\n',out);
+    fprintf(out," delta: STACK=%ud; SP=%ld",
+            STACK_item_count(top_of_back_trace_frame(bt),
+                             top_of_back_trace_frame(bt->bt_next)),
+            (((long)((char*)(bt->bt_next) - (char*)bt) ^ SPoffset) - SPoffset)
+            / sizeof(SPint));
+  fputc('\n',out); fflush(out);
 }
 
 /* print the whole backtrace stack */
 local uintL back_trace_out (FILE* out, const struct backtrace_t *bt) {
-  var uintL bt_index = 0;
-  var const struct backtrace_t *bt_fast = (bt ? bt : back_trace);
-  var const struct backtrace_t *bt_slow = bt_fast;
+  uintL bt_index = 0;
+  const struct backtrace_t *bt_fast = (bt ? bt : back_trace);
+  const struct backtrace_t *bt_slow = bt_fast;
   if (out == NULL) out = stdout;
   begin_system_call();
   while (bt_fast) {
@@ -425,7 +441,14 @@ local object find_sym (char* name_s, char* pack_s) {
 
 #endif
 
-#ifdef DEBUG_SPVW
+#if defined(DEBUG_SPVW)
+unsigned int get_constsym_count (void);
+unsigned int get_constsym_count (void) { return symbol_count; }
+object get_constsym (unsigned int);
+object get_constsym (unsigned int pos) {
+  if (pos < symbol_count) return symbol_tab_ptr_as_object(((symbol_*)((char*)&symbol_tab+varobjects_misaligned))+pos);
+  else return Fixnum_0;
+}
 #define FUN(from,to,name) local to CONCAT(name,_) (from x) { return name(x); }
 FUN(chart,cint,as_cint)
 FUN(cint,chart,as_chart)
@@ -452,6 +475,39 @@ FUN(object,object,Car)
 FUN(object,object,Cdr)
 FUN(object,Symbol,TheSymbol)
 FUN(object,Hashtable,TheHashtable)
+FUN(object,Package,ThePackage)
+FUN(object,Pathname,ThePathname)
 FUN(object,Dfloat,TheDfloat)
+FUN(object,Lfloat,TheLfloat)
+FUN(object,Cclosure,TheCclosure)
+FUN(object,int,Cclosure_length)
+FUN(object,Codevec,TheCodevec)
+local void venv_out (FILE *out, object venv) { /* cf eval.d:symbol_env_search */
+  begin_system_call();
+  if (out == NULL) out = stdout;
+ next_env:
+  nobject_out(out,venv); fputc('\n',out);
+  if (framepointerp(venv)) {
+     var gcv_object_t* FRAME = TheFramepointer(venv);
+     var uintL count = as_oint(FRAME_(frame_count)); /* number of bindings */
+     fprintf(out,"* count=%d\n",count);
+     if (count > 0) {
+      var gcv_object_t* bindingsptr = &FRAME_(frame_bindings); /* 1st binding */
+      do {
+       #ifdef NO_symbolflags
+        nobject_out(out,*(bindingsptr STACKop 1));
+       #else
+        nobject_out(out,*(bindingsptr STACKop 0));
+       #endif
+        fputc('\n',out);
+        bindingsptr skipSTACKop varframe_binding_size; /* no: next binding */
+      } while (--count);
+    }
+    venv = FRAME_(frame_next_env);
+    goto next_env;
+  }
+  fflush(out);
+  end_system_call();
+}
 #undef FUN
 #endif

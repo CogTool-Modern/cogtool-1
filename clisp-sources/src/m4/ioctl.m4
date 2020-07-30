@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2004 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2004, 2007-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -12,7 +12,6 @@ AC_PREREQ(2.57)
 
 AC_DEFUN([CL_IOCTL],
 [AC_REQUIRE([CL_TERM])dnl
-AC_REQUIRE([CL_OPENFLAGS])dnl
 AC_REQUIRE([CL_CADDR_T])dnl
 AC_CHECK_FUNCS(ioctl)
 if test $ac_cv_func_ioctl = yes; then
@@ -64,13 +63,13 @@ ioctl_decl="$ioctl_decl1", ioctl_decl="$ioctl_decl2")
 fi
 dnl Then find out about the correct ioctl declaration:
 for y in 'caddr_t arg' 'void* arg' '...'; do
-for x in 'int' 'unsigned long' 'long'; do
+for x in SIZE_VARIANTS; do
 if test -z "$have_ioctl"; then
 CL_PROTO_TRY($ioctl_decl[
 #ifdef INCLUDE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
-], [int ioctl (int fd, $x request, $y);], [int ioctl();], [
+], [int ioctl (int fd, $x request, $y);], [
 cl_cv_proto_ioctl_arg2="$x"
 if test "$y" = "..."; then
 cl_cv_proto_ioctl_dots=yes
@@ -85,10 +84,7 @@ fi
 done
 done
 if test -z "$have_ioctl"; then
-  echo "*** Missing autoconfiguration support for this platform." 1>&2
-  echo "*** Please report this as a bug to the CLISP developers." 1>&2
-  echo "*** When doing this, please also show your system's ioctl() declaration." 1>&2
-  exit 1
+CL_PROTO_MISSING(ioctl)
 fi
 ], [extern int ioctl ($cl_cv_proto_ioctl_args);])
 AC_DEFINE_UNQUOTED(IOCTL_REQUEST_T,$cl_cv_proto_ioctl_arg2,[type of `request' in ioctl() declaration])
@@ -130,9 +126,6 @@ AC_TRY_RUN([
 #endif
 /* Declare open(). */
 #include <fcntl.h>
-#ifdef OPEN_NEEDS_SYS_FILE_H
-#include <sys/file.h>
-#endif
 int main ()
 { int fd = open("conftest.c",O_RDONLY,0644);
   unsigned long bytes_ready;

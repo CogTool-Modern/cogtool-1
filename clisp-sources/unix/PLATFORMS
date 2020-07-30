@@ -21,7 +21,10 @@ This file presents
     PC 386 under BeOS 5.0
     IA-64 running Linux, emulated by HP NUE
     AMD64 (x86_64) running FreeBSD
+    DEC Alpha running Linux
     AFS (Andrew File System)
+    PC 386 running OpenBSD 3.8
+    Nokia N800 (Arm) running Linux
 * hints for porting to new platforms.
 
 
@@ -382,6 +385,14 @@ Apple iBook PPC G4    MacOS X 10.3.8  Bruno Haible  <bruno@clisp.org>
 2005-03               54.12 s user +  9.36 s system (without generational GC)
                       46.41 s user + 13.85 s system (with generational GC)
 
+Apple Macbook Intel   MacOS X 10.4.5  Gene Garbutt  <ggarbutt@mac.com>
+2006-03               19.13 s user +  6.59 s system
+
+ARM 1136J-S, 128M RAM, gcc 3.4.4,     Jamie Craig <jamie@jamiecraig.com>
+2007-07-11            5m28.941s (4m58.844s user, 0m13.234s sys)
+running from SD card instead of internal flash.
+CFLAGS='-DNO_GENERATIONAL_GC -mcpu=arm1136j-s'
+http://permalink.gmane.org/gmane.lisp.clisp.general/11881
 
 When you install CLISP on a machine not mentioned here, please send us a short
 note containing the information mentioned above. If you didn't succeed in
@@ -393,26 +404,26 @@ Special hints for some platforms:
 ---------------------------------
 
 
-On NetBSD/sparc 1.4.1:
+* On NetBSD/sparc 1.4.1:
 
 The default stack limit is 512 KB, which is not sufficient for building CLISP.
 Use the "ulimit -s" command to increase it.
 
 
-On PC 386 under FreeBSD 4.0:
+* On PC 386 under FreeBSD 4.0:
 
 gcc 2.95.2 miscompiles the streamp() macro in (at least) io.d at optimization
 level -O2. Replace -O2 with -O in the CFLAGS in the makefile. This is fixed in
 gcc-3.3.1.
 
 
-On BSDI 1.0:
+* On BSDI 1.0:
 
 Add -DNO_ASM to the CFLAGS in the makefile. Otherwise the assembly code in
 eval.d cannot be fed through the assembler.
 
 
-On a 386 PC under GNU 0.2 (the Hurd):
+* On a 386 PC under GNU 0.2 (the Hurd):
 
 Before starting the configuration, disable the "crash" server:
   $ settrans -g /servers/crash
@@ -422,23 +433,23 @@ attached).
 
 Choose "gcc -D__USE_GNU" as compiler.
 
-After configuring, change unixconf.h to contain the line
+After configuring, change build-dir/config.h to contain the line
   #undef HAVE_GETRUSAGE
 
 For executing "makemake", the default shell (bash-2.0) cannot be used (buggy).
 Install bash-2.01 or newer.
 
 
-On a Sun4 (Sparc) under Linux:
+* On a Sun4 (Sparc) under Linux:
 
-After configuring, change unixconf.h to contain the lines
+After configuring, change build-dir/config.h to contain the lines
   #undef HAVE_MMAP_DEVZERO
   #undef HAVE_MMAP_DEVZERO_SUN4_29
 Otherwise, the poor Sparc1 will freeze up about half way through the compile
 of compiler.lisp. Looks like a kernel problem.
 
 
-On a 386 PC under SunOS 5.4 (Solaris 2.4):
+* On a 386 PC under SunOS 5.4 (Solaris 2.4):
 
 Use CC="gcc". You can't use "gcc -ansi" because (at least) the <sys/signal.h>
 (#included by <signal.h>) thinks "gcc -ansi" means *strict* ANSI, which
@@ -457,7 +468,7 @@ require intervention, but once it is linked, shared libraries will appear
 in VM that CLISP expects to be free.
 
 
-On a HP9000/8xx under HP-UX version 8, 9, 10:
+* On a HP9000/8xx under HP-UX version 8, 9, 10:
 
 If cc had no bugs:
   Choose "cc -Aa -z -D_HPUX_SOURCE" or "c89 -z -D_HPUX_SOURCE" as compiler,
@@ -494,14 +505,19 @@ and you need to use GNU make instead of HP-UX make.
 With older versions of gcc, the testsuite causes a failure because of ISQRT.
 A workaround is to use gcc 2.95.2 or newer.
 
+HP-UX has two different malloc() implementations.  Both are broken.
+When used with CLISP, the one in the default libc.a leads to a SIGSEGV,
+the one in libmalloc.a leads to a SIGBUS.
+Pass "--with-gmalloc" to ./configure to work around this problem.
 
-On SINIX-N 5.43:
+
+* On SINIX-N 5.43:
 
 Choose CC="cc -D_XPG_IV" instead of CC=cc. This avoids a problem with a wrong
 declaration of gettimeofday().
 
 
-On IRIX 6.2 in 64-bit mode:
+* On IRIX 6.2 in 64-bit mode:
 
 The C compiler 6.2 is unable to compile CLISP. If you don't have the C
 compiler 7.0 or newer, you have to use the C++ compiler 7.0 instead.
@@ -513,14 +529,14 @@ eval.d is apparently miscompiled. Remove the "-L/usr/lib -lX11" from the
 CFLAGS in the makefile, if your X11 libraries are 32-bit.
 
 
-On IRIX 6.2 and 6.3:
+* On IRIX 6.2 and 6.3:
 
 The configuration of ffcall hangs during "checking for working mprotect".
 The running `conftest' process is unkillable. No workaround is known.
 The problem seems to be gone in IRIX 6.4.
 
 
-On IRIX 6.5:
+* On IRIX 6.5:
 
 The /bin/sh has a problem with autoconf generated configure scripts. You
 have to first install GNU bash and point the CONFIG_SHELL environment
@@ -532,16 +548,7 @@ With the C compiler 7.2.1 we were not able to make CLISP work. So use
 GNU gcc instead.
 
 
-On NeXT running NeXTstep 3.3:
-
-NeXT's cc has problem with the inline assembler commands. Either add
--DNO_ASM to the CFLAGS in the Makefile, or use gcc-2.7.2 or newer.
-
-If you get an error in the header file "ip.h" because the type `n_long' is
-undefined, add -Dn_long='unsigned long' to the CFLAGS in the Makefile.
-
-
-On Apple PowerPC running MacOS X Server:
+* On Apple PowerPC running MacOS X Server:
 
 You can get C development tools from either
 Fink - <http://fink.sourceforge.net> (Free Software ported to Darwin)
@@ -576,7 +583,7 @@ GC, so the small startup slowdown may not matter for you).
 <http://article.gmane.org/gmane.lisp.clisp.general:10481>
 
 
-On AIX 3 and 4:
+* On AIX 3 and 4:
 
 You can't use "cc" as compiler since it wants more than 64 MB RAM to compile
 eval.d. You will use GNU gcc without regrets.
@@ -589,19 +596,19 @@ the config.cache which is generated.  If this happens, start over
 with the variable CONFIG_SHELL exported as a reliable shell, like bash.
 
 
-On AIX 5.1:
+* On AIX 5.1:
 
 When using "xlc -D_ALL_SOURCE" as compiler, you cannot use optimizations.
 So remove any -O from the CFLAGS in the Makefile.
 
 
-On DEC Alpha AXP running OSF/1 3.2:
+* On DEC Alpha AXP running OSF/1 3.2:
 
 The build process crashes during bootstrap, right after loading backquote.lisp.
 You'd better try with gcc.
 
 
-On DEC Alpha AXP running OSF/1 4.0b:
+* On DEC Alpha AXP running OSF/1 4.0b:
 
 cc has a preprocessor bug which occurs in spvw.d and eval.d. So get and
 install GNU gcc (version 2.5.5 or newer).
@@ -610,35 +617,70 @@ has another bug which occurs in pathname.d. So get and install GNU gcc
 for real.
 
 
-On PC 386 under BeOS 5.0:
+* On PC 386 under BeOS 5.0:
 
 gcc miscompiles something with the default flags. Changing the CFLAGS in
 the Makefile, replacing "-fomit-frame-pointer -O2 -fexpensive-optimizations"
 with "-O", avoids this.
 
 
-On IA-64 running Linux, emulated by HP NUE:
+* On IA-64 running Linux, emulated by HP NUE:
 
-Add -DNO_MULTIMAP_SHM -DNO_MULTIMAP_FILE -DNO_SINGLEMAP -DNO_TRIVIALMAP
-to the CFLAGS, or, equivalently, pass "--disable-mmap" to ./configure.
-
-
-On AMD64 (x86_64) running FreeBSD:
-
-Add -DNO_MULTIMAP_SHM -DNO_MULTIMAP_FILE -DNO_SINGLEMAP -DNO_TRIVIALMAP
-to the CFLAGS, or, equivalently, pass "--disable-mmap" to ./configure.
+Add -DNO_SINGLEMAP -DNO_TRIVIALMAP to the CFLAGS, or, equivalently, pass
+"--disable-mmap" to ./configure.
 
 
-On DEC Alpha running Linux:
+* On AMD64 (x86_64) running FreeBSD:
 
-Add -DNO_MULTIMAP_SHM -DNO_MULTIMAP_FILE -DNO_SINGLEMAP -DNO_TRIVIALMAP
-to the CFLAGS, or, equivalently, pass "--disable-mmap" to ./configure.
+Add -DNO_SINGLEMAP -DNO_TRIVIALMAP to the CFLAGS, or, equivalently, pass
+"--disable-mmap" to ./configure.
 
 
-On platforms using AFS:
+* On DEC Alpha running Linux:
+
+Add -DNO_SINGLEMAP -DNO_TRIVIALMAP to the CFLAGS, or, equivalently, pass
+"--disable-mmap" to ./configure.
+
+
+* On PA-RISC 2 (hppa2.0) running Linux:
+
+Add -DNO_SINGLEMAP -DNO_TRIVIALMAP to the CFLAGS, or, equivalently, pass
+"--disable-mmap" to ./configure.
+
+
+* On platforms using AFS:
 
 You may get an "Invalid cross-device link" error.
 If you do, try running make as "make LN_HARD='cp -p' LN='cp -p'".
+
+
+* On PC 386 running OpenBSD 3.8:
+
+If you get mmap errors on the first invocation of lisp.run, this is
+likely due to the new randomizing malloc.
+Pass "--with-gmalloc" to ./configure to work around this problem.
+If the problem persists, copy ftp://gee.cs.oswego.edu/pub/misc/malloc.c
+to malloc/gmalloc.c; change line 509 to "#define HAVE_MMAP 0";
+and try "--with-gmalloc" again.
+
+
+* On Nokia N800 (Arm) running Linux:
+
+If you get a crash during loading of the first few lisp file (first GC),
+add "-DNO_GENERATIONAL_GC" to CFLAGS.
+If your modules do not work (clisp.h does not define "object" type),
+install GNU sed.
+
+
+* On ppc and ppc64 running Linux:
+
+If you get a crash during loading of the first few lisp file (first GC),
+add "-DNO_GENERATIONAL_GC" to CFLAGS.
+
+
+* On Sparc running Solaris 8, 9, 10:
+
+Use gcc 3.3.* because gcc 4.* miscompiles at least io.d.
 
 
 Hints for porting to new platforms:
@@ -666,12 +708,10 @@ appropriately. No assumptions about the stack area are made.
 Has your operating system shared memory or memory mapping facilities?
 On 64-bit platforms, CLISP tries to use them to save the time for stripping
 off the tag bits (see above) before memory accesses. If you get an error
-message concerning shared memory, you should add -DNO_MULTIMAP_SHM to the
-CFLAGS and recompile. If you get an error message concerning mapped memory,
-you should add -DNO_MULTIMAP_FILE -DNO_SINGLEMAP to the CFLAGS and recompile.
-Doing so introduces a speed penalty of about 6%. If you still get an error
-message concerning mapped memory, you should add -DNO_TRIVIALMAP to the CFLAGS
-and recompile.
+message concerning mapped memory, you should add -DNO_SINGLEMAP to the CFLAGS
+and recompile. Doing so introduces a speed penalty of about 6%. If you still
+get an error message concerning mapped memory, you should add -DNO_TRIVIALMAP
+to the CFLAGS and recompile.
 
 If you get an error message mentioning "handle_fault", then generational GC
 is not working. Add -DNO_GENERATIONAL_GC to the CFLAGS and recompile.

@@ -1,6 +1,6 @@
 ;;;; Common Lisp Object System for CLISP: Classes
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2004
+;;;; Sam Steingold 1998 - 2004, 2007
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -111,3 +111,11 @@
 (predefun print-object (object stream)
   (declare (ignore object))
   (write-string "#<UNKNOWN>" stream))
+
+(defvar *enable-clos-warnings* nil)
+(defun clos-warn (type format &rest args)
+  ;; type MUST be a SIMPLE-* condition!
+  (when *enable-clos-warnings*
+    (apply 'sys::warn-of-type type format args)))
+(defmacro clos-warning (format &rest args)
+  `(clos-warn 'simple-clos-warning ,format .,args))

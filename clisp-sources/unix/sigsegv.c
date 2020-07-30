@@ -30,19 +30,14 @@
  */
 
 
-#if 1
-/* Put your pathname to unixconf.h here if you have already run configure. */
-#include "unixconf.h"
+#if HAVE_CONFIG_H
+/* Put your pathname to config.h here if you have already run configure. */
+#include "config.h"
 #endif
 
-#ifndef UNIXCONF
+#ifndef HAVE_CONFIG_H
 
-/* The following bits of information can be copied from unixconf.h. */
-
-/* CL_STDC_HEADERS */
-/* Define if you have the ANSI C header files
-   <stdlib.h>, <stdarg.h>, <string.h>, <float.h>, <limits.h>. */
-#undef STDC_HEADERS
+/* The following bits of information can be copied from config.h. */
 
 /* CL_UNISTD_H */
 /* Define if you have <unistd.h>. */
@@ -53,18 +48,12 @@
 #undef size_t
 #endif
 
-/* AC_RETSIGTYPE */
-/* Define as the return type of signal handlers (int or void). */
-#define RETSIGTYPE void
-
 #endif
 
 
 /* Declarations. */
 
-#ifdef STDC_HEADERS
 #include <stdlib.h>
-#endif
 
 #ifdef HAVE_UNISTD_H
 #include <sys/types.h>
@@ -72,7 +61,7 @@
 #endif
 
 #include <signal.h>
-typedef RETSIGTYPE (*signal_handler_t) ();
+typedef void (*signal_handler_t) ();
 extern signal_handler_t signal (int sig, signal_handler_t handler);
 /* forward */ void install_signal (int sig, signal_handler_t handler);
 
@@ -193,15 +182,6 @@ extern signal_handler_t signal (int sig, signal_handler_t handler);
 #define WP_SIGNAL  FAULT_HANDLER(SIGBUS)
 #endif
 
-#if defined(NeXT) /* NextStep 3.2 */
-/* The fault address is not passed to the signal handler. To get the fault
- * address, a Mach exception handler has to be set up, which runs in a separate
- * thread.
- */
-#define WP_SIGNAL  FAULT_HANDLER(SIGBUS)
-#define CAN_HANDLE_WP_FAULT
-#endif
-
 #if 0
 /* Ultrix ?? */
 #define FAULT_HANDLER_ARGLIST  sig, code, scp
@@ -252,7 +232,7 @@ char* fault_address;
 typedef void* (*something) [20];
 void do_nothing();
 
-RETSIGTYPE fault_handler (sig, arg1, arg2, arg3, arg4, arg5, arg6)
+void fault_handler (sig, arg1, arg2, arg3, arg4, arg5, arg6)
   int sig;
   something arg1, arg2, arg3, arg4, arg5, arg6;
 { /* Set a breakpoint here! */
@@ -300,9 +280,9 @@ void do_nothing() { }
 /* Test the database entry. */
 
 
-#ifndef UNIXCONF
+#ifndef HAVE_CONFIG_H
 
-/* More information from unixconf.h */
+/* More information from config.h */
 
 /* CL_CADDR_T */
 #undef CADDR_T
@@ -332,23 +312,6 @@ extern RETGETPAGESIZETYPE getpagesize(/* void */);
 #endif
 #endif
 
-#ifdef NeXT /* NeXTstep has Mach VM. */
-#include <sys/types.h>
-#include <sys/resource.h>
-#include <mach/mach.h>
-#include <mach/machine/vm_param.h>
-#define mmap(addr,len,prot,unused_flags,unused_fd,unused_off) \
-  ({vm_address_t address = addr; \
-    vm_allocate(task_self(),&address,len,!(addr)); \
-    address; \
-  })
-#define mprotect(addr,len,prot) \
-  (vm_protect(task_self(),addr,len,0,prot)==KERN_SUCCESS ? 0 : -1)
-#define PROT_NONE 0
-#define PROT_READ VM_PROT_READ
-#define PROT_WRITE VM_PROT_WRITE
-#define PROT_EXEC VM_PROT_EXECUTE
-#else
 #ifdef HAVE_MMAP
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -356,7 +319,6 @@ extern void* mmap (/* void* addr, size_t len, int prot, int flags, int fd, off_t
 extern int mprotect (/* void* addr, size_t len, int prot */);
 #else
 #error "Need mprotect() for the test."
-#endif
 #endif
 
 #ifndef PROT_READ_WRITE

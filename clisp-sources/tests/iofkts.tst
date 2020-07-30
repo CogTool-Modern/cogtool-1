@@ -1,10 +1,7 @@
-;; -*- mode: Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;;****************************************************************************
 ;;*      Test the I/O functions                                              *
 ;;****************************************************************************
-
-(PROGN (IN-PACKAGE #-(or SBCL OpenMCL) "USER" #+(or SBCL OpenMCL) "COMMON-LISP-USER") T)
-T
 
 ;;--- let test ---------------------------------------------------------------
 ;; always compiler error
@@ -745,11 +742,12 @@ t
   (write-char #\) out))
 MY-PPRINT-REVERSE
 
-(let ((*print-pprint-dispatch* (copy-pprint-dispatch)))
+(let ((*print-pprint-dispatch* (copy-pprint-dispatch nil)))
   (set-pprint-dispatch '(cons (member foo)) 'my-pprint-reverse 0)
   (write-to-string '(foo bar :boo 1) :pretty t :escape t))
 "(1 :BOO BAR FOO)"
 
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=873204&group_id=1355
 (defun my-pprint-logical (out list)
   (pprint-logical-block (out list :prefix "(" :suffix ")")
     (when list
@@ -760,10 +758,44 @@ MY-PPRINT-REVERSE
         (write-char #\Space out)))))
 MY-PPRINT-LOGICAL
 
-(let ((*print-pprint-dispatch* (copy-pprint-dispatch)))
+(let ((*print-pprint-dispatch* (copy-pprint-dispatch nil)))
   (set-pprint-dispatch '(cons (member bar)) 'my-pprint-logical 0)
   (write-to-string '(bar foo :boo 1) :pretty t :escape t))
 "(?BAR? ?FOO? ?:BOO? ?1?)"
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1482533&group_id=1355&atid=101355
+;; http://www.lisp.org/HyperSpec/Body/fun_pprint-dispatch.html
+(with-output-to-string (s) (print-object 42 s)) "42"
+(string= (with-output-to-string (s)
+           (let ((*print-pretty* t))
+             (write 42 :stream s)))
+         (with-output-to-string (s)
+           (funcall (pprint-dispatch 42) s 42)))
+T
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1598053&group_id=1355&atid=101355
+;; https://sourceforge.net/tracker/index.php?func=detail&aid=1483768&group_id=1355&atid=101355
+(let ((*print-pprint-dispatch* (copy-pprint-dispatch nil))
+      (*print-pretty* t))
+  (flet ((my-symbol-pprint (stream obj)
+           (let ((*print-pretty* nil))
+             (princ "++" stream) (princ obj stream) (princ "++" stream))))
+    (set-pprint-dispatch 'symbol #'my-symbol-pprint)
+    (princ-to-string '(a (b (c (d) e) f) g))))
+"(++A++ (++B++ (++C++ (++D++) ++E++) ++F++) ++G++)"
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1835520&group_id=1355
+(let ((*print-pprint-dispatch* (copy-pprint-dispatch nil))
+      (*print-pretty* t)
+      (l '(:bracket 1 2 (:bracket 3 4))))
+  (flet ((bracket-list-printer (stream blist)
+           (format stream "[~{~S~^ ~}]" (rest blist))))
+    (set-pprint-dispatch '(cons (eql :bracket)) #'bracket-list-printer)
+    (list (princ-to-string l)
+          (with-output-to-string (s)
+            (pprint-logical-block (s ())
+              (prin1 l s))))))
+("[1 2 [3 4]]" "[1 2 [3 4]]")
 
 (progn
  (defclass c1 () ((a :initarg a) (b :initarg b) (c :initarg c)))
@@ -801,15 +833,14 @@ T
 (write-to-string (make-instance 'c2 'b 123 'cc 42) :pretty t)
 "#[C2 B 123 CC 42]"
 
-#+:enable-risky-tests
 (write-to-string (list (make-instance 'c2 'a 45 'bb 17 'aa 12)
                        (make-instance 'c2 'b 123 'cc 42))
                  :pretty t)
-#+:enable-risky-tests
-"(#[C2 AA 12 BB 17 A 45] #[C2 CC 42 B 123])"
+"(#[C2 A 45 AA 12 BB 17] #[C2 B 123 CC 42])"
 
 (let ((*print-readably* t))
-  (with-output-to-string (out) (pprint-linear out (list 'a 'b 'c))))
+  (with-output-to-string (out)
+    (pprint-linear out (list 'cl-user::a 'cl-user::b 'cl-user::c))))
 #+CLISP "(|COMMON-LISP-USER|::|A| |COMMON-LISP-USER|::|B| |COMMON-LISP-USER|::|C|)"
 #+CMU "(A . (B C))"
 #-(or CLISP CMU) "(A B C)"
@@ -822,26 +853,70 @@ T
              #2=(\"null\" #1# \"zero\") #2#))"))
 T
 
-;; cleanup
-(progn
-  (makunbound 'bs)
-  (makunbound 'str1)
-  (makunbound 's1)
-  (makunbound 'string1)
-  (makunbound 'string2)
-  (makunbound 'a)
-  (makunbound 'aa)
-  (makunbound 'b)
-  (makunbound 'c)
-  (makunbound 'd)
-  (makunbound 'j)
-  (makunbound 'x)
-  (fmakunbound 'ask)
-  (fmakunbound 'my-pprint-reverse)
-  (fmakunbound 'my-pprint-logical)
-  (setf (find-class 'c1) nil
-        (find-class 'c2) nil))
-NIL
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1890854&group_id=1355
+(with-input-from-string (s "'a #'b c d")
+  (list (read-preserving-whitespace s) (read-char s)
+        (read-preserving-whitespace s) (read-char s)
+        (read-preserving-whitespace s) (read-char s)
+        (read-char s)))
+((QUOTE A) #\Space (FUNCTION B) #\Space C #\Space #\d)
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1412454&group_id=1355&atid=101355
+(let (#+clisp (*pprint-first-newline* nil))
+  (format nil "~{~a~}" (list "string1" "string2"
+                             (concatenate 'string "string3"
+                                          (string #\newline)))))
+"string1string2string3
+"
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1613300&group_id=1355&atid=101355
+#+clisp (princ-to-string (fdefinition 'defun)) #+clisp
+"#<MACRO #<COMPILED-FUNCTION DEFUN> (FUNCTION-NAME LAMBDA-LIST &BODY FORMS)>"
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1831367&group_id=1355
+(flet ((foo-printer (stream foo)
+         (let ((*print-pretty* nil))
+           (princ "FOO:" stream) (prin1 (cdr foo) stream))))
+  (with-standard-io-syntax
+    (set-pprint-dispatch '(cons (member foo)) #'foo-printer)
+    (write-to-string '(foo 123) :pretty t)))
+"FOO:(123.)"
+
+;; http://article.gmane.org/gmane.lisp.clisp.devel:17529
+;; required by ANSI, tested by COPY-PPRINT-DISPATCH.[145]
+(eq *print-pprint-dispatch* (copy-pprint-dispatch)) NIL
+
+;; https://sourceforge.net/tracker/?func=detail&atid=101355&aid=1834193&group_id=1355
+(with-output-to-string (s)
+  (princ "xxx" s)
+  (terpri s)
+  (princ #\Tab s)
+  (fresh-line s)
+  (princ "yyy" s))
+"xxx
+	
+yyy"
+
+(progn ; cleanup
+  (symbol-cleanup 'bs)
+  (symbol-cleanup 'str1)
+  (symbol-cleanup 's1)
+  (symbol-cleanup 'string1)
+  (symbol-cleanup 'string2)
+  (symbol-cleanup 'a)
+  (symbol-cleanup 'aa)
+  (symbol-cleanup 'b)
+  (symbol-cleanup 'c)
+  (symbol-cleanup 'd)
+  (symbol-cleanup 'j)
+  (symbol-cleanup 'x)
+  (symbol-cleanup 'ask)
+  (symbol-cleanup 'my-pprint-reverse)
+  (symbol-cleanup 'my-pprint-logical)
+  (symbol-cleanup 'foo-printer)
+  (symbol-cleanup 'c1)
+  (symbol-cleanup 'c2))
+T
 
 ;; local variables:
 ;; eval: (make-local-variable 'write-file-functions)

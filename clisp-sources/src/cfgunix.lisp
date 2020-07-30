@@ -46,7 +46,7 @@
 (setq *parse-namestring-dot-file* :name)
 
 ;; which browser do you use? (see `*browsers*' in clhs.lisp)
-;; (setq *browser* :mozilla-remote)
+;; (setq *browser* :firefox)
 
 (defvar *impnotes-root-default* "http://clisp.cons.org/impnotes/")
 (defun impnotes-root ()

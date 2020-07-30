@@ -1,14 +1,14 @@
 /*
  * Functions for characters and strings for CLISP
- * Bruno Haible 1990-2004
- * Sam Steingold 1998-2004
+ * Bruno Haible 1990-2008
+ * Sam Steingold 1998-2009
  * German comments translated into English: Stefan Kain 2002-09-20
  */
 
 #include "lispbibl.c"
 
 /* character conversion tables: */
-#if defined(UNICODE)
+#if defined(ENABLE_UNICODE)
 /* here are the registered bijective case (small<-->CAP) transformations
  for Unicode. */
 #elif defined(ISOLATIN_CHS)
@@ -24,11 +24,6 @@
   small CC CD DD CE CF EF E2 B7 EA D4 D7 D6 B5 EC E4 F1
   CAP   D8 A5 A7 DA DB EE E1 B6 E9 D0 D3 D2 B4 EB E3 F0
   which äÄ ëË ïÏ öÖ üÜ ÿŸ ãÃ ñÑ õÕ åÅ æÆ øØ çÇ šŠ ðÐ þÞ */
-#elif defined(NEXTSTEP_CHS)
-/* here are the registered bijective case (small<-->CAP) transformations
- small 61 ... 7A D5 ... E0 E2 E4 ... E7 EC ... F0 F1 F2 .. F4 F6 F7 F9 FA FC
- CAP   41 ... 5A 81 ... 8C 8D 8E ... 91 92 ... 96 E1 97 .. 99 9A 9B E9 EA 9C
- which aA ... zZ àÀ ... ìÌ íÍ îÎ ... ñÑ òÒ ... öÖ æÆ ùÙ .. ûÛ üÜ ýÝ øØ œŒ þÞ */
 #else /* defined(ASCII_CHS) */
 /* here are the registered bijective case (small<-->CAP) transformations
   small 61 ... 7A
@@ -36,7 +31,7 @@
   both  aA ... zZ */
 #endif
 
-#ifdef UNICODE
+#ifdef ENABLE_UNICODE
 /* No-conversion table, used by up_case_table and down_case_table. */
 static const uint16 nop_page[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -59,8 +54,8 @@ static const uint16 nop_page[256] = {
 #endif
 
 /* Converts byte ch into an uppercase letter */
-global chart up_case (chart ch) {
- #ifdef UNICODE
+modexp chart up_case (chart ch) {
+ #ifdef ENABLE_UNICODE
   #include "uni_upcase.c"
   var cint c = as_cint(ch);
   if (c < sizeof(up_case_table)/sizeof(up_case_table[0]) << 8)
@@ -106,24 +101,6 @@ global chart up_case (chart ch) {
       0xE0,0xE1,0xE1,0xE3,0xE3,0xE5,0xE6,0xE7,0xE8,0xE9,0xE9,0xEB,0xEB,0xED,0xEE,0xEE,
       0xF0,0xF0,0xF2,0xF3,0xF4,0xF5,0xF6,0xF7,0xF8,0xF9,0xFA,0xFB,0xFC,0xFD,0xFE,0xFF,
     };
-   #elif defined(NEXTSTEP_CHS)
-    { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,
-      0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x1D,0x1E,0x1F,
-      0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x29,0x2A,0x2B,0x2C,0x2D,0x2E,0x2F,
-      0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3A,0x3B,0x3C,0x3D,0x3E,0x3F,
-      0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4A,0x4B,0x4C,0x4D,0x4E,0x4F,
-      0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5A,0x5B,0x5C,0x5D,0x5E,0x5F,
-      0x60,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4A,0x4B,0x4C,0x4D,0x4E,0x4F,
-      0x50,0x51,0x52,0x53,0x54,0x55,0x56,0x57,0x58,0x59,0x5A,0x7B,0x7C,0x7D,0x7E,0x7F,
-      0x80,0x81,0x82,0x83,0x84,0x85,0x86,0x87,0x88,0x89,0x8A,0x8B,0x8C,0x8D,0x8E,0x8F,
-      0x90,0x91,0x92,0x93,0x94,0x95,0x96,0x97,0x98,0x99,0x9A,0x9B,0x9C,0x9D,0x9E,0x9F,
-      0xA0,0xA1,0xA2,0xA3,0xA4,0xA5,0xA6,0xA7,0xA8,0xA9,0xAA,0xAB,0xAC,0xAD,0xAE,0xAF,
-      0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBA,0xBB,0xBC,0xBD,0xBE,0xBF,
-      0xC0,0xC1,0xC2,0xC3,0xC4,0xC5,0xC6,0xC7,0xC8,0xC9,0xCA,0xCB,0xCC,0xCD,0xCE,0xCF,
-      0xD0,0xD1,0xD2,0xD3,0xD4,0x81,0x82,0x83,0x84,0x85,0x86,0x87,0x88,0x89,0x8A,0x8B,
-      0x8C,0xE1,0x8D,0xE3,0x8E,0x8F,0x90,0x91,0xE8,0xE9,0xEA,0xEB,0x92,0x93,0x94,0x95,
-      0x96,0xE1,0x97,0x98,0x99,0xF5,0x9A,0x9B,0xF8,0xE9,0xEA,0xFB,0x9C,0xFD,0xFE,0xFF,
-    };
    #else /* standard ascii conversion table: only a..z --> A..Z */
     { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,
       0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x1D,0x1E,0x1F,
@@ -148,8 +125,8 @@ global chart up_case (chart ch) {
 }
 
 /* Converts byte ch into a lowercase letter */
-global chart down_case (chart ch) {
- #ifdef UNICODE
+modexp chart down_case (chart ch) {
+ #ifdef ENABLE_UNICODE
   #include "uni_downcase.c"
   var cint c = as_cint(ch);
   if (c < sizeof(down_case_table)/sizeof(down_case_table[0]) << 8)
@@ -195,24 +172,6 @@ global chart down_case (chart ch) {
       0xC4,0xE2,0xE2,0xE4,0xE4,0xD5,0xD9,0xC6,0xCA,0xEA,0xEA,0xEC,0xEC,0xC7,0xEF,0xEF,
       0xF1,0xF1,0xF2,0xF3,0xF4,0xF5,0xF6,0xF7,0xF8,0xF9,0xFA,0xFB,0xFC,0xFD,0xFE,0xFF,
     };
-   #elif defined(NEXTSTEP_CHS)
-    { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,
-      0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x1D,0x1E,0x1F,
-      0x20,0x21,0x22,0x23,0x24,0x25,0x26,0x27,0x28,0x29,0x2A,0x2B,0x2C,0x2D,0x2E,0x2F,
-      0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x3A,0x3B,0x3C,0x3D,0x3E,0x3F,
-      0x40,0x61,0x62,0x63,0x64,0x65,0x66,0x67,0x68,0x69,0x6A,0x6B,0x6C,0x6D,0x6E,0x6F,
-      0x70,0x71,0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7A,0x5B,0x5C,0x5D,0x5E,0x5F,
-      0x60,0x61,0x62,0x63,0x64,0x65,0x66,0x67,0x68,0x69,0x6A,0x6B,0x6C,0x6D,0x6E,0x6F,
-      0x70,0x71,0x72,0x73,0x74,0x75,0x76,0x77,0x78,0x79,0x7A,0x7B,0x7C,0x7D,0x7E,0x7F,
-      0x80,0xD5,0xD6,0xD7,0xD8,0xD9,0xDA,0xDB,0xDC,0xDD,0xDE,0xDF,0xE0,0xE2,0xE4,0xE5,
-      0xE6,0xE7,0xEC,0xED,0xEE,0xEF,0xF0,0xF2,0xF3,0xF4,0xF6,0xF7,0xFC,0x9D,0x9E,0x9F,
-      0xA0,0xA1,0xA2,0xA3,0xA4,0xA5,0xA6,0xA7,0xA8,0xA9,0xAA,0xAB,0xAC,0xAD,0xAE,0xAF,
-      0xB0,0xB1,0xB2,0xB3,0xB4,0xB5,0xB6,0xB7,0xB8,0xB9,0xBA,0xBB,0xBC,0xBD,0xBE,0xBF,
-      0xC0,0xC1,0xC2,0xC3,0xC4,0xC5,0xC6,0xC7,0xC8,0xC9,0xCA,0xCB,0xCC,0xCD,0xCE,0xCF,
-      0xD0,0xD1,0xD2,0xD3,0xD4,0xD5,0xD6,0xD7,0xD8,0xD9,0xDA,0xDB,0xDC,0xDD,0xDE,0xDF,
-      0xE0,0xF1,0xE2,0xE3,0xE4,0xE5,0xE6,0xE7,0xE8,0xF9,0xFA,0xEB,0xEC,0xED,0xEE,0xEF,
-      0xF0,0xF1,0xF2,0xF3,0xF4,0xF5,0xF6,0xF7,0xF8,0xF9,0xFA,0xFB,0xFC,0xFD,0xFE,0xFF,
-    };
    #else /* standard ascii conversion table: only A..Z --> a..z */
     { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F,
       0x10,0x11,0x12,0x13,0x14,0x15,0x16,0x17,0x18,0x19,0x1A,0x1B,0x1C,0x1D,0x1E,0x1F,
@@ -236,7 +195,7 @@ global chart down_case (chart ch) {
  #endif
 }
 
-#ifdef UNICODE
+#ifdef ENABLE_UNICODE
 /* Table of Unicode character attributes.
  unicode_attribute(c)
  > cint c: a character code
@@ -256,7 +215,7 @@ global chart down_case (chart ch) {
  > ch: character-code
  < result: true if alphabetic, otherwise false.
  Alphabetic characters have a code c, with */
-#if defined(UNICODE)
+#if defined(ENABLE_UNICODE)
 /* java.lang.Character.isLetter(c) */
 #else
 /* $41 <= c <= $5A or $61 <= c <= $7A */
@@ -265,8 +224,6 @@ global chart down_case (chart ch) {
 #elif defined(HPROMAN8_CHS)
 /* or $A1 <= c <= $A7 or $AD <= c <= $AE or $B1 <= c <= $B7 except c=$B3
    or $C0 <= c <= $F1. */
-#elif defined(NEXTSTEP_CHS)
-/* or $81 <= c <= $9D or $D5 <= c <= $FD. */
 #endif
 #endif
 /* Therein, all uppercase- and all lowercase-
@@ -274,7 +231,7 @@ global chart down_case (chart ch) {
 local bool alphap (chart ch)
 {
   var cint c = as_cint(ch);
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   return (unicode_attribute(c) == 3);
  #else
   if (c < 0x41) goto no; if (c <= 0x5A) goto yes;
@@ -291,9 +248,6 @@ local bool alphap (chart ch)
   } else {
     if (c > 0xB7) goto no; if (c == 0xB3) goto no; else goto yes;
   }
- #elif defined(NEXTSTEP_CHS)
-  if (c < 0x81) goto no; if (c <= 0x9D) goto yes;
-  if (c < 0xD5) goto no; if (c <= 0xFD) goto yes;
  #endif
  no: return false;
  yes: return true;
@@ -305,7 +259,7 @@ local bool alphap (chart ch)
  > ch: character-code
  < result: true if numeric, otherwise false. */
 local bool numericp (chart ch);
-#ifdef UNICODE
+#ifdef ENABLE_UNICODE
   #define numericp(ch)  (unicode_attribute(as_cint(ch)) == 2)
 #else
   #define numericp(ch)  (('0' <= as_cint(ch)) && (as_cint(ch) <= '9'))
@@ -318,7 +272,7 @@ local bool numericp (chart ch);
  Alphanumeric characters comprise the alphabetic characters and the digits. */
 global bool alphanumericp (chart ch)
 {
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   var cint c = as_cint(ch);
   return (unicode_attribute(c) >= 2);
  #else
@@ -331,14 +285,11 @@ global bool alphanumericp (chart ch)
  > ch: character-code
  < result: true if printing, otherwise false.
  Graphic-Characters are those with a Code c, with */
-#if defined(UNICODE)
+#if defined(ENABLE_UNICODE)
 /*       (java.lang.Character.isDefined(c) || c == 0x20AC)
          && !(c < 0x0020 || (0x007F <= c <= 0x009F)) */
 #elif defined(ISOLATIN_CHS) || defined(HPROMAN8_CHS)
 /*       $20 <= c <= $7E or $A0 <= c < $100. */
-#elif defined(NEXTSTEP_CHS)
-/*       $20 <= c <= $7E or $80 <= c <= $A5 or c in {$A7,$A8,$AA,$AB,$AE..$B7}
-         or $BA <= c <= $FD except c = $CD. */
 #else /* defined(ASCII_CHS) */
 /*       $20 <= c <= $7E. */
 #endif
@@ -346,21 +297,11 @@ global bool graphic_char_p (chart ch) {
   /* This would be the same as iswprint(ch), assuming wide characters were
      Unicode. */
   var cint c = as_cint(ch);
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   return (unicode_attribute(c) == 0 ? false : true);
  #else
  #if defined(ISOLATIN_CHS) || defined(HPROMAN8_CHS)
   if ((('~' >= c) && (c >= ' ')) || (c >= 0xA0)) goto yes; else goto no;
- #elif defined(NEXTSTEP_CHS)
-  if (c <= '~') { if (c >= ' ') goto yes; else goto no; }
-  if (c < 0xC0) {
-    if (c < 0xA0) { if (c >= 0x80) goto yes; else goto no; }
-    /* fetch bit c-0xA0 from the 32-bit-number
-       %11111100111111111100110110111111: */
-    if (0xFCFFCDBF & bit(c-0xA0)) goto yes; else goto no;
-  } else {
-    if ((c <= 0xFD) && !(c == 0xCD)) goto yes; else goto no;
-  }
  #else /* defined(ASCII_CHS) */
   if (c >= ' ') goto yes; else goto no;
  #endif
@@ -374,10 +315,8 @@ global bool graphic_char_p (chart ch) {
  > ch: character code
  < result: number of output columns occupied by ch */
 global uintL char_width (chart ch);
-#ifdef UNICODE
-#include "uniwidth.h"
-global inline int uc_width (ucs4_t uc, const char *encoding);
-#include "width.c"
+#ifdef ENABLE_UNICODE
+#include "uniwidth.h"           /* from gnulib */
 global uintL char_width (chart ch) {
   /* This would be the same as wcwidth(ch), assuming wide characters were
      Unicode, except that for non-printable characters we return 0, not -1. */
@@ -391,7 +330,7 @@ global uintL char_width (chart ch) {
 }
 #endif
 
-#if !defined(UNICODE) || defined(HAVE_SMALL_SSTRING)
+#if !defined(ENABLE_UNICODE) || defined(HAVE_SMALL_SSTRING)
 /* Copies an array of uint8 to an array of uint8.
  copy_8bit_8bit(src,dest,len);
  > uint8* src: source
@@ -408,7 +347,7 @@ global void copy_8bit_8bit (const uint8* src, uint8* dest, uintL len) {
  > uint8* src: source
  > uint16* dest: destination
  > uintL len: number of elements to be copied, > 0 */
-global void copy_8bit_16bit (const uint8* src, uint16* dest, uintL len) {
+modexp void copy_8bit_16bit (const uint8* src, uint16* dest, uintL len) {
   do { *dest++ = *src++; } while (--len);
 }
 #endif
@@ -419,7 +358,7 @@ global void copy_8bit_16bit (const uint8* src, uint16* dest, uintL len) {
  > uint8* src: source
  > uint32* dest: destination
  > uintL len: number of elements to be copied, > 0 */
-global void copy_8bit_32bit (const uint8* src, uint32* dest, uintL len) {
+modexp void copy_8bit_32bit (const uint8* src, uint32* dest, uintL len) {
   do { *dest++ = *src++; } while (--len);
 }
 #endif
@@ -431,7 +370,7 @@ global void copy_8bit_32bit (const uint8* src, uint32* dest, uintL len) {
  > uint16* src: source
  > uint8* dest: destination
  > uintL len: number of elements to be copied, > 0 */
-global void copy_16bit_8bit (const uint16* src, uint8* dest, uintL len) {
+modexp void copy_16bit_8bit (const uint16* src, uint8* dest, uintL len) {
   do { *dest++ = *src++; } while (--len);
 }
 #endif
@@ -442,7 +381,7 @@ global void copy_16bit_8bit (const uint16* src, uint8* dest, uintL len) {
  > uint16* src: source
  > uint16* dest: destination
  > uintL len: number of elements to be copied, > 0 */
-global void copy_16bit_16bit (const uint16* src, uint16* dest, uintL len) {
+modexp void copy_16bit_16bit (const uint16* src, uint16* dest, uintL len) {
   do { *dest++ = *src++; } while (--len);
 }
 #endif
@@ -453,7 +392,7 @@ global void copy_16bit_16bit (const uint16* src, uint16* dest, uintL len) {
  > uint16* src: source
  > uint32* dest: destination
  > uintL len: number of elements to be copied, > 0 */
-global void copy_16bit_32bit (const uint16* src, uint32* dest, uintL len) {
+modexp void copy_16bit_32bit (const uint16* src, uint32* dest, uintL len) {
   do { *dest++ = *src++; } while (--len);
 }
 #endif
@@ -465,7 +404,7 @@ global void copy_16bit_32bit (const uint16* src, uint32* dest, uintL len) {
  > uint32* src: source
  > uint8* dest: destination
  > uintL len: number of elements to be copied, > 0 */
-global void copy_32bit_8bit (const uint32* src, uint8* dest, uintL len) {
+modexp void copy_32bit_8bit (const uint32* src, uint8* dest, uintL len) {
   do { *dest++ = *src++; } while (--len);
 }
 #endif
@@ -477,12 +416,12 @@ global void copy_32bit_8bit (const uint32* src, uint8* dest, uintL len) {
  > uint32* src: source
  > uint16* dest: destination
  > uintL len: number of elements to be copied, > 0 */
-global void copy_32bit_16bit (const uint32* src, uint16* dest, uintL len) {
+modexp void copy_32bit_16bit (const uint32* src, uint16* dest, uintL len) {
   do { *dest++ = *src++; } while (--len);
 }
 #endif
 
-#if defined(UNICODE)
+#if defined(ENABLE_UNICODE)
 /* Copies an array of uint32 to an array of uint32.
  copy_32bit_32bit(src,dest,len);
  > uint32* src: source
@@ -495,12 +434,12 @@ global void copy_32bit_32bit (const uint32* src, uint32* dest, uintL len) {
 
 #ifdef HAVE_SMALL_SSTRING
 
-# Determines the smallest string element type capable of holding a
-# set of 16-bit characters.
-# smallest_string_flavour16(src,len)
-# > uint16* src: source
-# > uintL len: number of characters at src
-# < result: Sstringtype_8Bit or Sstringtype_16Bit
+/* Determines the smallest string element type capable of holding a
+ set of 16-bit characters.
+ smallest_string_flavour16(src,len)
+ > uint16* src: source
+ > uintL len: number of characters at src
+ < result: Sstringtype_8Bit or Sstringtype_16Bit */
 global uintBWL smallest_string_flavour16 (const uint16* src, uintL len) {
   var uintBWL result = Sstringtype_8Bit;
   if (len > 0) {
@@ -516,12 +455,12 @@ global uintBWL smallest_string_flavour16 (const uint16* src, uintL len) {
   return result;
 }
 
-# Determines the smallest string element type capable of holding a
-# set of 32-bit characters.
-# smallest_string_flavour32(src,len)
-# > uint32* src: source
-# > uintL len: number of characters at src
-# < result: Sstringtype_8Bit or Sstringtype_16Bit or Sstringtype_32Bit
+/* Determines the smallest string element type capable of holding a
+ set of 32-bit characters.
+ smallest_string_flavour32(src,len)
+ > uint32* src: source
+ > uintL len: number of characters at src
+ < result: Sstringtype_8Bit or Sstringtype_16Bit or Sstringtype_32Bit */
 global uintBWL smallest_string_flavour32 (const uint32* src, uintL len) {
   var uintBWL result = Sstringtype_8Bit;
   if (len > 0) {
@@ -547,7 +486,7 @@ global uintBWL smallest_string_flavour32 (const uint32* src, uintL len) {
  < uintL len: the fill-pointer length of the string
  < uintL offset: offset into the datastorage vector
  < object result: datastorage vector, a simple-string or NIL */
-global object unpack_string_ro (object string, uintL* len, uintL* offset) {
+modexp object unpack_string_ro (object string, uintL* len, uintL* offset) {
   if (simple_string_p(string)) {
     sstring_un_realloc(string);
     *len = Sstring_length(string);
@@ -573,8 +512,9 @@ global object unpack_string_ro (object string, uintL* len, uintL* offset) {
   }
 }
 
+#if 0                           /* not used */
 /* UP: unpack a string
- unpack_string_rw(string,&len)  [for read-write access]
+ unpack_string_rw(string,&len,&offset)  [for read-write access]
  > object string: a string
  < uintL len: the fill-pointer length of the string
  < uintL offset: offset in the datastorage vector
@@ -582,18 +522,19 @@ global object unpack_string_ro (object string, uintL* len, uintL* offset) {
 global object unpack_string_rw (object string, uintL* len, uintL* offset) {
   var object unpacked = unpack_string_ro(string,len,offset);
   if (*len > 0) {
-    if (simple_nilarray_p(unpacked)) fehler_nilarray_access();
+    if (simple_nilarray_p(unpacked)) error_nilarray_access();
     check_sstring_mutable(unpacked);
   }
   return unpacked;
 }
+#endif
 
 /* UP: compares two strings for equality
- string_gleich(string1,string2)
+ string_eq(string1,string2)
  > string1: string
  > string2: simple-string
  < result: /=0, if equal */
-global bool string_gleich (object string1, object string2) {
+global bool string_eq (object string1, object string2) {
   var uintL len1;
   var uintL offset1;
   string1 = unpack_string_ro(string1,&len1,&offset1);
@@ -611,7 +552,7 @@ global bool string_gleich (object string1, object string2) {
  > string1: string
  > string2: simple-string
  < result: /=0, if equal */
-global bool string_equal (object string1, object string2) {
+modexp bool string_equal (object string1, object string2) {
   var uintL len1;
   var uintL offset1;
   string1 = unpack_string_ro(string1,&len1,&offset1);
@@ -634,7 +575,7 @@ global maygc object sstring_store (object string, uintL index, chart element) {
   var object inner_string = string;
   sstring_un_realloc(inner_string);
   switch (sstring_eltype(TheSstring(inner_string))) {
-  #ifdef UNICODE
+  #ifdef ENABLE_UNICODE
    #ifdef HAVE_SMALL_SSTRING
     case Sstringtype_8Bit: /* mutable Simple-String */
       if (as_cint(element) < cint8_limit) {
@@ -689,7 +630,7 @@ global maygc object sstring_store_array (object string, uintL offset,
     var object inner_string = string;
     sstring_un_realloc(inner_string);
     switch (sstring_eltype(TheSstring(inner_string))) {
-    #ifdef UNICODE
+    #ifdef ENABLE_UNICODE
      #ifdef HAVE_SMALL_SSTRING
       case Sstringtype_8Bit: { /* mutable Simple-String */
         var bool fits_in_8bit = true;
@@ -799,7 +740,7 @@ global maygc object sstring_store_array (object string, uintL offset,
   return string;
 }
 
-#ifdef UNICODE
+#ifdef ENABLE_UNICODE
 /* UP: Creates a Simple-String with given elements.
  stringof(len)
  > uintL len: desired vector length
@@ -818,8 +759,8 @@ global maygc object stringof (uintL len) {
     dotimespL(count,len, { *ptr++ = char_code(NEXT(argptr)); });
     set_args_end_pointer(topargptr);
     #ifdef HAVE_SMALL_SSTRING
-    # We use alloca for small-simple-strings, therefore their length
-    # should not be too large, or we risk an SP overflow and core dump.
+    /* We use alloca for small-simple-strings, therefore their length
+     should not be too large, or we risk an SP overflow and core dump. */
     if (len < 0x10000) {
       var uintBWL flavour = smallest_string_flavour(&TheSnstring(new_string)->data[0],len);
       if (flavour == Sstringtype_8Bit) {
@@ -856,7 +797,7 @@ global maygc object copy_string_normal (object string) {
   /* new_string = new Normal-Simple-String with given length len */
   string = popSTACK(); /* return string */
   if (len > 0) {
-   #ifdef UNICODE
+   #ifdef ENABLE_UNICODE
     SstringCase(string,
                 { copy_8bit_32bit(&TheS8string(string)->data[offset],
                                   &TheS32string(new_string)->data[0],len); },
@@ -864,12 +805,12 @@ global maygc object copy_string_normal (object string) {
                                    &TheS32string(new_string)->data[0],len); },
                 { copy_32bit_32bit(&TheS32string(string)->data[offset],
                                    &TheS32string(new_string)->data[0],len); },
-                { fehler_nilarray_retrieve(); });
+                { error_nilarray_retrieve(); });
    #else
     SstringCase(string, { NOTREACHED; }, { NOTREACHED; },
                 { copy_8bit_8bit(&TheS8string(string)->data[offset],
                                  &TheS8string(new_string)->data[0],len); },
-                { fehler_nilarray_retrieve(); });
+                { error_nilarray_retrieve(); });
    #endif
   }
   return new_string;
@@ -886,8 +827,8 @@ global maygc object copy_string (object string) {
   var uintL offset;
   string = unpack_string_ro(string,&len,&offset);
   var uintBWL flavour;
-  # We use alloca for small-simple-strings, therefore their length
-  # should not be too large, or we risk an SP overflow and core dump.
+  /* We use alloca for small-simple-strings, therefore their length
+   should not be too large, or we risk an SP overflow and core dump. */
   if (len < 0x10000) {
     SstringCase(string,
       { flavour = smallest_string_flavour8(&TheS8string(string)->data[offset],len); },
@@ -912,7 +853,7 @@ global maygc object copy_string (object string) {
                                     &TheS8string(new_string)->data[0],len); },
                   { copy_32bit_8bit(&TheS32string(string)->data[offset],
                                     &TheS8string(new_string)->data[0],len); },
-                  { fehler_nilarray_retrieve(); });
+                  { error_nilarray_retrieve(); });
     } else if (flavour == Sstringtype_16Bit) {
       SstringCase(string,
                   { copy_8bit_16bit(&TheS8string(string)->data[offset],
@@ -940,7 +881,7 @@ global maygc object copy_string (object string) {
 /* UP: converts a string into a Simple-String.
  coerce_ss(obj)
  > obj: Lisp-object, should be a string.
- < ergebnis: Simple-String with the same characters
+ < result: Simple-String with the same characters
  can trigger GC */
 global maygc object coerce_ss (object obj) {
  start:
@@ -1001,10 +942,10 @@ global maygc object coerce_imm_ss (object obj)
           var uintL offset;
           var object string = unpack_string_ro(obj,&len,&offset);
           if (simple_nilarray_p(string)) {
-            if (len > 0) fehler_nilarray_retrieve();
+            if (len > 0) error_nilarray_retrieve();
             return allocate_imm_string(0);
           }
-          #ifdef UNICODE
+          #ifdef ENABLE_UNICODE
           #ifdef HAVE_SMALL_SSTRING
           if (sstring_eltype(TheSstring(string)) == Sstringtype_8Bit) {
             pushSTACK(string);
@@ -1190,7 +1131,7 @@ global maygc object coerce_imm_normal_ss (object obj)
                                  &TheS32string(new_string)->data[0],len); },
               { copy_32bit_32bit(&TheS32string(string)->data[offset],
                                  &TheS32string(new_string)->data[0],len); },
-              { fehler_nilarray_retrieve(); });
+              { error_nilarray_retrieve(); });
           }
           return new_string;
         }
@@ -1273,20 +1214,20 @@ global object coerce_char (object obj) {
 /* table of character-names:
  defined in CONSTOBJ.D, */
 #ifdef WIN32_CHARNAMES
-  #define charname_table_length  13  /* length of the table */
+  #define charname_table_length  14  /* length of the table */
   #define charname_table  ((gcv_object_t*)(&object_tab.charname_0)) /* table starts with charname_0 */
 #endif
 #ifdef UNIX_CHARNAMES
-  #define charname_table_length  46  /* length of the table */
-  #define charname_table  ((gcv_object_t*)(&object_tab.charname_0bis)) /* table starts with charname_0bis */
+  #define charname_table_length  48  /* length of the table */
+  #define charname_table  ((gcv_object_t*)(&object_tab.charname_0_1)) /* table starts with charname_0_1 */
 #endif
 /* table of codes for this name: */
 local const uintB charname_table_codes [charname_table_length]
   #ifdef WIN32_CHARNAMES
-    = { 0,BEL,BS,TAB,NL,11,PG,CR,26,ESC,' ',RUBOUT,LF, };
+    = { 0,BEL,BS,TAB,NL,11,PG,CR,26,ESC,' ',RUBOUT,LF,27, };
   #endif
   #ifdef UNIX_CHARNAMES
-    = { 0,7,BS,TAB,NL,LF,PG,CR,27,32,RUBOUT,127,
+    = { 0,7,BS,TAB,NL,LF,LF,PG,PG,CR,27,32,RUBOUT,127,
         0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,
         20,21,22,23,24,25,26,27,28,29,30,31,32,127,
       };
@@ -1294,11 +1235,8 @@ local const uintB charname_table_codes [charname_table_length]
 /* the code charname_table_codes[i] belongs to the name charname_table[i]
    (for 0 <= i < charname_table_length). */
 
-#ifdef UNICODE
-
-#include "uniname.h"
-#include "uniname.c"
-
+#ifdef ENABLE_UNICODE
+#include "uniname.h"            /* from gnulib */
 #endif
 
 /* UP: return the name of a character
@@ -1321,7 +1259,7 @@ global maygc object char_name (chart code) {
     }
   }
   /* not found */
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   /* Try to find the long name, from UnicodeDataFull.txt. It is the second
      semicolon separated field from (sys::unicode-attributes-line c). */
   #ifdef AWFULLY_SLOW
@@ -1402,7 +1340,7 @@ global maygc object char_name (chart code) {
       return name;
     }
   }
- #else /* no UNICODE */
+ #else /* no ENABLE_UNICODE */
   {
     var object name = allocate_string(1);
     TheSnstring(name)->data[0] = ascii(c);
@@ -1428,7 +1366,7 @@ global object name_char (object string) {
     }
   }
   /* no character with the name name found */
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   {
     var uintL len;
     var uintL offset;
@@ -1444,7 +1382,7 @@ global object name_char (object string) {
         var uintL code = 0;
         var uintL index = 1;
         var const chart* tmpcharptr = charptr+1;
-        loop {
+        while (1) {
           var cint c = as_cint(*tmpcharptr++); /* next character */
           /* should be a hexadecimal digit: */
           if (c > 'f') break;
@@ -1472,7 +1410,7 @@ global object name_char (object string) {
       { /* Test for word1_word2_... syntax. */
         var char buf[UNINAME_MAX];
         var char* ptr = buf;
-        loop {
+        while (1) {
           var cint c = as_cint(*charptr++);
           if (!(c >= ' ' && c <= '~'))
             break;
@@ -1490,7 +1428,7 @@ global object name_char (object string) {
       }
     }
   }
- #else /* no UNICODE */
+ #else /* no ENABLE_UNICODE */
   return coerce_char(string);
  #endif
   return NIL;
@@ -1603,7 +1541,7 @@ LISPFUN(digit_char_p,seclass_foldable,1,1,norest,nokey,0,NIL)
   var object arg = check_char(popSTACK());
   var chart ch = char_code(arg);
   var cint c = as_cint(ch);
- #ifdef UNICODE
+ #ifdef ENABLE_UNICODE
   switch (c >> 8) {
     case 0x00: /* ASCII */
       if ((c >= 0x0030) && (c <= 0x0039)) { c -= 0x0030; break; }
@@ -1723,7 +1661,7 @@ local maygc void test_char_args_upcase (uintC argcount, gcv_object_t* args_point
 }
 
 /* UP: (CHAR= char {char}) for checked arguments */
-local Values char_gleich (uintC argcount, gcv_object_t* args_pointer)
+local Values char_eq (uintC argcount, gcv_object_t* args_pointer)
 { /* method:
  n+1 arguments Arg[0..n].
  x:=Arg[n].
@@ -1739,7 +1677,7 @@ local Values char_gleich (uintC argcount, gcv_object_t* args_pointer)
 }
 
 /* UP: (CHAR/= char {char}) for checked arguments */
-local Values char_ungleich (uintC argcount, gcv_object_t* args_pointer)
+local Values char_noteq (uintC argcount, gcv_object_t* args_pointer)
 { /* method:
  n+1 arguments Arg[0..n].
  for j:=n-1 to 0 step -1 do
@@ -1765,7 +1703,7 @@ local Values char_ungleich (uintC argcount, gcv_object_t* args_pointer)
 }
 
 /* UP: (CHAR< char {char}) for checked arguments */
-local Values char_kleiner (uintC argcount, gcv_object_t* args_pointer)
+local Values char_less (uintC argcount, gcv_object_t* args_pointer)
 { /* method:
  n+1 Arguments Arg[0..n].
  for i:=n to 1 step -1 do
@@ -1782,7 +1720,7 @@ local Values char_kleiner (uintC argcount, gcv_object_t* args_pointer)
 }
 
 /* UP: (CHAR> char {char}) for checked arguments */
-local Values char_groesser (uintC argcount, gcv_object_t* args_pointer)
+local Values char_greater (uintC argcount, gcv_object_t* args_pointer)
 { /* method:
  n+1 arguments Arg[0..n].
  for i:=n to 1 step -1 do
@@ -1799,7 +1737,7 @@ local Values char_groesser (uintC argcount, gcv_object_t* args_pointer)
 }
 
 /* UP: (CHAR<= char {char}) for checked arguments */
-local Values char_klgleich (uintC argcount, gcv_object_t* args_pointer)
+local Values char_ltequal (uintC argcount, gcv_object_t* args_pointer)
 { /* method:
  n+1 arguments Arg[0..n].
  for i:=n to 1 step -1 do
@@ -1816,7 +1754,7 @@ local Values char_klgleich (uintC argcount, gcv_object_t* args_pointer)
 }
 
 /* UP: (CHAR>= char {char}) for checked arguments */
-local Values char_grgleich (uintC argcount, gcv_object_t* args_pointer)
+local Values char_gtequal (uintC argcount, gcv_object_t* args_pointer)
 { /* method:
  n+1 arguments Arg[0..n].
  for i:=n to 1 step -1 do
@@ -1832,88 +1770,88 @@ local Values char_grgleich (uintC argcount, gcv_object_t* args_pointer)
  ok: set_args_end_pointer(args_pointer);
 }
 
-LISPFUN(char_gleich,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(char_eq,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR= char {char}), CLTL p. 237 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args(argcount,args_pointer);
-  return_Values char_gleich(argcount,args_pointer);
+  return_Values char_eq(argcount,args_pointer);
 }
 
-LISPFUN(char_ungleich,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(char_noteq,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR/= char {char}), CLTL p. 237 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args(argcount,args_pointer);
-  return_Values char_ungleich(argcount,args_pointer);
+  return_Values char_noteq(argcount,args_pointer);
 }
 
-LISPFUN(char_kleiner,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(char_less,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR< char {char}), CLTL p. 237 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args(argcount,args_pointer);
-  return_Values char_kleiner(argcount,args_pointer);
+  return_Values char_less(argcount,args_pointer);
 }
 
-LISPFUN(char_groesser,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(char_greater,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR> char {char}), CLTL p. 237 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args(argcount,args_pointer);
-  return_Values char_groesser(argcount,args_pointer);
+  return_Values char_greater(argcount,args_pointer);
 }
 
-LISPFUN(char_klgleich,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(char_ltequal,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR<= char {char}), CLTL p. 237 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args(argcount,args_pointer);
-  return_Values char_klgleich(argcount,args_pointer);
+  return_Values char_ltequal(argcount,args_pointer);
 }
 
-LISPFUN(char_grgleich,seclass_foldable,1,0,rest,nokey,0,NIL)
+LISPFUN(char_gtequal,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR>= char {char}), CLTL p. 237 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args(argcount,args_pointer);
-  return_Values char_grgleich(argcount,args_pointer);
+  return_Values char_gtequal(argcount,args_pointer);
 }
 
 LISPFUN(char_equal,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR-EQUAL char {char}), CLTL p. 239 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args_upcase(argcount,args_pointer);
-  return_Values char_gleich(argcount,args_pointer);
+  return_Values char_eq(argcount,args_pointer);
 }
 
 LISPFUN(char_not_equal,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR-NOT-EQUAL char {char}), CLTL p. 239 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args_upcase(argcount,args_pointer);
-  return_Values char_ungleich(argcount,args_pointer);
+  return_Values char_noteq(argcount,args_pointer);
 }
 
 LISPFUN(char_lessp,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR-LESSP char {char}), CLTL p. 239 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args_upcase(argcount,args_pointer);
-  return_Values char_kleiner(argcount,args_pointer);
+  return_Values char_less(argcount,args_pointer);
 }
 
 LISPFUN(char_greaterp,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR-GREATERP char {char}), CLTL p. 239 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args_upcase(argcount,args_pointer);
-  return_Values char_groesser(argcount,args_pointer);
+  return_Values char_greater(argcount,args_pointer);
 }
 
 LISPFUN(char_not_greaterp,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR-NOT-GREATERP char {char}), CLTL p. 239 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args_upcase(argcount,args_pointer);
-  return_Values char_klgleich(argcount,args_pointer);
+  return_Values char_ltequal(argcount,args_pointer);
 }
 
 LISPFUN(char_not_lessp,seclass_foldable,1,0,rest,nokey,0,NIL)
 { /* (CHAR-NOT-LESSP char {char}), CLTL p. 239 */
   var gcv_object_t* args_pointer = rest_args_pointer STACKop 1;
   test_char_args_upcase(argcount,args_pointer);
-  return_Values char_grgleich(argcount,args_pointer);
+  return_Values char_gtequal(argcount,args_pointer);
 }
 
 LISPFUNNF(char_code,1)
@@ -1930,7 +1868,7 @@ LISPFUNNF(code_char,1)
     pushSTACK(codeobj); /* TYPE-ERROR slot DATUM */
     pushSTACK(S(integer)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(codeobj); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,
+    error(type_error,
            GETTEXT("~S: the code argument should be an integer, not ~S"));
   }
   /* codeobj is now an integer. */
@@ -1952,7 +1890,7 @@ LISPFUNNR(character,1)
     pushSTACK(O(type_designator_character)); /* TYPE-ERROR slot EXPECTED-TYPE*/
     pushSTACK(STACK_1);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: cannot coerce ~S to a character"));
+    error(type_error,GETTEXT("~S: cannot coerce ~S to a character"));
   } else {
     VALUES1(trial); skipSTACK(1);
   }
@@ -1984,7 +1922,7 @@ LISPFUN(digit_char,seclass_foldable,1,1,norest,nokey,0,NIL)
     pushSTACK(weightobj); /* TYPE-ERROR slot DATUM */
     pushSTACK(S(integer)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(weightobj); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,
+    error(type_error,
            GETTEXT("~S: the weight argument should be an integer, not ~S"));
   }
   /* weightobj is now an integer. */
@@ -2021,7 +1959,7 @@ LISPFUNNF(int_char,1)
     pushSTACK(arg); /* TYPE-ERROR slot DATUM */
     pushSTACK(S(integer)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(arg); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: argument should be an integer, not ~S"));
+    error(type_error,GETTEXT("~S: argument should be an integer, not ~S"));
   }
 }
 
@@ -2077,11 +2015,11 @@ local bool string_eqcomp_inverted (object string1, uintL offset1, object string2
 }
 
 /* UP: compares two strings for equality modulo case-invert
- string_gleich_inverted(string1,string2)
+ string_eq_inverted(string1,string2)
  > string1: string
  > string2: simple-string
  < result: /=0, if equal modulo case-invert */
-global bool string_gleich_inverted (object string1, object string2) {
+global bool string_eq_inverted (object string1, object string2) {
   var uintL len1;
   var uintL offset1;
   string1 = unpack_string_ro(string1,&len1,&offset1);
@@ -2143,7 +2081,7 @@ local maygc void nstring_invertcase (object dv, uintL offset, uintL len) {
       do { *charptr = as_cint(invert_case(as_chart(*charptr))); charptr++;
       } while (--len);
     },{
-      fehler_nilarray_retrieve();
+      error_nilarray_retrieve();
     });
 }
 
@@ -2162,49 +2100,49 @@ global maygc object string_invertcase (object string) {
 }
 
 /* error, if index-argument is not an integer. */
-nonreturning_function(local, fehler_int, (object kw, object obj)) {
+nonreturning_function(local, error_int, (object kw, object obj)) {
   pushSTACK(obj); /* TYPE-ERROR slot DATUM */
   pushSTACK(S(integer)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj);
   if (eq(kw,nullobj)) {
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: index should be an integer, not ~S"));
+    error(type_error,GETTEXT("~S: index should be an integer, not ~S"));
   } else {
     pushSTACK(kw); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: ~S-index should be an integer, not ~S"));
+    error(type_error,GETTEXT("~S: ~S-index should be an integer, not ~S"));
   }
 }
 
 /* error, if index-argument is not an integer or NIL. */
-nonreturning_function(local, fehler_int_null, (object kw, object obj)) {
+nonreturning_function(local, error_int_null, (object kw, object obj)) {
   pushSTACK(obj); /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_end_index)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj);
   if (eq(kw,nullobj)) {
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: index should be NIL or an integer, not ~S"));
+    error(type_error,GETTEXT("~S: index should be NIL or an integer, not ~S"));
   } else {
     pushSTACK(kw); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: ~S-index should be NIL or an integer, not ~S"));
+    error(type_error,GETTEXT("~S: ~S-index should be NIL or an integer, not ~S"));
   }
 }
 
 /* error, if index-argument is negative. */
-nonreturning_function(local, fehler_posint, (object kw, object obj)) {
+nonreturning_function(local, error_posint, (object kw, object obj)) {
   pushSTACK(obj); /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_posinteger)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(obj);
   if (eq(kw,nullobj)) {
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: index should not be negative: ~S"));
+    error(type_error,GETTEXT("~S: index should not be negative: ~S"));
   } else {
     pushSTACK(kw); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: ~S-index should not be negative: ~S"));
+    error(type_error,GETTEXT("~S: ~S-index should not be negative: ~S"));
   }
 }
 
 /* error, if index-argument is not <= limit. */
-nonreturning_function(local, fehler_cmp_inclusive, (object kw, object obj,
+nonreturning_function(local, error_cmp_inclusive, (object kw, object obj,
                                                     uintL grenze)) {
   pushSTACK(obj); /* TYPE-ERROR slot DATUM */
   pushSTACK(NIL);
@@ -2217,15 +2155,15 @@ nonreturning_function(local, fehler_cmp_inclusive, (object kw, object obj,
   }
   if (eq(kw,nullobj)) {
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: index ~S should not be greater than the length of the string"));
+    error(type_error,GETTEXT("~S: index ~S should not be greater than the length of the string"));
   } else {
     pushSTACK(kw); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: ~S-index ~S should not be greater than the length of the string"));
+    error(type_error,GETTEXT("~S: ~S-index ~S should not be greater than the length of the string"));
   }
 }
 
 /* error, if index-argument is not < limit. */
-nonreturning_function(local, fehler_cmp_exclusive, (object kw, object obj,
+nonreturning_function(local, error_cmp_exclusive, (object kw, object obj,
                                                     uintL grenze)) {
   pushSTACK(obj); /* TYPE-ERROR slot DATUM */
   pushSTACK(NIL);
@@ -2238,44 +2176,44 @@ nonreturning_function(local, fehler_cmp_exclusive, (object kw, object obj,
   }
   if (eq(kw,nullobj)) {
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,
+    error(type_error,
            GETTEXT("~S: index ~S should be less than the length of the string"));
   } else {
     pushSTACK(kw); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: ~S-index ~S should be less than the length of the string"));
+    error(type_error,GETTEXT("~S: ~S-index ~S should be less than the length of the string"));
   }
 }
 
 /* Macro: checks an index-argument
- test_index(woher,wohin_zuweisung,def,default,vergleich,grenze,ucname,lcname)
- woher : expression, where the index (as object) comes from.
- wohin_zuweisung : assigns the result (as uintV) .
+ test_index(from,to_setter,def,default,uplimit_cmp,upper_limit,ucname,lcname)
+ from : expression, where the index (as object) comes from.
+ to_setter : assigns the result (as uintV) .
  def : 0 if we do not have to test for default values,
        1 if the default is set in on unbound,
        2 if the default is set in on unbound or NIL.
  default : expression, that serves as default value in this case.
- grenze : upper limit
- vergleich : comparison with upper limit
+ upper_limit : upper limit
+ uplimit_cmp : comparison with upper limit
  kw : keyword, that identifies the index, or nullobj */
-#define test_index(woher,wohin_zuweisung,def,default,vergleich,grenze,kw) \
-  { var object index = woher; /* index-argument */                      \
+#define test_index(from,to_setter,def,default,uplimit_cmp,upper_limit,kw) \
+  { var object index = from; /* index-argument */                       \
     if (def && (!boundp(index) || (def == 2 && nullp(index))))          \
-      { wohin_zuweisung default; }                                      \
+      { to_setter default; }                                            \
     else { /* must be an integer: */                                    \
       if (!integerp(index))                                             \
-        { if (def==2) fehler_int_null(kw,index); else fehler_int(kw,index); } \
+        { if (def==2) error_int_null(kw,index); else error_int(kw,index); } \
       /* index is an integer. */                                        \
       if (!(positivep(index)))                                          \
-        { fehler_posint(kw,index); }                                    \
+        { error_posint(kw,index); }                                     \
       /* index is >=0. */                                               \
       if (!((posfixnump(index)) &&                                      \
-            ((wohin_zuweisung posfixnum_to_V(index)) vergleich grenze))) { \
-        if (0 vergleich 0)                                              \
-          /* "<= grenze" - comparison not satisfied (grenze == limit) */ \
-          { fehler_cmp_inclusive(kw,index,grenze); }                    \
+            ((to_setter posfixnum_to_V(index)) uplimit_cmp upper_limit))) { \
+        if (0 uplimit_cmp 0)                                            \
+          /* "<= upper_limit" - comparison not satisfied (upper_limit == limit) */ \
+          { error_cmp_inclusive(kw,index,upper_limit); }                \
         else                                                            \
-          /* "< grenze" - comparison not satisfied (grenze == limit) */ \
-          { fehler_cmp_exclusive(kw,index,grenze); }                    \
+          /* "< upper_limit" - comparison not satisfied (upper_limit == limit) */ \
+          { error_cmp_exclusive(kw,index,upper_limit); }                \
       }                                                                 \
     }}
 
@@ -2316,9 +2254,9 @@ LISPFUNNR(schar,2)
   if (!simple_string_p(string)) { /* must be a simple-string */
     if (stringp(string)
         && (Iarray_flags(string) & arrayflags_atype_mask) == Atype_NIL)
-      fehler_nilarray_store();
+      error_nilarray_store();
     else
-      fehler_sstring(string);
+      error_sstring(string);
   }
   sstring_un_realloc(string);
   var uintL index = test_index_arg(Sstring_length(string));
@@ -2342,7 +2280,7 @@ LISPFUNN(store_char,3)
   } else {
     len = TheIarray(string)->totalsize;
     string = iarray_displace_check(string,len,&offset);
-    if (simple_nilarray_p(string)) fehler_nilarray_store();
+    if (simple_nilarray_p(string)) error_nilarray_store();
   }
   check_sstring_mutable(string);
   offset += test_index_arg(len); /* go to the element addressed by index */
@@ -2359,9 +2297,9 @@ LISPFUNN(store_schar,3)
   if (!simple_string_p(string)) { /* must be a simple-string */
     if (stringp(string)
         && (Iarray_flags(string) & arrayflags_atype_mask) == Atype_NIL)
-      fehler_nilarray_store();
+      error_nilarray_store();
     else
-      fehler_sstring(string);
+      error_sstring(string);
   }
   sstring_un_realloc(string);
   check_sstring_mutable(string);
@@ -2372,7 +2310,6 @@ LISPFUNN(store_schar,3)
 }
 
 /* UP: checks :START and :END limits for a vector argument
- > STACK_2: vector-argument
  > STACK_1: optional :start-argument
  > STACK_0: optional :end-argument
  > stringarg arg: arg.string its data vector,
@@ -2382,11 +2319,10 @@ LISPFUNN(store_schar,3)
                   [arg.offset+arg.index .. arg.offset+arg.index+arg.len-1] the
                   range within the data vector corresponding to the selected
                   vector slice
- < result: vector-argument
- increases STACK by 3 */
-global object test_vector_limits (stringarg* arg) {
+ removes 2 elements from STACK */
+modexp void test_vector_limits (stringarg* arg) {
   if (arg->len > 0 && simple_nilarray_p(arg->string))
-    fehler_nilarray_retrieve();
+    error_nilarray_retrieve();
   var uintV start;
   var uintV end;
   /* arg->len is the length (<2^oint_data_len).
@@ -2403,12 +2339,11 @@ global object test_vector_limits (stringarg* arg) {
     pushSTACK(STACK_0); /* :END index */
     pushSTACK(STACK_(1+1)); /* :START index */
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: :START-index ~S must not be greater than :END-index ~S"));
+    error(error_condition,GETTEXT("~S: :START-index ~S must not be greater than :END-index ~S"));
   }
   skipSTACK(2);
   /* fill results: */
   arg->index = start; arg->len = end-start;
-  return popSTACK();
 }
 
 /* UP: checks the limits for a string-argument
@@ -2424,7 +2359,8 @@ global maygc object test_string_limits_ro (stringarg* arg) {
   /* check string-argument: */
   STACK_2 = check_string(STACK_2);
   arg->string = unpack_string_ro(STACK_2,&arg->len,&arg->offset);
-  return test_vector_limits(arg);
+  test_vector_limits(arg);
+  return popSTACK();
 }
 
 /* UP: checks the limits for a string-argument
@@ -2439,7 +2375,7 @@ global maygc object test_string_limits_ro (stringarg* arg) {
 local maygc object test_string_limits_rw (stringarg* arg) {
   var object string = test_string_limits_ro(arg);
   if (arg->len > 0) {
-    if (simple_nilarray_p(arg->string)) fehler_nilarray_access();
+    if (simple_nilarray_p(arg->string)) error_nilarray_access();
     check_sstring_mutable(arg->string);
   }
   return string;
@@ -2507,7 +2443,7 @@ local maygc void test_1_stringsym_limits (bool invert, object* string_,
     pushSTACK(STACK_0); /* :END-Index */
     pushSTACK(STACK_2); /* :START-Index */
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: :start-index ~S must not be greater than :end-index ~S"));
+    error(error_condition,GETTEXT("~S: :START-index ~S must not be greater than :END-index ~S"));
   }
   skipSTACK(3);
   /* copy string and issue results: */
@@ -2557,12 +2493,12 @@ local void test_2_stringsym_limits (bool invert, stringarg* arg1, stringarg* arg
       pushSTACK(STACK_2); /* :END1-Index */
       pushSTACK(STACK_4); /* :START1-Index */
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(error,GETTEXT("~S: :start1-index ~S must not be greater than :end1-index ~S"));
+      error(error_condition,GETTEXT("~S: :START1-index ~S must not be greater than :END1-index ~S"));
     }
     /* issue the results for string1: */
     arg1->index = start1; arg1->len = end1-start1;
     if (arg1->len > 0 && simple_nilarray_p(arg1->string))
-      fehler_nilarray_retrieve();
+      error_nilarray_retrieve();
   }
   { /* check :START2 and :END2: */
     var uintV start2;
@@ -2580,12 +2516,12 @@ local void test_2_stringsym_limits (bool invert, stringarg* arg1, stringarg* arg
       pushSTACK(STACK_0); /* :END2-Index */
       pushSTACK(STACK_2); /* :START2-Index */
       pushSTACK(TheSubr(subr_self)->name);
-      fehler(error,GETTEXT("~S: :start2-index ~S must not be greater than :end2-index ~S"));
+      error(error_condition,GETTEXT("~S: :START2-index ~S must not be greater than :END2-index ~S"));
     }
     /* issue the results for string2: */
     arg2->index = start2; arg2->len = end2-start2;
     if (arg2->len > 0 && simple_nilarray_p(arg2->string))
-      fehler_nilarray_retrieve();
+      error_nilarray_retrieve();
   }
   /* done. */
   skipSTACK(6);
@@ -2616,7 +2552,7 @@ global bool string_eqcomp (object string1, uintL offset1, object string2,
  > arg1: here are the addressed characters in string1
  > arg2: here are the addressed characters in string2
  < arg1.index: location of the first difference i string1
- < ergebnis: 0 if equal,
+ < result: 0 if equal,
              -1 if string1 is genuinely lesser than string2,
              +1 if string1 is genuinely bigger than string2. */
 local signean string_comp (stringarg* arg1, const stringarg* arg2) {
@@ -2630,7 +2566,7 @@ local signean string_comp (stringarg* arg1, const stringarg* arg2) {
     if (len2==0) goto A_string2_end;
     SstringDispatch(arg2->string,X2, {
       var const cintX2* charptr2 = &((SstringX2)TheVarobject(arg2->string))->data[arg2->offset+arg2->index];
-      loop {
+      while (1) {
         /* compare next characters: */
         if (!chareq(as_chart(*charptr1++),as_chart(*charptr2++))) break;
         /* decrease both counters: */
@@ -2663,7 +2599,7 @@ local signean string_comp (stringarg* arg1, const stringarg* arg2) {
     if (len2==0) goto B_string2_end;
     SstringDispatch(arg2->string,X2, {
       var const cintX2* charptr2 = &((SstringX2)TheVarobject(arg2->string))->data[arg2->offset+arg2->index];
-      loop {
+      while (1) {
         /* compare next characters: */
         if (!chareq(as_chart(*charptr1++),as_chart(*charptr2++))) break;
         /* decrease both counters: */
@@ -2696,7 +2632,7 @@ local signean string_comp (stringarg* arg1, const stringarg* arg2) {
     if (len2==0) goto C_string2_end;
     SstringDispatch(arg2->string,X2, {
       var const cintX2* charptr2 = &((SstringX2)TheVarobject(arg2->string))->data[arg2->offset+arg2->index];
-      loop {
+      while (1) {
         /* compare next characters: */
         if (!chareq(as_chart(*charptr1++),as_chart(*charptr2++))) break;
         /* decrease both counters: */
@@ -2725,7 +2661,7 @@ local signean string_comp (stringarg* arg1, const stringarg* arg2) {
     /* one of the strings empty ? */
     if (len1==0) goto D_string1_end;
     if (len2==0) goto D_string2_end;
-    fehler_nilarray_retrieve();
+    error_nilarray_retrieve();
   D_string1_end: /* string1 finished */
     arg1->index = 0;
     if (len2==0)
@@ -2739,7 +2675,7 @@ local signean string_comp (stringarg* arg1, const stringarg* arg2) {
 }
 
 /* (STRING= string1 string2 :start1 :end1 :start2 :end2), CLTL p. 300 */
-LISPFUN(string_gleich,seclass_read,2,0,norest,key,4,
+LISPFUN(string_eq,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2755,7 +2691,7 @@ LISPFUN(string_gleich,seclass_read,2,0,norest,key,4,
 }
 
 /* (CS-COMMON-LISP:STRING= string1 string2 :start1 :end1 :start2 :end2) */
-LISPFUN(cs_string_gleich,seclass_read,2,0,norest,key,4,
+LISPFUN(cs_string_eq,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2771,7 +2707,7 @@ LISPFUN(cs_string_gleich,seclass_read,2,0,norest,key,4,
 }
 
 /* (STRING/= string1 string2 :start1 :end1 :start2 :end2), CLTL p. 301 */
-LISPFUN(string_ungleich,seclass_read,2,0,norest,key,4,
+LISPFUN(string_noteq,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2783,7 +2719,7 @@ LISPFUN(string_ungleich,seclass_read,2,0,norest,key,4,
 }
 
 /* (CS-COMMON-LISP:STRING/= string1 string2 :start1 :end1 :start2 :end2) */
-LISPFUN(cs_string_ungleich,seclass_read,2,0,norest,key,4,
+LISPFUN(cs_string_noteq,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2795,7 +2731,7 @@ LISPFUN(cs_string_ungleich,seclass_read,2,0,norest,key,4,
 }
 
 /* (STRING< string1 string2 :start1 :end1 :start2 :end2), CLTL p. 301 */
-LISPFUN(string_kleiner,seclass_read,2,0,norest,key,4,
+LISPFUN(string_less,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2807,7 +2743,7 @@ LISPFUN(string_kleiner,seclass_read,2,0,norest,key,4,
 }
 
 /* (CS-COMMON-LISP:STRING< string1 string2 :start1 :end1 :start2 :end2) */
-LISPFUN(cs_string_kleiner,seclass_read,2,0,norest,key,4,
+LISPFUN(cs_string_less,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2819,7 +2755,7 @@ LISPFUN(cs_string_kleiner,seclass_read,2,0,norest,key,4,
 }
 
 /* (STRING> string1 string2 :start1 :end1 :start2 :end2), CLTL p. 301 */
-LISPFUN(string_groesser,seclass_read,2,0,norest,key,4,
+LISPFUN(string_greater,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2831,7 +2767,7 @@ LISPFUN(string_groesser,seclass_read,2,0,norest,key,4,
 }
 
 /* (CS-COMMON-LISP:STRING> string1 string2 :start1 :end1 :start2 :end2) */
-LISPFUN(cs_string_groesser,seclass_read,2,0,norest,key,4,
+LISPFUN(cs_string_greater,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2843,7 +2779,7 @@ LISPFUN(cs_string_groesser,seclass_read,2,0,norest,key,4,
 }
 
 /* (STRING<= string1 string2 :start1 :end1 :start2 :end2), CLTL p. 301 */
-LISPFUN(string_klgleich,seclass_read,2,0,norest,key,4,
+LISPFUN(string_ltequal,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2855,7 +2791,7 @@ LISPFUN(string_klgleich,seclass_read,2,0,norest,key,4,
 }
 
 /* (CS-COMMON-LISP:STRING<= string1 string2 :start1 :end1 :start2 :end2) */
-LISPFUN(cs_string_klgleich,seclass_read,2,0,norest,key,4,
+LISPFUN(cs_string_ltequal,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2867,7 +2803,7 @@ LISPFUN(cs_string_klgleich,seclass_read,2,0,norest,key,4,
 }
 
 /* (STRING>= string1 string2 :start1 :end1 :start2 :end2), CLTL p. 301 */
-LISPFUN(string_grgleich,seclass_read,2,0,norest,key,4,
+LISPFUN(string_gtequal,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2879,7 +2815,7 @@ LISPFUN(string_grgleich,seclass_read,2,0,norest,key,4,
 }
 
 /* (CS-COMMON-LISP:STRING>= string1 string2 :start1 :end1 :start2 :end2) */
-LISPFUN(cs_string_grgleich,seclass_read,2,0,norest,key,4,
+LISPFUN(cs_string_gtequal,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 {
   var stringarg arg1;
@@ -2932,7 +2868,7 @@ local signean string_comp_ci (stringarg* arg1, const stringarg* arg2)
     if (len2==0) goto A_string2_end;
     SstringDispatch(arg2->string,X2, {
       var const cintX2* charptr2 = &((SstringX2)TheVarobject(arg2->string))->data[arg2->offset+arg2->index];
-      loop {
+      while (1) {
         /* compare next characters: */
         if (!chareq(ch1 = up_case(as_chart(*charptr1++)), ch2 = up_case(as_chart(*charptr2++)))) break;
         /* decrease both counters: */
@@ -2967,7 +2903,7 @@ local signean string_comp_ci (stringarg* arg1, const stringarg* arg2)
     if (len2==0) goto B_string2_end;
     SstringDispatch(arg2->string,X2, {
       var const cintX2* charptr2 = &((SstringX2)TheVarobject(arg2->string))->data[arg2->offset+arg2->index];
-      loop {
+      while (1) {
         /* compare next characters: */
         if (!chareq(ch1 = up_case(as_chart(*charptr1++)), ch2 = up_case(as_chart(*charptr2++)))) break;
         /* decrease both counters: */
@@ -3002,7 +2938,7 @@ local signean string_comp_ci (stringarg* arg1, const stringarg* arg2)
     if (len2==0) goto C_string2_end;
     SstringDispatch(arg2->string,X2, {
       var const cintX2* charptr2 = &((SstringX2)TheVarobject(arg2->string))->data[arg2->offset+arg2->index];
-      loop {
+      while (1) {
         /* compare next characters: */
         if (!chareq(ch1 = up_case(as_chart(*charptr1++)), ch2 = up_case(as_chart(*charptr2++)))) break;
         /* decrease both counters: */
@@ -3031,7 +2967,7 @@ local signean string_comp_ci (stringarg* arg1, const stringarg* arg2)
     /* one of the strings empty ? */
     if (len1==0) goto D_string1_end;
     if (len2==0) goto D_string2_end;
-    fehler_nilarray_retrieve();
+    error_nilarray_retrieve();
   D_string1_end: /* string1 finished */
     arg1->index = 0;
     if (len2==0)
@@ -3162,7 +3098,7 @@ local object string_search (const stringarg* arg1, const stringarg* arg2,
  notfound: return NIL;
 }
 
-LISPFUN(search_string_gleich,seclass_read,2,0,norest,key,4,
+LISPFUN(search_string_eq,seclass_read,2,0,norest,key,4,
         (kw(start1),kw(end1),kw(start2),kw(end2)) )
 { /* (SYS::SEARCH-STRING= string1 string2 [:start1] [:end1] [:start2] [:end2])
    = (search string1 string2 :test #'char= [:start1] [:end1] [:start2] [:end2]) */
@@ -3195,7 +3131,7 @@ LISPFUN(make_string,seclass_no_se,1,0,norest,key,2,
     pushSTACK(STACK_2); /* TYPE-ERROR slot DATUM */
     pushSTACK(O(type_posfixnum)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(STACK_(2+2)); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,
+    error(type_error,
            GETTEXT("~S: the string length ~S should be nonnegative fixnum"));
   }
   size = posfixnum_to_V(STACK_2);
@@ -3211,7 +3147,7 @@ LISPFUN(make_string,seclass_no_se,1,0,norest,key,2,
         pushSTACK(S(character)); /* CHARACTER */
         pushSTACK(S(Kelement_type)); /* :ELEMENT-TYPE */
         pushSTACK(S(make_string));
-        fehler(error,GETTEXT("~S: ~S argument must be a subtype of ~S, not ~S"));
+        error(error_condition,GETTEXT("~S: ~S argument must be a subtype of ~S, not ~S"));
       }
     }
   }
@@ -3219,8 +3155,8 @@ LISPFUN(make_string,seclass_no_se,1,0,norest,key,2,
   /* maybe fill with initial-element: */
   var object initial_element = STACK_1;
   if (!boundp(initial_element)) {
-    # Allocate a small-sstring, to save memory in the most frequent case.
-    # It will become wider as needed automatically.
+    /* Allocate a small-sstring, to save memory in the most frequent case.
+     It will become wider as needed automatically. */
     new_string = allocate_s8string(size);
   } else {
     if (!charp(initial_element)) { /* must be a character */
@@ -3228,7 +3164,7 @@ LISPFUN(make_string,seclass_no_se,1,0,norest,key,2,
       pushSTACK(S(character)); /* TYPE-ERROR slot EXPECTED-TYPE */
       pushSTACK(S(character)); pushSTACK(initial_element);
       pushSTACK(S(Kinitial_element)); pushSTACK(TheSubr(subr_self)->name);
-      fehler(type_error,GETTEXT("~S: ~S argument ~S should be of type ~S"));
+      error(type_error,GETTEXT("~S: ~S argument ~S should be of type ~S"));
     } else {
       var chart ch = char_code(initial_element);
      #ifdef HAVE_SMALL_SSTRING
@@ -3375,14 +3311,14 @@ global maygc void nstring_upcase (object dv, uintL offset, uintL len) {
       do { *charptr = as_cint(up_case(as_chart(*charptr))); charptr++;
       } while (--len);
     },{
-      fehler_nilarray_retrieve();
+      error_nilarray_retrieve();
     });
 }
 
 /* UP: converts a string into uppercase letters
  string_upcase(string)
  > string: string
- < ergebnis: new normal-simple-string, in uppercase letters
+ < result: new normal-simple-string, in uppercase letters
  can trigger GC */
 global maygc object string_upcase (object string) {
   string = copy_string_normal(string); /* copy and turn into a normal-simple-string */
@@ -3449,7 +3385,7 @@ global maygc void nstring_downcase (object dv, uintL offset, uintL len) {
       do { *charptr = as_cint(down_case(as_chart(*charptr))); charptr++;
       } while (--len);
     },{
-      fehler_nilarray_retrieve();
+      error_nilarray_retrieve();
     });
 }
 
@@ -3516,7 +3452,7 @@ global maygc void nstring_capitalize (object dv, uintL offset, uintL len) {
       /* Found the start of a word. */
      wordstart_8:
       dv = sstring_store(dv,offset,up_case(ch));
-      loop {
+      while (1) {
         offset++;
         if (sstring_reallocatedp(TheSstring(dv))) { /* has it been reallocated? */
           dv = TheSistring(dv)->data;
@@ -3544,7 +3480,7 @@ global maygc void nstring_capitalize (object dv, uintL offset, uintL len) {
       /* Found the start of a word. */
      wordstart_16:
       dv = sstring_store(dv,offset,up_case(ch));
-      loop {
+      while (1) {
         offset++;
         if (sstring_reallocatedp(TheSstring(dv))) { /* has it been reallocated? */
           dv = TheSistring(dv)->data;
@@ -3572,7 +3508,7 @@ global maygc void nstring_capitalize (object dv, uintL offset, uintL len) {
       /* Found the start of a word. */
      wordstart_32:
       TheS32string(dv)->data[offset] = as_cint(up_case(ch));
-      loop {
+      while (1) {
         offset++;
       in_word_32:
         if (--len==0)
@@ -3584,7 +3520,7 @@ global maygc void nstring_capitalize (object dv, uintL offset, uintL len) {
       }
       return; /* len = 0 -> string terminated */
     },{
-      fehler_nilarray_retrieve();
+      error_nilarray_retrieve();
     });
   }
 }
@@ -3669,7 +3605,7 @@ global maygc object subsstring (object string, uintL start, uintL end) {
   var object new_string = allocate_string(count);
   string = popSTACK();
   if (count > 0) {
-   #ifdef UNICODE
+   #ifdef ENABLE_UNICODE
     SstringCase(string,
       { copy_8bit_32bit(&TheS8string(string)->data[start],
                         &TheS32string(new_string)->data[0],count); },
@@ -3677,12 +3613,12 @@ global maygc object subsstring (object string, uintL start, uintL end) {
                          &TheS32string(new_string)->data[0],count); },
       { copy_32bit_32bit(&TheS32string(string)->data[start],
                          &TheS32string(new_string)->data[0],count); },
-      { fehler_nilarray_retrieve(); });
+      { error_nilarray_retrieve(); });
    #else
     SstringCase(string, { NOTREACHED; }, { NOTREACHED; },
       { copy_8bit_8bit(&TheS8string(string)->data[start],
                        &TheS8string(new_string)->data[0],count); },
-      { fehler_nilarray_retrieve(); });
+      { error_nilarray_retrieve(); });
    #endif
   }
   DBGREALLOC(new_string);
@@ -3713,7 +3649,7 @@ LISPFUN(substring,seclass_read,2,1,norest,nokey,0,NIL)
     pushSTACK(STACK_0); /* :END-Index */
     pushSTACK(STACK_2); /* :START-Index */
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: :start-index ~S must not be greater than :end-index ~S"));
+    error(error_condition,GETTEXT("~S: :START-index ~S must not be greater than :END-index ~S"));
   }
   skipSTACK(3);
   /* extract substring: */
@@ -3725,7 +3661,7 @@ LISPFUN(substring,seclass_read,2,1,norest,nokey,0,NIL)
     var uintL len; /* again the length of the old string */
     var uintL offset;
     string = unpack_string_ro(string,&len,&offset);
-   #ifdef UNICODE
+   #ifdef ENABLE_UNICODE
     SstringCase(string,
       { copy_8bit_32bit(&TheS8string(string)->data[offset+start],
                         &TheS32string(new_string)->data[0],count); },
@@ -3733,12 +3669,12 @@ LISPFUN(substring,seclass_read,2,1,norest,nokey,0,NIL)
                          &TheS32string(new_string)->data[0],count); },
       { copy_32bit_32bit(&TheS32string(string)->data[offset+start],
                          &TheS32string(new_string)->data[0],count); },
-      { fehler_nilarray_retrieve(); });
+      { error_nilarray_retrieve(); });
    #else
     SstringCase(string, { NOTREACHED; }, { NOTREACHED; },
       { copy_8bit_8bit(&TheS8string(string)->data[offset+start],
                        &TheS8string(new_string)->data[0],count); },
-      { fehler_nilarray_retrieve(); });
+      { error_nilarray_retrieve(); });
    #endif
   }
   DBGREALLOC(new_string);
@@ -3752,7 +3688,7 @@ LISPFUN(substring,seclass_read,2,1,norest,nokey,0,NIL)
  < result: total string, freshly created
  < STACK: cleaned up
  can trigger GC */
-global maygc object string_concat (uintC argcount) {
+modexp maygc object string_concat (uintC argcount) {
   var gcv_object_t* args_pointer = (args_end_pointer STACKop argcount);
   /* args_pointer = pointer to the arguments
      check, if they are all strings, and add the lengths: */
@@ -3778,7 +3714,7 @@ global maygc object string_concat (uintC argcount) {
       var uintL offset;
       var object string = unpack_string_ro(arg,&len,&offset);
       if (len > 0) { /* copy len characters from string to charptr2: */
-       #ifdef UNICODE
+       #ifdef ENABLE_UNICODE
         SstringCase(string,
           { copy_8bit_32bit(&TheS8string(string)->data[offset],
                             charptr2,len); },
@@ -3786,11 +3722,11 @@ global maygc object string_concat (uintC argcount) {
                              charptr2,len); },
           { copy_32bit_32bit(&TheS32string(string)->data[offset],
                              charptr2,len); },
-          { fehler_nilarray_retrieve(); });
+          { error_nilarray_retrieve(); });
        #else
         SstringCase(string, { NOTREACHED; }, { NOTREACHED; },
           { copy_8bit_8bit(&TheS8string(string)->data[offset],charptr2,len); },
-          { fehler_nilarray_retrieve(); });
+          { error_nilarray_retrieve(); });
        #endif
         charptr2 += len;
       }

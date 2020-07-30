@@ -67,8 +67,8 @@
         ;; Therefore, convert 2^e := 2^(binexpo-1) into the decimal system.
         (let* ((e (- binexpo 1))
                (e-gross (> (abs e) (ash l 1))) ; if |e| is very large, >2*l ?
-               g f     ; auxiliary variables in case that |e| is large
-               ten-d  ; auxiliary variable 10^|d| in case that |e| is small
+               g f   ; auxiliary variables in case that |e| is large
+               ten-d ; auxiliary variable 10^|d| in case that |e| is small
                d a1 a2); result variables
           (if e-gross ; is |e| really big?
             ;; As 2^e can work only approximately, we need safety bits.
@@ -158,7 +158,7 @@
               ;; If a1' < a1 or a2 < a2' , then the power-of-2-approximation-
               ;; 10^d * f/2^g for 2^e has not been accurate enough,
               ;; and we have to repeat everything with increased h.
-              ;; Exception (wenn even no higer precision helps):
+              ;; Exception (when even higer precision does not help):
               ;;   If the upper or lower interval boundary (x+x2)/2 resp.
               ;;   (x+x1)/2 has itself the shape 10^d * a with integer a.
               ;;   This is tested via:
@@ -237,7 +237,10 @@
                     ;; a1 = 1+floor(below*2^e/(2^belowshift*10^d)),
                     ;; a2 = floor((above*2^e-1)/10^d).
                     (setq a1 (1+ (floor (ash below e) (ash ten-d belowshift))))
-                    (setq a2 (floor (1- (ash above e)) ten-d)))))
+                    ;; even mantissas represent top-inclusive intervals
+                    (setq a2 (if (evenp binmant)
+                                 (floor (ash above e) ten-d)
+                                 (floor (1- (ash above e)) ten-d))))))
               ;; e < 0. Estimate d = floor(e*lg(2)) like above.
               ;; |e|<=2*l<2^21.
               (progn
@@ -256,6 +259,8 @@
                 ;; a1 = 1+floor(below*10^(-d)/2^(-e+belowshift)),
                 ;; a2 = floor((above*10^(-d)-1)/2^(-e))
                 (setq a1 (1+ (ash (* below ten-d) (- e belowshift))))
+                ;; for some reason the (evenp binmant) does not make a
+                ;; difference here
                 (setq a2 (ash (1- (* above ten-d)) e)))))
           ;; Now the integer a's with (x+x1)/2 < 10^d * a < (x+x2)/2 are
           ;; exactly the integer a's with a1 <= a <= a2. There are at most 20.

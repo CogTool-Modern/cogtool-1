@@ -5,7 +5,7 @@
         John Hinsdale, Alma Mater Software, Inc.
         hin@alma.com
 
-        $Id: README,v 1.2 2003/09/08 23:33:29 hin Exp $
+        $Id: README,v 1.3 2008/06/29 17:51:01 sds Exp $
 
 This CLISP module provides an interface with the FastCGI protocol,
 which implements a fully CGI-compatible process model for running Web
@@ -51,11 +51,13 @@ You will need to:
         (2) BUILDING THE MODULE
             -------------------
 
-As of ver. 2.31, CLISP comes with module in the source distribution.
-The modules is in the subdirectory "modules/fastcgi".
+As of ver. 2.31, CLISP comes with the module in the source distribution.
+The module is in the subdirectory "modules/fastcgi".
 
 Run (or re-run) CLISP configure, adding the option
-"--with-module=fastcgi"
+    "--with-module=fastcgi"
+If you have build CLISP already:
+$ cd build-dir && make MODULES=fastcgi
 
 Re-compile and install CLISP.  Note you have to use the "full" linking
 set to get the extra modules (e.g., "clisp -K full").  You'll know you
@@ -71,7 +73,7 @@ the following channels:
 	(a) environment variables (e.g., "HTTP_USER_AGENT" is the
 	    set by the Web server to name the browser used
 
-	(b) reading from standard input (i.e., to get input data in 
+	(b) reading from standard input (i.e., to get input data in
             a "method=POST" request
 
 	(c) writing an HTTP response document (usually "Content-type:

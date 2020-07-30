@@ -1,10 +1,11 @@
 (in-package "EXT")
-(export '(ethe letf letf* with-collect compiled-file-p))
+(export '(ethe letf letf* with-collect compiled-file-p compile-time-value
+          canonicalize))
 (in-package "SYSTEM")
 ;;; ---------------------------------------------------------------------------
 ;;; Wie THE, nur dass auch im compilierten Code der Typtest durchgeführt wird.
 (defmacro ethe (typespec form)
-  (let ((g (gensym)))
+  (let ((g (gensym "VALUES-")))
     `(THE ,typespec
        (LET ((,g (MULTIPLE-VALUE-LIST ,form)))
          (IF (SYS::%THE ,g ',(type-for-discrimination typespec))
@@ -81,16 +82,11 @@
                 (setq place (third place) form `(THE ,(second place) ,form))
                 (return)
           ) ) )
-          (error-of-type 'source-program-error
-            :form whole-form
-            :detail bind
-            (TEXT "illegal syntax in LETF* binding: ~S")
-            bind
-      ) ) )
+          (illegal-syntax bind 'LETF* whole-form)))
       (multiple-value-bind (rest-expanded flag)
           (expand-LETF* (cdr bindlist) declare body whole-form env)
         (if (and (atom place)
-                 (not (and (symbolp place) (nth-value 1 (macroexpand-1 place))))
+                 (not (and (symbolp place) (nth-value 1 (macroexpand-1 place env))))
             )
           (values
             (if flag
@@ -104,7 +100,7 @@
           (if (and (consp place) (eq (car place) 'VALUES))
             (if (every #'(lambda (subplace)
                            (and (symbolp subplace)
-                                (not (nth-value 1 (macroexpand-1 subplace)))
+                                (not (nth-value 1 (macroexpand-1 subplace env)))
                          ) )
                        place)
               (values
@@ -127,12 +123,12 @@
                             ,@(nreverse stores2)
                     ) ) ) )
                   (multiple-value-bind (SM-temps SM-subforms SM-stores SM-setterform SM-getterform)
-                      (get-setf-method (pop subplacesr))
+                      (get-setf-method (pop subplacesr) env)
                     (setq bindlist
                       (cons (list (first SM-stores) SM-getterform)
                             (nreconc (mapcar #'list SM-temps SM-subforms) bindlist)
                     ) )
-                    (let ((storetemp (gensym)))
+                    (let ((storetemp (gensym "LETF*-")))
                       (setq storetemps (cons storetemp storetemps))
                       ; We can use subst-in-form here, because storetemp is just a variable reference.
                       (setq stores1 (cons (subst-in-form storetemp (first SM-stores) SM-setterform) stores1))
@@ -142,8 +138,8 @@
                 t
             ) )
             (multiple-value-bind (SM-temps SM-subforms SM-stores SM-setterform SM-getterform)
-                (get-setf-method place)
-              (let ((formvar (gensym)))
+                (get-setf-method place env)
+              (let ((formvar (gensym "LETF*-VALUE-")))
                 (values
                   `(LET* (,.(mapcar #'list SM-temps SM-subforms)
                           (,(first SM-stores) ,SM-getterform)
@@ -209,6 +205,7 @@
         (let ((body body-rest) ; eine Formenliste ohne Deklarationen
               (1form nil)) ; zeigt an, ob body aus einer einzigen Form besteht
           (when uwp-store1
+            (unless body (setq body '(nil)))
             (setq body `((UNWIND-PROTECT (PROGN ,@uwp-store1 ,@body) ,@uwp-store2))
                   1form t
           ) )
@@ -259,15 +256,10 @@
                 (setq place (third place) form `(THE ,(second place) ,form))
                 (return)
           ) ) )
-          (error-of-type 'source-program-error
-            :form whole-form
-            :detail bind
-            (TEXT "illegal syntax in LETF binding: ~S")
-            bind
-      ) ) )
+          (illegal-syntax bind 'LETF whole-form)))
       (multiple-value-bind (L1 L2 L3 L4) (expand-LETF (cdr bindlist) whole-form env)
         (if (and (atom place)
-                 (not (and (symbolp place) (nth-value 1 (macroexpand-1 place))))
+                 (not (and (symbolp place) (nth-value 1 (macroexpand-1 place env))))
             )
           (let ((g (gensym)))
             (values (cons (list g form) L1) (cons (list place g) L2) L3 L4)
@@ -275,12 +267,11 @@
           (if (and (consp place) (eq (car place) 'VALUES))
             (if (every #'(lambda (subplace)
                            (and (symbolp subplace)
-                                (not (nth-value 1 (macroexpand-1 subplace)))
+                                (not (nth-value 1 (macroexpand-1 subplace env)))
                          ) )
                        place)
               (let ((gs (mapcar #'(lambda (subplace)
-                                    (declare (ignore subplace))
-                                    (gensym)
+                                    (gensym (symbol-name subplace))
                                   )
                                 (cdr place)
                    ))   )
@@ -298,19 +289,19 @@
                   ((atom subplacesr)
                    (values
                      (nreconc bindlist
-                              (cons (list (cons 'VALUES storetemps) form) L1)
+                              (cons (list (cons 'VALUES (nreverse storetemps)) form) L1)
                      )
                      L2
                      (nreconc stores1 L3)
                      (nreconc stores2 L4)
                   ))
                 (multiple-value-bind (SM-temps SM-subforms SM-stores SM-setterform SM-getterform)
-                    (get-setf-method (pop subplacesr))
+                    (get-setf-method (pop subplacesr) env)
                   (setq bindlist
                     (cons (list (first SM-stores) SM-getterform)
                           (nreconc (mapcar #'list SM-temps SM-subforms) bindlist)
                   ) )
-                  (let ((storetemp (gensym)))
+                  (let ((storetemp (gensym "LETF-")))
                     (setq storetemps (cons storetemp storetemps))
                     ; We can use subst-in-form here, because storetemp is just a variable reference.
                     (setq stores1 (cons (subst-in-form storetemp (first SM-stores) SM-setterform) stores1))
@@ -318,12 +309,13 @@
                   (setq stores2 (cons SM-setterform stores2))
             ) ) )
             (multiple-value-bind (SM-temps SM-subforms SM-stores SM-setterform SM-getterform)
-                (get-setf-method place)
-              (let ((g (gensym)))
+                (get-setf-method place env)
+              (let ((g (gensym "LETF-VALUE-")))
                 (values
                   `(,.(mapcar #'list SM-temps SM-subforms)
                     (,(first SM-stores) ,SM-getterform)
-                    (,g ,form))
+                    (,g ,form)
+                    . ,L1)
                   L2
                   ; We can use subst-in-form here, because g is just a variable reference.
                   (cons (subst-in-form g (first SM-stores) SM-setterform) L3)
@@ -370,7 +362,7 @@ on other lisps (which is 1.5-2 times as fast as push/nreverse there)."
 
 ;;; ---------------------------------------------------------------------------
 (defun compiled-file-p (file-name)
-  "Return non-NIL is FILE-NAME names a CLISP-compiled file
+  "Return non-NIL if FILE-NAME names a CLISP-compiled file
 with compatible bytecodes."
   (with-open-file (in file-name :direction :input :if-does-not-exist nil)
     (handler-bind ((error (lambda (c) (declare (ignore c))
@@ -380,3 +372,40 @@ with compatible bytecodes."
              (and (consp form)
                   (eq (car form) 'SYSTEM::VERSION)
                   (null (eval form))))))))
+
+;;; ---------------------------------------------------------------------------
+;;; http://groups.google.com/group/comp.lang.lisp/browse_thread/thread/7fda163e5e8194f2/65564bd5e2810f01
+(defmacro compile-time-value (expression)
+  "Evaluate the EXPRESSION at compile time, writing the value into the FAS file."
+  (declare (ignore expression))
+  () ; see compiler.lisp:c-COMPILE-TIME-VALUE
+  #+(or) ;; the gensym result leaks into the *.lib and *.fas files
+  (let ((result (gensym "COMPILE-TIME-VALUE-")))
+    `(let ((,result nil))
+       (declare (special ,result))
+       (eval-when (compile)
+         (setq ,result `',(eval ',expression)))
+       (eval-when (compile load eval)
+         (macrolet ((ctv () ,result))
+           (eval-when (load eval) (ctv)))))))
+
+;;; ---------------------------------------------------------------------------
+(defun canonicalize (value functions &key (test 'eql) (max-iter 1024))
+  "Call FUNCTIONS on VALUE until it stabilizes according to TEST.
+TEST should be a avalid HASH-TABLE-TEST.
+MAX-ITER limits the number of iteration over the FUNCTIONS (defaults to 1024).
+Returns the canonicalized value and the number of iterations it required."
+  (if functions
+      (let ((ht (make-hash-table :test test)) (prev value) next (count 0))
+        (setf (gethash value ht) 0)
+        (loop (setq next (reduce (lambda (v f) (funcall f v)) functions
+                                 :initial-value prev))
+          (when (funcall test next prev) (return (values next count)))
+          (let ((old (gethash next ht)))
+            (when old
+              (error "~S(~S ~S): circular computation: value ~S appears at steps ~:D and ~:D" 'canonicalize value functions next old (1+ count))))
+          (when (and max-iter (= count max-iter))
+            (error "~S(~S ~S): maximum number of iterations exceeded ~:D, last two values were ~S and ~S" 'canonicalize value functions max-iter prev next))
+          (setq prev next)
+          (setf (gethash next ht) (incf count))))
+      value))

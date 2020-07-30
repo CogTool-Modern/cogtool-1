@@ -1,7 +1,7 @@
 /*
  * Functions for records and structures in CLISP
  * Bruno Haible 1990-2005
- * Sam Steingold 1998-2004
+ * Sam Steingold 1998-2008
  * German comments translated into English: Stefan Kain 2002-04-16
  */
 #include "lispbibl.c"
@@ -13,12 +13,12 @@
  (SYS::%RECORD-STORE record index value) store value as the index'th
    entry in the record and return value.
  (SYS::%RECORD-LENGTH record) return the length of the record.
-*/
-/* Error message
+
+ Error message
  > STACK_1: record
  > STACK_0: (bad) index
  > limit: exclusive upper bound on the index */
-nonreturning_function(local, fehler_index, (uintL limit)) {
+nonreturning_function(local, error_index, (uintL limit)) {
   pushSTACK(STACK_0); /* TYPE-ERROR slot DATUM */
   {
     var object tmp;
@@ -29,15 +29,15 @@ nonreturning_function(local, fehler_index, (uintL limit)) {
   pushSTACK(STACK_(1+2)); /* record */
   pushSTACK(STACK_(0+3)); /* index */
   pushSTACK(TheSubr(subr_self)->name); /* function name */
-  fehler(type_error,GETTEXT("~S: ~S is not a valid index into ~S"));
+  error(type_error,GETTEXT("~S: ~S is not a valid index into ~S"));
 }
 
 /* Error message
  > STACK_0: (bad) record */
-nonreturning_function(local, fehler_record, (void)) {
+nonreturning_function(local, error_record, (void)) {
   pushSTACK(TheSubr(subr_self)->name); /* function name */
-  fehler(error, /* type_error ?? */
-         GETTEXT("~S: ~S is not a record"));
+  error(error_condition, /* type_error ?? */
+        GETTEXT("~S: ~S is not a record"));
 }
 
 /* Subroutine for record access functions
@@ -47,13 +47,13 @@ nonreturning_function(local, fehler_record, (void)) {
  < returns: the address of the referred record item */
 local gcv_object_t* record_up (void) {
   /* the record must be a Closure/Structure/Stream/OtherRecord: */
-  if_recordp(STACK_1, ; , { skipSTACK(1); fehler_record(); } );
+  if_recordp(STACK_1, ; , { skipSTACK(1); error_record(); } );
   var object record = STACK_1;
   var uintL length = Record_length(record);
   var uintV index;
   if (!(posfixnump(STACK_0) && ((index = posfixnum_to_V(STACK_0)) < length)))
     /* extract and check index */
-    fehler_index(length);
+    error_index(length);
   skipSTACK(2); /* clear up stack */
   return &TheRecord(record)->recdata[index]; /* record element address */
 }
@@ -76,7 +76,7 @@ LISPFUNN(record_store,3)
 LISPFUNNR(record_length,1)
 {
   /* the record must be a Closure/Structure/Stream/OtherRecord: */
-  if_recordp(STACK_0, ; , { fehler_record(); } );
+  if_recordp(STACK_0, ; , { error_record(); } );
   var object record = popSTACK();
   var uintL length = Record_length(record);
   VALUES1(fixnum(length)); /* length as Fixnum */
@@ -89,14 +89,14 @@ LISPFUNNR(record_length,1)
   if (!(posfixnump(STACK_0)                                                   \
         && ((length = posfixnum_to_V(STACK_0)) <= (uintV)(vbitm(intWsize)-1)) \
         && (length>0)))                                                       \
-    fehler_record_length()
-nonreturning_function(local, fehler_record_length, (void)) {
+    error_record_length()
+nonreturning_function(local, error_record_length, (void)) {
   /* STACK_0 = length, TYPE-ERROR slot DATUM */
   pushSTACK(O(type_posint16)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(O(type_posint16)); /* type */
   pushSTACK(STACK_2); /* length */
   pushSTACK(TheSubr(subr_self)->name); /* function name */
-  fehler(type_error,GETTEXT("~S: length ~S should be of type ~S"));
+  error(type_error,GETTEXT("~S: length ~S should be of type ~S"));
 }
 
 /* ===========================================================================
@@ -123,26 +123,26 @@ nonreturning_function(local, fehler_record_length, (void)) {
 local gcv_object_t* structure_up (void) {
   /* structure must be of Type structure: */
   if (!structurep(STACK_1)) {
-   fehler_bad_structure: /* STACK_2 = type, STACK_1 = structure */
+   error_bad_structure: /* STACK_2 = type, STACK_1 = structure */
     pushSTACK(STACK_1); /* TYPE-ERROR slot DATUM */
     pushSTACK(STACK_(2+1)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(STACK_(2+2));
     pushSTACK(STACK_(1+3));
     pushSTACK(TheSubr(subr_self)->name); /* function name */
-    fehler(type_error,GETTEXT("~S: ~S is not a structure of type ~S"));
+    error(type_error,GETTEXT("~S: ~S is not a structure of type ~S"));
   }
   var object structure = STACK_1;
   /* check if type occurs in namelist = (name_1 ... name_i-1 name_i) : */
   if (!nullp(memq(STACK_2,TheStructure(structure)->structure_types)))
     goto yes;
   /* type did not occur -> Error: */
-  goto fehler_bad_structure;
+  goto error_bad_structure;
  yes: { /* type did occur: */
     var uintL length = (uintL)Structure_length(structure);
     var uintV index;
     /* fetch index and check */
     if (!(posfixnump(STACK_0) && ((index = posfixnum_to_V(STACK_0)) < length)))
-      fehler_index(length);
+      error_index(length);
     /* address of the structure-component */
     return &TheStructure(structure)->recdata[index];
   }
@@ -177,7 +177,7 @@ LISPFUNNR(structure_ref,3) {
     pushSTACK(STACK_(1+3+2));
     pushSTACK(value1);
     pushSTACK(S(structure_ref));
-    fehler(unbound_slot,GETTEXT("~S: Slot ~S of ~S has no value"));
+    error(unbound_slot,GETTEXT("~S: Slot ~S of ~S has no value"));
   }
   skipSTACK(3); /* clean up stack */
 }
@@ -259,12 +259,9 @@ LISPFUNNR(structure_type_p,2) {
    closure as an array of fixnums >=0, <256.
  (SYS::CLOSURE-CONSTS closure) returns a list of all constants of a
    compiled closure.
- (SYS::MAKE-CODE-VECTOR list) returns for a list of fixnums >=0, <256
-   a simple-8bit-vector of the same length, that contains these numbers
-   as bytes.
- (SYS::%MAKE-CLOSURE name codevec consts seclass) returns a closure with given
-   name (a symbol), given code-vector (a simple-bit-vector) and
-   further given constants.
+ (SYS::MAKE-CLOSURE &key name code constants seclass lambda-list documentation
+    jitc-p) returns a closure with given name (a symbol), given code-vector
+    (a list of bytes), given constants, seclass, lalist, doc string and JITC_p.
  (SYS::MAKE-CONSTANT-INITFUNCTION value) returns a closure that, when called
    with 0 arguments, returns the given value.
  (SYS::CONSTANT-INITFUNCTION-P object) tests whether an object was returned by
@@ -276,18 +273,21 @@ LISPFUNNR(structure_type_p,2) {
  (SYS::GENERIC-FUNCTION-EFFECTIVE-METHOD-FUNCTION generic-function)
    returns a function, which delivers the effective methods, so that
    (APPLY generic-function arguments)
-   == (APPLY (APPLY ergebnis arguments) arguments) .
+   == (APPLY (APPLY result arguments) arguments) .
 */
+
+/* error, if argument is not a closure */
+nonreturning_function(local, error_closure, (object obj)) {
+  pushSTACK(obj);
+  pushSTACK(TheSubr(subr_self)->name); /* function name */
+  error(error_condition, /* type_error ?? */
+        GETTEXT("~S: ~S is not a closure"));
+}
 
 /* (SYS::CLOSURE-NAME closure) returns the name of a closure. */
 LISPFUNNR(closure_name,1) {
   var object closure = popSTACK();
-  if (!closurep(closure)) {
-    pushSTACK(closure);
-    pushSTACK(TheSubr(subr_self)->name); /* function name */
-    fehler(error, /* type_error ?? */
-           GETTEXT("~S: ~S is not a closure"));
-  }
+  if (!closurep(closure)) error_closure(closure);
   VALUES1(Closure_name(closure));
 }
 
@@ -295,12 +295,7 @@ LISPFUNNR(closure_name,1) {
    closure. */
 LISPFUNN(set_closure_name,2) {
   var object closure = popSTACK();
-  if (!closurep(closure)) {
-    pushSTACK(closure);
-    pushSTACK(TheSubr(subr_self)->name); /* function name */
-    fehler(error, /* type_error ?? */
-           GETTEXT("~S: ~S is not a closure"));
-  }
+  if (!closurep(closure)) error_closure(closure);
   var object new_name = popSTACK();
   if (Closure_instancep(closure))
     TheCclosure(closure)->clos_consts[1] = new_name;
@@ -310,18 +305,18 @@ LISPFUNN(set_closure_name,2) {
 }
 
 /* error, if argument is not a compiled closure */
-nonreturning_function(local, fehler_cclosure, (object obj)) {
+nonreturning_function(local, error_cclosure, (object obj)) {
   pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name); /* function name */
-  fehler(error, /* type_error ?? */
-         GETTEXT("~S: This is not a compiled closure: ~S"));
+  error(error_condition, /* type_error ?? */
+        GETTEXT("~S: ~S is not a compiled closure"));
 }
 
 /* (SYS::CLOSURE-CODEVEC closure) returns the code-vector of a compiled
    closure, as an array of fixnums >=0, <256. */
 LISPFUNNR(closure_codevec,1) {
   var object closure = popSTACK();
-  if (!(cclosurep(closure))) fehler_cclosure(closure);
+  if (!cclosurep(closure)) error_cclosure(closure);
   var object codevec = TheCclosure(closure)->clos_codevec;
   VALUES1(codevec);
 }
@@ -330,9 +325,13 @@ LISPFUNNR(closure_codevec,1) {
    compiled closure. */
 LISPFUNNR(closure_consts,1) {
   var object closure = popSTACK();
-  if (!(cclosurep(closure))) fehler_cclosure(closure);
-  /* comprise elements 2,3,... to a list: */
-  var uintC index = Cclosure_length(closure)-2; /* index := length */
+  if (!cclosurep(closure)) error_cclosure(closure);
+  /* put elements 2,3,... to a list: */
+  var uintB ccv_flags =
+    TheCodevec(TheCclosure(closure)->clos_codevec)->ccv_flags;
+  var uintC index = Cclosure_last_const(closure) + 1
+    - ccv_flags_jitc_p(ccv_flags) - ccv_flags_documentation_p(ccv_flags)
+    - ccv_flags_lambda_list_p(ccv_flags);
   /* step through closure from behind and push constants onto a list: */
   pushSTACK(closure); /* closure */
   pushSTACK(NIL); /* list := () */
@@ -347,13 +346,41 @@ LISPFUNNR(closure_consts,1) {
   VALUES1(STACK_0); skipSTACK(2); /* list as value */
 }
 
-/* (SYS::MAKE-CODE-VECTOR list) returns for a list of fixnums >=0, <256
-   a simple-8bit-vector of the same length, that contains these numbers
-   as bytes. */
-LISPFUNNR(make_code_vector,1) {
-  var object bv = allocate_bit_vector(Atype_8Bit,llength(STACK_0)); /* simple-8bit-vector */
+/* return the address of the Nth constant
+ > STACK_0: position
+ > STACK_1: compiled closure
+ < address of the constant
+ can trigger GC */
+local maygc gcv_object_t* closure_const (void) {
+  var uintV pos = posfixnum_to_V(check_posfixnum(STACK_0));
+  var object closure = STACK_1;
+  if (!cclosurep(closure)) error_cclosure(closure);
+  var uintB ccv_flags =
+    TheCodevec(TheCclosure(closure)->clos_codevec)->ccv_flags;
+  var uintC max_index = Cclosure_last_const(closure)
+    - ccv_flags_documentation_p(ccv_flags) - ccv_flags_lambda_list_p(ccv_flags);
+  if (pos > max_index) error_index(max_index);
+  return &(TheCclosure(closure)->clos_consts[(uintP)pos]);
+}
+
+/* (SYS::CLOSURE-CONST closure n)
+   returns the n-th constant of the compiled closure. */
+LISPFUNNR(closure_const,2) {
+  VALUES1(*closure_const()); skipSTACK(2);
+}
+/* (SYS::SET-CLOSURE-CONST value closure n)
+   set the n-th constant of the compiled closure. */
+LISPFUNN(set_closure_const,3) {
+  VALUES1(*closure_const() = STACK_2); skipSTACK(3);
+}
+
+/* make_code_vector(list) converts a list of fixnums >=0, <256
+ into a simple-8bit-vector of the same length, that contains these numbers
+ as bytes. */
+local maygc void make_code_vector (gcv_object_t *code) {
+  var object bv = allocate_bit_vector(Atype_8Bit,llength(*code)); /* simple-8bit-vector */
   /* fill: */
-  var object listr = popSTACK(); /* list */
+  var object listr = *code; /* list */
   var uintB* ptr = &TheSbvector(bv)->data[0]; /* loop through the bit-vector */
   while (consp(listr)) {
     var uintV byte;
@@ -365,12 +392,13 @@ LISPFUNNR(make_code_vector,1) {
     *ptr++ = (uintB)byte;
     listr = Cdr(listr);
   }
-  VALUES1(bv); return;
+  *code = bv;
+  return;
  bad_byte:
   pushSTACK(Car(listr)); /* TYPE-ERROR slot DATUM */
   pushSTACK(O(type_uint8)); /* TYPE-ERROR slot EXPECTED-TYPE */
   pushSTACK(STACK_1);
-  fehler(type_error,GETTEXT("~S is not a valid code-vector byte"));
+  error(type_error,GETTEXT("~S is not a valid code-vector byte"));
 }
 
 /* parse the seclass object (NIL or SECLASS, see compiler.lisp)
@@ -381,7 +409,7 @@ local seclass_t parse_seclass (object sec, object closure)
   if (!consp(sec) || !consp(Cdr(sec)) || !consp(Cdr(Cdr(sec)))) {
     pushSTACK(closure); pushSTACK(sec);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: invalid side-effect class ~S for function ~S"));
+    error(error_condition,GETTEXT("~S: invalid side-effect class ~S for function ~S"));
   }
   var object modifies = Car(Cdr(sec));
   return (nullp(Car(sec))
@@ -389,39 +417,48 @@ local seclass_t parse_seclass (object sec, object closure)
           : (nullp(modifies) ? seclass_read : seclass_default));
 }
 
-/* (SYS::%MAKE-CLOSURE name codevec consts seclass) returns a closure
-   with given name (a symbol), given code-vector (a simple-bit-vector),
-   given constants, and given side-effect class. */
-LISPFUNNR(make_closure,4) {
-  var seclass_t seclass = parse_seclass(STACK_0,STACK_3); skipSTACK(1);
-  /* codevec must be a simple-bit-vector: */
-  if (!simple_bit_vector_p(Atype_8Bit,STACK_1)) {
-    /* STACK_1 = codevec */
-    pushSTACK(STACK_1); /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(simple_bit_vector)); /* TYPE-ERROR slot EXPECTED-TYPE */
-    pushSTACK(STACK_(1+2));
-    pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: invalid code-vector ~S"));
-  }
-  /* create a new closure of length (+ 2 (length consts)) : */
-  var uintL length = 2+llength(STACK_0);
+/* (SYS::%MAKE-CLOSURE name codevec consts seclassJ lambda-list documentation)
+ returns a closure with given name (a symbol),
+ given code-vector (a simple-bit-vector), given constants,
+ given side-effect class, lambda-list and documentation. */
+LISPFUN(make_closure,seclass_default,0,0,norest,key,7,(kw(name),kw(code),
+        kw(constants),kw(seclass),kw(lambda_list),kw(documentation),kw(jitc_p)))
+{
+  var bool jitc_p = !eq(Fixnum_0,popSTACK());
+  var seclass_t seclass = parse_seclass(STACK_2,STACK_5);
+  /* convert code to a simple-bit-vector: */
+  if (listp(STACK_4)) make_code_vector(&STACK_4);
+  /* create a new closure of length
+     (+ 2 (length consts) lalist-p doc-p jitc_p) : */
+  var uintL length = 2+llength(STACK_3) + (jitc_p ? 1 : 0)
+    +(listp(STACK_1) ? 1 : 0)+(nullp(STACK_0) || stringp(STACK_0) ? 1 : 0);
   if (!(length <= (uintL)(bitm(intWsize)-1))) { /* should fit into a uintW */
-    /* STACK_0 = consts */
-    pushSTACK(STACK_2); /* name */
+    pushSTACK(STACK_3/* constants */);
+    pushSTACK(STACK_6/* name */);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: function ~S is too big: ~S"));
+    error(error_condition,GETTEXT("~S: function ~S is too big: ~S"));
   }
   var object closure = allocate_closure(length,seclass<<4);
-  TheCclosure(closure)->clos_name_or_class_version = STACK_2; /* fill name */
-  TheCclosure(closure)->clos_codevec = STACK_1; /* fill codevector */
-  { /* fill constants: */
-    var object constsr = popSTACK();
-    var gcv_object_t* ptr = &TheCclosure(closure)->clos_consts[0];
-    while (consp(constsr)) {
-      *ptr++ = Car(constsr); constsr = Cdr(constsr);
-    }
+  TheCclosure(closure)->clos_name_or_class_version = STACK_5; /* fill name */
+  TheCclosure(closure)->clos_codevec = STACK_4; /* fill codevector */
+  /* fill constants: */
+  var object constsr = STACK_3;
+  var gcv_object_t* ptr = &TheCclosure(closure)->clos_consts[0];
+  while (consp(constsr)) {
+    *ptr++ = Car(constsr); constsr = Cdr(constsr);
   }
-  VALUES1(closure); skipSTACK(2);
+  var uintB *ccv_flags = &(TheCodevec(STACK_4)->ccv_flags);
+  if (listp(STACK_1)) {
+    *ccv_flags |= bit(1);
+    *ptr++ = STACK_1;
+  } else *ccv_flags &= ~bit(1);
+  if (nullp(STACK_0) || stringp(STACK_0)) {
+    *ccv_flags |= bit(2);
+    *ptr++ = STACK_0;
+  } else *ccv_flags &= ~bit(2);
+  if (jitc_p) *ccv_flags |= bit(5);
+  else *ccv_flags &= ~bit(5);
+  VALUES1(closure); skipSTACK(6);
 }
 
 /* (SYS::MAKE-CONSTANT-INITFUNCTION value) returns a closure that, when called
@@ -433,28 +470,70 @@ LISPFUNN(make_constant_initfunction,1)
   pushSTACK(O(constant_initfunction_code));
   pushSTACK(consts);
   pushSTACK(O(seclass_no_se));
+  pushSTACK(Fixnum_0); /* no lalist */
+  pushSTACK(Fixnum_0); /* no doc */
+  pushSTACK(Fixnum_0); /* no jitc */
   C_make_closure();
 }
 
 /* (SYS::CONSTANT-INITFUNCTION-P object) tests whether an object was returned by
    SYS::MAKE-CONSTANT-INITFUNCTION. */
-LISPFUNN(constant_initfunction_p,1)
-{
+#define CONSTANT_INITFUNCTION_P(obj)  (closurep(obj)  \
+  && eq(TheClosure(obj)->clos_name_or_class_version,S(constant_initfunction)) \
+  && eq(TheClosure(obj)->clos_codevec,O(constant_initfunction_code)))
+LISPFUNN(constant_initfunction_p,1) {
   var object obj = popSTACK();
-  VALUES_IF(closurep(obj)
-            && eq(TheClosure(obj)->clos_name_or_class_version,S(constant_initfunction))
-            && eq(TheClosure(obj)->clos_codevec,O(constant_initfunction_code)));
+  VALUES_IF(CONSTANT_INITFUNCTION_P(obj));
 }
 
 LISPFUNN(closure_set_seclass,2)
 { /* (CLOSURE-SET-SECLASS closure new-seclass)
  - for adding methods to generic functions; return the old seclass */
   var object closure = STACK_1;
-  if (!cclosurep(closure)) fehler_cclosure(closure);
+  if (!cclosurep(closure)) error_cclosure(closure);
   var seclass_t new_seclass = parse_seclass(STACK_0,closure);
   VALUES1(seclass_object((seclass_t)Cclosure_seclass(closure)));
   Cclosure_set_seclass(closure,new_seclass);
   skipSTACK(2);
+}
+
+LISPFUNNR(closure_documentation,1)
+{ /* return the doc string, if any */
+  var object closure = popSTACK();
+  if (!cclosurep(closure)) error_cclosure(closure);
+  var uintB ccv_flags =
+    TheCodevec(TheCclosure(closure)->clos_codevec)->ccv_flags;
+  /* depending on bit(5), the ultimate or the penultimate constant */
+  VALUES1(ccv_flags_documentation_p(ccv_flags)
+          ? (object)TheCclosure(closure)->clos_consts
+             [Cclosure_last_const(closure)-ccv_flags_jitc_p(ccv_flags)]
+          : NIL);
+}
+LISPFUNN(closure_set_documentation,2)
+{ /* set the doc string, if possible*/
+  if (!nullp(STACK_0)) STACK_0 = check_string(STACK_0);
+  var object closure = STACK_1;
+  if (!cclosurep(closure)) error_cclosure(closure);
+  var uintB ccv_flags =
+    TheCodevec(TheCclosure(closure)->clos_codevec)->ccv_flags;
+  if (ccv_flags_documentation_p(ccv_flags))
+    TheCclosure(closure)->clos_consts
+      [Cclosure_last_const(closure)-ccv_flags_jitc_p(ccv_flags)] = STACK_0;
+  VALUES1(STACK_0); skipSTACK(2);
+}
+LISPFUNNR(closure_lambda_list,1)
+{ /* return the lambda list, if any */
+  var object closure = popSTACK();
+  if (!cclosurep(closure)) error_cclosure(closure);
+  var uintB ccv_flags =
+    TheCodevec(TheCclosure(closure)->clos_codevec)->ccv_flags;
+  /* depending on bit(2) & bit(5), the ultimate, penultimate
+     or pre-penultimate constant */
+  VALUES1(ccv_flags_lambda_list_p(ccv_flags)
+          ? (object)TheCclosure(closure)->clos_consts
+             [Cclosure_last_const(closure)-ccv_flags_documentation_p(ccv_flags)
+	      -ccv_flags_jitc_p(ccv_flags)]
+          : NIL);
 }
 
 /* (CLOS:SET-FUNCALLABLE-INSTANCE-FUNCTION closure function) redirects closure
@@ -464,15 +543,15 @@ LISPFUNN(set_funcallable_instance_function,2)
   var object closure = STACK_1;
   if (!funcallable_instance_p(closure)) {
     pushSTACK(closure); pushSTACK(TheSubr(subr_self)->name);
-    fehler(error, /* type_error ?? */
-           GETTEXT("~S: argument is not a funcallable instance: ~S"));
+    error(error_condition, /* type_error ?? */
+          GETTEXT("~S: argument is not a funcallable instance: ~S"));
   }
   var object function = STACK_0;
   if (!(subrp(function) || closurep(function) || ffunctionp(function))) {
     pushSTACK(function);    /* TYPE-ERROR slot DATUM */
     pushSTACK(S(function)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(function); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error, GETTEXT("~S: argument is not a function: ~S"));
+    error(type_error, GETTEXT("~S: argument is not a function: ~S"));
   }
   var object codevec;
   var object venv;
@@ -524,18 +603,18 @@ local inline maygc object check_genericlambda_function (object obj) {
 /* (SYS::%COPY-GENERIC-FUNCTION venv closure) copies the closure, which must be
    a generic function with venv slot, copying in the given venv. */
 LISPFUNN(copy_generic_function,2) {
-  /* Note: closure's clos_consts[0] is a simple-vector #(NIL c1 ... cn) where
+  /* Note: closure's clos_venv is a simple-vector #(NIL c1 ... cn) where
      c1,...,cn are constant objects, and NIL is the placeholder to be replaced
      with the passed venv. */
   var object oldclos = check_genericlambda_function(STACK_0);
-  var object vector = TheCclosure(oldclos)->clos_consts[0];
+  var object vector = TheCclosure(oldclos)->clos_venv;
   if (!(simple_vector_p(vector)
         && (Svector_length(vector) > 0)
         && nullp(TheSvector(vector)->data[0]))) {
     pushSTACK(oldclos);
     pushSTACK(TheSubr(subr_self)->name); /* function name */
-    fehler(error,
-           GETTEXT("~S: This is not a prototype of a generic function: ~S"));
+    error(error_condition,
+          GETTEXT("~S: This is not a prototype of a generic function: ~S"));
   }
   vector = copy_svector(vector); /* copy the vector */
   TheSvector(vector)->data[0] = STACK_1; /* put in venv */
@@ -545,7 +624,7 @@ LISPFUNN(copy_generic_function,2) {
   oldclos = STACK_0;
   do_cclosure_copy(newclos,oldclos);
   /* Put in the copied vector with venv: */
-  TheCclosure(newclos)->clos_consts[0] = STACK_1;
+  TheCclosure(newclos)->clos_venv = STACK_1;
   VALUES1(newclos);
   skipSTACK(2);
 }
@@ -553,7 +632,7 @@ LISPFUNN(copy_generic_function,2) {
 /* (SYS::GENERIC-FUNCTION-EFFECTIVE-METHOD-FUNCTION generic-function)
    returns a function, which delivers the effective methods, so that
    (APPLY generic-function arguments)
-   == (APPLY (APPLY ergebnis arguments) arguments) .
+   == (APPLY (APPLY result arguments) arguments) .
    is used for CALL-NEXT-METHOD; can assume that the
    generic-function has already been called, i.e. that the dispatch has
    already been installed. */
@@ -680,16 +759,17 @@ LISPFUNN(global_symbol_macro_definition,1)
 /* ===========================================================================
  * Macro:
 
- (SYS::MAKE-MACRO expander) returns a Macro object with the given expander
- function.
+ (SYS::MAKE-MACRO expander lambdalist) returns a Macro object with the given
+   expander function and macro lambda list.
  (SYS::MACROP object) tests for a Macro.
  (SYS::MACRO-EXPANDER macro) returns the macro's expander function. */
 
-/* (SYS::MAKE-MACRO expander) returns a Macro object with the given expander
- function. */
-LISPFUNN(make_macro,1) {
-  STACK_0 = check_function(STACK_0);
+/* (SYS::MAKE-MACRO expander lambdalist)
+ returns a Macro object with the given expander function. */
+LISPFUN(make_macro,seclass_no_se,2,0,norest,nokey,0,NIL) {
+  STACK_1 = check_function(STACK_1);
   var object m = allocate_macro();
+  TheMacro(m)->macro_lambda_list = popSTACK();
   TheMacro(m)->macro_expander = popSTACK();
   VALUES1(m);
 }
@@ -700,19 +780,36 @@ LISPFUNN(macrop,1) {
   VALUES_IF(macrop(obj));
 }
 
-/* (SYS::MACRO-EXPANDER macro) returns the macro's expander function. */
-LISPFUNN(macro_expander,1) {
-  var object obj = popSTACK();
+/* UP: check that the argument is a macro
+ > mac: macro
+ < mac: same
+ can trigger GC */
+local maygc object check_macro (object obj) {
   while (!macrop(obj)) {
-    pushSTACK(NIL); /* no PLACE */
-    pushSTACK(obj); /* TYPE-ERROR slot DATUM */
-    pushSTACK(S(macro)); /* TYPE-ERROR slot EXPECTED-TYPE */
+    pushSTACK(NIL);             /* no PLACE */
+    pushSTACK(obj);             /* TYPE-ERROR slot DATUM */
+    pushSTACK(S(macro));        /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(S(macro)); pushSTACK(obj);
-    pushSTACK(S(macro_expander)); /* function name */
+    pushSTACK(TheSubr(subr_self)->name); /* function name */
     check_value(type_error,GETTEXT("~S: ~S is not a ~S"));
     obj = value1;
   }
+  return obj;
+}
+
+/* (SYS::MACRO-EXPANDER macro) returns the macro's expander function. */
+LISPFUNN(macro_expander,1) {
+  var object obj = check_macro(popSTACK());
   VALUES1(TheMacro(obj)->macro_expander);
+}
+
+/* (SYS::MACRO-LAMBDA-LIST macro) returns the macro's lambda list. */
+LISPFUNN(macro_lambda_list,1) {
+  STACK_0 = check_macro(STACK_0);
+  var object lalist = TheMacro(STACK_0)->macro_lambda_list;
+  if (!listp(lalist))
+    error(error_condition,GETTEXT("Due to the compiler optimization settings, lambda list for ~S is not available"));
+  VALUES1(lalist); skipSTACK(1);
 }
 
 /* ===========================================================================
@@ -773,6 +870,10 @@ LISPFUNN(function_macro_expander,1) {
 /* ===========================================================================
  * Finalizer: */
 
+#ifdef MULTITHREAD
+global xmutex_t all_finalizers_lock;
+#endif
+
 /* (FINALIZE object function &optional alive)
  records that function is called if object dies through GC, with
  object and poss. alive as argument. If alive dies before object dies,
@@ -784,8 +885,13 @@ LISPFUN(finalize,seclass_default,2,1,norest,nokey,0,NIL) {
     TheFinalizer(f)->fin_trigger = STACK_2;
     TheFinalizer(f)->fin_function = STACK_1;
     TheFinalizer(f)->fin_alive = STACK_0; /* The default #<UNBOUND> lives forever. */
-    TheFinalizer(f)->fin_cdr = O(all_finalizers);
-    O(all_finalizers) = f;
+    pushSTACK(f); /* put in gcsafe place */
+    var gcv_object_t *f_ = &STACK_0;
+    WITH_OS_MUTEX_LOCK(0,&all_finalizers_lock, {
+      TheFinalizer(*f_)->fin_cdr = O(all_finalizers);
+      O(all_finalizers) = *f_;
+    });
+    skipSTACK(1);
   }
   skipSTACK(3); VALUES1(NIL);
 }
@@ -854,7 +960,7 @@ LISPFUNN(allocate_metaobject_instance,2) {
     if (!(simple_vector_p(cv) && Svector_length(cv) == classversion_length)) {
       pushSTACK(cv);
       pushSTACK(TheSubr(subr_self)->name); /* function name */
-      fehler(error,GETTEXT("~S: ~S is not a CLOS class-version"));
+      error(error_condition,GETTEXT("~S: ~S is not a CLOS class-version"));
     }
   }
   var object instance =
@@ -879,7 +985,7 @@ LISPFUNN(allocate_std_instance,2) {
   { /* Fetch the class-version now, before any possible GC, at which the
        user could redefine the class of which we are creating an instance. */
     var object clas = STACK_0;
-    if_defined_class_p(clas, ; , fehler_class(clas); );
+    if_defined_class_p(clas, ; , error_class(clas); );
     TheClass(clas)->instantiated = T;
     STACK_0 = TheClass(clas)->current_version;
   }
@@ -901,12 +1007,12 @@ LISPFUNN(allocate_funcallable_instance,2) {
   /* check length, should be a fixnum >3 that fits into a uintW: */
   var uintV length;
   test_record_length(length);
-  if (!(length>3)) fehler_record_length();
+  if (!(length>3)) error_record_length();
   skipSTACK(1);
   { /* Fetch the class-version now, before any possible GC, at which the
        user could redefine the class of which we are creating an instance. */
     var object clas = STACK_0;
-    if_defined_class_p(clas, ; , fehler_class(clas); );
+    if_defined_class_p(clas, ; , error_class(clas); );
     TheClass(clas)->instantiated = T;
     STACK_0 = TheClass(clas)->current_version;
   }
@@ -934,14 +1040,14 @@ LISPFUNN(allocate_funcallable_instance,2) {
    "initialization argument list". */
 local inline void check_initialization_argument_list (uintL argcount, object caller) {
   if (argcount%2 != 0)
-    fehler_key_odd(argcount,caller);
+    error_key_odd(argcount,caller);
   if (argcount > 0) {
     var gcv_object_t* argptr = STACK STACKop argcount;
     do {
       if (!symbolp(Next(argptr))) {
         pushSTACK(Next(argptr)); pushSTACK(caller);
         /* ANSI CL 3.5.1.5. wants a PROGRAM-ERROR here. */
-        fehler(program_error,GETTEXT("~S: invalid initialization argument ~S"));
+        error(program_error,GETTEXT("~S: invalid initialization argument ~S"));
       }
       argptr skipSTACKop -2;
       argcount -= 2;
@@ -955,9 +1061,9 @@ local Values do_allocate_instance (object clas);
   class must be an instance of <standard-class> or <structure-class>. */
 LISPFUN(pallocate_instance,seclass_read,1,0,rest,nokey,0,NIL) {
   check_initialization_argument_list(argcount,S(allocate_instance));
-  # No need to check the validity of the initargs, because ANSI CL says
-  # "The caller of allocate-instance is expected to have already checked
-  #  the initialization arguments."
+  /* No need to check the validity of the initargs, because ANSI CL says
+   "The caller of allocate-instance is expected to have already checked
+    the initialization arguments." */
   set_args_end_pointer(rest_args_pointer); /* clean up STACK */
   return_Values do_allocate_instance(popSTACK());
 }
@@ -1029,7 +1135,7 @@ local inline gcv_object_t* ptr_to_slot (object instance, object slotinfo,
   /* invalid location, probably bad :allocation slot option */
   pushSTACK(instance); pushSTACK(slotname);
   pushSTACK(slotinfo); pushSTACK(TheSubr(subr_self)->name);
-  fehler(error,GETTEXT("~S: Invalid location ~S of slot ~S in ~S (check the :ALLOCATION slot option"));
+  error(error_condition,GETTEXT("~S: Invalid location ~S of slot ~S in ~S (check the :ALLOCATION slot option)"));
 }
 
 /* UP: visits a slot.
@@ -1046,7 +1152,7 @@ local gcv_object_t* slot_using_class_up (void) {
   if (!eq(clas,STACK_2)) {
     pushSTACK(STACK_1); pushSTACK(STACK_(2+1));
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: invalid arguments: class argument ~S is not the class of ~S"));
+    error(error_condition,GETTEXT("~S: invalid arguments: class argument ~S is not the class of ~S"));
   }
   var object slotinfo = TheSlotDefinition(STACK_0)->slotdef_location;
   return ptr_to_slot(STACK_1,slotinfo,STACK_0);
@@ -1099,7 +1205,7 @@ LISPFUNN(slot_value,2) {
   if (!eq(slotinfo,nullobj)) { /* found? */
     if (regular_instance_p(slotinfo)) {
       if (!eq(TheSlotDefinition(slotinfo)->slotdef_efm_svuc,L(pslot_value_using_class))) {
-        # Call the effective method of CLOS:SLOT-VALUE-USING-CLASS.
+        /* Call the effective method of CLOS:SLOT-VALUE-USING-CLASS. */
         var object efm = TheSlotDefinition(slotinfo)->slotdef_efm_svuc;
         pushSTACK(clas); pushSTACK(STACK_(1+1)); pushSTACK(slotinfo);
         funcall(efm,3);
@@ -1136,13 +1242,13 @@ LISPFUNN(set_slot_value,3) {
   if (!eq(slotinfo,nullobj)) { /* found? */
     if (regular_instance_p(slotinfo)) {
       if (!eq(TheSlotDefinition(slotinfo)->slotdef_efm_ssvuc,L(pset_slot_value_using_class))) {
-        # Call the effective method of (SETF CLOS:SLOT-VALUE-USING-CLASS).
+        /* Call the effective method of (SETF CLOS:SLOT-VALUE-USING-CLASS). */
         var object efm = TheSlotDefinition(slotinfo)->slotdef_efm_ssvuc;
         pushSTACK(STACK_0); pushSTACK(clas); pushSTACK(STACK_(2+2));
         pushSTACK(slotinfo);
         funcall(efm,4);
-        # It must return the new-value. But anyway, just for safety
-        # (don't trust user-defined methods):
+        /* It must return the new-value. But anyway, just for safety
+         (don't trust user-defined methods): */
         value1 = STACK_0;
         goto done;
       }
@@ -1171,7 +1277,7 @@ LISPFUNN(slot_boundp,2) {
   if (!eq(slotinfo,nullobj)) { /* found? */
     if (regular_instance_p(slotinfo)) {
       if (!eq(TheSlotDefinition(slotinfo)->slotdef_efm_sbuc,L(pslot_boundp_using_class))) {
-        # Call the effective method of CLOS:SLOT-BOUNDP-USING-CLASS.
+        /* Call the effective method of CLOS:SLOT-BOUNDP-USING-CLASS. */
         var object efm = TheSlotDefinition(slotinfo)->slotdef_efm_sbuc;
         pushSTACK(clas); pushSTACK(STACK_(1+1)); pushSTACK(slotinfo);
         funcall(efm,3);
@@ -1201,7 +1307,7 @@ LISPFUNN(slot_makunbound,2) {
   if (!eq(slotinfo,nullobj)) { /* found? */
     if (regular_instance_p(slotinfo)) {
       if (!eq(TheSlotDefinition(slotinfo)->slotdef_efm_smuc,L(pslot_makunbound_using_class))) {
-        # Call the effective method of CLOS:SLOT-MAKUNBOUND-USING-CLASS.
+        /* Call the effective method of CLOS:SLOT-MAKUNBOUND-USING-CLASS. */
         var object efm = TheSlotDefinition(slotinfo)->slotdef_efm_smuc;
         pushSTACK(clas); pushSTACK(STACK_(1+1)); pushSTACK(slotinfo);
         funcall(efm,3);
@@ -1257,7 +1363,7 @@ local gcv_object_t* slot_access_up (void) {
       if (posfixnump(slotinfo) && ((index = posfixnum_to_V(slotinfo)) < length)) {
         return &((Srecord)TheInstance(obj_forwarded))->recdata[index];
       } else {
-        fehler_index(length);
+        error_index(length);
       }
     } else if (consp(slotinfo)) {
       /* shared slot, slotinfo is (class-version . index) */
@@ -1266,13 +1372,13 @@ local gcv_object_t* slot_access_up (void) {
     } else {
       /* location already in STACK_0. */
       pushSTACK(TheSubr(subr_self)->name); /* function name */
-      fehler(error,GETTEXT("~S: invalid slot location ~S"));
+      error(error_condition,GETTEXT("~S: invalid slot location ~S"));
     }
   } else {
     /* instance already in STACK_1. TYPE-ERROR slot DATUM */
     STACK_0 = S(standard_object); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(obj); pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: not a CLOS instance: ~S"));
+    error(type_error,GETTEXT("~S: not a CLOS instance: ~S"));
   }
 }
 
@@ -1289,7 +1395,7 @@ LISPFUNN(set_standard_instance_access,3) {
 }
 
 /* (SYS::%UNBOUND) */
-LISPFUNNF(punbound,0) {
+LISPFUNNR(punbound,0) { /* not Foldable yet because (const-value (new-const #<unbound>)) is NIL */
   VALUES1(unbound);
 }
 
@@ -1326,7 +1432,7 @@ global maygc object update_instance (object user_obj, object obj) {
      UPDATE-INSTANCE-FOR-REDEFINED-CLASS is processing, slot accesses to the
      instance being redefined must *not* invoke update_instance (otherwise we
      get an unwanted recursion; this slows down SLOT-VALUE. */
- #if defined(STACKCHECKS) || defined(STACKCHECKC)
+ #if STACKCHECKS || STACKCHECKC
   var gcv_object_t *saved_stack = STACK;
  #endif
   pushSTACK(user_obj);
@@ -1336,19 +1442,19 @@ global maygc object update_instance (object user_obj, object obj) {
     finish_entry_frame(UNWIND_PROTECT,returner,, goto clean_up; );
   }
   record_flags_set(TheInstance(obj),instflags_beingupdated_B);
-  do {
+  {do {
     pushSTACK(obj);
     var object cv = TheInstance(obj)->inst_class_version;
-    # We know that the next class is already finalized before
-    # TheInstance(obj)->inst_class_version is filled.
+    /* We know that the next class is already finalized before
+     TheInstance(obj)->inst_class_version is filled. */
     {
       var object newclass = TheClassVersion(TheClassVersion(cv)->cv_next)->cv_class;
       if (!eq(TheClass(newclass)->initialized,fixnum(6)))
         NOTREACHED;
     }
-    # Compute the information needed for the update, if not already done.
+    /* Compute the information needed for the update, if not already done. */
     if (nullp(TheClassVersion(cv)->cv_slotlists_valid_p)) {
-      # Invoke (CLOS::CLASS-VERSION-COMPUTE-SLOTLISTS cv):
+      /* Invoke (CLOS::CLASS-VERSION-COMPUTE-SLOTLISTS cv): */
       pushSTACK(cv); funcall(S(class_version_compute_slotlists),1);
       obj = STACK_0;
       cv = TheInstance(obj)->inst_class_version;
@@ -1356,7 +1462,7 @@ global maygc object update_instance (object user_obj, object obj) {
     }
     pushSTACK(TheClassVersion(cv)->cv_added_slots);
     pushSTACK(TheClassVersion(cv)->cv_discarded_slots);
-    # Fetch the values of the local slots that are discarded.
+    /* Fetch the values of the local slots that are discarded. */
     {
       var uintV max_local_slots = posfixnum_to_V(TheClass(TheClassVersion(cv)->cv_class)->instance_size);
       get_space_on_STACK(2*max_local_slots);
@@ -1380,8 +1486,8 @@ global maygc object update_instance (object user_obj, object obj) {
     }
     obj = STACK_3;
     cv = TheInstance(obj)->inst_class_version;
-    # Fetch the values of the slots that remain local or were shared and
-    # become local. These values are retained.
+    /* Fetch the values of the slots that remain local or were shared and
+     become local. These values are retained. */
     var uintL kept_slots;
     {
       var object oldclass = TheClassVersion(cv)->cv_class;
@@ -1410,10 +1516,10 @@ global maygc object update_instance (object user_obj, object obj) {
       }
       kept_slots = count;
     }
-    # STACK layout: user-obj, UNWIND-PROTECT frame,
-    #               obj, added-slots, discarded-slots, propertylist,
-    #               {old-value, new-slotinfo}*kept_slots.
-    # ANSI CL 4.3.6.1. Modifying the Structure of Instances
+    /* STACK layout: user-obj, UNWIND-PROTECT frame,
+                   obj, added-slots, discarded-slots, propertylist,
+                   {old-value, new-slotinfo}*kept_slots.
+     ANSI CL 4.3.6.1. Modifying the Structure of Instances */
     {
       var object newclass = TheClassVersion(TheClassVersion(cv)->cv_next)->cv_class;
       /* (CLOS::ALLOCATE-STD-INSTANCE newclass (class-instance-size newclass)) or
@@ -1441,17 +1547,17 @@ global maygc object update_instance (object user_obj, object obj) {
       TheSrecord(obj)->recdata[posfixnum_to_V(new_slotinfo)] = popSTACK();
     });
     STACK_3 = STACK_(2+4);
-    # STACK layout: user-obj, UNWIND-PROTECT frame,
-    #               user-obj, added-slots, discarded-slots, propertylist.
-    # ANSI CL 4.3.6.2. Initializing Newly Added Local Slots
+    /* STACK layout: user-obj, UNWIND-PROTECT frame,
+                   user-obj, added-slots, discarded-slots, propertylist.
+     ANSI CL 4.3.6.2. Initializing Newly Added Local Slots */
     funcall(S(update_instance_frc),4);
-    # STACK layout: user-obj, UNWIND-PROTECT frame.
+    /* STACK layout: user-obj, UNWIND-PROTECT frame. */
     obj = STACK_2;
     instance_un_realloc(obj);
-  } while (!instance_valid_p(obj));
+  } while (!instance_valid_p(obj));}
   record_flags_clr(TheInstance(obj),instflags_beingupdated_B);
   skipSTACK(1+2); /* unwind UNWIND-PROTECT frame, drop user-obj */
- #if defined(STACKCHECKS) || defined(STACKCHECKC)
+ #if STACKCHECKS || STACKCHECKC
   if (saved_stack != STACK) abort();
  #endif
   return obj;
@@ -1497,10 +1603,10 @@ local void keyword_test (object caller, gcv_object_t* rest_args_pointer,
       var object key = NEXT(ptr);
       var object val = NEXT(ptr);
       if (!symbolp(key))
-        fehler_key_notkw(key,caller);
+        error_key_notkw(key,caller);
       if (!eq(key,S(Kallow_other_keys))
           && nullp(memq(key,valid_keywords))) /* not found */
-        fehler_key_badkw(caller,key,val,valid_keywords);
+        error_key_badkw(caller,key,val,valid_keywords);
     } while(--count);
   }
 }
@@ -1515,7 +1621,7 @@ local inline gcv_object_t* slot_in_arglist (const object slot, uintC argcount,
     var object initarg = NEXT(ptr);
     if (!nullp(memq(initarg,l)))
       return ptr;
-    NEXT(ptr);
+    (void)NEXT(ptr);
   });
   return NULL;
 }
@@ -1567,7 +1673,7 @@ LISPFUN(pshared_initialize,seclass_default,2,0,rest,nokey,0,NIL) {
         var object slotinfo = slot;
         if (regular_instance_p(slotinfo)) {
           if (!eq(TheSlotDefinition(slotinfo)->slotdef_efm_sbuc,L(pslot_boundp_using_class))) {
-            # Call (eff-SLOT-BOUNDP-USING-CLASS clas instance slot):
+            /* Call (eff-SLOT-BOUNDP-USING-CLASS clas instance slot): */
             var object efm = TheSlotDefinition(slotinfo)->slotdef_efm_sbuc;
             pushSTACK(clas); pushSTACK(slots); pushSTACK(slot);
             pushSTACK(clas); pushSTACK(Before(rest_args_pointer STACKop 1)); pushSTACK(slot);
@@ -1599,9 +1705,7 @@ LISPFUN(pshared_initialize,seclass_default,2,0,rest,nokey,0,NIL) {
         }
        eval_init:
         /* evaluate the initform: */
-        if (closurep(init)
-            && eq(TheClosure(init)->clos_name_or_class_version,S(constant_initfunction))
-            && eq(TheClosure(init)->clos_codevec,O(constant_initfunction_code))) {
+        if (CONSTANT_INITFUNCTION_P(init)) {
           value1 = TheClosure(init)->other[0];
         } else {
           pushSTACK(clas); pushSTACK(slots); pushSTACK(slot);
@@ -1614,7 +1718,7 @@ LISPFUN(pshared_initialize,seclass_default,2,0,rest,nokey,0,NIL) {
         var object slotinfo = slot;
         if (regular_instance_p(slotinfo)) {
           if (!eq(TheSlotDefinition(slotinfo)->slotdef_efm_ssvuc,L(pset_slot_value_using_class))) {
-            # Call (eff-SET-SLOT-VALUE-USING-CLASS value1 clas instance slot):
+            /* Call (eff-SET-SLOT-VALUE-USING-CLASS value1 clas instance slot): */
             var object efm = TheSlotDefinition(slotinfo)->slotdef_efm_ssvuc;
             pushSTACK(clas); pushSTACK(slots);
             pushSTACK(value1); pushSTACK(clas); pushSTACK(Before(rest_args_pointer STACKop 1)); pushSTACK(slot);
@@ -1716,7 +1820,7 @@ LISPFUN(preinitialize_instance,seclass_default,1,0,rest,nokey,0,NIL) {
           var object slotinfo = slot;
           if (regular_instance_p(slotinfo)) {
             if (!eq(TheSlotDefinition(slotinfo)->slotdef_efm_ssvuc,L(pset_slot_value_using_class))) {
-              # Call (eff-SET-SLOT-VALUE-USING-CLASS value clas instance slot):
+              /* Call (eff-SET-SLOT-VALUE-USING-CLASS value clas instance slot): */
               var object efm = TheSlotDefinition(slotinfo)->slotdef_efm_ssvuc;
               pushSTACK(clas); pushSTACK(slots);
               pushSTACK(value); pushSTACK(clas); pushSTACK(Before(rest_args_pointer)); pushSTACK(slot);
@@ -1813,7 +1917,7 @@ local Values do_initialize_instance (object info,
         var object slotinfo = slot;
         if (regular_instance_p(slotinfo)) {
           if (!eq(TheSlotDefinition(slotinfo)->slotdef_efm_sbuc,L(pslot_boundp_using_class))) {
-            # Call (eff-SLOT-BOUNDP-USING-CLASS clas instance slot):
+            /* Call (eff-SLOT-BOUNDP-USING-CLASS clas instance slot): */
             var object efm = TheSlotDefinition(slotinfo)->slotdef_efm_sbuc;
             pushSTACK(clas); pushSTACK(slots); pushSTACK(slot);
             pushSTACK(clas); pushSTACK(Before(rest_args_pointer)); pushSTACK(slot);
@@ -1833,9 +1937,7 @@ local Values do_initialize_instance (object info,
         var object init = Cdr(TheSlotDefinition(slot)->slotdef_inheritable_initer); /* (slot-definition-initfunction slot) */
         if (nullp(init))
           goto slot_done;
-        if (closurep(init)
-            && eq(TheClosure(init)->clos_name_or_class_version,S(constant_initfunction))
-            && eq(TheClosure(init)->clos_codevec,O(constant_initfunction_code))) {
+        if (CONSTANT_INITFUNCTION_P(init)) {
           value1 = TheClosure(init)->other[0];
         } else {
           pushSTACK(clas); pushSTACK(slots); pushSTACK(slot);
@@ -1848,7 +1950,7 @@ local Values do_initialize_instance (object info,
         var object slotinfo = slot;
         if (regular_instance_p(slotinfo)) {
           if (!eq(TheSlotDefinition(slotinfo)->slotdef_efm_ssvuc,L(pset_slot_value_using_class))) {
-            # Call (eff-SET-SLOT-VALUE-USING-CLASS value1 clas instance slot):
+            /* Call (eff-SET-SLOT-VALUE-USING-CLASS value1 clas instance slot): */
             var object efm = TheSlotDefinition(slotinfo)->slotdef_efm_ssvuc;
             pushSTACK(clas); pushSTACK(slots);
             pushSTACK(value1); pushSTACK(clas); pushSTACK(Before(rest_args_pointer)); pushSTACK(slot);
@@ -1924,16 +2026,14 @@ LISPFUN(pmake_instance,seclass_default,1,0,rest,nokey,0,NIL) {
         dotimespC(count,argcount, {
           if (eq(NEXT(ptr),key))
             goto key_found;
-          NEXT(ptr);
+          (void)NEXT(ptr);
         });
       }
       /* not found */
       pushSTACK(key); /* Initarg in the stack */
       {
         var object init = Car(Cdr(Cdr(default_initarg)));
-        if (closurep(init)
-            && eq(TheClosure(init)->clos_name_or_class_version,S(constant_initfunction))
-            && eq(TheClosure(init)->clos_codevec,O(constant_initfunction_code))) {
+        if (CONSTANT_INITFUNCTION_P(init)) {
           pushSTACK(TheClosure(init)->other[0]); /* default in the stack */
         } else {
           pushSTACK(l);
@@ -1970,7 +2070,7 @@ LISPFUN(pmake_instance,seclass_default,1,0,rest,nokey,0,NIL) {
             /* instance already in STACK_0 */
             pushSTACK(Before(rest_args_pointer));
             pushSTACK(S(allocate_instance));
-            fehler(error,GETTEXT("~S method for ~S returned ~S"));
+            error(error_condition,GETTEXT("~S method for ~S returned ~S"));
           }
           value1 = popSTACK(); /* restore instance */
         } else {

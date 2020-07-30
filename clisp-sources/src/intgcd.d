@@ -3,7 +3,7 @@
 # Liefert den ggT zweier Integers.
 # I_I_gcd_I(a,b)
 # > a,b: zwei Integers
-# < ergebnis: (gcd a b), ein Integer >=0
+# < result: (gcd a b), ein Integer >=0
 # can trigger GC
   local maygc object I_I_gcd_I (object a, object b);
   #define GCD_ALGO 3  # 1: binär, 2: Schulmethode, 3: Lehmer
@@ -48,7 +48,7 @@
 # Liefert den ggT zweier Langworte.
 # UV_UV_gcd_UV(a,b)
 # > uintV a,b: zwei Langworte >0
-# < ergebnis: (gcd a b), ein Langwort >0
+# < result: (gcd a b), ein Langwort >0
 #if GCD_ALGO==2 # nur dann brauchen wir's
   local uintV UV_UV_gcd_UV (uintV a, uintV b);
 # binäre Methode:
@@ -79,7 +79,7 @@
   {
     #ifdef DUMMER_GGT # so macht's ein Mathematiker:
     var uintV bit_j = bit(0);
-    loop {
+    while (1) {
       # a,b >0
       if (!((a & bit_j) ==0)) {
         if (!((b & bit_j) ==0))
@@ -104,7 +104,7 @@
     if (!((b & bit_j) ==0))
       goto even_odd;
     #endif
-    loop {
+    while (1) {
      odd_odd: # a,b >0, beide ungerade
       # Vergleiche a und b:
       if (a == b) # a=b>0 -> fertig
@@ -347,7 +347,7 @@
         STACK_0 = a; a = b;
       }
     }
-    loop { # Hier a > STACK_0 > 0
+    while (1) { # Hier a > STACK_0 > 0
       if (eq(STACK_0,Fixnum_1)) # b=1 -> Ergebnis 1
         return popSTACK();
       I_I_divide_I_I(a,STACK_0); b = STACK_0; skipSTACK(2); # b := Rest der Division a / STACK_0
@@ -416,7 +416,7 @@
         swap(STACK_5,STACK_3); swap(STACK_4,STACK_2);
       }
     }
-    loop { # Hier a>b>0
+    while (1) { # Hier a>b>0
       if (eq(b,Fixnum_1)) { # b=1 -> g=b, (u,v) = (ub,vb)
         STACK_5 = STACK_3; STACK_4 = STACK_2; STACK_3 = b;
         skipSTACK(3); return;
@@ -428,12 +428,12 @@
         skipSTACK(3); return;
       }
       {
-        var object x = I_I_mal_I(STACK_1,STACK_(3+2)); # q*ub
+        var object x = I_I_mult_I(STACK_1,STACK_(3+2)); # q*ub
         x = I_I_minus_I(STACK_(5+2),x); # ua-q*ub
         STACK_(5+2) = STACK_(3+2); STACK_(3+2) = x; # ua := ub, ub := x
       }
       {
-        var object x = I_I_mal_I(STACK_1,STACK_(2+2)); # q*vb
+        var object x = I_I_mult_I(STACK_1,STACK_(2+2)); # q*vb
         x = I_I_minus_I(STACK_(4+2),x); # va-q*vb
         STACK_(4+2) = STACK_(2+2); STACK_(2+2) = x; # va := vb, vb := x
       }
@@ -624,7 +624,7 @@
         # Jetzt ist ../c_len/c_LSDptr, ../c_len/d_LSDptr frei.
       }
       begin_arith_call();
-      loop {
+      while (1) {
         # Hier a,b>0, beides NUDS.
         # Vergleiche a und b:
         if (a_len > b_len) # a>b ?
@@ -1029,7 +1029,7 @@
         # Jetzt ist ../c_len/c_LSDptr, ../c_len/d_LSDptr frei.
       }
       begin_arith_call();
-      loop {
+      while (1) {
         # Hier a,b>0, beides NUDS.
         # Vergleiche a und b:
         if (a_len > b_len) # a>b ?
@@ -1275,7 +1275,7 @@
 # Liefert das kgV zweier Integers.
 # I_I_lcm_I(a,b)
 # > a,b: zwei Integers
-# < ergebnis: (lcm a b), ein Integer >=0
+# < result: (lcm a b), ein Integer >=0
 # can trigger GC
   local maygc object I_I_lcm_I (object a, object b)
   {
@@ -1294,6 +1294,6 @@
     var object g = I_I_gcd_I(STACK_0,b); # g = (gcd a b)
     a = popSTACK();
     if (!eq(g,Fixnum_1)) { a = I_I_exquopos_I(a,g); } # a durch g (beide >0) dividieren
-    return I_I_mal_I(a,popSTACK()); # mit b multiplizieren
+    return I_I_mult_I(a,popSTACK()); # mit b multiplizieren
   }
 

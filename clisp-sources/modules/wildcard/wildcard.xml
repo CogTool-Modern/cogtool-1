@@ -5,7 +5,7 @@
 <para>Wildcards, also called <quote>&path-match; Notation</quote>,
 describe sets of file names.</para>
 
-<simpara>When this module is present, &features-var;
+<simpara>When this module is present, &features-my;
  contains the symbol <constant>:WILDCARD</constant>.</simpara>
 
 <para>The <quote role="package">WILDCARD</quote> package exports the

@@ -1,7 +1,6 @@
-# -*- makefile -*-
-# This is the developer's makefile, not the user's makefile.
+# This is the developer's -*- Makefile -*-, not the user's Makefile.
 # Do not use it unless you know exactly what you are doing!
-
+# Expects GNU make
 
 # Some important programs:
 SHELL = /bin/sh
@@ -9,168 +8,112 @@ MAKE = make
 PERL = perl
 GROFF = nroff -man
 # GROFF = groff -mandoc
+RM = rm -f
+# http://ctags.sourceforge.net
+CTAGS = ctags
 
-# Assume tar/bzip2/gzip are present
-# set this if you are using GNU tar
-EXCLUDE=--exclude CVS --exclude \*.fas --exclude \*.lib --exclude \*.obj   \
-        --exclude \*.exe --exclude \*.mem --exclude \*.o --exclude build   \
-        --exclude .cvsignore --exclude \*~ --exclude .\#\*                 \
-        --exclude $(AUTOCONF_CACHE) --exclude tmp --exclude queued         \
-        `sed "s/^/--exclude /" doc/.cvsignore`                             \
-        --exclude TAGS --exclude \*.elc --exclude \*.orig --exclude \*.rej
+.PHONY : all build-prerequisites htmldoc makefiles configures check-configures \
+	update-ansi-tests potfiles fixperms \
+	view-man view-html check-sbcl install-gcc \
+	multibuild-linux-x86 multibuild-darwin-powerpc \
+	build-aux-update gnulib-imported distrib release pre-release \
+	upload upload-ssh upload-sf upload-gnu \
+	src-distrib doc-distrib gnu-distrib tag-release tp-mail
 
-# The distribution's top directory is called TOPDIR here.
-# Use clisp-YYYY-MM-DD where DD.MM.YYYY is the date.
-TOPDIR = clisp
-T = $(TOPDIR)
+all : build-prerequisites makefiles update-ansi-tests potfiles htmldoc
 
-SOURCES1 = $T/ANNOUNCE $T/COPYRIGHT $T/GNU-GPL $T/INSTALL $T/SUMMARY $T/clisp.spec $T/clisp.lsm $T/configure
-SOURCES2 = $T/src
-SOURCES4 = $T/ffcall $T/libcharset $T/utils
-SOURCES5 = $T/unix $T/win32msvc $T/nextapp
-SOURCES6 = $T/modules
-# for developers only: $T/benchmarks $T/sacla-tests $T/ansi-tests
-SOURCES7 = $T/tests $T/emacs $T/doc $T/Makefile.devel
-
-SOURCES = $(SOURCES1) $(SOURCES2) $(SOURCES4) $(SOURCES5) $(SOURCES6) $(SOURCES7)
-
-all : makefiles check-configures update-ansi-tests update-docbook-utils     \
-	fixperms                                                            \
-	potfiles                                                            \
-	src/version.h                                                       \
-	src/uninames.h src/asmi386.h src/ari80386.msvc.c src/sp80386.msvc.c \
-	ffcall/avcall/avcall.h.msvc ffcall/vacall/config.h.msvc             \
-	ffcall/vacall/vacall.h.msvc ffcall/trampoline/config.h.msvc         \
-	ffcall/callback/vacall_r/config.h.msvc                              \
-	ffcall/callback/vacall_r/vacall_r.h.msvc                            \
-	ffcall/callback/trampoline_r/config.h.msvc                          \
-	htmldoc
-
-ffcall-i386 : ffcall/avcall/avcall-i386-msvc.c          \
-	ffcall/vacall/vacall-i386-msvc.c                \
-	ffcall/callback/vacall_r/vacall-i386-msvc.c
+build-prerequisites : check-configures fixperms                             \
+			src/version.h                                       \
+			src/asmi386.h src/ari80386.msvc.c src/sp80386.msvc.c
 
 htmldoc:
-	cd doc && make all && make html && cd ..;
+	make -C doc all html
 
-makefiles :                                                                \
-	win32msvc/makefile.msvc7                                           \
-	win32msvc/makefile.msvc6 win32msvc/makefile.msvc6d                 \
-	win32msvc/makefile.msvc5 win32msvc/makefile.msvc5d                 \
-	win32msvc/makefile.msvc4
+MAKEMAKE_TMP=src/makemake
+makefiles : win32msvc/makefile.msvc7 win32msvc/makefile.msvc6
+	$(RM) $(MAKEMAKE_TMP)
 
-win32msvc/makefile.msvc4 : makemake
-	./makemake --with-dynamic-ffi \
-		win32msvc msvc4 > win32msvc/makefile.msvc4
+win32msvc/makefile.msvc6 : $(MAKEMAKE_TMP)
+	cd src && ./makemake --with-dynamic-ffi --without-dynamic-modules \
+		win32msvc msvc6 > ../win32msvc/makefile.msvc6
 
-win32msvc/makefile.msvc5 : makemake
-	./makemake --with-dynamic-ffi \
-		win32msvc msvc5 > win32msvc/makefile.msvc5
+win32msvc/makefile.msvc7 : $(MAKEMAKE_TMP)
+	cd src && ./makemake --with-dynamic-ffi --without-dynamic-modules \
+		win32msvc msvc7 > ../win32msvc/makefile.msvc7
 
-win32msvc/makefile.msvc5d : makemake
-	./makemake --with-dynamic-ffi \
-		win32msvc msvc5 debug > win32msvc/makefile.msvc5d
-
-win32msvc/makefile.msvc6 : makemake
-	./makemake --with-dynamic-ffi \
-		win32msvc msvc6 > win32msvc/makefile.msvc6
-
-win32msvc/makefile.msvc6d : makemake
-	./makemake --with-dynamic-ffi \
-		win32msvc msvc6 debug > win32msvc/makefile.msvc6d
-
-win32msvc/makefile.msvc7 : makemake
-	./makemake --with-dynamic-ffi \
-		win32msvc msvc7 > win32msvc/makefile.msvc7
-
-makemake : src/makemake.in version.sh
-	. version.sh; { \
-	echo "#!/bin/sh" ; \
-	sed "s/@PACKAGE_VERSION@/$${VERSION_NUMBER}/g" src/makemake.in ; \
-	} > makemake
-	chmod a+x makemake
+$(MAKEMAKE_TMP) : src/makemake.in version.sh
+	. ./version.sh; { \
+	  echo "#!/bin/sh" ; \
+	  sed -e "s/@PACKAGE_VERSION@/$${VERSION_NUMBER}/g" \
+        -e "s/@CLISP_DECOLONIZE@/echo $$x/" src/makemake.in ; \
+	} > $(MAKEMAKE_TMP)
+	chmod a+x $(MAKEMAKE_TMP)
 
 CURDIR=$(shell pwd)
 
-MODULES=berkeley-db clx/new-clx dirkey fastcgi i18n oracle pari pcre \
-	postgresql rawsock readline regexp syscalls wildcard zlib
+MODULES=berkeley-db clx/new-clx dirkey fastcgi i18n oracle pari pcre dbus \
+  postgresql rawsock readline regexp syscalls wildcard zlib gtk2 gdbm libsvm
+CONFIG_H_IN = src/config.h.in $(patsubst %,modules/%/config.h.in,$(MODULES))
 MOD_CONFIGURES=$(patsubst %,modules/%/configure,$(MODULES))
-MOD_CONFIG_H_IN=$(patsubst %,modules/%/config.h.in,$(MODULES))
-CLISP_CONFIGURES=src/configure $(MOD_CONFIGURES)
-FFCALL=avcall vacall trampoline callback callback/vacall_r callback/trampoline_r
-FFCALL_CONFIGURES=ffcall/configure $(patsubst %,ffcall/%/configure,$(FFCALL))
-CONFIGURES = $(CLISP_CONFIGURES) utils/hln/configure libcharset/configure \
-	${FFCALL_CONFIGURES}
+CONFIGURES=src/configure $(MOD_CONFIGURES)
 
-CONFIG_H_IN = $(MOD_CONFIG_H_IN) src/unixconf.h.in
+GNULIB_USERS = src modules/regexp modules/syscalls modules/wildcard
+MAKEFILE_IN = $(addsuffix /gllib/Makefile.in, $(GNULIB_USERS))
+GET_PREFIX = grep -- --macro-prefix $$d/glm4/gnulib-cache.m4 | sed -e 's/.*--macro-prefix=\([^ ]*\) .*/\1/'
+$(MAKEFILE_IN) : %/Makefile.in : %/Makefile.am %/../configure.in src/aclocal.m4
+	cd $* && cd .. && \
+	(test -f aclocal.m4 || ln -s $(CURDIR)/src/aclocal.m4 .) && \
+	ln -s $(CURDIR)/src '$$cl_cv_clisp_libdir' && \
+	automake gllib/Makefile && \
+	$(RM) '$$cl_cv_clisp_libdir' && \
+	d=. && PREFIX=`$(GET_PREFIX)` && \
+	sed -i -e 's,$$(top_srcdir)/src/build-aux,$$(CLISP_LIBDIR)/build-aux,' \
+	  -e 's,$$(top_srcdir)/$$cl_cv_clisp_libdir,$$(CLISP_LIBDIR),' \
+	  -e '/<.*build.aux/a\	| sed -e '"'"'s/_GL_/_'$${PREFIX}'_GL_/g'"'"' \\' \
+	  -e 's/\(definition.*\) of _GL_/\1 of _'$${PREFIX}'_GL_/' \
+		gllib/Makefile.in && \
+	(test -L aclocal.m4 && $(RM) aclocal.m4 || true)
 
-configures : ffcall/autoconf/aclocal.m4 $(CONFIGURES) $(CONFIG_H_IN)
+configures : $(CONFIGURES) $(CONFIG_H_IN) $(MAKEFILE_IN)
 
-src/autoconf/aclocal.m4 : $(wildcard src/m4/*.m4) \
-			$(addsuffix .in,$(CLISP_CONFIGURES))
-	egrep '(AC_INIT|AC_PREREQ)' src/configure.in > configure.ac
-	echo AC_GNU_SOURCE >> configure.ac
-	cat $(addsuffix .in,$(CLISP_CONFIGURES)) | \
+src/aclocal.m4 : $(wildcard src/m4/*.m4) $(wildcard src/glm4/*.m4) \
+			$(addsuffix .in,$(CONFIGURES))
+	$(RM) configure.ac
+	cp src/configure.in configure.ac
+	cat $(addsuffix .in,$(MOD_CONFIGURES)) | \
 	egrep -v -e 'AC_(INIT|PREREQ|CANONICAL_|GNU_SOURCE|CONFIG_HEADER|OUTPUT)' \
 		-e 'AC_CONFIG_FILE.*(Makefile|link\.sh)' >> configure.ac
-	echo AC_OUTPUT >> configure.ac
-	aclocal -I `pwd`/src/m4 --output=src/autoconf/aclocal.m4
+	aclocal --output=src/aclocal.m4 -I $(CURDIR)/src/m4 \
+		$(patsubst %, -I $(CURDIR)/%/glm4, $(GNULIB_USERS))
 	$(RM) configure.ac
 
-AUTOCONF_FILES = src/autoconf/aclocal.m4
-AUTOCONF = autoconf
+AUTOCONF_FILES = src/aclocal.m4
 AUTOCONF_CACHE = autom4te.cache
-AUTOHEADER = autoheader
 
-$(CLISP_CONFIGURES) utils/hln/configure: %/configure : \
-			%/configure.in $(AUTOCONF_FILES) version.sh
-	cd $*; $(AUTOCONF) --include=$(CURDIR)/src/autoconf --include=$(CURDIR)
+$(CONFIGURES) : %/configure : %/configure.in $(AUTOCONF_FILES) version.sh
+	cd $* && autoconf --include=$(CURDIR)/src
 
-$(MOD_CONFIG_H_IN) : %/config.h.in : %/configure.in $(AUTOCONF_FILES)
-	cd $*; $(AUTOHEADER) --include=$(CURDIR)/src/autoconf
-
-src/unixconf.h.in : src/configure.in $(AUTOCONF_FILES)
-	cd src ; $(AUTOHEADER) --include=autoconf
-
-ffcall/autoconf/aclocal.m4 : src/autoconf/aclocal.m4
-	cd ffcall ; $(MAKE) -f Makefile.devel autoconf/aclocal.m4
-
-$(FFCALL_CONFIGURES) : %/configure : %/configure.in \
-			ffcall/autoconf/aclocal.m4 $(AUTOCONF_FILES)
-	cd ffcall ; $(MAKE) -f Makefile.devel $(patsubst ffcall/%,%,$@)
-
-libcharset/configure : libcharset/configure.in libcharset/autoconf/aclocal.m4 $(AUTOCONF_FILES)
-	cd libcharset ; $(MAKE) -f Makefile.devel configure
-
+$(CONFIG_H_IN) : %/config.h.in : %/configure.in $(AUTOCONF_FILES)
+	cd $* && autoheader --include=$(CURDIR)/src
 
 # syntax check
-check-configures : $(CONFIGURES) $(CONFIG_H_IN)
+check-configures : configures
 	set -e; for f in $(CONFIGURES); do bash -x -n $$f; done
 	rm -rf `find . -name $(AUTOCONF_CACHE)`;
 
 
-ANSITESTS_CVS_ROOT = :ext:anoncvs@savannah.gnu.org:/cvsroot/gcl
-ANSITESTS_CVS_REPOSITORY = gcl/ansi-tests
+ANSITESTS_SVN = svn://common-lisp.net/project/ansi-test/svn/trunk/ansi-tests
 update-ansi-tests:
 	if test -d ansi-tests; then \
 	  cd ansi-tests && \
-	  cvs update -d -P; \
+	  svn update; \
 	else \
-	  cvs -d "$(ANSITESTS_CVS_ROOT)" checkout $(ANSITESTS_CVS_REPOSITORY); \
-	  mv $(ANSITESTS_CVS_REPOSITORY) ansi-tests; \
-	  rm -rf `echo $(ANSITESTS_CVS_REPOSITORY) | sed -e 's,/.*,,'`; \
+	  svn co $(ANSITESTS_SVN); \
 	fi
 
-
-DOCBOOK_XML_DOWNLOAD = http://www.docbook.org/xml/4.3/docbook-xml-4.3.zip
-update-docbook-utils:
-	if test ! -d utils/docbook; then \
-	  mkdir utils/docbook && \
-	  cd utils/docbook && \
-	  wget -O docbook-xml.zip $(DOCBOOK_XML_DOWNLOAD) && \
-	  unzip -x docbook-xml.zip && \
-	  rm -f docbook-xml.zip; \
-	fi
+# this must not be in "all" because this downloads 23MB XSL + 500kB DTD
+update-docbook-utils :
+	make -C doc docbook-xsl docbook-dtd
 
 CLISP=$(CURDIR)/build/clisp
 potfiles :
@@ -183,24 +126,23 @@ fixperms :
 view-man :
 	grep -v '^#[ie]' doc/_clisp.1 | $(GROFF) -Tascii | less
 
+# all possible browsers, some might not be present, but we do not care
+# list GUI first because they put themselves into background
+BROWSERS=firefox mozilla netscape opera links lynx
 view-html :
 	grep -v '^#[ie]' doc/_clisp.html > /tmp/clisp.html
-	netscape /tmp/clisp.html &
-	lynx /tmp/clisp.html
+	for b in $(BROWSERS); do $$b /tmp/clisp.html; done
 
 
 src/version.h: version.sh
-	. version.sh ; \
-	{ echo "/* generated by Makefile.devel from version.sh */" ; \
+	. ./version.sh ; { \
+	  echo "/* generated by Makefile.devel from version.sh */" ; \
 	  echo "#define PACKAGE_NAME \"GNU CLISP\"" ; \
 	  echo "#define PACKAGE_TARNAME \"clisp\"" ; \
 	  echo "#define PACKAGE_VERSION \"$$VERSION_NUMBER ($$RELEASE_DATE)\"" ; \
 	  echo "#define PACKAGE_STRING \"GNU CLISP $$VERSION_NUMBER ($$RELEASE_DATE)\"" ; \
 	  echo "#define PACKAGE_BUGREPORT \"http://clisp.cons.org/\""; \
 	} > src/version.h
-
-src/uninames.h : utils/unicode/UnicodeDataFull.txt utils/gen-uninames
-	$(CLISP) utils/gen-uninames utils/unicode/UnicodeDataFull.txt src/uninames.h
 
 src/asmi386.h : src/asmi386.hh
 	sed -e 's,//.*$$,,' < src/asmi386.hh > src/asmi386.h
@@ -211,158 +153,150 @@ src/ari80386.msvc.c : src/ari80386.d src/asmi386.sh
 src/sp80386.msvc.c : src/sp80386.d src/asmi386.sh
 	src/asmi386.sh -no-C < src/sp80386.d > src/sp80386.msvc.c
 
-ffcall/avcall/avcall.h.msvc : ffcall/avcall/avcall.h.in
-	cd ffcall ; $(MAKE) -f Makefile.devel avcall/avcall.h.msvc
-
-ffcall/avcall/avcall-i386-msvc.c : ffcall/avcall/avcall-i386-macro.S ffcall/avcall/asmi386.sh
-	cd ffcall ; $(MAKE) -f Makefile.devel avcall/avcall-i386-msvc.c
-
-# ffcall/vacall/config.h.in , ffcall/trampoline/config.h.in,
-# all/callback/vacall_r/vacall_r.h.in, ffcall/callback/trampoline_r/config.h.in
-# are not auto-generated!
-ffcall/vacall/config.h.msvc : ffcall/vacall/config.h.in
-	cd ffcall ; $(MAKE) -f Makefile.devel vacall/config.h.msvc
-
-ffcall/vacall/vacall.h.msvc : ffcall/vacall/vacall.h.in
-	cd ffcall ; $(MAKE) -f Makefile.devel vacall/vacall.h.msvc
-
-ffcall/vacall/vacall-i386-msvc.c : ffcall/vacall/vacall-i386-macro.S ffcall/vacall/asmi386.sh
-	cd ffcall ; $(MAKE) -f Makefile.devel vacall/vacall-i386-msvc.c
-
-ffcall/trampoline/config.h.msvc : ffcall/trampoline/config.h.in
-	cd ffcall ; $(MAKE) -f Makefile.devel trampoline/config.h.msvc
-
-ffcall/callback/vacall_r/config.h.msvc : ffcall/callback/vacall_r/config.h.in
-	cd ffcall ; $(MAKE) -f Makefile.devel callback/vacall_r/config.h.msvc
-
-ffcall/callback/vacall_r/vacall_r.h.msvc : ffcall/callback/vacall_r/vacall_r.h.in
-	cd ffcall ; $(MAKE) -f Makefile.devel callback/vacall_r/vacall_r.h.msvc
-
-ffcall/callback/vacall_r/vacall-i386-msvc.c : ffcall/callback/vacall_r/vacall-i386-macro.S ffcall/callback/vacall_r/asmi386.sh
-	cd ffcall ; $(MAKE) -f Makefile.devel callback/vacall_r/vacall-i386-msvc.c
-
-ffcall/callback/trampoline_r/config.h.msvc : ffcall/callback/trampoline_r/config.h.in
-	cd ffcall ; $(MAKE) -f Makefile.devel callback/trampoline_r/config.h.msvc
-
-
 # Build and test all essential memory models on a Linux/x86 machine.
 MULTIBUILD_OPTIONS =
 MULTIBUILD_CFLAGS = -g
 
-multibuild-linux-x86: build-linux-x86-1 build-linux-x86-2 build-linux-x86-3 build-linux-x86-4 build-linux-x86-5 build-linux-x86-6 build-linux-x86-7 build-linux-x86-8 build-linux-x86-9 build-linux-x86-10
-build-linux-x86-1:
+multibuild-linux-x86:  build-linux-x86-standard-spvw_mixed_blocks-staggered \
+	build-linux-x86-standard-spvw_mixed_blocks-opposite	\
+	build-linux-x86-standard-spvw_mixed_blocks-opposite-fixedmemsize \
+	build-linux-x86-standard-spvw_mixed_pages		\
+	build-linux-x86-noexec-spvw_mixed_blocks-staggered	\
+	build-linux-x86-noexec-spvw_mixed_blocks-opposite	\
+	build-linux-x86-noexec-spvw_mixed_blocks-opposite-fixedmemsize \
+	build-linux-x86-noexec-spvw_mixed_pages			\
+	build-linux-x86-spvw_pure_blocks			\
+	build-linux-x86-wide
+build-linux-x86-standard-spvw_mixed_blocks-staggered:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DSTANDARD_HEAPCODES -DCONS_HEAP_GROWS_UP" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-standard-spvw_mixed_blocks-staggered
-build-linux-x86-2:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-linux-x86-standard-spvw_mixed_blocks-opposite:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DSTANDARD_HEAPCODES -DCONS_HEAP_GROWS_DOWN" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-standard-spvw_mixed_blocks-opposite
-build-linux-x86-3:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-linux-x86-standard-spvw_mixed_blocks-opposite-fixedmemsize:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DSTANDARD_HEAPCODES -DNO_VIRTUAL_MEMORY -DNO_TRIVIALMAP" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-standard-spvw_mixed_blocks-opposite-fixedmemsize
-build-linux-x86-4:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-linux-x86-standard-spvw_mixed_pages:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
-	CPPFLAGS="-DSTANDARD_HEAPCODES -DNO_SINGLEMAP -DNO_TRIVIALMAP -DNO_MULTIMAP_FILE -DNO_MULTIMAP_SHM" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-standard-spvw_mixed_pages
-build-linux-x86-5:
+	CPPFLAGS="-DSTANDARD_HEAPCODES -DNO_SINGLEMAP -DNO_TRIVIALMAP" \
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-linux-x86-noexec-spvw_mixed_blocks-staggered:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DCONS_HEAP_GROWS_UP" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-noexec-spvw_mixed_blocks-staggered
-build-linux-x86-6:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-linux-x86-noexec-spvw_mixed_blocks-opposite:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DCONS_HEAP_GROWS_DOWN" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-noexec-spvw_mixed_blocks-opposite
-build-linux-x86-7:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-linux-x86-noexec-spvw_mixed_blocks-opposite-fixedmemsize:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DNO_VIRTUAL_MEMORY -DNO_TRIVIALMAP" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-noexec-spvw_mixed_blocks-opposite-fixedmemsize
-build-linux-x86-8:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-linux-x86-noexec-spvw_mixed_pages:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
-	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DNO_SINGLEMAP -DNO_TRIVIALMAP -DNO_MULTIMAP_FILE -DNO_MULTIMAP_SHM" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-noexec-spvw_mixed_pages
-build-linux-x86-9:
+	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DNO_SINGLEMAP -DNO_TRIVIALMAP" \
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-linux-x86-spvw_pure_blocks:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DTYPECODES" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-spvw_pure_blocks
-build-linux-x86-10:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-linux-x86-wide:
+	rm -rf $@
 	CFLAGS="-O -falign-functions=4 $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DWIDE" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-wide
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
 
-multibuild-darwin-powerpc: build-darwin-powerpc-1 build-darwin-powerpc-2 build-darwin-powerpc-3 build-darwin-powerpc-4 build-darwin-powerpc-5 build-darwin-powerpc-6 build-darwin-powerpc-7 build-darwin-powerpc-8 build-darwin-powerpc-9 build-darwin-powerpc-10
-build-darwin-powerpc-1:
+multibuild-darwin-powerpc: \
+	build-darwin-powerpc-standard-spvw_mixed_blocks-staggered	\
+	build-darwin-powerpc-standard-spvw_mixed_blocks-opposite	\
+	build-darwin-powerpc-standard-spvw_mixed_blocks-opposite-fixedmemsize \
+	build-darwin-powerpc-standard-spvw_mixed_pages		\
+	build-darwin-powerpc-noexec-spvw_mixed_blocks-staggered	\
+	build-darwin-powerpc-noexec-spvw_mixed_blocks-opposite	\
+	build-darwin-powerpc-noexec-spvw_mixed_blocks-opposite-fixedmemsize \
+	build-darwin-powerpc-noexec-spvw_mixed_pages		\
+	build-darwin-powerpc-spvw_pure_blocks			\
+	build-darwin-powerpc-wide
+build-darwin-powerpc-standard-spvw_mixed_blocks-staggered:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DSTANDARD_HEAPCODES -DCONS_HEAP_GROWS_UP" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-standard-spvw_mixed_blocks-staggered
-build-darwin-powerpc-2:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-darwin-powerpc-standard-spvw_mixed_blocks-opposite:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DSTANDARD_HEAPCODES -DCONS_HEAP_GROWS_DOWN" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-standard-spvw_mixed_blocks-opposite
-build-darwin-powerpc-3:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-darwin-powerpc-standard-spvw_mixed_blocks-opposite-fixedmemsize:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DSTANDARD_HEAPCODES -DNO_VIRTUAL_MEMORY -DNO_TRIVIALMAP" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-standard-spvw_mixed_blocks-opposite-fixedmemsize
-build-darwin-powerpc-4:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-darwin-powerpc-standard-spvw_mixed_pages:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
-	CPPFLAGS="-DSTANDARD_HEAPCODES -DNO_SINGLEMAP -DNO_TRIVIALMAP -DNO_MULTIMAP_FILE -DNO_MULTIMAP_SHM" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-standard-spvw_mixed_pages
-build-darwin-powerpc-5:
+	CPPFLAGS="-DSTANDARD_HEAPCODES -DNO_SINGLEMAP -DNO_TRIVIALMAP" \
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-darwin-powerpc-noexec-spvw_mixed_blocks-staggered:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DCONS_HEAP_GROWS_UP" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-noexec-spvw_mixed_blocks-staggered
-build-darwin-powerpc-6:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-darwin-powerpc-noexec-spvw_mixed_blocks-opposite:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DCONS_HEAP_GROWS_DOWN" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-noexec-spvw_mixed_blocks-opposite
-build-darwin-powerpc-7:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-darwin-powerpc-noexec-spvw_mixed_blocks-opposite-fixedmemsize:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DNO_VIRTUAL_MEMORY -DNO_TRIVIALMAP" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-noexec-spvw_mixed_blocks-opposite-fixedmemsize
-build-darwin-powerpc-8:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-darwin-powerpc-noexec-spvw_mixed_pages:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
-	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DNO_SINGLEMAP -DNO_TRIVIALMAP -DNO_MULTIMAP_FILE -DNO_MULTIMAP_SHM" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-noexec-spvw_mixed_pages
-build-darwin-powerpc-9:
+	CPPFLAGS="-DLINUX_NOEXEC_HEAPCODES -DNO_SINGLEMAP -DNO_TRIVIALMAP" \
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-darwin-powerpc-spvw_pure_blocks:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DTYPECODES" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-spvw_pure_blocks
-build-darwin-powerpc-10:
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+build-darwin-powerpc-wide:
+	rm -rf $@
 	CFLAGS="-O $(MULTIBUILD_CFLAGS)" \
 	CPPFLAGS="-DWIDE" \
-	  ./configure --build $(MULTIBUILD_OPTIONS) \
-	              build-wide
+	  ./configure --cbc $(MULTIBUILD_OPTIONS) $@
+
+SRCDIRS=src utils benchmarks emacs modules sacla-tests tests
+TAGS : force
+	$(CTAGS) -e -R --langmap=c:.c.d.f $(SRCDIRS)
+
+tags : force
+	$(CTAGS) -R --langmap=c:.c.d.f $(SRCDIRS)
 
 # Bootstrap SBCL.
 SBCL_VERSION = 0.8.15
 SBCL_SOURCE_FILE = sbcl-$(SBCL_VERSION)-source.tar.bz2
 SBCL_SOURCE_URL = http://www.haible.de/bruno/$(SBCL_SOURCE_FILE)
 check-sbcl:
-	./configure --build build-for-sbcl
+	./configure --cbc build-for-sbcl
 	test -f $(SBCL_SOURCE_FILE) || wget $(SBCL_SOURCE_URL)
 	rm -rf sbcl-$(SBCL_VERSION)
 	bunzip2 -c < $(SBCL_SOURCE_FILE) | tar xvf -
-	clisp=`pwd`/build-for-sbcl/clisp; \
+	clisp=$(CURDIR)/build-for-sbcl/clisp; \
 	cd sbcl-$(SBCL_VERSION) && sh make.sh $$clisp
 
 
@@ -386,67 +320,250 @@ install-gcc:
 	rm -rf gcc-$(GCC_VERSION)-build
 	rm -rf gcc-$(GCC_VERSION)
 
+GNULIB_CVS_ROOT = :pserver:anonymous@pserver.git.sv.gnu.org:/gnulib.git
+GNULIB_CVS_REPOSITORY = HEAD
+GNULIB_GIT = git://git.savannah.gnu.org/gnulib.git
+GNULIB_CHECKOUT := gnulib
+update-gnulib:
+	if test -d $(GNULIB_CHECKOUT); then \
+	  cd $(GNULIB_CHECKOUT) ; \
+	  if test -d .git; then git pull; else cvs update -d -P; fi \
+	else \
+	  if git --version >/dev/null 2>&1; then \
+	    git clone "$(GNULIB_GIT)" $(GNULIB_CHECKOUT) ; \
+	  else cvs -d "$(GNULIB_CVS_ROOT)" checkout -d $(GNULIB_CHECKOUT) $(GNULIB_CVS_REPOSITORY); fi \
+	fi
 
-distrib : fixperms src-distrib doc-distrib
+# it is important to get ltmain.sh and libtool.m4 from the same version of
+# libtool. Don't rely on what's installed in /usr/share or similar.
+LIBTOOL_VERSION = 2.2.8
+LIBTOOL_SOURCE_FILE = libtool-$(LIBTOOL_VERSION).tar.gz
+LIBTOOL_SOURCE_URL = http://ftp.gnu.org/gnu/libtool/$(LIBTOOL_SOURCE_FILE)
+# an alternative way to update libtool files is "cd src; libtoolize --copy"
+GTK2_SVN_ROOT = http://svn.gnome.org/svn/gtk+/trunk/m4macros
+GNULIB_AUX=config.guess config.rpath config.sub depcomp install-sh missing
+# it is important not to have "*.m4" targets with ": force" dependencies
+# because otherwise every make will rebuild all configures
+build-aux-update : update-gnulib force
+	for f in $(GNULIB_AUX); do \
+	  cp -afuv $(GNULIB_CHECKOUT)/build-aux/$$f src/build-aux; \
+	done
+	cp -afuv /usr/share/automake*/compile src/build-aux
+	test -f $(LIBTOOL_SOURCE_FILE) || wget $(LIBTOOL_SOURCE_URL)
+	rm -rf libtool-$(LIBTOOL_VERSION)
+	gunzip -c < $(LIBTOOL_SOURCE_FILE) | tar xf -
+	cp -afuv libtool-$(LIBTOOL_VERSION)/libltdl/config/ltmain.sh src/build-aux/ltmain.sh
+	chmod +x src/build-aux/ltmain.sh
+	for f in libtool ltoptions ltsugar ltversion lt~obsolete; do \
+	  cp -afuv libtool-$(LIBTOOL_VERSION)/libltdl/m4/$$f.m4 src/m4/; done
+	rm -rf libtool-$(LIBTOOL_VERSION) $(LIBTOOL_SOURCE_FILE)
+	cd src/m4; rm -fv gtk-2.0.m4; wget $(GTK2_SVN_ROOT)/gtk-2.0.m4
 
-## Pre-release TODO:
-# echo URL-tar.bz2| mail -s "clisp-`cat VERSION`" translation@IRO.UMontreal.CA
+# gnulib-tool hack to support multiple gllib directories:
+# headers are generated for each gllib differently, depending on which
+# features are actually used, so we need to be able to include all these
+# generated headers without fear that one will shadow another, so we
+# prepend the macro-prefix before the guard macros
+GNULIB_TOOL_PATCH = gnulib-tool.patch
+
+GNULIB_TOOL = $(GNULIB_CHECKOUT)/gnulib-tool-patched --import \
+	--no-vc-files --no-libtool --no-changelog --aux-dir=src/build-aux
+# unistd is needed in both syscalls and core separately because unistd.h
+# is generated differently depending on whether gethostname (required by
+# uname) is present
+GNULIB_CORE = no-c++ stdint stdbool havelib gettext localcharset \
+	uniwidth/width streq uniname/uniname unitypes link-follow \
+	nocrash libsigsegv gnu-make gettimeofday getpagesize sys_time
+# these modules are included as dependencies by regexp and fnmatch
+# so we include them here so that they appear once in src/gl*
+# instead of N times in $(GNULIB_USERS)/gl*
+GNULIB_MODULES = alloca-opt alloca extensions include_next verify string \
+	mbsinit wchar wctype mbrtowc mbsrtowcs memchr nl_langinfo
+GNULIB_COMMON = $(GNULIB_CORE) $(GNULIB_MODULES)
+GNULIB_AVOID = $(addprefix --avoid=, $(GNULIB_COMMON))
+GNULIB_IMPORTED_LOG = /tmp/gnulib-imported.log
+gnulib-imported : update-gnulib force
+	$(RM) configure.ac; ln -sv src/configure.in configure.ac
+	$(RM) $(addsuffix /glm4/gnulib-cache.m4, $(GNULIB_USERS)) \
+		$(GNULIB_IMPORTED_LOG)
+	cp $(GNULIB_CHECKOUT)/gnulib-tool $(GNULIB_CHECKOUT)/gnulib-tool-patched
+	patch $(GNULIB_CHECKOUT)/gnulib-tool-patched $(GNULIB_TOOL_PATCH)
+	$(GNULIB_TOOL) --source-base=src/gllib --m4-base=src/glm4 \
+		$(GNULIB_COMMON) | tee -a $(GNULIB_IMPORTED_LOG)
+	$(GNULIB_TOOL) --source-base=modules/syscalls/gllib \
+		--macro-prefix=sc_gl --m4-base=modules/syscalls/glm4 \
+		$(GNULIB_AVOID) mktime strftime strptime strverscmp uname \
+		| tee -a $(GNULIB_IMPORTED_LOG)
+	$(GNULIB_TOOL) --source-base=modules/regexp/gllib \
+		--macro-prefix=rx_gl --m4-base=modules/regexp/glm4 \
+		$(GNULIB_AVOID) regex | tee -a $(GNULIB_IMPORTED_LOG)
+	$(GNULIB_TOOL) --source-base=modules/wildcard/gllib \
+		--macro-prefix=wc_gl --m4-base=modules/wildcard/glm4 \
+		$(GNULIB_AVOID) fnmatch-gnu | tee -a $(GNULIB_IMPORTED_LOG)
+	$(RM) configure.ac
+	for d in $(GNULIB_USERS); do $(RM) `find $$d/gllib -name \*~`; done
+	for d in $(GNULIB_USERS); do $(RM) `find $$d/glm4 -name \*~`; done
+# _GL_UNUSED is defined by gnulib-common.m4:gl_COMMON_BODY which places
+# the definition into config.h. Since we cannot know which gnulib-common
+# will be used by a given configure.in, we cannot use a prefix for it
+# and thus must revert the effects of --macro-prefix in imported code.
+	for d in $(GNULIB_USERS); do \
+	  PREFIX=`$(GET_PREFIX)`; test -n "$${PREFIX}" && \
+	  sed -i -e 's/_'$${PREFIX}'_GL_UNUSED/_GL_UNUSED/g' $$d/gllib/*.c; done
+	cd src/glm4; \
+	for f in *.m4; do \
+	  if test -f ../m4/$$f; then \
+	    echo == $$f; \
+	    if cmp $$f ../m4/$$f; then \
+	      cd ../m4; cvs rm -f $$f; cd ../glm4; \
+	    fi; \
+	  fi; \
+	done
+	$(RM) $(GNULIB_CHECKOUT)/gnulib-tool-patched
+	@echo the import log is in $(GNULIB_IMPORTED_LOG)
+
+distrib : fixperms src-distrib doc-distrib gnu-distrib
+
+# start gpg agent before "make release"!
+release : distrib upload tag-release
+
+# 2-3 weeks before a release
+# manually: check for new versions of
+#  libsvm, netica api, postgresql, berkeley-db, dbus, pcre, readline
+pre-release : gnulib-imported build-aux-update tp-mail
+
 ## RELEASE TODO:
-# Before doing a "make src-distrib":
-# * update version.sh, src/NEWS, src/HISTORY
-# * update clisp.lsm, clisp.spec
+# Before doing a "make distrib":
+# * update version.sh, src/NEWS, doc/history.xml
 # * "make -f Makefile.devel all"
+# === Note that for clisp to report its version correctly, src/version.h and
+# === src/configure must be regenerated after version.sh is updated
 # web pages to be updated:
-# * www/index.php, www/impnotes.html, www/clisp.html, www/impnotes/
-# dates to be updated:
-# * banner in spvw.d
+# * www/index.html, www/impnotes.html, www/clisp.html, www/impnotes/
+# dates to be updated (1st release each calendar year):
+# * banner in src/spvw.d
 # * COPYRIGHT
-# * doc/impnotes.xml.in, doc/clisp.xml.in
+# * clisp-doc-copyright in doc/impent.xml
+# * AC_COPYRIGHT in src/configure.in
 
-# CLISP release announcements go to:
+## CLISP release announcements go to:
 # clisp-announce@lists.sourceforge.net
 # info-gnu@gnu.org
 # news:comp.lang.lisp
 # news:comp.os.linux.announce (linux-announce@news.ornl.gov)
 # http://freshmeat.net/projects/clisp/
 # https://sourceforge.net/news/submit.php?group_id=1355
+# WIKIs to be updated: http://en.wikipedia.org/wiki/CLISP
 
-VER=$(shell . version.sh ; echo $$VERSION_NUMBER)
+VER=$(shell . ./version.sh ; echo $$VERSION_NUMBER)
+REL=$(shell . ./version.sh ; echo $$RELEASE_DATE)
 ARCHIVE=../archives/$(VER)
-SRC_DIST=$(ARCHIVE)/clisp-$(VER).tar.bz2
-SRC_DIST1=$(ARCHIVE)/clisp-$(VER).tar.gz
-DOC_DIST=$(ARCHIVE)/clisp-$(VER)-impnotes.zip
-UPLOAD=$(SRC_DIST) $(SRC_DIST1) $(DOC_DIST)
+SUFFIX=
+# The distribution's top directory is called TOPDIR here.
+TOPDIR=clisp-$(VER)$(SUFFIX)
+SRC_DIST=$(ARCHIVE)/$(TOPDIR).tar.bz2
+SRC_DIST1=$(ARCHIVE)/$(TOPDIR).tar.gz
+DOC_DIST=$(ARCHIVE)/$(TOPDIR)-impnotes.zip
+UPLOAD=$(SRC_DIST) $(SRC_DIST1) $(DOC_DIST) src/NEWS
 SSHUP=podval:~/public_html/clisp/
-FTPUP=upload.sf.net:/incoming sunsite.unc.edu:/incoming/linux
+GNU_TOP=$(ARCHIVE)/NEWS $(ARCHIVE)/SUMMARY
+GNU_SRC=$(SRC_DIST1) $(SRC_DIST)
+GNU_DIST=$(GNU_TOP) $(GNU_SRC)
+GNU_SYM=$(ARCHIVE)/$(TOPDIR).symlink.directive
+
+# Assume tar/bzip2/gzip are present
+# set this if you are using GNU tar
+EXCLUDE=--exclude CVS --exclude \*.fas --exclude \*.lib --exclude \*.obj   \
+        --exclude \*.exe --exclude \*.mem --exclude \*.o --exclude build   \
+        --exclude .cvsignore --exclude \*~ --exclude .\#\*                 \
+        --exclude $(AUTOCONF_CACHE) --exclude tmp --exclude queued         \
+        --exclude libtool-\*.tar.gz                                        \
+        `sed "s/^/--exclude /" doc/.cvsignore`                             \
+        --exclude TAGS --exclude \*.elc --exclude \*.orig --exclude \*.rej
+
+T = $(TOPDIR)
+SOURCES1 = $T/ANNOUNCE $T/COPYRIGHT $T/GNU-GPL $T/INSTALL $T/SUMMARY $T/clisp.spec $T/configure
+SOURCES2 = $T/src
+SOURCES4 = $T/utils
+SOURCES5 = $T/unix $T/win32msvc
+SOURCES6 = $T/modules
+# for developers only: $T/benchmarks $T/sacla-tests $T/ansi-tests
+SOURCES7 = $T/tests $T/emacs $T/doc $T/Makefile.devel
+
+SOURCES = $(SOURCES1) $(SOURCES2) $(SOURCES4) $(SOURCES5) $(SOURCES6) $(SOURCES7)
+
 
 $(SRC_DIST1) : $(SRC_DIST)
 	bzcat -v $(SRC_DIST) | gzip -9 -v > $(SRC_DIST1)
 
-upload : $(SRC_DIST1) force
-	for h in $(SSHUP) ; do \
-	  scp $(UPLOAD) $${h}/latest/; scp src/NEWS $${h}; \
-	done
-	for h in $(FTPUP) ; do \
-	  lftp $${h} -e "mput clisp.lsm $(UPLOAD); quit"; \
-	done
+upload-ssh : $(SRC_DIST1) force
+	for h in $(SSHUP) ; do scp $(UPLOAD) $${h}; done
+
+upload-sf : $(SRC_DIST1) force
+	rsync -avP -e ssh $(UPLOAD) frs.sf.net:/home/frs/project/c/cl/clisp/clisp/$(VER)/
+
+upload-gnu : force		# gnu-distrib -- do not re-sign everything
+	UP=""; for f in $(GNU_DIST); do \
+		UP=$${UP}" $$f $$f.sig $$f.directive.asc"; done; \
+	lftp ftp://ftp-upload.gnu.org/incoming/ftp -e "mput $${UP} $(GNU_SYM).asc; quit"
+
+upload : upload-ssh upload-sf upload-gnu
 
 src-distrib : force
-	$(MAKE) -f Makefile.devel src--distrib TOPDIR=clisp-$(VER)
-
-src--distrib : force
 	mkdir -p $(ARCHIVE)
 	ln -s . $(TOPDIR)
 	tar cvfhj $(SRC_DIST) $(EXCLUDE) $(SOURCES)
-	rm -f $(TOPDIR)
+	$(RM) $(TOPDIR)
+	echo $(SRC_DIST)
 
 doc-distrib : force
-	$(MAKE) -f Makefile.devel doc--distrib TOPDIR=clisp-$(VER)
-
-doc--distrib : force
 	mkdir -p $(ARCHIVE)
 	ln -s . $(TOPDIR)
-	zip -9vor $(DOC_DIST) $(TOPDIR)/doc/html -x \*.cvsignore -x \*.symlinks -x \*CVS\*
-	rm -f $(TOPDIR)
+	zip -9vor $(DOC_DIST) $(TOPDIR)/doc/html -x \*.cvsignore -x \*.symlinks -x \*CVS\* -x .\#\* -x \*~
+	$(RM) $(TOPDIR)
+
+# http://www.gnu.org/prep/maintain/html_node/Automated-Upload-Procedure.html
+GPG=gpg --use-agent --yes
+gnu-distrib : $(SRC_DIST1) force
+	mkdir -p $(ARCHIVE)
+	cp -f src/NEWS SUMMARY $(ARCHIVE)
+	for f in $(GNU_DIST); do $(GPG) -b $$f; done
+	for f in $(GNU_TOP); do \
+		$(RM) $$f.directive; \
+		echo "version: 1.1" >> $$f.directive; \
+		echo "directory: clisp" >> $$f.directive; \
+		echo "filename: "`basename $$f` >> $$f.directive; \
+		$(GPG) --clearsign $$f.directive; \
+	done
+	for f in $(GNU_SRC); do \
+		$(RM) $$f.directive; \
+		echo "version: 1.1" >> $$f.directive; \
+		echo "directory: clisp/release/$(VER)" >> $$f.directive; \
+		echo "filename: "`basename $$f` >> $$f.directive; \
+		$(GPG) --clearsign $$f.directive; \
+	done
+	echo "version: 1.1" > $(GNU_SYM)
+	echo "directory: clisp/release" >> $(GNU_SYM)
+	echo "rmsymlink: latest" >> $(GNU_SYM)
+	echo "symlink: $(VER) latest" >> $(GNU_SYM)
+	$(GPG) --clearsign $(GNU_SYM)
+
+tag-release : force
+	cvs tag -FR clisp_$(subst .,_,$(VER))-$(REL) .
+
+TP_EMAIL=coordinator@translationproject.org
+MESSAGE_FILE=tp_message
+TP_SUFFIX=-pre1
+tp-mail : force
+	echo "Domain: clisp" > $(MESSAGE_FILE)
+	if test -n "$(TP_SUFFIX)"; then \
+	  f=`make -f Makefile.devel src-distrib SUFFIX=$(TP_SUFFIX) | tail -n 2 | head -n 1`; \
+	  for h in $(SSHUP) ; do scp $$f $${h}; done \
+	else f=$(SRC_DIST); fi; f=`basename $$f`; \
+	echo "Location: http://clisp.podval.org/$$f" >> $(MESSAGE_FILE); \
+	cat $(MESSAGE_FILE); \
+	mail -s "CLISP pre-release $$f is available" \
+		-c clisp-devel@lists.sf.net $(TP_EMAIL) < $(MESSAGE_FILE)
+	$(RM) $(MESSAGE_FILE)
 
 force :

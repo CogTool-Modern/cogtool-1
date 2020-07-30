@@ -1,8 +1,8 @@
 ;;; MODPREP - CLISP module preprocessor
 ;;;
 ;;; Copyright (C) 1998 Bruno Haible (20.9.1998, 10.-11.10.1998) [C]
-;;; Copyright (C) 2003-2005 by Sam Steingold [lisp]
-;;; This is Free Software, covered by the GNU GPL (v2)
+;;; Copyright (C) 2003-2010 by Sam Steingold [lisp]
+;;; This is Free Software, covered by the GNU GPL (v2+)
 ;;; See http://www.gnu.org/copyleft/gpl.html
 #| This preprocessor generates all necessary tables for a CLISP module.
 The input file is normal C code, modified like this:
@@ -18,13 +18,17 @@ The input file is normal C code, modified like this:
   The backquoted strings are read in at module load time.
 - The module SUBRs can be referred to using double backquote syntax:
     pushSTACK(``FOO:BAR``);
-  means the same as L(bar) in the CLISP sources
+  means the same as L(bar) in the CLISP sources.
+- CPP definienda ("#define FOO baz zot") can be accessed as strings using
+    `STRINGIFY(FOO)` which evaluates to the Lisp string "baz zot".
 - The definition of Lisp functions is done using the macro
     DEFUN(function_name, lambda_list)
   for example
-    DEFUN(foo::bar, x y [&optional z] [&rest foo | &key a b c] )
+    DEFUN(foo::bar, x y [&optional z] [&rest foo | &key a b c | &allow-other-keys] )
   &rest and &key cannot be combined (this is a restriction for SUBRs).
   &key requires at least one keyword (this is a restriction for SUBRs too).
+  &allow-other-keys is the same as &rest, but argcount is checked for being even
+  if keywords are named with colon (:FOO), they are assumed to preexist in core.
 - Variables containing Lisp objects (known to the garbage collector) are
   defined using the macro
     DEFVAR(variable_name, initform)
@@ -84,7 +88,7 @@ The input file is normal C code, modified like this:
  enum means no #ifdef
  prefix, suffix default to ""
  reverse defaults to "" and means ERROR
- bitmasks means additional *_to_list and *_from_list functions are defined
+ bitmasks means additional *_to_list and *_of_list functions are defined
  delim defaults to "_" and separates prefix and suffix
 
 Restrictions and caveats:
@@ -223,6 +227,7 @@ The vector is freshly constructed, but the strings are shared"
 (defvar *module-name*)
 (defvar *module-line*)
 (defvar *module-package*)
+(defparameter *package-properties* (make-hash-table :test 'equal))
 (defvar *module-all-packages*)
 (defvar *init-1-name* nil "Did the module define its own init1?")
 (defvar *init-2-name* nil "Did the module define its own init2?")
@@ -241,13 +246,38 @@ The vector is freshly constructed, but the strings are shared"
               (let ((start (next-non-blank argument (1+ =))))
                 (if start (subseq argument start) T)))
         argument)))
-(defun split-command (line &key (start 0) (end (length line)))
+(defun strip-comments (line start end)
+  "Return the same LINE but without the embedded comments."
+  ;; abc/*c1*/def/*c2 --> abcdef
+  (do ((comment-start (search #1="/*" line :start2 start :end2 end)
+                      (and comment-end
+                           (search #1# line :start2 comment-end :end2 end)))
+       parts (comment-end start))
+      ((null comment-start)
+       (if parts
+           (let ((ret (apply #'ext:string-concat
+                             (nreverse (if comment-end
+                                           (cons (subseq line comment-end
+                                                         ;; include last #\)
+                                                         (and end (1+ end)))
+                                                 parts)
+                                           parts)))))
+             (values ret 0 (position #\) ret :from-end t)))
+           (values line start end)))
+    (push (subseq line comment-end comment-start) parts)
+    (when (setq comment-end (search #2="*/" line :start2 comment-start
+                                    :end2 end))
+      (incf comment-end #.(length #2#)))))
+(defun split-command (line &key (start 0) (end (length line)) &aux end1)
   "parse command line into command name and arguments:
 FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
+  ;; end: where the command in the original line in *lines* ends
+  ;; end1: where the command in the comment-stripped line ends
   (setq start (next-non-blank line start))
   (unless start (return-from split-command nil)) ; blank line
   (setq end (position #\) line :start start :end end :from-end t))
-  (let* ((last (or (prev-non-blank line end)         ;nothing before #\)
+  (setf (values line start end1) (strip-comments line start end))
+  (let* ((last (or (prev-non-blank line end1) ; nothing before #\)
                    (return-from split-command nil))) ; => no command
          (paren (position #\( line :start start :end last)) args
          (name (subseq line start
@@ -257,7 +287,7 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
       (return-from split-command nil))
     ;; valid command in LINE
     (unless end (error "~S:~D: no closing paren in ~S[~:D;~:D]"
-                       *input-file* *lineno* line start end))
+                       *input-file* *lineno* line start end1))
     (unless paren (error "~S:~D: no opening paren in ~S[~:D;~:D]"
                          *input-file* *lineno* line start last))
     (setq start (next-non-blank line (1+ paren)))
@@ -280,7 +310,7 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
 (defun defmodule-p (line)
   (multiple-value-bind (name args) (split-command line)
     (unless (string= "DEFMODULE" name) (return-from defmodule-p nil))
-    (assert (= 2 (length args)) () "~S: requires 2 arguments, got ~S"
+    (assert (<= 2 (length args)) () "~S: requires at least 2 arguments, got ~S"
             name args)
     (setq *module-name* (first args)
           *init-1-name* (format nil "module__~A__init_function_1"
@@ -291,6 +321,10 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
                               *module-name*)
           *module-package* (extract-argument-string (second args))
           *module-all-packages* (list *module-package*))
+    (let ((properties (third args)))
+      (when properties
+        (setf (gethash *module-package* *package-properties*)
+              (read-from-string properties))))
     (values *module-name* *module-package*)))
 
 (defstruct objdef
@@ -303,11 +337,20 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
   (find tag *objdefs* :test #'string= :key #'objdef-tag))
 (defun write-string-c-style (string out)
   (loop :for cc :across string :and ii :upfrom 0
-    :do (cond ((alphanumericp cc) (write-char (char-downcase cc) out))
+    :do (cond ((alphanumericp cc)
+               (write-char (if (case-sensitive-package-p)
+                               cc (char-downcase cc))
+                           out))
               ((char= cc #\:) (write-char (if (zerop ii) #\K #\_) out))
               ((or (char= cc #\_) (char= cc #\-)) (write-char #\_ out))
               (t (format out "_~2,'0x" (char-code cc))))))
 
+(defvar *tag-length-limit* 2000
+  "The approximate maximum length of a C name.
+This works around the failure on i18n on Alpha Linux:
+/tmp/ccYZBYCX.s: Assembler messages:
+/tmp/ccYZBYCX.s:401: Fatal error: string too big (8281 bytes)
+See bug #[ 1491252 ]: i18n does not build on cf:alpha")
 (defun init-to-tag (init already-present-p &optional (prefix "object_"))
   (let ((base
          (with-output-to-string (s)
@@ -321,14 +364,27 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
                        (cons (write-string-c-style (car el) s)
                              (write-char #\_ s)
                              (write-string-c-style (cdr el) s)))))))))
+    (when (< *tag-length-limit* (length base))
+      (let ((*print-lines* 5))
+        (warn "truncated a very long tag (from ~:d to ~:d) for ~s"
+              (length base) *tag-length-limit* init))
+      (setq base (subseq base 0 *tag-length-limit*)))
     (when (funcall already-present-p base)
       (loop :for ii :upfrom 0 :for new = (format nil "~a_~d" base ii)
         :while (funcall already-present-p new)
         :finally (setq base new)))
     base))
 
+(defun case-sensitive-package-p ()
+  (let ((properties (gethash *module-package* *package-properties*)))
+    (or (getf properties :modern) (getf properties :case-sensitive))))
+(defun case-inverted-package-p ()
+  (let ((properties (gethash *module-package* *package-properties*)))
+    (or (getf properties :modern) (getf properties :case-inverted))))
+
 (defun string-upcase-verbose (string)
   (when (and (some #'lower-case-p string)    ; upcasing will modify
+             (not (case-sensitive-package-p))
              (not (string-object-p string))) ; this is not a string object
     (warn "~S:~D: fixed object case ~S" *input-file* *lineno* string)
     (setq string (string-upcase string)))
@@ -352,13 +408,40 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
     (stack-push-optimize (objdef-cond-stack odef) condition)
     odef))
 
+(defun maybe-prepend-colon (name)
+  (if (find #\: name) name (ext:string-concat ":" name)))
+
+(defun mk-objdef (init &key (start 0) (end (length init))
+                  (condition (current-condition)))
+  "Make OBJDEF from INIT.
+If init starts with #\:, assume a standard keyword like :TYPE
+ otherwise call INIT-TO-OBJDEF after possibly prepending #\:.
+The last feature is disabled because &S() does not work in non-debug builds."
+  (if (and nil (char= (aref init start) #\:)) ; standard keyword like :TYPE
+      (make-objdef :init (subseq init start end))
+      (init-to-objdef (maybe-prepend-colon (subseq init start end)) condition)))
+
+(defun objdef-object (od)
+  "How do we access this objdef in C?"
+  (let ((tag (objdef-tag od)))
+    (if tag
+        (ext:string-concat "O(" tag ")") ; local object
+        (ext:string-concat "S(K"         ; global keyword: drop leading #\:
+                           (nsubstitute #\_ #\-
+                                        (nstring-downcase
+                                         (subseq (objdef-init od) 1)))
+                           ")"))))
+
+(defun objdef-local (od)
+  (or (objdef-tag od) (error "No tag in local object ~S" od)))
+
 (defconstant *seclass*
   #("seclass_foldable" "seclass_no_se" "seclass_read"
     "seclass_write" "seclass_default")
   "must be in sync with src/lispbibl.d:seclass_t")
 (defstruct signature
   (seclass (1- (length *seclass*)))
-  req opt rest-p key-p keywords
+  req opt rest keywords
   (cond-stack (make-array 5 :adjustable t :fill-pointer 0)))
 
 (defconstant *valid-signatures*
@@ -384,18 +467,18 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
    (make-signature :req 2 :opt 3)
    (make-signature :req 0 :opt 4)
    (make-signature :req 0 :opt 5)
-   (make-signature :req 0 :opt 0 :rest-p t)
-   (make-signature :req 1 :opt 0 :rest-p t)
-   (make-signature :req 2 :opt 0 :rest-p t)
-   (make-signature :req 3 :opt 0 :rest-p t)
-   (make-signature :req 0 :opt 0 :key-p t)
-   (make-signature :req 1 :opt 0 :key-p t)
-   (make-signature :req 2 :opt 0 :key-p t)
-   (make-signature :req 3 :opt 0 :key-p t)
-   (make-signature :req 4 :opt 0 :key-p t)
-   (make-signature :req 0 :opt 1 :key-p t)
-   (make-signature :req 1 :opt 1 :key-p t)
-   (make-signature :req 1 :opt 2 :key-p t))
+   (make-signature :req 0 :opt 0 :rest '&rest)
+   (make-signature :req 1 :opt 0 :rest '&rest)
+   (make-signature :req 2 :opt 0 :rest '&rest)
+   (make-signature :req 3 :opt 0 :rest '&rest)
+   (make-signature :req 0 :opt 0 :rest '&key)
+   (make-signature :req 1 :opt 0 :rest '&key)
+   (make-signature :req 2 :opt 0 :rest '&key)
+   (make-signature :req 3 :opt 0 :rest '&key)
+   (make-signature :req 4 :opt 0 :rest '&key)
+   (make-signature :req 0 :opt 1 :rest '&key)
+   (make-signature :req 1 :opt 1 :rest '&key)
+   (make-signature :req 1 :opt 2 :rest '&key))
   "must be in sync with src/lispbibl.d:subr_argtype_t")
 
 (defvar *must-close-next-defun* nil
@@ -406,11 +489,14 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
 (defun parse-signature (fname line &key (start 0) (end (length line)))
   (unless end
     (error "~S:~D: unterminated signature ~S" *input-file* *lineno* line))
-  (loop :with seen-opt :and seen-key :and seen-rest :and keys
+  (loop :with seen-opt :and seen-key :and seen-rest :and seen-aok :and keys
     :and opt = 0 :and req = 0 :and pos2 = start
     :for pos1 = (next-non-blank line pos2)
     :while (and pos1 (< pos1 end))
     :do (setq pos2 (min end (or (next-blank line pos1) end)))
+    (when seen-aok
+      (error "~S:~D: bad signature ~S between ~S and ~S"
+             *input-file* *lineno* line pos1 pos2))
     (cond ((string-equal line "&optional" :start1 pos1 :end1 pos2)
            (when (or seen-opt seen-key seen-rest)
              (error "~S:~D: bad signature ~S between ~S and ~S"
@@ -426,40 +512,38 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
              (error "~S:~D: bad signature ~S between ~S and ~S"
                     *input-file* *lineno* line pos1 pos2))
            (setq seen-rest 0))
+          ((string-equal line "&allow-other-keys" :start1 pos1 :end1 pos2)
+           (when (or seen-key seen-rest)
+             (error "~S:~D: bad signature ~S between ~S and ~S"
+                    *input-file* *lineno* line pos1 pos2))
+           (setq seen-aok t))
           (seen-rest
-           (if (zerop seen-rest) (setq seen-rest t)
+           (if (zerop seen-rest) (setq seen-rest '&rest)
                (error "~S:~D: bad signature ~S between ~S and ~S"
                       *input-file* *lineno* line pos1 pos2)))
-          (seen-key
-           (push (init-to-objdef (if (char= (aref line pos1) #\:)
-                                     (subseq line pos1 pos2)
-                                     (ext:string-concat
-                                      ":" (subseq line pos1 pos2))))
-                 keys))
+          (seen-key (push (mk-objdef line :start pos1 :end pos2) keys))
           (seen-opt (incf opt))
           ((incf req)))
     :finally (return (check-signature fname
                       (make-signature
-                       :req req :opt opt :rest-p seen-rest
-                       :key-p seen-key :keywords (nreverse keys))))))
+                       :req req :opt opt :keywords (nreverse keys)
+                       :rest (cond (seen-aok '&allow-other-keys)
+                                   (seen-key '&key)
+                                   (seen-rest)))))))
 
 (defun check-signature (fname sig)
   (if (find sig *valid-signatures* :test #'signature-match)
     (values sig nil)
-    (values (load-time-value (make-signature :req 0 :opt 0 :rest-p t))
+    (values (load-time-value (make-signature :req 0 :opt 0 :rest '&rest))
       (with-output-to-string (out) ; emulate signature
-        (warn "~S:~D:~A: emulating signature (~A ~A~:[~; &rest~]~:[~; &key~])"
+        (warn "~S:~D:~A: emulating signature (~A ~A~@[ ~S~])"
               *input-file* *lineno* fname
-              (signature-req sig) (signature-opt sig)
-              (signature-rest-p sig) (signature-key-p sig))
+              (signature-req sig) (signature-opt sig) (signature-rest sig))
         (incf *emulation-count*)
-        (when (signature-rest-p sig) ; why?!
-          (error "~S:~D:~A: cannot emulate &rest" *input-file* *lineno* fname))
         (let* ((min-arg (signature-req sig))
                (req+opt (+ min-arg (signature-opt sig)))
-               (max-arg
-                (unless (or (signature-rest-p sig) (signature-key-p sig))
-                  req+opt))
+               (rest (signature-rest sig))
+               (max-arg (unless rest req+opt))
                (kwds (signature-keywords sig)) (n-kwds (length kwds))
                (kwd-list
                  (with-output-to-string (kwd-s)
@@ -469,11 +553,11 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
                      ;; cannot have conditionals in this init
                      (write-string (objdef-init k) kwd-s))
                    (write-char #\) kwd-s))))
-          (format out "{ if (argcount < ~D) { pushSTACK(TheSubr(subr_self)->name); fehler(source_program_error,GETTEXT(\"EVAL/APPLY: too few arguments given to ~~S\")); } " min-arg)
-          (when max-arg (format out "if (argcount > ~D) { pushSTACK(TheSubr(subr_self)->name); fehler(source_program_error,GETTEXT(\"EVAL/APPLY: too many arguments given to ~~S\")); } " max-arg))
+          (format out "{ if (argcount < ~D) { pushSTACK(TheSubr(subr_self)->name); error(program_error,GETTEXT(\"EVAL/APPLY: too few arguments given to ~~S\")); } " min-arg)
+          (when max-arg (format out "if (argcount > ~D) { pushSTACK(TheSubr(subr_self)->name); error(program_error,GETTEXT(\"EVAL/APPLY: too many arguments given to ~~S\")); } " max-arg))
+          (when (or (eq '&key rest) (eq '&allow-other-keys rest)) (format out "if ((argcount-~D)%2) error_key_odd(argcount,TheSubr(subr_self)->name); " req+opt))
           (unless (zerop (signature-opt sig)) (format out "for (;argcount < ~D; argcount++) pushSTACK(unbound); " req+opt))
-          (when (signature-key-p sig)
-            (format out "if ((argcount-~D)%2) fehler_key_odd(argcount,TheSubr(subr_self)->name); " req+opt)
+          (when (eq '&key rest)
             (when (zerop n-kwds) (warn "~A: &key without any keywords" fname))
             (format out "{ uintC i; skipSTACK((-~D)); ~
   for (i = 0; i<argcount-~D; i++) STACK_(i) = STACK_(i+~D); "
@@ -482,18 +566,17 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
               (format out "STACK_(argcount-~D+~D) = unbound; " req+opt i))
             (format out "for (i = argcount-~D; i > 0; i -= 2) " req+opt)
             (loop :for k :in kwds :and i :upfrom 0 :do
-              (format out "~[~:;else ~]if (eq (STACK_(i-1),O(~A))) ~
+              (format out "~[~:;else ~]if (eq(STACK_(i-1),~A)) ~
  STACK_(argcount-~D+~D) = STACK_(i-2); "
-                      i (objdef-tag k) req+opt (- n-kwds i 1)))
-            (format out "else fehler_key_badkw(TheSubr(subr_self)->name,STACK_(i-1),STACK_(i-2),O(~A)); skipSTACK(argcount-~D); }"
-                    (objdef-tag (init-to-objdef kwd-list)) req+opt))
+                      i (objdef-object k) req+opt (- n-kwds i 1)))
+            (format out "else error_key_badkw(TheSubr(subr_self)->name,STACK_(i-1),STACK_(i-2),O(~A)); skipSTACK(argcount-~D); }"
+                    (objdef-local (init-to-objdef kwd-list)) req+opt))
           (setq *must-close-next-defun* t))))))
 
 (defun signature-match (s1 s2)
   (and (= (signature-req s1) (signature-req s2))
        (= (signature-opt s1) (signature-opt s2))
-       (eq (signature-rest-p s1) (signature-rest-p s2))
-       (eq (signature-key-p s1) (signature-key-p s2))))
+       (eq (signature-rest s1) (signature-rest s2))))
 
 (defun signature= (s1 s2)
   (and (signature-match s1 s2)
@@ -522,8 +605,9 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
       (setq pack (string-upcase pack)))
     (unless (every (lambda (c) (or (not (alpha-char-p c)) (upper-case-p c)))
                    name)
-      (warn "~S:~D: fixed function name case ~S" *input-file* *lineno* name)
-      (setq name (string-upcase name)))
+      (unless (case-sensitive-package-p)
+        (warn "~S:~D: fixed function name case ~S" *input-file* *lineno* name)
+        (setq name (string-upcase name))))
     (pushnew pack *module-all-packages* :test #'string=)
     (vector-push-extend fd *fundefs*)
     fd))
@@ -560,12 +644,12 @@ FOO(bar,baz,zot) ==> FOO; (bar baz zot); end-position"
           (push sig (fundef-signatures fdef))))
     fdef))
 
-(defun fundef-lispfun (fundef sig)
+(defun fundef-lispfun (fundef sig &aux (rest (signature-rest sig)))
   "Print a signature in a form suitable as argument list for LISPFUN."
   (format nil "(~a,~a,~d,~d,~:[no~;~]rest,~:[no~;~]key,~d,NIL)"
           (fundef-tag fundef) (aref *seclass* (signature-seclass sig))
           (signature-req sig) (signature-opt sig)
-          (signature-rest-p sig) (signature-key-p sig)
+          (or (eq '&rest rest) (eq '&allow-other-keys rest)) (eq '&key rest)
           (length (signature-keywords sig))))
 
 (defvar *brace-depth* 0)
@@ -633,6 +717,10 @@ and turn it into DEFUN(funname,lambdalist,signature)."
   (etypecase name
     (string
      (setq name (substitute #\_ #\- name))
+     (let ((pos (position #\: name)))
+       (when pos
+         (setq name (subseq name (position #\: name :start pos
+                                           :test #'char/=)))))
      (when prefix (setq name (ext:string-concat prefix delim name)))
      (when suffix (setq name (ext:string-concat name delim suffix))))
     (cons (setq name (second name))))
@@ -663,9 +751,10 @@ CPP-NAMES is the list of possible values, either strings or
     (stack-push-optimize (checker-cond-stack ch) condition)
     (cond (enum
            (dolist (name cpp-names)
-             (push (init-to-objdef (ext:string-concat ":" name) condition)
-                   cpp-odefs)
-             (setq type-odef (ext:string-concat type-odef " :" name)))
+             (let ((od (mk-objdef name :condition condition)))
+               (push od cpp-odefs)
+               (setq type-odef (ext:string-concat
+                                type-odef " " (objdef-init od)))))
            (setf (checker-type-odef ch)
                  (init-to-objdef (ext:string-concat type-odef "))"))))
           (t
@@ -673,19 +762,19 @@ CPP-NAMES is the list of possible values, either strings or
            (dolist (name cpp-names)
              (etypecase name
                (string
-                (let ((co (ext:string-concat
-                           "defined(" (to-C-name name prefix suffix delim)
-                           ")")))
-                  (push (init-to-objdef (ext:string-concat ":" name)
-                                        (concatenate 'vector condition
-                                                     (list co)))
-                        cpp-odefs)
-                  (push (cons co (ext:string-concat " :" name)) type-odef)))
+                (let* ((co (ext:string-concat
+                            "defined(" (to-C-name name prefix suffix delim)
+                            ")"))
+                       (od (mk-objdef name :condition
+                                      (concatenate 'vector condition
+                                                   (list co)))))
+                  (push od cpp-odefs)
+                  (push (cons co (objdef-init od)) type-odef)))
                (cons
-                (let ((nm (symbol-name (car name))))
-                  (push (init-to-objdef (ext:string-concat ":" nm) condition)
-                        cpp-odefs)
-                  (push (ext:string-concat " :" nm) type-odef)))))
+                (let ((od (mk-objdef (symbol-name (car name))
+                                     :condition condition)))
+                  (push od cpp-odefs)
+                  (push (objdef-init od) type-odef)))))
            (setf (checker-type-odef ch)
                  (init-to-objdef (nreconc type-odef (list "))"))))))
     (setf (checker-cpp-odefs ch) (nreverse cpp-odefs))
@@ -811,13 +900,13 @@ Also return status: NIL for parsing until the end and
                                subst-start nil in-subst nil))
                        (let* ((id (subseq line (1+ subst-start) ii))
                               (def (init-to-objdef id))
-                              (tag (objdef-tag def))
+                              (tag (objdef-object def))
                               (tlen (1- (length tag))))
                          (setq line (ext:string-concat
                                      (subseq line 0 subst-start)
-                                     "O(" tag ")" (subseq line (1+ ii)))
-                               end (+ end tlen (- subst-start ii) 3)
-                               ii (+ subst-start tlen 3)
+                                     tag (subseq line (1+ ii)))
+                               end (+ end tlen (- subst-start ii))
+                               ii (+ subst-start tlen)
                                subst-start nil in-subst nil))))
                (setq in-subst t subst-start ii))))))
 
@@ -955,7 +1044,7 @@ commas and parentheses."
           *fundefs* (sort *fundefs* #'string-lessp :key #'fundef-tag))
     (loop :for od :across *objdefs*
       :do (with-conditional (out (objdef-cond-stack od))
-            (format out "  gcv_object_t _~A;" (objdef-tag od))))
+            (format out "  gcv_object_t _~A;" (objdef-local od))))
     (loop :for vd :across *vardefs*
       :do (with-conditional (out (vardef-cond-stack vd))
             (format out "  gcv_object_t _~A;" (vardef-tag vd))))
@@ -966,7 +1055,7 @@ commas and parentheses."
     (formatln out "struct ~A_t {" object-tab-initdata)
     (loop :for od :across *objdefs*
       :do (with-conditional (out (objdef-cond-stack od))
-            (format out "  object_initdata_t _~A;" (objdef-tag od))))
+            (format out "  object_initdata_t _~A;" (objdef-local od))))
     (loop :for vd :across *vardefs*
       :do (with-conditional (out (vardef-cond-stack vd))
             (format out "  object_initdata_t _~A;"  (vardef-tag vd))))
@@ -976,13 +1065,16 @@ commas and parentheses."
       :do (with-conditional (out (objdef-cond-stack od))
             (let ((init (objdef-init od)))
               (etypecase init
-                (string (format out "  { ~S }," init))
-                (cons (format out "  {")
+                (string (if (let ((pos (position #\( init)))
+                              (and pos (string= init "STRINGIFY" :end1 pos)))
+                            (format out "  { \"\\\"~S\\\"\" }," init)
+                            (format out "  { ~S }," init)))
+                (cons (format out "  {~%")
                       (dolist (el init)
                         (etypecase el
-                          (string (formatln out " ~S" el))
+                          (string (formatln out "    \" \" ~S" el))
                           (cons (formatln out "#  if ~A" (car el))
-                                (formatln out "    ~S" (cdr el))
+                                (formatln out "    \" \" ~S" (cdr el))
                                 (formatln out "#  endif") )))
                       (format out "  },"))))))
     (loop :for vd :across *vardefs*
@@ -1017,7 +1109,6 @@ commas and parentheses."
       :for prefix = (checker-prefix ch) :for suffix = (checker-suffix ch)
       :for delim = (checker-delim ch)
       :for reverse = (checker-reverse ch) :for bitmasks = (checker-bitmasks ch)
-      :for type-tag = (objdef-tag (checker-type-odef ch))
       :for c-name = (checker-name ch) :for c-type = (or (checker-type ch) "int")
       :for enum-p = (checker-enum-p ch)
       :do (with-conditional (out (checker-cond-stack ch))
@@ -1027,7 +1118,7 @@ commas and parentheses."
               :for odef :in (checker-cpp-odefs ch)
               :for need-ifdef = (and (not enum-p) (stringp name))
               :do (when need-ifdef (formatln out " #ifdef ~A" name-C))
-              (formatln out "  { ~A, &(O(~A)) }," name-C (objdef-tag odef))
+              (formatln out "  { ~A, &(~A) }," name-C (objdef-object odef))
               (when need-ifdef (formatln out " #endif")))
             (formatln out "  { 0, NULL }")
             (formatln out "};")
@@ -1035,7 +1126,13 @@ commas and parentheses."
             (formatln out "  ~A_table," c-name)
             (formatln out "  (sizeof(~A_table)/sizeof(c_lisp_pair_t))-1,"
                       c-name)
-            (cond ((and (not enum-p) (stringp default))
+            (cond ((and (not enum-p) (stringp default)
+                        ;; check that default a valid for CPP: [_A-Za-z0-9]*
+                        ;; "(unsigned)~0" should not be protected with #ifdef
+                        (every (lambda (c)
+                                 (or (char= c #\_)
+                                     (digit-char-p c 36)))
+                               default))
                    (formatln out "# if defined(~A)" default)
                    (formatln out "  ~A,true," default)
                    (formatln out "# else")
@@ -1052,7 +1149,7 @@ commas and parentheses."
             (when bitmasks
               (formatln out "#define ~A_to_list(a) map_c_to_list(a,&~A_map)"
                         c-name c-name)
-              (formatln out "#define ~A_from_list(a) map_list_to_c(a,&~A_map)"
+              (formatln out "#define ~A_of_list(a) map_list_to_c(a,&~A_map)"
                         c-name c-name))))
     (newline out)))
 
@@ -1088,7 +1185,11 @@ commas and parentheses."
     (formatln out "} ~A = {" subr-tab-initdata)
     (loop :for fd :across *fundefs*
       :do (with-conditional (out (fundef-cond-stack fd))
-            (format out "  { ~S, ~S }," (fundef-pack fd) (fundef-name fd))))
+            (format out "  { ~S, ~S }," (fundef-pack fd)
+                    (if (case-inverted-package-p)
+                        ;; will be inverted again lisp-side
+                        (string-invertcase (fundef-name fd))
+                        (fundef-name fd)))))
     (formatln out "  0")
     (formatln out "};") (newline out)
     ;; Emit the decl first, to avoid "gcc -missing-declarations" warnings.
@@ -1097,10 +1198,10 @@ commas and parentheses."
     (formatln out "{")
     (loop :for fd :across *fundefs* :for tag = (fundef-tag fd) :do
       (loop :for sig :in (fundef-signatures fd) :do
-        (when (signature-key-p sig)
+        (when (eq '&key (signature-rest sig))
           (with-conditional (out (signature-cond-stack sig))
             (dolist (kw (signature-keywords sig))
-              (formatln out "  pushSTACK(O(~A));" (objdef-tag kw)))
+              (formatln out "  pushSTACK(~A);" (objdef-object kw)))
             (format out "  ~A._~A.keywords = vectorof(~D);" subr-tab tag
                     (length (signature-keywords sig)))))))
     (loop :for vi :across *varinits*
@@ -1133,11 +1234,39 @@ commas and parentheses."
       (print-tables-1 out)))
   (print-tables-2 out))
 
-(defun mod-file (input)
+(defun mod-file-1 (input &optional (defaults input))
   (make-pathname :name (ext:string-concat (pathname-name input) ".m")
-                 :defaults input))
+                 :defaults defaults))
 
-(defun modprep (*input-file* &optional (output (mod-file *input-file*)))
+(defun mod-file (input &optional (output t)
+                 &aux (sys::*internal-compiled-file-type*
+                       (pathname-type input)))
+  (let ((output1 (compile-file-pathname input :output-file output)))
+    (unless (and (or (pathnamep output) (stringp output))
+                 (pathname-name output))
+      (setq output1 (mod-file-1 output1)))
+    (when (string= (namestring (absolute-pathname output1))
+                   (namestring (absolute-pathname input)))
+      (error "~S(~S, ~S): output ~S the same as input"
+             'mod-file input output output1))
+    output1))
+#|
+ (dolist (a '(("/foo/bar/zot.m.c" "/foo/bar/zot.c")
+              ("/quux/froq.a" "/foo/bar/zot.c" "/quux/froq.a")
+              ("zot.m.c" "/foo/bar/zot.c" "./")
+              ("here/zot.m.c" "/foo/bar/zot.c" "./here/")
+              ("quux.c" "/foo/bar/zot.c" "./quux.c")
+              ("foo/bar/zot.m.c" "foo/bar/zot.c")
+              ("/quux/froq.a" "foo/bar/zot.c" "/quux/froq.a")
+              ("zot.m.c" "foo/bar/zot.c" "./")
+              ("here/zot.m.c" "foo/bar/zot.c" "./here/")
+              ("quux.c" "foo/bar/zot.c" "./quux.c")))
+   (let* ((expected (pop a)) (actual (apply #'mod-file a)))
+     (format t "~&~S --> ~S [~S ~A]~%"
+             a actual expected (equal expected (namestring actual)))))
+|#
+
+(defun modprep (*input-file* &optional (output (mod-file-1 *input-file*)))
   (format t "~&;; ~S: ~S --> ~S~%" 'modprep *input-file* output)
   (with-open-file (in *input-file* :direction :input
                       #+UNICODE :external-format #+UNICODE charset:utf-8)
@@ -1158,6 +1287,6 @@ commas and parentheses."
     (format t "~&~S: wrote ~A (~:D byte~:P)~&"
             'modprep output (file-length out))))
 
-(modprep (first *args*) (or (second *args*) (mod-file (first *args*))))
+(modprep (first *args*) (apply #'mod-file *args*))
 
 ;;; file modprep.lisp ends here

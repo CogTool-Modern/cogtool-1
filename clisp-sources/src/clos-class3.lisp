@@ -2,7 +2,7 @@
 ;;;; Class metaobjects
 ;;;; Part 3: Class definition and redefinition.
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2005
+;;;; Sam Steingold 1998 - 2008
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -26,7 +26,7 @@
   *<built-in-class>-class-version*
   'defined-class
   'class
-  ;; built-in-classes for CLASS-OF
+  ;; built-in-classes for CLASS-OF - order in sync with constobj.d
   (vector 'array 'bit-vector 'character 'complex 'cons 'float 'function
           'hash-table 'integer 'list 'null 'package 'pathname
           #+LOGICAL-PATHNAMES 'logical-pathname
@@ -44,12 +44,7 @@
 
 (defmacro defclass (&whole whole-form
                     name superclass-specs slot-specs &rest options)
-  (unless (symbolp name)
-    (error-of-type 'ext:source-program-error
-      :form whole-form
-      :detail name
-      (TEXT "~S: class name ~S should be a symbol")
-      'defclass name))
+  (setq name (sys::check-not-declaration name 'defclass))
   (let* ((superclass-forms
            (progn
              (unless (listp superclass-specs)
@@ -86,8 +81,8 @@
                ;; Typical beginner error: Omission of the parentheses around the
                ;; slot-specs. Probably someone who knows DEFSTRUCT and uses
                ;; DEFCLASS for the first time.
-               (warn (TEXT "~S ~S: Every second slot name is a keyword, and these slots have no options. If you want to define a slot with options, you need to enclose all slot specifications in parentheses: ~S, not ~S.")
-                     'defclass name (list slot-specs) slot-specs))
+               (clos-warning (TEXT "~S ~S: Every second slot name is a keyword, and these slots have no options. If you want to define a slot with options, you need to enclose all slot specifications in parentheses: ~S, not ~S.")
+                 'defclass name (list slot-specs) slot-specs))
              (mapcar #'(lambda (slot-spec)
                          (let ((slot-name slot-spec) (slot-options '()))
                            (when (consp slot-spec)
@@ -108,7 +103,7 @@
                              (push slot-name slot-names))
                            (let ((readers '())
                                  (writers '())
-                                 (allocation '())
+                                 (allocations '())
                                  (initargs '())
                                  (initform nil) (initfunction nil)
                                  (types '())
@@ -151,13 +146,19 @@
                                     (push argument readers)
                                     (push `(SETF ,argument) writers))
                                    (:ALLOCATION
-                                    (when allocation
+                                    (unless (symbolp argument)
+                                      (error-of-type 'ext:source-program-error
+                                        :form whole-form
+                                        :detail argument
+                                        (TEXT "~S ~S, slot option ~S for slot ~S: ~S is not a symbol")
+                                        'defclass name ':allocation slot-name argument))
+                                    (when allocations
                                       (error-of-type 'ext:source-program-error
                                         :form whole-form
                                         :detail slot-options
                                         (TEXT "~S ~S, slot option ~S for slot ~S may only be given once")
                                         'defclass name ':allocation slot-name))
-                                    (setq allocation argument))
+                                    (setq allocations (list argument)))
                                    (:INITARG
                                     (unless (symbolp argument)
                                       (error-of-type 'ext:source-program-error
@@ -239,7 +240,7 @@
                                 :NAME ',slot-name
                                 ,@(when readers `(:READERS ',readers))
                                 ,@(when writers `(:WRITERS ',writers))
-                                ,@(when allocation `(:ALLOCATION ',allocation))
+                                ,@(when allocations `(:ALLOCATION ',(first allocations)))
                                 ,@(when initargs `(:INITARGS ',(nreverse initargs)))
                                 ,@(when initform `(:INITFORM ,initform :INITFUNCTION ,initfunction))
                                 ,@(when types `(:TYPE ',(first types)))
@@ -273,7 +274,7 @@
               (error-of-type 'ext:source-program-error
                 :form whole-form
                 :detail options
-                (TEXT "~S ~S, option ~S may only be given once")
+                (TEXT "~S ~S: option ~S may only be given once")
                 'defclass name optionkey))
             (case optionkey
               (:METACLASS
@@ -292,8 +293,8 @@
                (let ((list (rest option)))
                  (when (and (consp list) (null (cdr list)) (listp (car list)))
                    (setq list (car list))
-                   (warn (TEXT "~S ~S: option ~S should be written ~S")
-                         'defclass name option (cons ':DEFAULT-INITARGS list)))
+                   (clos-warning (TEXT "~S ~S: option ~S should be written ~S")
+                     'defclass name option (cons ':DEFAULT-INITARGS list)))
                  (when (oddp (length list))
                    (error-of-type 'ext:source-program-error
                      :form whole-form
@@ -356,7 +357,7 @@
                    (error-of-type 'ext:source-program-error
                      :form whole-form
                      :detail options
-                     (TEXT "~S ~S, option ~S may only be given once")
+                     (TEXT "~S ~S: option ~S may only be given once")
                      'defclass name optionkey))
                  (push option user-defined-args)
                  (return))))))
@@ -479,8 +480,8 @@
              ;; error is signalled." But we can do better: ignore the old
              ;; class, warn and proceed. The old instances will thus keep
              ;; pointing to the old class.
-             (warn (TEXT "Cannot redefine ~S with a different metaclass ~S")
-                   class metaclass)
+             (clos-warning (TEXT "Cannot redefine ~S with a different metaclass ~S")
+               class metaclass)
              (setq class nil))
             ((not a-semi-standard-class-p)
              ;; This can occur when redefining a class defined through
@@ -537,14 +538,14 @@
     class))
 
 ;; Preliminary.
-(defun ensure-class-using-class (class name &rest args
-                                 &key (metaclass <standard-class>)
-                                      (direct-superclasses '())
-                                      (direct-slots '())
-                                      (direct-default-initargs '())
-                                      (documentation nil)
-                                      (fixed-slot-locations nil)
-                                 &allow-other-keys)
+(predefun ensure-class-using-class (class name &rest args
+                                    &key (metaclass <standard-class>)
+                                         (direct-superclasses '())
+                                         (direct-slots '())
+                                         (direct-default-initargs '())
+                                         (documentation nil)
+                                         (fixed-slot-locations nil)
+                                    &allow-other-keys)
   (declare (ignore metaclass direct-superclasses direct-slots
                    direct-default-initargs documentation fixed-slot-locations))
   (apply #'ensure-class-using-class-<t> class name args))
@@ -573,14 +574,18 @@
     result))
 
 ;; Preliminary.
-(defun reader-method-class (class direct-slot &rest initargs)
+(predefun reader-method-class (class direct-slot &rest initargs)
   (declare (ignore class direct-slot initargs))
   <standard-reader-method>)
-(defun writer-method-class (class direct-slot &rest initargs)
+(predefun writer-method-class (class direct-slot &rest initargs)
   (declare (ignore class direct-slot initargs))
   <standard-writer-method>)
 
 ;; ---------------------------- Class redefinition ----------------------------
+
+;; When this is true, all safety checks about the metaclasses
+;; of superclasses are omitted.
+(defparameter *allow-mixing-metaclasses* nil)
 
 (defun reinitialize-instance-<defined-class> (class &rest all-keys
                                               &key (name nil name-p)
@@ -594,8 +599,7 @@
   (if (and (>= (class-initialized class) 4) ; already finalized?
            (subclassp class <metaobject>))
     ;; Things would go awry when we try to redefine <class> and similar.
-    (warn (TEXT "Redefining metaobject class ~S has no effect.")
-          class)
+    (clos-warning (TEXT "Redefining metaobject class ~S has no effect.") class)
     (progn
       (when direct-superclasses-p
         ;; Normalize the (class-direct-superclasses class) in the same way as
@@ -750,6 +754,10 @@
           ;; and <inheritable-slot-definition-doc>.
           ;; No need to call (install-class-direct-accessors class) here.
       ) )
+      ;; Try to finalize it (mop-cl-reinit-mo, bug [ 1526448 ])
+      (unless *allow-mixing-metaclasses* ; for gray.lisp
+        (when (finalizable-p class)
+          (finalize-inheritance class)))
       ;; Notification of listeners:
       (map-dependents class
         #'(lambda (dependent)
@@ -775,7 +783,7 @@
 ;; ------------------- General routines for <defined-class> -------------------
 
 ;; Preliminary.
-(defun class-name (class)
+(predefun class-name (class)
   (class-classname class))
 
 ;; Returns the list of implicit direct superclasses when none was specified.
@@ -784,10 +792,6 @@
         ((typep class <funcallable-standard-class>) (list <funcallable-standard-object>))
         ((typep class <structure-class>) (list <structure-object>))
         (t '())))
-
-;; When this is true, all safety checks about the metaclasses
-;; of superclasses are omitted.
-(defparameter *allow-mixing-metaclasses* nil)
 
 (defun check-metaclass-mix (name direct-superclasses metaclass-test metaclass)
   (unless *allow-mixing-metaclasses*
@@ -798,7 +802,7 @@
         metaclass))))
 
 ;; Preliminary.
-(defun validate-superclass (class superclass)
+(predefun validate-superclass (class superclass)
   (or ;; Green light if class and superclass belong to the same metaclass.
       (eq (sys::%record-ref class 0) (sys::%record-ref superclass 0))
       ;; Green light also if class is a funcallable-standard-class and
@@ -837,11 +841,11 @@
   list-direct-subclasses)
 
 ;; Preliminary.
-(defun add-direct-subclass (class subclass)
+(predefun add-direct-subclass (class subclass)
   (add-direct-subclass-internal class subclass))
-(defun remove-direct-subclass (class subclass)
+(predefun remove-direct-subclass (class subclass)
   (remove-direct-subclass-internal class subclass))
-(defun class-direct-subclasses (class)
+(predefun class-direct-subclasses (class)
   (list-direct-subclasses class))
 
 (defun checked-class-direct-subclasses (class)
@@ -1014,8 +1018,8 @@
                        (DL (class-precedence-list D) (cdr DL)))
                       ((null DL) t)
                     (when (null (setq CL (member (car DL) CL))) (return nil)))
-                (warn (TEXT "(class-precedence-list ~S) and (class-precedence-list ~S) are inconsistent")
-                      class D)))
+                (clos-warning (TEXT "(class-precedence-list ~S) and (class-precedence-list ~S) are inconsistent")
+                  class D)))
           direct-superclasses)
     L))
 
@@ -1023,7 +1027,7 @@
   (std-compute-cpl class (class-direct-superclasses class)))
 
 ;; Preliminary.
-(defun compute-class-precedence-list (class)
+(predefun compute-class-precedence-list (class)
   (compute-class-precedence-list-<defined-class> class))
 
 (defun checked-compute-class-precedence-list (class)
@@ -1143,7 +1147,7 @@
      )))
 
 ;; Preliminary.
-(defun compute-effective-slot-definition-initargs (class direct-slot-definitions)
+(predefun compute-effective-slot-definition-initargs (class direct-slot-definitions)
   (compute-effective-slot-definition-initargs-<defined-class> class direct-slot-definitions))
 
 (defun compute-effective-slot-definition-<defined-class> (class name directslotdefs)
@@ -1168,13 +1172,14 @@
                          (eq slot-definition-class 'standard-effective-slot-definition)
                          (and (defined-class-p slot-definition-class)
                               (subclassp slot-definition-class <standard-effective-slot-definition>)))
-               (error #1=(TEXT "Wrong ~S result for class ~S: not a subclass of ~S: ~S")
+               (error (TEXT "Wrong ~S result for class ~S: not a subclass of ~S: ~S")
                       'effective-slot-definition-class (class-name class)
                       'standard-effective-slot-definition slot-definition-class)))
             ((structure-class-p class)
              (unless (and (defined-class-p slot-definition-class)
                           (subclassp slot-definition-class <structure-effective-slot-definition>))
-               (error #1# 'effective-slot-definition-class (class-name class)
+               (error (TEXT "Wrong ~S result for class ~S: not a subclass of ~S: ~S")
+                      'effective-slot-definition-class (class-name class)
                       'structure-effective-slot-definition slot-definition-class))))
       (apply (cond ((eq slot-definition-class 'standard-effective-slot-definition)
                     #'make-instance-<standard-effective-slot-definition>)
@@ -1182,7 +1187,7 @@
              slot-definition-class args))))
 
 ;; Preliminary.
-(defun compute-effective-slot-definition (class slotname direct-slot-definitions)
+(predefun compute-effective-slot-definition (class slotname direct-slot-definitions)
   (compute-effective-slot-definition-<defined-class> class slotname direct-slot-definitions))
 
 (defun compute-slots-<defined-class>-primary (class)
@@ -1349,12 +1354,12 @@
       ;; space.
       (when constrained-indices
         (setq local-index (1+ (car (last constrained-indices))))
-        (warn (TEXT "In class ~S, constrained slot locations cause holes to appear.")
-              (class-name class)))
+        (clos-warning (TEXT "In class ~S, constrained slot locations cause holes to appear.")
+          (class-name class)))
       slots)))
 
 ;; Preliminary.
-(defun compute-slots (class)
+(predefun compute-slots (class)
   (compute-slots-<slotted-class>-around class #'compute-slots-<defined-class>-primary))
 
 (defun checked-compute-slots (class)
@@ -1498,7 +1503,7 @@
     :from-end t))
 
 ;; Preliminary.
-(defun compute-default-initargs (class)
+(predefun compute-default-initargs (class)
   (compute-default-initargs-<defined-class> class))
 
 (defun checked-compute-default-initargs (class)
@@ -1522,6 +1527,18 @@
 
 ;; Flag to avoid bootstrapping issues with the compiler.
 (defvar *compile-accessor-functions* nil)
+
+(defun check-method-redefinition (funname qualifiers spec-list caller)
+  (sys::check-redefinition
+   (list* funname qualifiers spec-list) caller
+   ;; do not warn about redefinition when no method was defined
+   (and (fboundp 'find-method) (fboundp funname)
+        (typep-class (fdefinition funname) <generic-function>)
+        (not (safe-gf-undeterminedp (fdefinition funname)))
+        (eql (sig-req-num (safe-gf-signature (fdefinition funname)))
+             (length spec-list))
+        (find-method (fdefinition funname) qualifiers spec-list nil)
+        (TEXT "method"))))
 
 ;; Install the accessor methods corresponding to the direct slots of a class.
 (defun install-class-direct-accessors (class)
@@ -1553,79 +1570,99 @@
                         (assert (typep (slot-definition-location effective-slot) 'integer))
                         `(SYSTEM::%STRUCTURE-REF ',(class-name class) OBJECT ,(slot-definition-location effective-slot)))
                       `(SLOT-VALUE OBJECT ',slot-name))))))
-          ; Generic accessors are defined as methods and listed in the
-          ; direct-accessors list, so they can be removed upon class redefinition.
-          ; Non-generic accessors are defined as plain functions.
+          ;; Generic accessors are defined as methods and listed in the
+          ;; direct-accessors list, so they can be removed upon class redefinition.
+          ;; Non-generic accessors are defined as plain functions.
+          ;; Call CHECK-REDEFINITION appropriately.
           (dolist (funname readers)
             (if generic-p
-              (setf (class-direct-accessors class)
-                    (list* funname
-                           (do-defmethod funname
-                             (let* ((args
-                                      (list
+              (progn
+                (check-method-redefinition funname nil (list class) 'defclass)
+                (setf (class-direct-accessors class)
+                      (list* funname
+                             (do-defmethod funname
+                               (let* ((args
+                                       (list
                                         :specializers (list class)
                                         :qualifiers nil
                                         :lambda-list '(OBJECT)
                                         'signature (sys::memoized (make-signature :req-num 1))
                                         :slot-definition slot))
-                                    (method-class
-                                      (apply #'reader-method-class class slot args)))
-                               (unless (and (defined-class-p method-class)
-                                            (subclassp method-class <standard-reader-method>))
-                                 (error #1=(TEXT "Wrong ~S result for class ~S: not a subclass of ~S: ~S")
-                                        'reader-method-class (class-name class) 'standard-reader-method method-class))
-                               (apply #'make-instance method-class
-                                      (nconc (method-function-initargs method-class
-                                               (eval
-                                                 `(LOCALLY
-                                                    (DECLARE (COMPILE))
-                                                    (%OPTIMIZE-FUNCTION-LAMBDA (T) (#:CONTINUATION OBJECT)
-                                                      (DECLARE (COMPILE))
-                                                      ,access-place))))
-                                             args))))
-                           (class-direct-accessors class)))
-              (setf (fdefinition funname)
-                    (eval `(FUNCTION ,funname
-                             (LAMBDA (OBJECT)
-                               ,@(if *compile-accessor-functions* '((DECLARE (COMPILE))))
+                                      (method-class
+                                       (apply #'reader-method-class
+                                              class slot args)))
+                                 (unless (and (defined-class-p method-class)
+                                              (subclassp method-class <standard-reader-method>))
+                                   (error (TEXT "Wrong ~S result for class ~S: not a subclass of ~S: ~S")
+                                          'reader-method-class (class-name class) 'standard-reader-method method-class))
+                                 (apply #'make-instance method-class
+                                        (nconc (method-function-initargs
+                                                method-class
+                                                (eval
+                                                 `(LOCALLY (DECLARE (COMPILE
+                                                                     ,funname))
+                                                    (%OPTIMIZE-FUNCTION-LAMBDA
+                                                     (T) (#:CONTINUATION OBJECT)
+                                                     (DECLARE (COMPILE))
+                                                     ,access-place))))
+                                               args))))
+                             (class-direct-accessors class))))
+              (progn
+                (sys::check-redefinition
+                 funname 'defclass (sys::fbound-string funname))
+                (setf (fdefinition funname)
+                      (eval `(FUNCTION ,funname (LAMBDA (OBJECT)
+                               ,@(if *compile-accessor-functions*
+                                     `((DECLARE (COMPILE ,funname))))
                                (UNLESS (TYPEP OBJECT ',class)
                                  (ERROR-ACCESSOR-TYPECHECK ',funname OBJECT ',class))
-                               ,access-place))))))
+                               ,access-place)))))))
           (dolist (funname writers)
             (if generic-p
-              (setf (class-direct-accessors class)
-                    (list* funname
-                           (do-defmethod funname
-                             (let* ((args
-                                      (list
+              (progn
+                (check-method-redefinition funname nil (list class) 'defclass)
+                (setf (class-direct-accessors class)
+                      (list* funname
+                             (do-defmethod funname
+                               (let* ((args
+                                       (list
                                         :specializers (list <t> class)
                                         :qualifiers nil
                                         :lambda-list '(NEW-VALUE OBJECT)
                                         'signature (sys::memoized (make-signature :req-num 2))
                                         :slot-definition slot))
-                                    (method-class
-                                      (apply #'writer-method-class class slot args)))
-                               (unless (and (defined-class-p method-class)
-                                            (subclassp method-class <standard-writer-method>))
-                                 (error #1# 'writer-method-class (class-name class)
-                                        'standard-writer-method method-class))
-                               (apply #'make-instance method-class
-                                      (nconc (method-function-initargs method-class
-                                               (eval
-                                                 `(LOCALLY
-                                                    (DECLARE (COMPILE))
-                                                    (%OPTIMIZE-FUNCTION-LAMBDA (T) (#:CONTINUATION NEW-VALUE OBJECT)
-                                                      (DECLARE (COMPILE))
-                                                      (SETF ,access-place NEW-VALUE)))))
-                                             args))))
-                           (class-direct-accessors class)))
-              (setf (fdefinition funname)
-                    (eval `(FUNCTION ,funname
-                             (LAMBDA (NEW-VALUE OBJECT)
-                               ,@(if *compile-accessor-functions* '((DECLARE (COMPILE))))
+                                      (method-class
+                                       (apply #'writer-method-class
+                                              class slot args)))
+                                 (unless (and (defined-class-p method-class)
+                                              (subclassp method-class <standard-writer-method>))
+                                   (error (TEXT "Wrong ~S result for class ~S: not a subclass of ~S: ~S")
+                                          'writer-method-class
+                                          (class-name class)
+                                          'standard-writer-method method-class))
+                                 (apply #'make-instance method-class
+                                        (nconc (method-function-initargs
+                                                method-class
+                                                (eval
+                                                 `(LOCALLY (DECLARE (COMPILE
+                                                                     ,funname))
+                                                    (%OPTIMIZE-FUNCTION-LAMBDA
+                                                     (T) (#:CONTINUATION NEW-VALUE OBJECT)
+                                                     (DECLARE (COMPILE))
+                                                     (SETF ,access-place NEW-VALUE)))))
+                                               args))))
+                             (class-direct-accessors class))))
+              (progn
+                (sys::check-redefinition
+                 funname 'defclass (sys::fbound-string
+                                    (sys::get-funname-symbol funname)))
+                (setf (fdefinition funname)
+                      (eval `(FUNCTION ,funname (LAMBDA (NEW-VALUE OBJECT)
+                               ,@(if *compile-accessor-functions*
+                                     `((DECLARE (COMPILE ,funname))))
                                (UNLESS (TYPEP OBJECT ',class)
                                  (ERROR-ACCESSOR-TYPECHECK ',funname OBJECT ',class))
-                               (SETF ,access-place NEW-VALUE))))))))))))
+                               (SETF ,access-place NEW-VALUE)))))))))))))
 
 ;; Remove a set of accessor methods given as a plist.
 (defun remove-accessor-methods (plist)
@@ -1964,7 +2001,7 @@
   t)
 
 ;; Preliminary.
-(defun finalize-inheritance (class)
+(predefun finalize-inheritance (class)
   (finalize-inheritance-<semi-standard-class> class))
 
 (defun finalize-inheritance-<semi-standard-class> (class)
@@ -2032,7 +2069,7 @@
 ;; ------------- Redefining an instance of <semi-standard-class> -------------
 
 ;; Preliminary definition.
-(defun make-instances-obsolete (class)
+(predefun make-instances-obsolete (class)
   (make-instances-obsolete-<semi-standard-class> class))
 
 (defun make-instances-obsolete-<semi-standard-class> (class)
@@ -2051,8 +2088,8 @@
           ;; Rebind *make-instances-obsolete-caller* because WARN may enter a
           ;; nested REP-loop.
           (*make-instances-obsolete-caller* 'make-instances-obsolete))
-      (warn (TEXT "~S: Class ~S (or one of its ancestors) is being redefined, but its instances cannot be made obsolete")
-            caller name))
+      (clos-warning (TEXT "~S: Class ~S (or one of its ancestors) is being redefined, but its instances cannot be made obsolete")
+        caller name))
     (progn
       (when (class-instantiated class) ; don't warn if there are no instances
         (let ((name (class-name class))
@@ -2061,10 +2098,10 @@
               ;; nested REP-loop.
               (*make-instances-obsolete-caller* 'make-instances-obsolete))
           (if (eq caller 'defclass)
-            (warn (TEXT "~S: Class ~S (or one of its ancestors) is being redefined, instances are obsolete")
-                  caller name)
-            (warn (TEXT "~S: instances of class ~S are made obsolete")
-                  caller name))))
+            (clos-warning (TEXT "~S: Class ~S (or one of its ancestors) is being redefined, instances are obsolete")
+              caller name)
+            (clos-warning (TEXT "~S: instances of class ~S are made obsolete")
+              caller name))))
       ;; Create a new class-version. (Even if there are no instances: the
       ;; shared-slots may need change.)
       (let* ((copy (copy-standard-class class))
@@ -2641,7 +2678,7 @@
   *<built-in-class>-class-version*
   <defined-class>
   <potential-class>
-  ;; built-in-classes for CLASS-OF
+  ;; built-in-classes for CLASS-OF - order in sync with constobj.d
   (vector <array> <bit-vector> <character> <complex> <cons> <float> <function>
           <hash-table> <integer> <list> <null> <package> <pathname>
           #+LOGICAL-PATHNAMES <logical-pathname>

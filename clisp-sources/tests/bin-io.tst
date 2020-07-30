@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; CLISP-specific tests of binary i/o
 ;; READ-FLOAT, WRITE-FLOAT
 ;; READ-INTEGER, WRITE-INTEGER
@@ -7,7 +7,7 @@
 ;; <http://clisp.cons.org/impnotes.html#bin-input>
 ;; <http://clisp.cons.org/impnotes.html#bin-output>
 
-(defun clisp-test-bin-i/o (&key (num 10) (file-name "./foocl")
+(defun clisp-test-bin-i/o (&key (num 10) (file-name "bin-io-tst")
                            (type 'unsigned-byte) (size 40) (endianness :little)
                            (int-list (ecase type
                                        (unsigned-byte
@@ -53,15 +53,16 @@ nil
 
 (let ((vec (make-array 8 :element-type '(unsigned-byte 8)
                          :initial-contents '(#x3f #xf0 0 0 0 0 0 0))))
-  (with-open-file (foo "./foocl" :direction :output
-                                 #+(or CMU SBCL) :if-exists #+(or CMU SBCL) :supersede
+  (with-open-file (foo "bin-io-tst" :direction :output
+                                 #+(or CMU SBCL) :if-exists
+                                 #+(or CMU SBCL) :supersede
                                  :element-type '(unsigned-byte 8))
     (write-sequence vec foo))
   (unwind-protect
-       (with-open-file (foo "./foocl" :direction :input
+       (with-open-file (foo "bin-io-tst" :direction :input
                             :element-type '(unsigned-byte 8))
          (read-float foo 'double-float :big))
-    (delete-file "./foocl")))
+    (delete-file "bin-io-tst")))
 1d0
 
 (progn

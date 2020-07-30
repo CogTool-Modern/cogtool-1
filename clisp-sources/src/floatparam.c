@@ -5,11 +5,6 @@
 
 #include <stdio.h>
 
-#if !(defined(__STDC__) || defined(__cplusplus))
-/* Only for use in function parameter lists and as function return type. */
-#define void
-#endif
-
 typedef int boolean;
 #define TRUE  1
 #define FALSE 0
@@ -29,7 +24,7 @@ static void header (void)
 }
 
 #define check(type,typeprefix,typestr,equalfn,mainfn)  \
-static boolean equalfn (type* x, type* y);				\
+static boolean equalfn (volatile type* x, volatile type* y);		\
 static void mainfn (void)						\
 {									\
   int mant_bits;							\
@@ -109,7 +104,10 @@ static void mainfn (void)						\
   }									\
   printf("\n");								\
 }									\
-static boolean equalfn (type* x, type* y) { return *x == *y; }		\
+static boolean equalfn (volatile type* x, volatile type* y)		\
+{									\
+  return *x == *y;							\
+}									\
 
 check(float,"float","float",equal_float,main_float)
 check(double,"double","double",equal_double,main_double)
@@ -118,15 +116,13 @@ check(ldouble,"long_double","long double",equal_ldouble,main_ldouble)
 #endif
 
 
-int main()
-{
+int main (int argc, char *argv[]) {
+  if (freopen(argc==1 ? "conftest.h" : argv[1], "w", stdout) == NULL) return 1;
   header();
   main_float();
   main_double();
 #ifdef HAVE_LONGDOUBLE
   main_ldouble();
 #endif
-
-  if (ferror(stdout) || fclose(stdout)) return 1;
-  return 0;
+  return ferror(stdout) || fclose(stdout);
 }

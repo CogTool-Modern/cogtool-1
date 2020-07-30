@@ -4,7 +4,8 @@
 /* dynamic data structures are not needed for such a simple problem */
 #define nmax 100
 
-int queens (int n)                /* function definition in ISO/ANSI C style */
+int queens (int);
+int queens (int n)
 { /* Compute the solutions of the n-queens problem. Assume n>0, n<=nmax.
      We look for a function D:{1,...,n} -> {1,...,n} such that
      D, D+id, D-id are injective. We use backtracking on D(1),...,D(n).

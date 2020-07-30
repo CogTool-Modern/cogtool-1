@@ -1,38 +1,37 @@
 # Makefile for CLISP module set zlib
 
+srcdir = @srcdir@
 CC = @CC@
 CPPFLAGS = @CPPFLAGS@
 CFLAGS = @CFLAGS@
-INCLUDES= ..
+CLISP = @CLISP@ -norc -q
+CLISP_LINKKIT = @CLISP_LINKKIT@
 
-CLISP = clisp -q -norc
-
-LN = ln
+LN = @LN@
 
 MAKE = make
 
 SHELL = /bin/sh
 
-DISTRIBFILES = zlib.o link.sh Makefile zlib.lisp
+GENERATED = zlib.o zlib.fas
+DISTRIBFILES = link.sh Makefile $(GENERATED) $(srcdir)/zlib.lisp
 distribdir =
 
-all : zlib.o zlib.fas
+# default target: make the module
+clisp-module : $(GENERATED)
 
-zlib.c zlib.fas : zlib.lisp
-	$(CLISP) -c zlib.lisp
+zlib.c zlib.fas : $(srcdir)/zlib.lisp
+	$(CLISP) -c $(srcdir)/zlib.lisp -o ./
 
-zlib.o : zlib.c $(INCLUDES)/clisp.h config.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -I$(INCLUDES) -c zlib.c
-
-# Make a module
-clisp-module : all
+zlib.o : zlib.c config.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I$(CLISP_LINKKIT) -c zlib.c
 
 # Make a module distribution into $(distribdir)
 clisp-module-distrib : clisp-module force
 	$(LN) $(DISTRIBFILES) $(distribdir)
 
 clean : force
-	rm -f core *.o *.a
+	rm -f core *.o *.a *.fas *.lib
 
 distclean : clean
 

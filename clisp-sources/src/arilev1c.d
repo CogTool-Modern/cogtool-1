@@ -10,7 +10,7 @@
     var uintD* destptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         *destptr++ = *sourceptr++; count--;
       }
       return destptr;
@@ -26,7 +26,7 @@
     var uintD* destptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         *--destptr = *--sourceptr; count--;
       }
       return destptr;
@@ -42,7 +42,7 @@
     var uintC count;
     var uintD filler;
     {
-      until (count==0) {
+      while (count != 0) {
         *destptr++ = filler; count--;
       }
       return destptr;
@@ -58,7 +58,7 @@
     var uintC count;
     var uintD filler;
     {
-      until (count==0) {
+      while (count != 0) {
         *--destptr = filler; count--;
       }
       return destptr;
@@ -73,7 +73,7 @@
     var uintD* destptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         *destptr++ = 0; count--;
       }
       return destptr;
@@ -88,7 +88,7 @@
     var uintD* destptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         *--destptr = 0; count--;
       }
       return destptr;
@@ -104,7 +104,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         *xptr++ |= *yptr++; count--;
       }
     }
@@ -119,7 +119,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         *xptr++ ^= *yptr++; count--;
       }
     }
@@ -134,7 +134,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         *xptr++ &= *yptr++; count--;
       }
     }
@@ -149,7 +149,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         var uintD temp = ~ (*xptr ^ *yptr++);
         *xptr++ = temp;
         count--;
@@ -166,7 +166,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         var uintD temp = ~ (*xptr & *yptr++);
         *xptr++ = temp;
         count--;
@@ -183,7 +183,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         var uintD temp = ~ (*xptr | *yptr++);
         *xptr++ = temp;
         count--;
@@ -200,7 +200,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         *xptr++ &= ~(*yptr++); count--;
       }
     }
@@ -215,7 +215,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         *xptr++ |= ~(*yptr++); count--;
       }
     }
@@ -233,7 +233,7 @@
         var uintD temp = ~ (*xptr);
         *xptr++ = temp;
         count--;
-      } until (count==0);
+      } while (count != 0);
     }
 
 # AND-Test-Schleife:
@@ -246,7 +246,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         if (*xptr++ & *yptr++)
           return true;
         count--;
@@ -263,7 +263,7 @@
     var const uintD* ptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         if (*ptr++)
           return true;
         count--;
@@ -283,7 +283,7 @@
     var const uintD* yptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         if (!(*xptr++ == *yptr++))
           # verschiedene Digits gefunden
           return (*--xptr > *--yptr ? signean_plus : signean_minus);
@@ -304,7 +304,7 @@
     var uintC count;
     {
       var uintD carry = 0;
-      until (count==0) {
+      while (count != 0) {
         var uintD source1 = *--sourceptr1;
         var uintD source2 = *--sourceptr2;
         if (carry)
@@ -335,7 +335,7 @@
     var uintC count;
     {
       var uintD carry = 0;
-      until (count==0) {
+      while (count != 0) {
         var uintD source1 = *--sourceptr;
         var uintD source2 = *--destptr;
         if (carry)
@@ -364,7 +364,7 @@
     var uintD* ptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         if (!( ++(*--ptr) == 0 ))
           return 0; # kein weiterer Übertrag
         count--;
@@ -384,7 +384,7 @@
     var uintC count;
     {
       var uintD carry = 0;
-      until (count==0) {
+      while (count != 0) {
         var uintD source1 = *--sourceptr1;
         var uintD source2 = *--sourceptr2;
         if (carry)
@@ -417,7 +417,7 @@
     var uintC count;
     var uintD carry;
     {
-      until (count==0) {
+      while (count != 0) {
         var uintD source1 = *--sourceptr1;
         var uintD source2 = *--sourceptr2;
         if (carry)
@@ -449,7 +449,7 @@
     var uintC count;
     {
       var uintD carry = 0;
-      until (count==0) {
+      while (count != 0) {
         var uintD source1 = *--destptr;
         var uintD source2 = *--sourceptr;
         if (carry)
@@ -478,7 +478,7 @@
     var uintD* ptr;
     var uintC count;
     {
-      until (count==0) {
+      while (count != 0) {
         if (!( (*--ptr)-- == 0 ))
           return 0; # kein weiterer Übertrag
         count--;
@@ -496,7 +496,7 @@
     var uintC count;
     {
       # erstes Digit /=0 suchen:
-      until (count==0) {
+      while (count != 0) {
         if (!(*--ptr == 0))
           goto L1;
         count--;
@@ -504,7 +504,7 @@
       return 0;
       L1: # erstes Digit /=0 gefunden, ab jetzt gibt's Carrys
       *ptr = - *ptr; count--; # 1 Digit negieren
-      until (count==0) { # alle anderen Digits invertieren
+      while (count != 0) { # alle anderen Digits invertieren
         --ptr;
         *ptr = ~ *ptr;
         count--;
@@ -523,7 +523,7 @@
     var uintC count;
     {
       var uintDD accu = 0;
-      until (count==0) {
+      while (count != 0) {
         accu = ((uintDD)(*--ptr)<<1)+accu; *ptr = lowD(accu);
         accu = (uintDD)(highD(accu));
         count--;
@@ -536,7 +536,7 @@
     var uintC count;
     {
       var uintD carry = 0;
-      until (count==0) {
+      while (count != 0) {
         var uintD accu = *--ptr;
         *ptr = (accu<<1) | carry;
         carry = accu>>(intDsize-1);
@@ -560,7 +560,7 @@
     var uintD carry;
     {
       var uintDD accu = (uintDD)carry;
-      until (count==0) {
+      while (count != 0) {
         accu = ((uintDD)(*--ptr)<<i)+accu; *ptr = lowD(accu);
         accu = (uintDD)(highD(accu));
         count--;
@@ -575,7 +575,7 @@
     var uintD carry;
     {
       var uintC j = intDsize-i;
-      until (count==0) {
+      while (count != 0) {
         var uintD accu = *--ptr;
         *ptr = (accu<<i) | carry;
         carry = accu>>j;
@@ -600,7 +600,7 @@
     var uintC i;
     {
       var uintDD accu = 0;
-      until (count==0) {
+      while (count != 0) {
         accu = ((uintDD)(*--sourceptr)<<i)+accu; *--destptr = lowD(accu);
         accu = (uintDD)(highD(accu));
         count--;
@@ -616,7 +616,7 @@
     {
       var uintC j = intDsize-i;
       var uintD carry = 0;
-      until (count==0) {
+      while (count != 0) {
         var uintD accu = *--sourceptr;
         *--destptr = (accu<<i) | carry;
         carry = accu>>j;
@@ -639,7 +639,7 @@
     var uintD carry;
     {
       var uintDD accu = (sintDD)(sintD)carry & ((uintDD)1 << (2*intDsize-1)); # 0 oder bit(2*intDsize-1)
-      until (count==0) {
+      while (count != 0) {
         accu = (highlowDD_0(*ptr)>>1)+accu; *ptr++ = highD(accu);
         accu = highlowDD_0(lowD(accu));
         count--;
@@ -653,7 +653,7 @@
     var uintD carry;
     {
       carry = carry << (intDsize-1); # carry zu einem einzigen Bit machen
-      until (count==0) {
+      while (count != 0) {
         var uintD accu = *ptr;
         *ptr++ = (accu >> 1) | carry;
         carry = accu << (intDsize-1);
@@ -676,7 +676,7 @@
     var uintC i;
     {
       var uintDD accu = 0;
-      until (count==0) {
+      while (count != 0) {
         # Die oberen i Bits von (uintD)accu bilden hier den Übertrag.
         accu = highlowDD_0(lowD(accu));
         # Die oberen i Bits von (uintDD)accu bilden hier den Übertrag.
@@ -693,7 +693,7 @@
     {
       var uintC j = intDsize-i;
       var uintD carry = 0;
-      until (count==0) {
+      while (count != 0) {
         var uintD accu = *ptr;
         *ptr++ = (accu >> i) | carry;
         carry = accu << j;
@@ -723,7 +723,7 @@
         # Die oberen i Bits von (uintDD)accu bilden hier den Übertrag.
         accu = (highlowDD_0(*ptr)>>i)+accu; *ptr++ = highD(accu);
         count--;
-      } until (count==0);
+      } while (count != 0);
       return lowD(accu);
     }
   #else
@@ -740,7 +740,7 @@
         carry = accu << j;
         count--;
       }
-      until (count==0) {
+      while (count != 0) {
         var uintD accu = *ptr;
         *ptr++ = (accu >> i) | carry;
         carry = accu << j;
@@ -767,7 +767,7 @@
     {
       var uintDD accu = # Übertrag mit carry initialisieren
                            highlowDD_0(carry)>>i;
-      until (count==0) {
+      while (count != 0) {
         # Die oberen i Bits von (uintD)accu bilden hier den Übertrag.
         accu = highlowDD_0(lowD(accu));
         # Die oberen i Bits von (uintDD)accu bilden hier den Übertrag.
@@ -786,7 +786,7 @@
     {
       var uintC j = intDsize-i;
       carry = carry << j;
-      until (count==0) {
+      while (count != 0) {
         var uintD accu = *sourceptr++;
         *destptr++ = (accu >> i) | carry;
         carry = accu << j;
@@ -811,7 +811,7 @@
     var uintD newdigit;
     {
       var uintDD carry = newdigit;
-      until (len==0) {
+      while (len != 0) {
         # Hier ist 0 <= carry < digit.
         carry = carry + muluD(digit,*--ptr);
         # Hier ist 0 <= carry < 2^intDsize*digit.
@@ -829,7 +829,7 @@
     var uintD newdigit;
     {
       var uintD carry = newdigit;
-      until (len==0) {
+      while (len != 0) {
         # Hier ist 0 <= carry < digit.
         var uintD hi;
         var uintD lo;
@@ -867,7 +867,7 @@
         *--destptr = lowD(carry);
         carry = (uintDD)highD(carry); # carry := floor(carry/2^intDsize) < digit
         len--;
-      } until (len==0);
+      } while (len != 0);
       *--destptr = lowD(carry);
     }
   #else
@@ -888,7 +888,7 @@
         *--destptr = lo;
         carry = hi;
         len--;
-      } until (len==0);
+      } while (len != 0);
       *--destptr = carry;
     }
   #endif
@@ -917,7 +917,7 @@
           *destptr = lowD(carry);
           carry = (uintDD)highD(carry); # carry := floor(carry/2^intDsize) <= digit
           len--;
-        } until (len==0);
+        } while (len != 0);
       }
       return lowD(carry);
     }
@@ -942,7 +942,7 @@
           *destptr = lo;
           carry = hi;
           len--;
-        } until (len==0);
+        } while (len != 0);
       }
       return carry;
     }
@@ -973,7 +973,7 @@
           carry = (uintDD)highD(carry); # carry := floor(carry/2^intDsize) <= digit
           # Hier ist 0 <= carry <= digit.
           len--;
-        } until (len==0);
+        } while (len != 0);
         return lowD(carry);
       } else
         return 0; # nichts zu subtrahieren -> kein Übertrag
@@ -998,7 +998,7 @@
           *destptr = carry - lo; if (carry < lo) { hi += 1; }
           carry = hi;
           len--;
-        } until (len==0);
+        } while (len != 0);
         return carry;
       } else
         return 0; # nichts zu subtrahieren -> kein Übertrag
@@ -1018,7 +1018,7 @@
     var uintC len;
     {
       var uintD rest = 0;
-      until (len==0) {
+      while (len != 0) {
         divuD(highlowDD(rest,*ptr),digit,*ptr =, rest =);
         ptr++; len--;
       }
@@ -1031,7 +1031,7 @@
     var uintC len;
     {
       var uintD rest = 0;
-      until (len==0) {
+      while (len != 0) {
         divuD(rest,*ptr,digit,*ptr =, rest =);
         ptr++; len--;
       }
@@ -1055,7 +1055,7 @@
     var uintC len;
     {
       var uintD rest = 0;
-      until (len==0) {
+      while (len != 0) {
         divuD(highlowDD(rest,*sourceptr++),digit,*destptr++ =, rest =);
         len--;
       }
@@ -1069,7 +1069,7 @@
     var uintC len;
     {
       var uintD rest = 0;
-      until (len==0) {
+      while (len != 0) {
         divuD(rest,*sourceptr++,digit,*destptr++ =, rest =);
         len--;
       }

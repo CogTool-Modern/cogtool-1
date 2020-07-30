@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 #+clisp (progn (setf (symbol-function 'setf-gethash)
                      (symbol-function 'sys::puthash)) t)
@@ -110,3 +110,22 @@ do-hash-test
          :sum (do-hash-test ht))
   :do (format t " done~%"))
 0                               ; there should have been 0 errors!
+
+(= (sxhash '(1 2 3 4 5 6 7 8))
+   (sxhash '(1 2 3 4 5 6 7 8 9)))
+NIL
+
+(typep (sxhash '#1=(1 #1# . #1#)) 'fixnum) T
+
+(= (sxhash '(1 (2 . 3) 4 (5 . 6) (7 (8))))
+   (sxhash '(1 (2 . 3) 4 (5 . 6) (8 (7)))))
+NIL
+
+(progn (symbol-cleanup 'symbole)
+       (symbol-cleanup 'hash-table-keys)
+       (symbol-cleanup 'check-hash-unique-vec)
+       (symbol-cleanup 'do-hash-test)
+       (symbol-cleanup 'setf-gethash)
+       (symbol-cleanup 'ht1)
+       (symbol-cleanup 'ht2))
+T

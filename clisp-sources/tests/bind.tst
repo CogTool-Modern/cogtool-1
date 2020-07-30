@@ -1,4 +1,4 @@
-;;; -*- Lisp -*-
+;;; -*- Lisp -*- vim:filetype=lisp
 ;; test non-global special bindings
 
 ;; variable being declared special is bound - a "bound" declaration
@@ -305,8 +305,7 @@ ERROR
         (foo 'bar))))
   (testfn))
 ERROR
-(fmakunbound 'symbol-type-fn)
-SYMBOL-TYPE-FN
+(symbol-cleanup 'symbol-type-fn) T
 
 ;; The scope of a "free" declaration in DO* contains the step-forms.
 (block done
@@ -408,3 +407,39 @@ t
       (declare (special -f- -x-))
       (%m (t)))))
 nil
+
+;; macrolet.47, labels.47
+(let ((x :special))
+  (declare (special x))
+  (let ((x :lexical))
+    (macrolet ((f () 'x))
+      (declare (special x))
+      (list x (f)))))
+(:SPECIAL :SPECIAL)
+(let ((x :special))
+  (declare (special x))
+  (let ((x :lexical))
+    (flet ((f () x))
+      (declare (special x))
+      (list x (f)))))
+(:SPECIAL :LEXICAL)
+(let ((x :special))
+  (declare (special x))
+  (let ((x :lexical))
+    (labels ((f () x))
+      (declare (special x))
+      (list x (f)))))
+(:SPECIAL :LEXICAL)
+(let ((x :special))
+  (declare (special x))
+  (let ((x :lexical))
+    (labels ()
+      (declare (special x))
+      x)))
+:SPECIAL
+(let ((x :special))
+  (declare (special x))
+  (let ((x :lexical))
+    (locally (declare (special x))
+      x)))
+:SPECIAL

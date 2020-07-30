@@ -2,17 +2,17 @@
  * top level loop, aux functions for the debugger, stepper for CLISP
  * Bruno Haible 1990-2005
  * ILISP friendliness: Marcus Daniels 8.4.1994
- * Sam Steingold 2001-2004
+ * Sam Steingold 2001-2009
  * German comments translated into English: Stefan Kain 2004-08-30
  */
 
 #include "lispbibl.c"
 
 
-/* ----------------------------------------------------------------------- */
-/* Top-Level-Loop */
+/* -----------------------------------------------------------------------
+ Top-Level-Loop
 
-/* SYS::READ-FORM realizes the following features of the top-level REP loop
+ SYS::READ-FORM realizes the following features of the top-level REP loop
    and of the debug REP loop:
 
    - The prompt. When the input stream is interactive, a prompt is printed
@@ -104,9 +104,8 @@
      [2]>
      *** - EVAL: variable BCDEF has no value
 
-*/
 
-/* (SYS::READ-FORM ostream istream prompt [commandlist])
+ (SYS::READ-FORM ostream istream prompt [commandlist])
  read one form (interactively) from the input stream.
  instead of the form, we also recognize special commands from commandlist
  (a fresh alist) or SYS::*KEY-BINDINGS*
@@ -146,8 +145,8 @@ local maygc Values read_form(void)
   pushSTACK(STACK_3); pushSTACK(NIL); funcall(L(terminal_raw),2);
   pushSTACK(value1);
   /* stack layout: ostream, istream, prompt, command-list, inputstream, raw. */
-  var signean status = listen_char(STACK_4);
-  if (ls_eof_p(status) && !boundp(Symbol_value(S(terminal_read_stream))))
+  if (listen_char(STACK_4) == LISTEN_EOF
+      && !boundp(Symbol_value(S(terminal_read_stream))))
     goto eof;
   /* already have characters available (and not in ilisp_mode) -> no prompt */
   if (ilisp_mode || interactive_stream_p(STACK_4)) {
@@ -257,9 +256,11 @@ local maygc Values read_form(void)
               { var chart ch = schar(line,len);
                 if (cint_white_p(as_cint(ch))) goto found;
               }
-              if (false) {
-               found:
-                funcall(Cdr(Car(alist)),0); /* call the appropriate function */
+              if (false) { found:
+                pushSTACK(Cdr(Car(alist))); /* save the function */
+                pushSTACK(subsstring(line,len,input_len));
+                funcall(STACK_1,1); /* call the appropriate function */
+                skipSTACK(1);       /* drop the function */
                 dynamic_unbind(S(key_bindings));
                 goto eof;
               }
@@ -318,7 +319,7 @@ local maygc Values read_form(void)
       /* If not at the beginning of a line, delete input till EOL: */
       if (interactive_stream_p(STACK_(4+1))
           && !eq(stream_get_lastchar(STACK_(4+1)),ascii_char(NL))) {
-        while (ls_avail_p(listen_char(STACK_(4+1)))) {
+        while (LISTEN_AVAIL == listen_char(STACK_(4+1))) {
           var object ch = peek_char(&STACK_(4+1));
           if (eq(ch,eof_value))
             break;
@@ -409,17 +410,17 @@ LISPFUN(read_eval_print,seclass_default,1,1,norest,nokey,0,NIL)
   pushSTACK(value1);          /* save a value */
   mv_to_list();               /* pack values into list */
   /* stack layout: ..., val1, vals. */
-  Symbol_value(S(durch3)) = Symbol_value(S(durch2)); /* (SETQ /// //) */
-  Symbol_value(S(durch2)) = Symbol_value(S(durch));  /* (SETQ // /) */
-  Symbol_value(S(durch)) = STACK_0;                  /* (SETQ / vals) */
-  Symbol_value(S(mal3)) = Symbol_value(S(mal2));     /* (SETQ *** **) */
-  Symbol_value(S(mal2)) = Symbol_value(S(mal));      /* (SETQ ** *) */
-  Symbol_value(S(mal)) = STACK_1;                    /* (SETQ * val1) */
+  Symbol_value(S(slash3)) = Symbol_value(S(slash2)); /* (SETQ /// //) */
+  Symbol_value(S(slash2)) = Symbol_value(S(slash));  /* (SETQ // /) */
+  Symbol_value(S(slash)) = STACK_0;                  /* (SETQ / vals) */
+  Symbol_value(S(star3)) = Symbol_value(S(star2));   /* (SETQ *** **) */
+  Symbol_value(S(star2)) = Symbol_value(S(star));    /* (SETQ ** *) */
+  Symbol_value(S(star)) = STACK_1;                   /* (SETQ * val1) */
   /* print values to ostream := value from *STANDARD-OUTPUT**/
   STACK_(1+2) = var_stream(S(standard_output),strmflags_wr_ch_B);
  #if 0
   if (mconsp(STACK_0)) {
-    loop {
+    while (1) {
       var object valsr = STACK_0;
       STACK_0 = Cdr(valsr);
       terpri(&STACK_(1+2));
@@ -441,7 +442,7 @@ LISPFUN(read_eval_print,seclass_default,1,1,norest,nokey,0,NIL)
    automatically, this new line really cannot be avoided.) */
   fresh_line(&STACK_(1+2));     /* (fresh-line ostream) */
   if (mconsp(STACK_0)) {
-    loop {
+    while (1) {
       var object valsr = STACK_0;
       STACK_0 = Cdr(valsr);
       prin1(&STACK_(1+2),Car(valsr)); /* print next value */
@@ -470,8 +471,8 @@ global void driver (void)
   bt_here.bt_stack = STACK STACKop -1;
   bt_here.bt_num_arg = -1;
   back_trace = &bt_here;
-  loop {
-    var object driverfun = Symbol_value(S(driverstern)); /* value of *DRIVER* */
+  while (1) {
+    var object driverfun = Symbol_value(S(driverstar)); /* value of *DRIVER* */
     if (nullp(driverfun))
       break;
     funcall(driverfun,0);       /* call with 0 arguments */
@@ -483,7 +484,7 @@ global void driver (void)
     var sp_jmp_buf returner;                /* memorize return point */
     finish_entry_frame(DRIVER,returner,,;);
     /* this is the entry point. */
-    loop {
+    while (1) {
       /* execute (SYS::READ-EVAL-PRINT "> "): */
       pushSTACK(O(prompt_string)); /* Prompt "> " */
       funcall(L(read_eval_print),1);
@@ -500,6 +501,8 @@ global void driver (void)
  > continuable_p == can be continued after the driver finishes
  can trigger GC */
 global maygc void break_driver (bool continuable_p) {
+  if (quit_on_signal_in_progress) /* if we are terminating on sighup, */
+    quit();              /* printing the "exiting" messages will fail */
   var object driverfun = Symbol_value(S(break_driver)); /* *BREAK-DRIVER* */
   if (!nullp(driverfun)) {
     pushSTACK(continuable_p ? T : NIL);
@@ -550,7 +553,7 @@ global maygc void break_driver (bool continuable_p) {
       var sp_jmp_buf returner; /* return point */
       finish_entry_frame(DRIVER,returner,,;);
       /* re-entry point is here */
-      loop {
+      while (1) {
         /* (SYS::READ-EVAL-PRINT Prompt) */
         pushSTACK(STACK_(0+2)); /* Prompt "nnn. Break> " */
         funcall(L(read_eval_print),1);
@@ -593,7 +596,7 @@ LISPFUNN(load,1)
 {
   funcall(L(open),1);           /* (OPEN filename) */
   pushSTACK(value1);            /* save stream */
-  loop {
+  while (1) {
     var object obj = stream_read(&STACK_0,NIL,NIL); /* read object */
     if (eq(obj,eof_value))                          /* EOF -> done */
       break;
@@ -607,30 +610,31 @@ LISPFUNN(load,1)
   skipSTACK(1); VALUES1(T);
 }
 
-/* ----------------------------------------------------------------------- */
-/* Auxiliary functions for debugger and stepper */
+/* -----------------------------------------------------------------------
+ Auxiliary functions for debugger and stepper
 
-/* The following functions climb around in the stack, but will never
+ The following functions climb around in the stack, but will never
  trespass a driver-frame or the upper end of the stack.
  Valid "stackpointers" are in this context pointers to stack elements or
  frames, if there is neither the end of stack nor a driver-frame.
- Modus 1: all stack item
+ Modus 1: all stack items
  Modus 2: frames
  Modus 3: lexical frames: frame-info has FRAME_BIT = 1 and
           (SKIP2_BIT = 1 or ENTRYPOINT_BIT = 0 or BLOCKGO_BIT = 1)
  Modus 4: EVAL- and APPLY-frames: frame-info = [TRAPPED_]EVAL/APPLY_FRAME_INFO
- Modus 5: APPLY-frames: frame-info = [TRAPPED_]APPLY_FRAME_INFO */
+ Modus 5: APPLY-frames: frame-info = [TRAPPED_]APPLY_FRAME_INFO
 
-/* Macro: tests, if FRAME has reached stack end. */
+ Macro: tests, if FRAME has reached stack end. */
 #define stack_upend_p()  \
-  (   eq(FRAME_(0),nullobj)           /* Nullword = upper stack end */ \
+  (   (gcv_object_t*)STACK_start cmpSTACKop FRAME                        \
    || (framecode(FRAME_(0)) == DRIVER_frame_info) /* driver-frame = stack end */ \
-   || ((framepointerp(Symbol_value(S(frame_limit2))))                        \
-       && (uTheFramepointer(Symbol_value(S(frame_limit2))) cmpSTACKop FRAME) /* FRAME > *frame-limit2* ? */))
+   || ((framepointerp(Symbol_value(S(frame_limit_up))))              \
+       && (uTheFramepointer(Symbol_value(S(frame_limit_up))) cmpSTACKop FRAME) /* FRAME > *frame-limit-up* ? */))
 #define stack_downend_p()  \
-  (   (framecode(FRAME_(0)) == DRIVER_frame_info) /* driver-frame = stack end */ \
-   || ((framepointerp(Symbol_value(S(frame_limit1))))                        \
-       && (FRAME cmpSTACKop uTheFramepointer(Symbol_value(S(frame_limit1)))) /* FRAME < *frame-limit1* ? */))
+  (   FRAME cmpSTACKop STACK                                            \
+   || (framecode(FRAME_(0)) == DRIVER_frame_info) /* driver-frame = stack end */ \
+   || ((framepointerp(Symbol_value(S(frame_limit_down))))            \
+       && (FRAME cmpSTACKop uTheFramepointer(Symbol_value(S(frame_limit_down)))) /* FRAME < *frame-limit-down* ? */))
 
 /* Macro: Tests, if FRAME points to a frame.
  first approximation:
@@ -653,7 +657,7 @@ local bool framep (gcv_object_t* FRAME)
 }
 
 /* Macro: decreases FRAME down to the next frame. */
-#define next_frame_down()  do { FRAME skipSTACKop -1; } until (frame_p());
+#define next_frame_down()  do { FRAME skipSTACKop -1; } while (!frame_p())
 
 /* Macro: Tests, if the frame at FRAME is a lexical frame. */
 #ifdef entrypoint_bit_t
@@ -707,7 +711,7 @@ local gcv_object_t* frame_up_2 (gcv_object_t* stackptr)
     FRAME = topofframe(FRAME_(0)); /* pointer top of frame */
   else
     FRAME skipSTACKop 1;        /* pointer to next object */
-  loop {
+  while (1) {
     if (stack_upend_p())
       return stackptr;
     if (as_oint(FRAME_(0)) & wbit(frame_bit_o))
@@ -732,7 +736,7 @@ local gcv_object_t* frame_up_3 (gcv_object_t* stackptr)
     FRAME = topofframe(FRAME_(0)); /* pointer top of frame */
   else
     FRAME skipSTACKop 1;      /* pointer to next object */
-  loop {
+  while (1) {
     if (stack_upend_p())
       return stackptr;
     if (frame_p()) {
@@ -749,7 +753,7 @@ local gcv_object_t* frame_up_3 (gcv_object_t* stackptr)
 local gcv_object_t* frame_down_3 (gcv_object_t* stackptr)
 {
   var gcv_object_t* FRAME = stackptr;
-  loop {
+  while (1) {
     next_frame_down();        /* search next frame below */
     if (stack_downend_p())
       return stackptr;
@@ -767,7 +771,7 @@ local gcv_object_t* frame_up_4 (gcv_object_t* stackptr)
     FRAME = topofframe(FRAME_(0)); /* pointer top of frame */
   else
     FRAME skipSTACKop 1;      /* pointer to next object */
-  loop {
+  while (1) {
     if (stack_upend_p())
       return stackptr;
     if (frame_p()) {
@@ -784,7 +788,7 @@ local gcv_object_t* frame_up_4 (gcv_object_t* stackptr)
 local gcv_object_t* frame_down_4 (gcv_object_t* stackptr)
 {
   var gcv_object_t* FRAME = stackptr;
-  loop {
+  while (1) {
     next_frame_down();        /* search next frame below */
     if (stack_downend_p())
       return stackptr;
@@ -802,7 +806,7 @@ local gcv_object_t* frame_up_5 (gcv_object_t* stackptr)
     FRAME = topofframe(FRAME_(0)); /* pointer top of frame */
   else
     FRAME skipSTACKop 1;      /* pointer to next object */
-  loop {
+  while (1) {
     if (stack_upend_p())
       return stackptr;
     if (frame_p()) {
@@ -819,7 +823,7 @@ local gcv_object_t* frame_up_5 (gcv_object_t* stackptr)
 local gcv_object_t* frame_down_5 (gcv_object_t* stackptr)
 {
   var gcv_object_t* FRAME = stackptr;
-  loop {
+  while (1) {
     next_frame_down();        /* search next frame below */
     if (stack_downend_p())
       return stackptr;
@@ -853,7 +857,7 @@ local climb_fun_t test_mode_arg (const climb_fun_t* table) {
     pushSTACK(O(type_climb_mode)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(arg);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(type_error,GETTEXT("~S: bad frame climbing mode ~S"));
+    error(type_error,GETTEXT("~S: bad frame climbing mode ~S"));
   }
   return table[mode-1];
 }
@@ -867,29 +871,31 @@ local gcv_object_t* test_framepointer_arg (void)
 {
   var object arg = popSTACK();
   if (!framepointerp(arg)) {
+    pushSTACK(arg);              /* TYPE-ERROR slot DATUM */
+    pushSTACK(S(frame_pointer)); /* TYPE-ERROR slot EXPECTED-TYPE */
     pushSTACK(arg);
     pushSTACK(TheSubr(subr_self)->name);
-    fehler(error,GETTEXT("~S: ~S is not a stack pointer"));
+    error(type_error,GETTEXT("~S: ~S is not a stack pointer"));
   }
   return uTheFramepointer(arg);
 }
 
-LISPFUNN(frame_up_1,2)
-{ /* (SYS::FRAME-UP-1 framepointer mode)
-     returns the frame-pointer increased by 1. */
-  var climb_fun_t frame_up_x = test_mode_arg(&frame_up_table[0]);
-  var gcv_object_t* stackptr = test_framepointer_arg();
-  stackptr = (*frame_up_x)(stackptr); /* climb up once */
-  VALUES1(make_framepointer(stackptr));
-}
-
-LISPFUNN(frame_up,2)
-{ /* (SYS::FRAME-UP framepointer mode) returns the frame-pointer at the top. */
-  var climb_fun_t frame_up_x = test_mode_arg(&frame_up_table[0]);
-  var gcv_object_t* stackptr = test_framepointer_arg();
-  /* climb up as high as possible: */
-  loop {
-    var gcv_object_t* next_stackptr = (*frame_up_x)(stackptr);
+/* climb n times or as far as possible, according to table
+ > STACK_0: mode
+ > STACK_1: frame pointer
+ > STACK_2: indicator, how far to climb
+ < value1: new frame pointer
+ removes 3 elements from STACK
+ can trigger GC*/
+local maygc Values climb_stack (const climb_fun_t* table) {
+  climb_fun_t climber = test_mode_arg(table);
+  gcv_object_t* stackptr = test_framepointer_arg();
+  object repeat_arg = popSTACK();
+  if (uint32_p(repeat_arg)) {
+    uint32 count = I_to_uint32(repeat_arg);
+    while (count--) stackptr = (*climber)(stackptr);
+  } else while (1) { /* climb as far as possible: */
+    gcv_object_t* next_stackptr = (*climber)(stackptr);
     if (next_stackptr == stackptr)
       break;
     stackptr = next_stackptr;
@@ -897,28 +903,16 @@ LISPFUNN(frame_up,2)
   VALUES1(make_framepointer(stackptr));
 }
 
-LISPFUNN(frame_down_1,2)
-{ /* (SYS::FRAME-DOWN-1 framepointer mode)
-     returns the frame-pointer 1 below. */
-  var climb_fun_t frame_down_x = test_mode_arg(&frame_down_table[0]);
-  var gcv_object_t* stackptr = test_framepointer_arg();
-  stackptr = (*frame_down_x)(stackptr); /* climb down once */
-  VALUES1(make_framepointer(stackptr));
+LISPFUNN(frame_up,3)
+{ /* (SYS::FRAME-UP n framepointer mode)
+     returns the frame-pointer increased by n or the top one. */
+  climb_stack(frame_up_table);
 }
 
-LISPFUNN(frame_down,2)
-{ /* (SYS::FRAME-DOWN framepointer mode)
-     returns the frame-pointer at the bottom. */
-  var climb_fun_t frame_down_x = test_mode_arg(&frame_down_table[0]);
-  var gcv_object_t* stackptr = test_framepointer_arg();
-  /* climb down as low as possible: */
-  loop {
-    var gcv_object_t* next_stackptr = (*frame_down_x)(stackptr);
-    if (next_stackptr == stackptr)
-      break;
-    stackptr = next_stackptr;
-  }
-  VALUES1(make_framepointer(stackptr));
+LISPFUNN(frame_down,3)
+{ /* (SYS::FRAME-DOWN n framepointer mode)
+     returns the frame-pointer decreased by n or the bottom one. */
+  climb_stack(frame_down_table);
 }
 
 LISPFUNN(the_frame,0)
@@ -942,9 +936,9 @@ local void same_env_as (void)
   var object found_go_env = nullobj;
   var object found_decl_env = nullobj;
   /* and fill: */
-  loop {
+  while (1) {
     /* search at FRAME downwards for ENV-frames: */
-    loop {
+    while (1) {
       FRAME skipSTACKop -1;
       if (FRAME==STACK)       /* done? */
         goto end;
@@ -991,7 +985,7 @@ local void same_env_as (void)
         && (!eq(found_block_env,nullobj))
         && (!eq(found_go_env,nullobj))
         && (!eq(found_decl_env,nullobj)))
-      goto fertig;
+      goto done;
   }
  end:                         /* end of stack is reached. */
   /* fetch the remaining environment-components from the current environment: */
@@ -1000,7 +994,7 @@ local void same_env_as (void)
   if (eq(found_block_env,nullobj)) { found_block_env = aktenv.block_env; }
   if (eq(found_go_env,nullobj)) { found_go_env = aktenv.go_env; }
   if (eq(found_decl_env,nullobj)) { found_decl_env = aktenv.decl_env; }
- fertig:
+ done:
   /* construct environment-frame: */
   make_ENV5_frame();
   /* set current environments: */
@@ -1044,12 +1038,12 @@ LISPFUNN(driver_frame_p,1)
 }
 
 /* error-message, if there is no EVAL/APPLY-frame-pointer.
- fehler_evalframe(obj);
+ error_evalframe(obj);
  > obj: not an EVAL/APPLY-frame-pointer */
-nonreturning_function(local, fehler_evalframe, (object obj)) {
+nonreturning_function(local, error_evalframe, (object obj)) {
   pushSTACK(obj);
   pushSTACK(TheSubr(subr_self)->name);
-  fehler(error,GETTEXT("~S: ~S is not a pointer to an EVAL/APPLY frame"));
+  error(error_condition,GETTEXT("~S: ~S is not a pointer to an EVAL/APPLY frame"));
 }
 
 LISPFUNN(trap_eval_frame,2)
@@ -1058,10 +1052,10 @@ LISPFUNN(trap_eval_frame,2)
   var object flag = popSTACK();
   var object frame = popSTACK();
   if (!framepointerp(frame))
-    fehler_evalframe(frame);
+    error_evalframe(frame);
   var gcv_object_t* FRAME = uTheFramepointer(frame);
   if (!evalapply_frame_p())
-    fehler_evalframe(frame);
+    error_evalframe(frame);
   /* FRAME points to the EVAL/APPLY-frame. */
   if (!nullp(flag)) {
     /* switch on breakpoint */
@@ -1078,10 +1072,10 @@ LISPFUNN(redo_eval_frame,1)
      EVAL/APPLY-frame and restarts to execute it. */
   var object frame = popSTACK();
   if (!framepointerp(frame))
-    fehler_evalframe(frame);
+    error_evalframe(frame);
   var gcv_object_t* FRAME = uTheFramepointer(frame);
   if (!evalapply_frame_p())
-    fehler_evalframe(frame);
+    error_evalframe(frame);
   /* FRAME points to the EVAL/APPLY-frame. */
   VALUES0;
   /* unwind everything up to the EVAL/APPLY-frame, then jump there */
@@ -1095,33 +1089,32 @@ LISPFUNN(return_from_eval_frame,2)
   var object form = popSTACK();
   var object frame = popSTACK();
   if (!framepointerp(frame))
-    fehler_evalframe(frame);
+    error_evalframe(frame);
   var gcv_object_t* FRAME = uTheFramepointer(frame);
   if (!evalapply_frame_p())
-    fehler_evalframe(frame);
+    error_evalframe(frame);
   /* FRAME points to the EVAL/APPLY-frame. */
   VALUES1(form);
   /* unwind everything up to the EVAL/APPLY-frame, jump there */
   unwind_upto(FRAME);
 }
 
-/* ----------------------------------------------------------------------- */
-/* Debug aux */
+/* -----------------------------------------------------------------------
+ Debug aux
 
-/* Returns the top-of-frame of a back_trace element. */
+ Returns the top-of-frame of a back_trace element. */
 global gcv_object_t* top_of_back_trace_frame (const struct backtrace_t *bt) {
   var gcv_object_t* stack = bt->bt_stack;
   var object fun = bt->bt_function;
-  if (fsubrp(fun)) {
-    /* FSUBR */
+  if (fsubrp(fun)) { /* FSUBR */
     var uintW numreq;
     var uintW numopt;
     var uintW body_flag;
     switch ((uintW)posfixnum_to_V(TheFsubr(fun)->argtype)) {
-      case fsubr_argtype_1_0_nobody: numreq = 1; numopt = 0; body_flag = 0; break;
-      case fsubr_argtype_2_0_nobody: numreq = 2; numopt = 0; body_flag = 0; break;
-      case fsubr_argtype_1_1_nobody: numreq = 1; numopt = 1; body_flag = 0; break;
-      case fsubr_argtype_2_1_nobody: numreq = 2; numopt = 1; body_flag = 0; break;
+      case fsubr_argtype_1_0_nobody: numreq = 1; numopt = 0; body_flag=0; break;
+      case fsubr_argtype_2_0_nobody: numreq = 2; numopt = 0; body_flag=0; break;
+      case fsubr_argtype_1_1_nobody: numreq = 1; numopt = 1; body_flag=0; break;
+      case fsubr_argtype_2_1_nobody: numreq = 2; numopt = 1; body_flag=0; break;
       case fsubr_argtype_0_body: numreq = 0; numopt = 0; body_flag = 1; break;
       case fsubr_argtype_1_body: numreq = 1; numopt = 0; body_flag = 1; break;
       case fsubr_argtype_2_body: numreq = 2; numopt = 0; body_flag = 1; break;
@@ -1129,39 +1122,60 @@ global gcv_object_t* top_of_back_trace_frame (const struct backtrace_t *bt) {
     }
     return stack STACKop (numreq + numopt + body_flag);
   }
-  if (subrp(fun))
-    /* SUBR */
-    return stack STACKop (TheSubr(fun)->req_anz + TheSubr(fun)->opt_anz
-                          + TheSubr(fun)->key_anz);
+  if (subrp(fun)) /* SUBR */
+    return stack STACKop (TheSubr(fun)->req_count + TheSubr(fun)->opt_count
+                          + TheSubr(fun)->key_count);
   if (closurep(fun)) {
-    if (simple_bit_vector_p(Atype_8Bit,TheClosure(fun)->clos_codevec)) {
-      /* Compiled-Closure */
-      var object codevec = TheClosure(fun)->clos_codevec;
+    var object codevec = TheClosure(fun)->clos_codevec;
+    if (simple_bit_vector_p(Atype_8Bit,codevec)) { /* Compiled Closure */
       return stack STACKop (TheCodevec(codevec)->ccv_numreq
                             + TheCodevec(codevec)->ccv_numopt
                             + (TheCodevec(codevec)->ccv_flags & bit(0) ? 1 : 0)
-                            + (TheCodevec(codevec)->ccv_flags & bit(7) ? TheCodevec(codevec)->ccv_numkey : 0));
-    } else
-      /* Interpreted-Closure */
+                            + (TheCodevec(codevec)->ccv_flags & bit(7)
+                               ? TheCodevec(codevec)->ccv_numkey : 0));
+    } else /* Interpreted Closure */
       return stack;
   }
   /* Only SUBRs and functions occur as bt_function. */
   NOTREACHED;
 }
 
-local void print_back_trace (const gcv_object_t* stream_,
-                             const struct backtrace_t *bt, int index) {
+/* print one backtrace object
+ > stream_ : lisp stream where the object is printed
+ > bt : the backtrace object to print
+ > index : the backtrace depth
+ can trigger GC */
+local maygc void print_back_trace (const gcv_object_t* stream_,
+                                   const struct backtrace_t *bt, uintL index) {
   write_ascii_char(stream_,'<');
-  if (index >= 0)
-    prin1(stream_,fixnum(index));
-  else
-    write_ascii_char(stream_,'#');
+  prin1(stream_,fixnum(index));
+  write_ascii_char(stream_,'/');
+  prin1(stream_,fixnum(STACK_item_count(bt->bt_stack,
+                                        (gcv_object_t*)STACK_start)));
   write_ascii_char(stream_,'>');
   write_ascii_char(stream_,' ');
   prin1(stream_,bt->bt_function);
   if (bt->bt_num_arg >= 0) {
     write_ascii_char(stream_,' ');
     prin1(stream_,fixnum(bt->bt_num_arg));
+  }
+}
+/* print several backtrace objects, up to FRAME
+ > stream_ : lisp stream where the object is printed
+ < FRAME : stack pointer - the limit for printing the stack
+ > bt : the first backtrace object to print
+ > index : the backtrace depth
+ < bt : the next backtrace depth to be printed
+ < index : the next backtrace depth
+ can trigger GC */
+local maygc void print_bt_to_frame (const gcv_object_t* stream_,
+                                    const gcv_object_t* FRAME,
+                                    const struct backtrace_t* *bt_,
+                                    uintL *index) {
+  while (bt_beyond_stack_p(*bt_,FRAME)) {
+    print_back_trace(stream_,*bt_,++(*index));
+    terpri(stream_);
+    *bt_ = (*bt_)->bt_next;
   }
 }
 
@@ -1172,8 +1186,7 @@ local void print_back_trace (const gcv_object_t* stream_,
 local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
                                            gcv_object_t* FRAME)
 {
-  if (!frame_p()) {
-    /* no frame, normal LISP-object */
+  if (!frame_p()) { /* no frame, normal LISP-object */
     write_sstring(stream_,O(showstack_string_lisp_obj)); /* "- " */
     var object obj = FRAME_(0);
    #if !defined(NO_symbolflags)
@@ -1184,14 +1197,17 @@ local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
    #endif
     prin1(stream_,obj);       /* print LISP-object */
     return FRAME STACKop 1;
-  } else {
-    /* met frame */
+  } else { /* met frame */
+    write_ascii_char(stream_,'[');
+    prin1(stream_,fixnum(STACK_item_count(FRAME,(gcv_object_t*)STACK_start)));
+    write_ascii_char(stream_,']');
+    write_ascii_char(stream_,' ');
     var gcv_object_t* FRAME_top = topofframe(FRAME_(0)); /* top of frame */
     switch (framecode(FRAME_(0))) { /* according to frametype */
-      case TRAPPED_APPLY_frame_info:
+      case TRAPPED_APPLY_frame_info: {
         write_sstring(stream_,CLSTEXT("APPLY frame with breakpoint for call "));
-        goto APPLY_frame;
-      case APPLY_frame_info:
+      } goto APPLY_frame;
+      case APPLY_frame_info: {
         write_sstring(stream_,CLSTEXT("APPLY frame for call "));
        APPLY_frame:
         /* print function name and arguments: */
@@ -1207,16 +1223,16 @@ local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
           });
         }
         write_ascii_char(stream_,')'); /* print ')' */
-        break;
-      case TRAPPED_EVAL_frame_info:
+      } break;
+      case TRAPPED_EVAL_frame_info: {
         write_sstring(stream_,CLSTEXT("EVAL frame with breakpoint for form "));
-        goto EVAL_frame;
-      case EVAL_frame_info:
+      } goto EVAL_frame;
+      case EVAL_frame_info: {
         write_sstring(stream_,CLSTEXT("EVAL frame for form "));
-      EVAL_frame:
+       EVAL_frame:
         prin1(stream_,FRAME_(frame_form)); /* print form */
-        break;
-      case DYNBIND_frame_info: /* dynamic variable binding frames: */
+      } break;
+      case DYNBIND_frame_info: { /* dynamic variable binding frames: */
         write_sstring(stream_,CLSTEXT("frame binding variables (~ = dynamically):"));
         /* print bindings: */
         FRAME skipSTACKop 1;
@@ -1230,14 +1246,14 @@ local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
           prin1(stream_,FRAME_(1)); /* print value */
           FRAME skipSTACKop 2;
         }
-        break;
+      } break;
      #ifdef HAVE_SAVED_REGISTERS
-      case CALLBACK_frame_info: /* callback-register-frames: */
+      case CALLBACK_frame_info: { /* callback-register-frames: */
         write_sstring(stream_,CLSTEXT("CALLBACK frame"));
-        break;
+      } break;
      #endif
       /* variable- and function binding frames: */
-      case VAR_frame_info:
+      case VAR_frame_info: {
         write_sstring(stream_,CLSTEXT("frame binding variables "));
        #ifdef NO_symbolflags
         prin1(stream_,make_framepointer(FRAME)); /* print frame-pointer */
@@ -1264,10 +1280,11 @@ local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
        #else
         goto VARFUN_frame;
        #endif
-      case FUN_frame_info:
+      }
+      case FUN_frame_info: {
         write_sstring(stream_,CLSTEXT("frame binding functions "));
         goto VARFUN_frame;
-      VARFUN_frame:
+       VARFUN_frame: {
         prin1(stream_,make_framepointer(FRAME)); /* print frame-pointer */
         write_sstring(stream_,CLSTEXT(" binds (~ = dynamically):"));
         pushSTACK(FRAME_(frame_next_env)); /* save next environment */
@@ -1285,8 +1302,8 @@ local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
             prin1(stream_,FRAME_(1)); /* print value */
           }
           FRAME skipSTACKop 2;
-        }
-      VARFUN_frame_next:
+        }}
+       VARFUN_frame_next:
         /* print next environment: */
         terpri(stream_);
         write_sstring(stream_,CLSTEXT("  Next environment: "));
@@ -1310,9 +1327,9 @@ local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
             } while (simple_vector_p(env));
           }
         }
-        break;
+      } break;
         /* compiled block/tagbody-frames: */
-      case CBLOCK_CTAGBODY_frame_info:
+      case CBLOCK_CTAGBODY_frame_info: {
         if (simple_vector_p(Car(FRAME_(frame_ctag)))) {
           /* compiled tagbody-frames: */
           write_sstring(stream_,CLSTEXT("compiled tagbody frame for "));
@@ -1322,28 +1339,28 @@ local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
           write_sstring(stream_,CLSTEXT("compiled block frame for "));
           prin1(stream_,Car(FRAME_(frame_ctag))); /* blockname */
         }
-        break;
+      } break;
         /* interpreted block-frames: */
-      case IBLOCK_frame_info:
+      case IBLOCK_frame_info: {
         write_sstring(stream_,CLSTEXT("block frame "));
-        goto IBLOCK_frame;
-      case NESTED_IBLOCK_frame_info:
+      } goto IBLOCK_frame;
+      case NESTED_IBLOCK_frame_info: {
         write_sstring(stream_,CLSTEXT("nested block frame "));
-        goto IBLOCK_frame;
-      IBLOCK_frame:
+      } goto IBLOCK_frame;
+      IBLOCK_frame: {
         pushSTACK(FRAME_(frame_next_env));
         prin1(stream_,make_framepointer(FRAME)); /* print frame-pointer */
         write_sstring(stream_,CLSTEXT(" for "));
         prin1(stream_,FRAME_(frame_name)); /* blockname */
-        goto NEXT_ENV;
+      } goto NEXT_ENV;
         /* interpreted tagbody-frames: */
-      case ITAGBODY_frame_info:
+      case ITAGBODY_frame_info: {
         write_sstring(stream_,CLSTEXT("tagbody frame "));
-        goto ITAGBODY_frame;
-      case NESTED_ITAGBODY_frame_info:
+      } goto ITAGBODY_frame;
+      case NESTED_ITAGBODY_frame_info: {
         write_sstring(stream_,CLSTEXT("nested tagbody frame "));
-        goto ITAGBODY_frame;
-      ITAGBODY_frame:
+      } goto ITAGBODY_frame;
+      ITAGBODY_frame: {
         pushSTACK(FRAME_(frame_next_env));
         prin1(stream_,make_framepointer(FRAME)); /* print frame-pointer */
         write_sstring(stream_,CLSTEXT(" for"));
@@ -1357,95 +1374,87 @@ local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
           prin1(stream_,FRAME_(1)); /* print body */
           FRAME skipSTACKop 2;
         }
-        goto NEXT_ENV;
-      NEXT_ENV: /* printing of a block- or tagbody-environments STACK_0 */
+      } goto NEXT_ENV;
+      NEXT_ENV: { /* printing of a block- or tagbody-environments STACK_0 */
         terpri(stream_);
         write_sstring(stream_,CLSTEXT("  Next environment: "));
-        {
-          var object env = popSTACK();
-          if (!consp(env)) {
-            prin1(stream_,env);
-          } else {
-            /* next environment is an Alist */
-            do {
-              pushSTACK(Cdr(env));
-              env = Car(env);
-              if (atomp(env)) {
-                pushSTACK(S(show_stack));
-                fehler(error,GETTEXT("~S: environment is not an alist"));
-              }
-              pushSTACK(Cdr(env));
-              pushSTACK(Car(env));
-              write_sstring(stream_,O(showstack_string_bindung)); /* "␤  | " */
-              prin1(stream_,popSTACK());
-              write_sstring(stream_,O(showstack_string_zuordtag)); /* " --> " */
-              prin1(stream_,popSTACK());
-              env = popSTACK();
-            } while (consp(env));
-          }
+        var object env = popSTACK();
+        if (!consp(env)) {
+          prin1(stream_,env);
+        } else { /* next environment is an Alist */
+          do {
+            pushSTACK(Cdr(env));
+            env = Car(env);
+            if (atomp(env)) {
+              pushSTACK(S(show_stack));
+              error(error_condition,
+                    GETTEXT("~S: environment is not an association list"));
+            }
+            pushSTACK(Cdr(env));
+            pushSTACK(Car(env));
+            write_sstring(stream_,O(showstack_string_bindung)); /* "␤  | " */
+            prin1(stream_,popSTACK());
+            write_sstring(stream_,O(showstack_string_zuordtag)); /* " --> " */
+            prin1(stream_,popSTACK());
+            env = popSTACK();
+          } while (consp(env));
         }
-        break;
-      case CATCH_frame_info:
-        /* catch-frames: */
+      } break;
+      case CATCH_frame_info: { /* catch-frames: */
         write_sstring(stream_,CLSTEXT("catch frame for tag "));
         prin1(stream_,FRAME_(frame_tag)); /* tag */
-        break;
-      case HANDLER_frame_info:
-        /* handler-frames: */
+      } break;
+      case HANDLER_frame_info: { /* handler-frames: */
         write_sstring(stream_,CLSTEXT("handler frame for conditions"));
-        {
-          var uintL m2 = Svector_length(Car(FRAME_(frame_handlers))); /* 2*m */
-          var uintL i = 0;
-          do {
-            write_ascii_char(stream_,' '); /* print ' ' */
-            prin1(stream_,TheSvector(Car(FRAME_(frame_handlers)))->data[i]); /* print type i */
-            i += 2;
-          } while (i < m2);
-        }
-        break;
-      case UNWIND_PROTECT_frame_info:
-        /* unwind-protect-frames: */
+        var uintL m2 = Svector_length(Car(FRAME_(frame_handlers))); /* 2*m */
+        var uintL i = 0;
+        do {
+          write_ascii_char(stream_,' '); /* print ' ' */
+          prin1(stream_,TheSvector(Car(FRAME_(frame_handlers)))->data[i]); /* print type i */
+          i += 2;
+        } while (i < m2);
+      } break;
+      case UNWIND_PROTECT_frame_info: { /* unwind-protect-frames: */
         write_sstring(stream_,CLSTEXT("unwind-protect frame"));
-        break;
-      case DRIVER_frame_info:
-        /* driver-frames: */
+      } break;
+      case DRIVER_frame_info: { /* driver-frames: */
         terpri(stream_); /* blank line */
         write_sstring(stream_,CLSTEXT("driver frame"));
-        break;
+      } break;
         /* environment-frames: */
-      case ENV1V_frame_info:
+      case ENV1V_frame_info: {
         write_sstring(stream_,CLSTEXT("frame binding environments"));
         write_sstring(stream_,O(showstack_string_VENV_frame)); /* "␤  VAR_ENV <--> " */
         prin1(stream_,FRAME_(1));
-        break;
-      case ENV1F_frame_info:
+      } break;
+      case ENV1F_frame_info: {
         write_sstring(stream_,CLSTEXT("frame binding environments"));
         write_sstring(stream_,O(showstack_string_FENV_frame)); /* "␤  FUN_ENV <--> " */
         prin1(stream_,FRAME_(1));
-        break;
-      case ENV1B_frame_info:
+      } break;
+      case ENV1B_frame_info: {
         write_sstring(stream_,CLSTEXT("frame binding environments"));
         write_sstring(stream_,O(showstack_string_BENV_frame)); /* "␤  BLOCK_ENV <--> " */
         prin1(stream_,FRAME_(1));
-        break;
-      case ENV1G_frame_info:
+      } break;
+      case ENV1G_frame_info: {
         write_sstring(stream_,CLSTEXT("frame binding environments"));
         write_sstring(stream_,O(showstack_string_GENV_frame)); /* "␤  GO_ENV <--> " */
         prin1(stream_,FRAME_(1));
-        break;
-      case ENV1D_frame_info:
+      } break;
+      case ENV1D_frame_info: {
         write_sstring(stream_,CLSTEXT("frame binding environments"));
         write_sstring(stream_,O(showstack_string_DENV_frame)); /* "␤  DECL_ENV <--> " */
         prin1(stream_,FRAME_(1));
-        break;
-      case ENV2VD_frame_info:
+      } break;
+      case ENV2VD_frame_info: {
         write_sstring(stream_,CLSTEXT("frame binding environments"));
         write_sstring(stream_,O(showstack_string_VENV_frame)); /* "␤  VAR_ENV <--> " */
         prin1(stream_,FRAME_(1));
         write_sstring(stream_,O(showstack_string_DENV_frame)); /* "␤  DECL_ENV <--> " */
         prin1(stream_,FRAME_(2));
-        break;
-      case ENV5_frame_info:
+      } break;
+      case ENV5_frame_info: {
         write_sstring(stream_,CLSTEXT("frame binding environments"));
         write_sstring(stream_,O(showstack_string_VENV_frame)); /* "␤  VAR_ENV <--> " */
         prin1(stream_,FRAME_(1));
@@ -1457,10 +1466,10 @@ local maygc gcv_object_t* print_stackitem (const gcv_object_t* stream_,
         prin1(stream_,FRAME_(4));
         write_sstring(stream_,O(showstack_string_DENV_frame)); /* "␤  DECL_ENV <--> " */
         prin1(stream_,FRAME_(5));
-        break;
+      } break;
       default:
         pushSTACK(S(show_stack));
-        fehler(serious_condition,GETTEXT("~S: unknown frame type"));
+        error(serious_condition,GETTEXT("~S: unknown frame type"));
     }
     return FRAME_top;         /* pointer top of frame */
   }
@@ -1476,11 +1485,7 @@ LISPFUNN(describe_frame,2)
     var uintL count = 0;
     var p_backtrace_t bt = back_trace;
     unwind_back_trace(bt,FRAME STACKop -1);
-    while (bt_beyond_stack_p(bt,FRAME)) {
-      print_back_trace(&STACK_0,bt,++count);
-      terpri(&STACK_0);
-      bt = bt->bt_next;
-    }
+    print_bt_to_frame(&STACK_0,FRAME,&bt,&count);
   }
   print_stackitem(&STACK_0,FRAME); /* print stack-item */
   elastic_newline(&STACK_0);
@@ -1500,28 +1505,17 @@ local inline maygc uintL show_stack (climb_fun_t frame_up_x, uintL frame_limit,
   var gcv_object_t* stream_ = &STACK_0;
   var uintL count = 0;
   var p_backtrace_t bt = back_trace;
-  while (!eq(FRAME_(0),nullobj) /* nullobj = stack end */
+  while (!((gcv_object_t*)STACK_start cmpSTACKop FRAME)
          && (frame_limit==0 || count<frame_limit)) {
     fresh_line(stream_);
+    print_bt_to_frame(stream_,FRAME,&bt,&count);
+    FRAME = print_stackitem(stream_,FRAME);
+    elastic_newline(stream_);
     if (frame_up_x != NULL) {
       var gcv_object_t* next_frame = (*frame_up_x)(FRAME);
       if (next_frame == FRAME) break;
       FRAME = next_frame;
-      while (bt_beyond_stack_p(bt,FRAME)) {
-        print_back_trace(stream_,bt,++count);
-        terpri(stream_);
-        bt = bt->bt_next;
-      }
-      print_stackitem(stream_,FRAME);
-    } else {
-      while (bt_beyond_stack_p(bt,FRAME)) {
-        print_back_trace(stream_,bt,++count);
-        terpri(stream_);
-        bt = bt->bt_next;
-      }
-      FRAME = print_stackitem(stream_,FRAME);
     }
-    elastic_newline(stream_);
   }
   skipSTACK(1); /* drop *STANDARD-OUTPUT* */
   return count;
@@ -1533,17 +1527,25 @@ LISPFUN(show_stack,seclass_default,0,3,norest,nokey,0,NIL)
                                    : test_framepointer_arg());
   var uintL frame_limit = (missingp(STACK_0) ? (skipSTACK(1), 0) :
                            uint32_p(STACK_0) ? I_to_uint32(popSTACK())
-                           : (fehler_uint32(popSTACK()), 0));
+                           : (error_uint32(popSTACK()), 0));
   var climb_fun_t frame_up_x = (missingp(STACK_0)
                                 ? (skipSTACK(1), (climb_fun_t) NULL)
                                 : test_mode_arg(&frame_up_table[0]));
   VALUES1(UL_to_I(show_stack(frame_up_x,frame_limit,start_frame)));
 }
 
-/* For debugging: From within gdb, type: call ext_show_stack().
+/* For debugging: From within gdb, type: call gdb_show_stack().
    Equivalent to (ext:show-stack) from the Lisp prompt. */
-global void ext_show_stack (void) {
+global void gdb_show_stack (void) {
   pushSTACK(unbound); pushSTACK(unbound); pushSTACK(unbound); C_show_stack();
+}
+
+/* Fore debugging: From within gdb, type: call gdb_disassemble_closure(obj).
+   Equivalent to (sys::disassemble-closures obj *standard-output*). */
+global void gdb_disassemble_closure (object obj) {
+  pushSTACK(obj); pushSTACK(Symbol_value(S(standard_output)));
+  funcall(S(disassemble_closures),2);
+  pushSTACK(Symbol_value(S(standard_output))); terpri(&STACK_0); skipSTACK(1);
 }
 
 LISPFUNN(crash,0)
@@ -1553,24 +1555,33 @@ LISPFUNN(crash,0)
 }
 
 LISPFUNN(proom,0)
-{ /* (SYSTEM::%ROOM), returns 3 values:
-     - room occupied by LISP-objects
-     - room free for LISP-objects
-     - room statically occupied by LISP-objects
+{ /* (SYSTEM::%ROOM), returns 6 values:
+     - room occupied by LISP-objects (bytes)
+     - room free for LISP-objects (bytes)
+     - room statically occupied by LISP-objects (bytes)
+     - GC count
+     - total space freed by GC (bytes)
+     - total time spent in GC (internal time units)
      do it in more detail at SPVW_PAGES?? */
-  var uintM n1 = used_space();
-  var uintM n2 = free_space();
-  var uintM n3 = static_space();
-  pushSTACK(uintM_to_I(n1));
-  pushSTACK(uintM_to_I(n2));
-  pushSTACK(uintM_to_I(n3));
-  STACK_to_mv(3);
+  pushSTACK(uintM_to_I(used_space()));
+  pushSTACK(uintM_to_I(free_space()));
+  pushSTACK(uintM_to_I(static_space()));
+  pushSTACK(UL_to_I(gc_count));
+ #ifdef intQsize
+  pushSTACK(UQ_to_I(gc_space));
+ #else
+  pushSTACK(UL2_to_I(gc_space.hi,gc_space.lo));
+ #endif
+  pushSTACK(internal_time_to_I(&gc_time));
+  STACK_to_mv(6);
 }
 
-LISPFUNN(gc,0)
-{ /* execute a GC and return the free space for LISP-objects (in bytes) */
-  gar_col();                  /* execute GC */
-  VALUES1(UL_to_I(free_space()));
+LISPFUN(gc,seclass_default,0,1,norest,nokey,0,NIL)
+{ /* execute a GC and return the same values as %ROOM
+   with an argument, invalidate JITC objects */
+  var object arg = popSTACK();
+  PERFORM_GC(gar_col(missingp(arg) ? 0 : 1),true); /* execute GC */
+  C_proom();
 }
 
 /* rewrite read-form, in collaboration with the terminal-stream?? */

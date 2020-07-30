@@ -1,6 +1,6 @@
 ;;; Sources for CLISP DEFSTRUCT macro
 ;;; Bruno Haible 1988-2005
-;;; Sam Steingold 1998-2005
+;;; Sam Steingold 1998-2006, 2010
 ;;; German comments translated into English: Stefan Kain 2003-01-14
 
 (in-package "SYSTEM")
@@ -362,10 +362,9 @@
                           keyflag keywords keyvars keyinits keysvars
                           allow-other-keys auxvars auxinits)
         (analyze-lambdalist arglist
-          #'(lambda (detail errorstring &rest arguments)
-              (error-of-type 'source-program-error
-                :form whole-form
-                :detail detail
+          #'(lambda (lalist detail errorstring &rest arguments)
+              (declare (ignore lalist)) ; use WHOLE-FORM instead
+              (sys::lambda-list-error whole-form detail
                 (TEXT "~S ~S: In ~S argument list: ~A")
                 'defstruct name ':constructor
                 (apply #'format nil errorstring arguments))))
@@ -619,12 +618,7 @@
       (setq name (first name-and-options))
       (setq options (rest name-and-options)))
     ;; otherwise, name and options are already correct.
-    (unless (symbolp name)
-      (error-of-type 'source-program-error
-        :form whole-form
-        :detail name
-        (TEXT "~S: invalid syntax for name and options: ~S")
-        'defstruct name-and-options))
+    (setq name (check-not-declaration name 'defstruct))
     ;; name is a symbol, options is the list of options.
     ;; processing the options:
     (dolist (option options)
@@ -1195,13 +1189,13 @@
         (setf (clos::class-instance-size class) new-value)))))
 |#
 
-(defun structure-kconstructor (name)
+(defun structure-keyword-constructor (name)
   (let ((desc (get name 'DEFSTRUCT-DESCRIPTION)))
     (if desc
       (svref desc *defstruct-description-kconstructor-location*)
       (clos::class-kconstructor (find-class name)))))
 #|
- (defun (setf structure-kconstructor) (new-value name)
+ (defun (setf structure-keyword-constructor) (new-value name)
   (let ((desc (get name 'DEFSTRUCT-DESCRIPTION)))
     (if desc
       (setf (svref desc *defstruct-description-kconstructor-location*) new-value)
@@ -1253,7 +1247,7 @@
     (macrolet ((fmakunbound-if-present (symbol-form)
                  `(let ((symbol ,symbol-form))
                     (when symbol (fmakunbound symbol)))))
-      (fmakunbound-if-present (structure-kconstructor name))
+      (fmakunbound-if-present (structure-keyword-constructor name))
       (mapc #'fmakunbound (structure-boa-constructors name))
       (fmakunbound-if-present (structure-copier name))
       (fmakunbound-if-present (structure-predicate name))

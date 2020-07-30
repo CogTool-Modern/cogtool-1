@@ -1,7 +1,7 @@
 ;;; Matlab API interface
 ;;; <http://www.mathworks.com/access/helpdesk/help/techdoc/apiref/apiref.shtml>
 ;;;
-;;; Copyright (C) 2004-2005 by Sam Steingold
+;;; Copyright (C) 2004-2008 by Sam Steingold
 ;;; This is Free Software, covered by the GNU GPL (v2)
 ;;; See http://www.gnu.org/copyleft/gpl.html
 
@@ -9,8 +9,8 @@
   (:modern t)
   (:use "COMMON-LISP" "FFI")
   (:shadowing-import-from "EXPORTING"
-           #:defconstant #:defun #:defmacro #:defvar
-           #:def-c-type #:def-c-enum #:def-c-struct #:def-c-var #:def-call-out))
+    #:defconstant #:defun #:defmacro #:defvar
+    #:def-c-type #:def-c-enum #:def-c-struct #:def-c-var #:def-call-out))
 
 (in-package "MATLAB")
 
@@ -21,7 +21,7 @@
 
 ;;; foreign function definitions
 
-(ffi:default-foreign-language :stdc)
+(default-foreign-language :stdc)
 
 ;;; --- Engine ---
 (c-lines "#include <engine.h>~%")
@@ -433,4 +433,6 @@
   (:arguments (array_ptr (c-pointer mxArray))))
 
 
+(pushnew :matlab *features*)
 (provide "matlab")
+(pushnew "MATLAB" custom:*system-package-list* :test #'string=)

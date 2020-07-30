@@ -1,6 +1,52 @@
 ;; run the test suit:
 
+;;; --- helpers for misc tests ---
 (defun princ-error (c) (format t "~&[~A]: ~A~%" (type-of c) c))
+(defun show (object &key ((:pretty *print-pretty*) *print-pretty*))
+  "Print the object on its own line and return it. Used in many tests!"
+  (fresh-line) (prin1 object) (terpri) object)
+#+clisp (progn
+(defun kill-down (name)
+  (dolist (f (directory (ext:string-concat name "**/*")))
+    (format t "~&removing file ~S~%" f)
+    (delete-file f)))
+(defun rmrf (name)
+  (ext:dir (ext:string-concat name "**/*"))
+  (ext:dir (ext:string-concat name "**/"))
+  (kill-down name)
+  (dolist (d (directory (ext:string-concat name "**/")))
+    (format t "~&removing directory ~S~%" d)
+    (ext:delete-directory d)))
+(defun prepare-directory (name)
+  (ensure-directories-exist name :verbose t)
+  (kill-down name))
+(defun cmd-args ()
+  "command and arg list for cloning this clisp process"
+  (let* ((argv (ext:argv))
+         (lispinit (aref argv (1+ (position "-M" argv :test #'string=)))))
+    (values (aref argv 0)
+            (list "-q" "-norc" "-B" (namestring *lib-directory*) "-M"
+                  (namestring (merge-pathnames lispinit *lib-directory*))))))
+(export '(kill-down rmrf prepare-directory cmd-args))
+)
+(defun show-file (file)         ; return line count
+  (with-open-file (st file :direction :input)
+    (format t "~&~S: ~:D byte~:P:~%" file (file-length st))
+    (loop :for l = (read-line st nil nil) :while l :count t
+      :do (format t "--> ~S~%" l))))
+(defun finish-file (file) (prog1 (show-file file) (delete-file file)))
+(defun post-compile-file-cleanup (file)
+  (delete-file file)
+  (delete-file (compile-file-pathname file))
+  #+clisp (delete-file (make-pathname :type "lib" :defaults file)))
+(defun symbol-cleanup (s)
+  (setf (find-class s) nil) (makunbound s) (fmakunbound s) (unintern s))
+(defvar *run-test-truename*)
+;; export symbols used by tests
+(export '(princ-error show show-file finish-file post-compile-file-cleanup
+          type-error-handler
+          symbol-cleanup *run-test-truename* with-ignored-errors diff-seq))
+;;; end helpers
 
 #+OLD-CLISP
 ;; Binding *ERROR-HANDLER* is a hammer technique for catching errors. It also
@@ -73,6 +119,22 @@
                (error "eval: ~S; compile: ~S" e-value c-value))
              e-value))))
 
+;; compare 2 sequences:
+;; list of (pos first second);
+;; last 3 elements can be smaller length, tail1, tail2
+(defun diff-seq (s1 s2 &key (test #'eql))
+  (let ((pos 0))
+    (nconc
+     (delete nil
+             (map 'list (lambda (e1 e2)
+                          (prog1 (unless (funcall test e1 e2)
+                                   (list pos e1 e2))
+                            (incf pos)))
+                  s1 s2))
+     (let ((l1 (length s1)) (l2 (length s2)))
+       (cond ((< l1 l2) (list l1 nil (subseq s2 l1)))
+             ((< l2 l1) (list l2 (subseq s1 l2) nil)))))))
+
 (defgeneric pretty-compare (result my-result log)
   (:documentation "print a pretty comparison of two results")
   (:method ((result sequence) (my-result sequence) (log stream))
@@ -102,10 +164,6 @@
         (format log "~&~S:~%CORRECT: ~S~%~7A: ~S~%~:[ DIFFERENT!~;same~]~%"
                 slot s-r lisp-implementation s-m (equal s-r s-m)))))
   (:method ((result t) (my-result t) (log stream)))) ; do nothing
-
-(defun show (object &key ((:pretty *print-pretty*) *print-pretty*))
-  "Print the object on its own line and return it. Used in many tests!"
-  (fresh-line) (prin1 object) (terpri) object)
 
 (defun type-error-handler (err)
   "Print the condition and THROW.
@@ -149,7 +207,8 @@ NIL: sacla-style: forms should evaluate to non-NIL.")
                              my-result error-message)
                  (pretty-compare result my-result log)
                  (format log "~[~*~:;OUT:~%~S~%~]~[~*~:;ERR:~%~S~]~2%"
-                         (length out) out (length err) err))))))
+                         (length out) out (length err) err)
+                 (force-output log))))))
     (values total-count error-count)))
 
 (defmacro check-ignore-errors (&body body)
@@ -201,19 +260,22 @@ NIL: sacla-style: forms should evaluate to non-NIL.")
                    (format log "~&Form: ~S~%CORRECT: ~S~%~7A: ~S~%~
                                 ~[~*~:;OUT:~%~S~%~]~[~*~:;ERR:~%~S~]~2%"
                                form errtype lisp-implementation my-result
-                               (length out) out (length err) err)))))))
+                               (length out) out (length err) err)
+                   (force-output log)))))))
     (values total-count error-count)))
 
 (defvar *run-test-tester* #'do-test)
 (defvar *run-test-type* "tst")
 (defvar *run-test-erg* "erg")
-(defvar *run-test-truename*)
+(defvar *run-test-own-package* t)
 (defun run-test (testname
                  &key ((:tester *run-test-tester*) *run-test-tester*)
                       ((:ignore-errors *test-ignore-errors*)
                         *test-ignore-errors*)
                       ((:eval-method *eval-method*) *eval-method*)
                       (logname testname)
+                      ((:own-package *run-test-own-package*)
+                       *run-test-own-package*)
                  &aux (logfile (merge-extension *run-test-erg* logname))
                       error-count total-count *run-test-truename*)
   (with-open-file (s (merge-extension *run-test-type* testname)
@@ -225,42 +287,129 @@ NIL: sacla-style: forms should evaluate to non-NIL.")
                                  #+(or CMU SBCL) :supersede
                                  #+ANSI-CL :if-exists #+ANSI-CL :new-version)
       (setq logfile (truename log))
-      (let* ((*package* *package*) (*print-circle* t) (*print-pretty* nil)
+      (let* ((*package*
+              (if *run-test-own-package*
+                  (make-package (namestring logfile)
+                                :use (cons *package*
+                                           (package-use-list *package*)))
+                  *package*))
+             (*print-circle* t) (*print-pretty* nil)
              (*eval-err* (make-string-output-stream))
              (*error-output* (make-broadcast-stream *error-output* *eval-err*))
              (*eval-out* (make-string-output-stream))
              (*standard-output* (make-broadcast-stream *standard-output*
                                                        *eval-out*)))
         (setf (values total-count error-count)
-              (funcall *run-test-tester* s log)))))
+              (funcall *run-test-tester* s log))
+        (when *run-test-own-package*
+          (delete-package *package*)))))
   (format t "~&~s: finished ~s (~:d error~:p out of ~:d test~:p)~%"
           'run-test testname error-count total-count)
   (if (zerop error-count)
       (delete-file logfile)
       (format t "~s: see ~a~%" 'run-test logfile))
-  (list testname total-count error-count))
+  (list logname total-count error-count))
 
-(defun report-results (res)
+(defun report-results (res &key (here (truename "./")))
   "res = list of RUN-TEST return values (testname total-count error-count)"
   (let ((error-count (reduce #'+ res :key #'third)))
     (format
-     t "~&finished ~3d file~:p:~31T ~3:d error~:p out of~50T ~5:d test~:p~%"
+     t "~&finished ~3d file~:p:~31T ~3:d error~:p out of~50T ~6:d test~:p~%"
      (length res) error-count (reduce #'+ res :key #'second))
-    (loop :with here = (truename "./") :for rec :in res :for count :upfrom 1 :do
-      (format t "~&~3d ~25@a:~31T ~3:d error~:p out of~50T ~5:d test~:p~%"
+    (loop :for rec :in res :for count :upfrom 1 :do
+      (format t "~&~3d ~25@a:~31T ~3:d error~:p out of~50T ~6:d test~:p~%"
               count (enough-namestring (first rec) here)
               (third rec) (second rec)))
     error-count))
 
-(defun run-some-tests (&key (dirlist '("./"))
-                       ((:eval-method *eval-method*) *eval-method*))
+;; see makemake.in:
+;; (run-some-tests :dirlist '("zlib" "pcre") :srcdir "../modules/")
+(defun run-some-tests (&key (dirlist '("./")) (srcdir "./") (outdir "./")
+                       ((:eval-method *eval-method*) *eval-method*)
+                       &aux #+clisp (custom:*merge-pathnames-ansi* t))
+  "Run tst files in DIRLIST under SRCDIR, writing erg under OUTDIR."
   (let ((files (mapcan (lambda (dir)
-                         (directory (make-pathname :name :wild
-                                                   :type *run-test-type*
-                                                   :defaults dir)))
-                       dirlist)))
-    (if files (report-results (mapcar #'run-test files))
+                         (directory (make-pathname
+                                     :name :wild :type *run-test-type*
+                                     :defaults (merge-pathnames dir srcdir))))
+                       dirlist))
+        (src-true (truename srcdir)))
+    (if files
+        (report-results
+         (mapcar (lambda (file)
+                   (run-test file :logname
+                             (merge-pathnames (enough-namestring file src-true)
+                                              outdir)))
+                 files)
+         :here outdir)
         (warn "no ~S files in directories ~S" *run-test-type* dirlist))))
+
+(defparameter *all-tests*
+  '(#-(or AKCL ECL)   ("alltest")
+                      ("array")
+    #-OpenMCL         ("backquot")
+    #+CLISP           ("bin-io")
+    #-(and AKCL (not GCL)) ("characters")
+    #+(or CLISP ALLEGRO CMU OpenMCL LISPWORKS) ("clos")
+    #+CLISP           ("defhash")
+    #+(and CLISP UNICODE) ("encoding")
+                      ("eval20")
+    #+CLISP           ("ext-clisp")
+    #+(and CLISP FFI) ("ffi")
+                      ("floeps")
+    #-OpenMCL         ("format")
+    #+CLISP           ("genstream")
+    #+XCL             ("hash")
+                      ("hashlong")
+    #+CLISP           ("hashtable")
+                      ("iofkts")
+                      ("lambda")
+                      ("lists151")
+    #-(or GCL OpenMCL) ("lists152")
+                      ("lists153")
+                      ("lists154")
+                      ("lists155")
+                      ("lists156")
+                      ("list-set")
+    #+(or CLISP GCL ALLEGRO CMU SBCL OpenMCL LISPWORKS) ("loop")
+                      ("macro8")
+                      ("map")
+    #+(or CLISP ALLEGRO OpenMCL LISPWORKS) ("mop")
+                      ("number")
+    #+CLISP           ("number2")
+    #-(or AKCL ALLEGRO CMU OpenMCL) ("pack11")
+    #+(or XCL CLISP)  ("path")
+    #+XCL             ("readtable")
+    #-CMU             ("setf")
+    #+(and CLISP SOCKETS) ("socket")
+                      ("steele7")
+    #-ALLEGRO         ("streams")
+                      ("streamslong")
+                      ("strings")
+    #-(or AKCL ECL)   ("symbol10")
+                      ("symbols")
+                      ("time")
+    #+XCL             ("tprint")
+    #+XCL             ("tread")
+                      ("type")
+    #-(or)            ("unportable")
+    #+(and CLISP mt)  ("mt")
+    #+CLISP           ("weak")
+    #+(or CLISP ALLEGRO CMU19 OpenMCL LISPWORKS) ("weakhash")
+    #+(or CLISP LISPWORKS) ("weakhash2")
+                      ("bind" :eval-method :eval :logname "bind-eval")
+                      ("bind" :eval-method :compile :logname "bind-compile")
+    #+(or CLISP ALLEGRO CMU LISPWORKS) ("conditions" :ignore-errors nil)
+    #+CLISP           ("restarts" :ignore-errors nil)
+                      ("excepsit" :tester do-errcheck)
+    ))
+
+(defun test-weakptr ()
+  (let ((tmp (list "weakptr" 0 0)))
+    (dotimes (i 20 tmp)
+      (let ((weak-res (run-test "weakptr")))
+        (incf (second tmp) (second weak-res))
+        (incf (third tmp) (third weak-res))))))
 
 (defun run-all-tests (&key (disable-risky t)
                       ((:eval-method *eval-method*) *eval-method*))
@@ -268,68 +417,35 @@ NIL: sacla-style: forms should evaluate to non-NIL.")
         #+CLISP (custom:*load-paths* nil)
         (*features* (if disable-risky *features*
                         (cons :enable-risky-tests *features*))))
-    (dolist (ff '(#-(or AKCL ECL)   "alltest"
-                                    "array"
-                  #-OpenMCL         "backquot"
-                  #+CLISP           "bin-io"
-                  #-(and AKCL (not GCL)) "characters"
-                  #+(or CLISP ALLEGRO CMU OpenMCL LISPWORKS) "clos"
-                  #+CLISP           "defhash"
-                  #+(and CLISP UNICODE) "encoding"
-                                    "eval20"
-                  #+(and CLISP FFI) "ffi"
-                                    "floeps"
-                  #-OpenMCL         "format"
-                  #+CLISP           "genstream"
-                  #+XCL             "hash"
-                                    "hashlong"
-                  #+CLISP           "hashtable"
-                                    "iofkts"
-                                    "lambda"
-                                    "lists151"
-                  #-(or GCL OpenMCL) "lists152"
-                                    "lists153"
-                                    "lists154"
-                                    "lists155"
-                                    "lists156"
-                  #+(or CLISP GCL ALLEGRO CMU SBCL OpenMCL LISPWORKS) "loop"
-                                    "macro8"
-                                    "map"
-                  #+(or CLISP ALLEGRO OpenMCL LISPWORKS) "mop"
-                                    "number"
-                  #+CLISP           "number2"
-                  #-(or AKCL ALLEGRO CMU OpenMCL) "pack11"
-                  #+(or XCL CLISP)  "path"
-                  #+XCL             "readtable"
-                  #-CMU             "setf"
-                  #+(and CLISP SOCKETS) "socket"
-                                    "steele7"
-                  #-ALLEGRO         "streams"
-                                    "streamslong"
-                                    "strings"
-                  #-(or AKCL ECL)   "symbol10"
-                                    "symbols"
-                                    "time"
-                  #+XCL             "tprint"
-                  #+XCL             "tread"
-                                    "type"
-                  #+CLISP           "weak"
-                  #+(or CLISP ALLEGRO CMU19 OpenMCL LISPWORKS) "weakhash"
-                  #+(or CLISP LISPWORKS) "weakhash2"))
-      (push (run-test ff) res))
-    (unless disable-risky ; fails on amd64 - disable for now...
-      (push (run-test "bind" :eval-method :eval :logname "bind-eval") res))
-    (push (run-test "bind" :eval-method :compile :logname "bind-compile") res)
+    (dolist (args *all-tests*)
+      (push (apply #'run-test args) res))
     #+(or CLISP ALLEGRO CMU SBCL LISPWORKS)
-    (let ((tmp (list "weakptr" 0 0)))
-      (push tmp res)
-      (dotimes (i 20)
-        (let ((weak-res (run-test "weakptr")))
-          (incf (second tmp) (second weak-res))
-          (incf (third tmp) (third weak-res)))))
-    #+(or CLISP ALLEGRO CMU LISPWORKS)
-    (push (run-test "conditions" :ignore-errors nil) res)
-    #+CLISP
-    (push (run-test "restarts" :ignore-errors nil) res)
-    (push (run-test "excepsit" :tester #'do-errcheck) res)
+    (push (test-weakptr) res)
     (report-results (nreverse res))))
+
+#+(and clisp mt)
+(defun run-all-tests-parallel (&key (concurrency 5) (disable-risky t)
+                               ((:eval-method *eval-method*) *eval-method*))
+  (let ((res ()) (lock (mt:make-mutex :name "res"))
+        (total (1+ (length *all-tests*)))
+        (custom:*load-paths* nil)
+        (*features* (if disable-risky *features*
+                        (cons :enable-risky-tests *features*))))
+    (macrolet ((run (body)
+                 `(mt:make-thread
+                   (lambda ()
+                     (let ((ans ,body))
+                       (mt:with-mutex-lock (lock)
+                         (push ans res))))
+                   :cstack-size 16777216)))
+      (dolist (args *all-tests*)
+        (let ((args args))
+          ;; this is "poor man" concurrency control - not exact at all
+          (loop until
+            (>= concurrency
+                (count t (mapcar #'mt:thread-active-p (mt:list-threads))))
+             :do (sleep 1))
+          (run (apply #'run-test args))))
+      (run (test-weakptr))
+      (loop :until (= total (length res)) :do (sleep 1))
+      (report-results (nreverse res)))))

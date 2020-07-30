@@ -18,7 +18,7 @@ clean:
 
 convert: phase-1 phase-2 phase-3 phase-4 phase-5 # phase-6
 
-PATCHED=$(shell egrep '^---' *-patch | sed -e 's,^[^/]*/,,' -e 's,	.*$$,,')
+PATCHED=$(shell egrep '^---' *.patch | sed -e 's,^[^/]*/,,' -e 's,	.*$$,,')
 undo:
 	cd ../../src; for f in *.ORIG; do mv -fv $$f `basename $$f .ORIG`; done
 	cd ../;       for f in *.ORIG; do mv -fv $$f `basename $$f .ORIG`; done
@@ -30,7 +30,7 @@ undo:
 phase-1: $(addprefix convert-,$(conversions))
 
 apply-patch-1:
-	cd ../..; patch -p1 < $(here)/phase-1-patch
+	cd ../..; patch -p1 < $(here)/phase-1.patch
 
 convert-%: comment5 apply-patch-1
 	cd ../../$*; \
@@ -46,7 +46,7 @@ comment5: ../comment5.c
 undo-phase-1:
 	cd ../../utils; for f in *.d; do mv $$f.ORIG $$f; done
 	cd ../../src; for f in *.d; do mv $$f.ORIG $$f; done
-	cd ../..; patch -R -p1 < $(here)/phase-1-patch
+	cd ../..; patch -R -p1 < $(here)/phase-1.patch
 
 # Phase Two: get rid of the idiosyncratic control-structure macros,
 # elif, until, and loop.
@@ -69,7 +69,7 @@ undo-phase-2:
 phase-3: $(addprefix var-global-and-local-,$(conversions))
 
 apply-patch-3:
-	cd ../..; patch -p1 < $(here)/phase-3-patch
+	cd ../..; patch -p1 < $(here)/phase-3.patch
 
 var-global-and-local-%: apply-patch-3
 	cd ../../$*;						  \
@@ -81,7 +81,7 @@ var-global-and-local-%: apply-patch-3
 undo-phase-3:
 	cd ../../src; for f in *.d; do mv $$f.PHASE-2 $$f; done
 	cd ../../utils; for f in *.d; do mv $$f.PHASE-2 $$f; done
-	cd ../..; patch -R -p1 < $(here)/phase-3-patch
+	cd ../..; patch -R -p1 < $(here)/phase-3.patch
 
 
 # Phase Four: run ansidecl to finally make .c files.
@@ -95,7 +95,7 @@ phase-4: ansidecl apply-patch-4
 	done
 
 apply-patch-4:
-	cd ../../; patch -p1 < $(here)/phase-4-patch
+	cd ../../; patch -p1 < $(here)/phase-4.patch
 
 ansidecl: ansidecl.c
 	gcc -o $@ $<

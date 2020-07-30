@@ -5,7 +5,7 @@
         John Hinsdale, Alma Mater Software, Inc.
         hin@alma.com
 
-        $Id: README,v 1.6 2003/10/08 18:05:35 sds Exp $
+        $Id: README,v 1.7 2008/05/08 02:28:34 sds Exp $
 
 This is the README for a low-level, but complete and functional module
 for CLISP that allows one to use CLISP to program Oracle database
@@ -108,7 +108,7 @@ help.
 
 It is recommended to build a separate Lisp containing the Oracle
 module in a build other than the default "src" subdirctory.  This is
-easily done by running CLISP's "configure" script with the --build
+easily done by running CLISP's "configure" script with the --cbc
 option, as well as the option to include the Oracle module.  The build
 will be done in a separate area from any other CLISP builds of the
 same source base.  The command I use is:
@@ -122,7 +122,7 @@ same source base.  The command I use is:
        --with-module=regexp                     \
        --with-module=bindings/glibc             \
        --with-module=oracle                     \
-       --build oralisp
+       --cbc oralisp
 
 If all goes well, this will build a complete Lisp in
         /path/to/clisp/oralisp/full

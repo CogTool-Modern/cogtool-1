@@ -1,7 +1,7 @@
 /*
  * List of all relocatable machine pointers
- * Bruno Haible 1990-2004
- * Sam Steingold 2005
+ * Bruno Haible 1990-2008
+ * Sam Steingold 2005, 2007
  */
 
 /* There are three kinds of relocatable pointers:
@@ -97,15 +97,12 @@ LPSEUDOCODE(rd_by_iau_buffered) LPSEUDOCODE(rd_by_ias_buffered) LPSEUDOCODE(rd_b
 LPSEUDOCODE(rd_by_array_iau8_buffered)
 LPSEUDOCODE(wr_by_iau_buffered) LPSEUDOCODE(wr_by_ias_buffered) LPSEUDOCODE(wr_by_ibu_buffered) LPSEUDOCODE(wr_by_ibs_buffered) LPSEUDOCODE(wr_by_icu_buffered) LPSEUDOCODE(wr_by_ics_buffered) LPSEUDOCODE(wr_by_iau8_buffered)
 LPSEUDOCODE(wr_by_array_iau8_buffered)
-#if defined(KEYBOARD) || defined(MAYBE_NEXTAPP)
+#if defined(KEYBOARD)
 LPSEUDOCODE(rd_ch_keyboard)
-#endif
-#if defined(MAYBE_NEXTAPP)
-LPSEUDOCODE(wr_ch_terminal) LPSEUDOCODE(rd_ch_terminal)
 #endif
 #ifdef UNIX
 LPSEUDOCODE(wr_ch_terminal1) LPSEUDOCODE(rd_ch_terminal1) LPSEUDOCODE(wr_ch_array_terminal1)
-#if defined(GNU_READLINE) || defined(MAYBE_NEXTAPP)
+#if defined(GNU_READLINE)
 LPSEUDOCODE(wr_ch_terminal3) LPSEUDOCODE(rd_ch_terminal3) LPSEUDOCODE(wr_ch_array_terminal3)
 #endif
 #endif
@@ -117,7 +114,7 @@ LPSEUDOCODE(wr_ch_printer)
 #endif
 
 /* External definitions from ENCODING.D: */
-#ifdef UNICODE
+#ifdef ENABLE_UNICODE
 XPSEUDOCODE(object, base64_range, (object encoding, uintL start, uintL end, uintL maxintervals))
 XPSEUDOCODE(uintL, base64_mblen, (object encoding, const uintB* src, const uintB* srcend))
 XPSEUDOCODE(void, base64_mbstowcs, (object encoding, object stream, const uintB* *srcp, const uintB* srcend, chart* *destp, chart* destend))
@@ -220,7 +217,6 @@ XPSEUDODATA(struct nls_table_t, nls_cp1254_table)
 XPSEUDODATA(struct nls_table_t, nls_cp1256_table)
 XPSEUDODATA(struct nls_table_t, nls_cp1257_table)
 XPSEUDODATA(struct nls_table_t, nls_hp_roman8_table)
-XPSEUDODATA(struct nls_table_t, nls_nextstep_table)
 XPSEUDODATA(struct nls_table_t, nls_jisx0201_table)
 #ifdef HAVE_GOOD_ICONV
 XPSEUDOCODE(uintL, iconv_mblen, (object encoding, const uintB* src, const uintB* srcend))

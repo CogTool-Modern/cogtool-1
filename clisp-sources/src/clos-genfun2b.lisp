@@ -2,7 +2,7 @@
 ;;;; Generic Functions
 ;;;; Part 2: Generic function dispatch and execution
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2004
+;;;; Sam Steingold 1998-2004, 2007-2008, 2010
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -88,12 +88,18 @@
       (error (TEXT "~S: ~S has ~S required argument~:P")
              'compute-applicable-methods-effective-method-for-set gf req-num))))
 
+(defun effective-method-function-name (gf methods)
+  (sys::symbol-suffix
+   (sys::closure-name gf)
+   (ext:string-concat "<EMF-" (princ-to-string (length methods)) ">")))
+
 (defun compute-effective-method-as-function (gf methods args)
   (when (null methods)
     (return-from compute-effective-method-as-function
       (no-method-caller 'no-applicable-method gf)))
   ;; Apply method combination:
-  (let ((ef-fun (compute-effective-method-as-function-form gf (safe-gf-method-combination gf) methods args)))
+  (let ((ef-fun (compute-effective-method-as-function-form
+                 gf (safe-gf-method-combination gf) methods args)))
     ;; Evaluate or compile the resulting form:
     (if (constantp ef-fun) ; constant or self-evaluating form?
       ;; No need to invoke the compiler for a constant form.
@@ -101,7 +107,9 @@
       ;; For a general form:
       ;; (eval ef-fun)                                 ; interpreted
       ;; (eval `(LOCALLY (DECLARE (COMPILE)) ,ef-fun)) ; compiled
-      (eval `(LET () (DECLARE (COMPILE) (INLINE FUNCALL APPLY))
+      (eval `(LET ()
+               (DECLARE (COMPILE ,(effective-method-function-name gf methods))
+                        (INLINE FUNCALL APPLY))
                ,ef-fun)))))
 
 (defun no-method-caller (no-method-name gf)
@@ -133,14 +141,20 @@
 ;;   )        )
 
 ;; Preliminary.
-(defun compute-discriminating-function (gf)
+(predefun compute-discriminating-function (gf)
   (compute-discriminating-function-<generic-function> gf))
+
+(defun compile-no-jitc (name &optional suffix)
+  (cons `(COMPILE ,(if suffix (sys::symbol-suffix name suffix) name))
+        '((OPTIMIZE (SPEED 0) (SPACE 3)))))
 
 (defun compute-discriminating-function-<generic-function> (gf)
   (multiple-value-bind (bindings lambdabody) (compute-dispatch gf)
     (let ((preliminary
             (eval `(LET ,bindings
-                     (DECLARE ,@(safe-gf-declspecs gf) (COMPILE))
+                     (DECLARE ,@(safe-gf-declspecs gf)
+                              ,@(compile-no-jitc (sys::closure-name gf)
+                                                 'preliminary))
                      (%GENERIC-FUNCTION-LAMBDA ,@lambdabody)))))
       (assert (<= (sys::%record-length preliminary) 3))
       preliminary)))
@@ -171,8 +185,7 @@
           (DECLARE (INLINE FUNCALL))
           (FUNCALL 'NO-METHOD-CALLER 'NO-APPLICABLE-METHOD ',gf)))))
   (let* ((signature (safe-gf-signature gf))
-         (req-anz (sig-req-num signature))
-         (req-vars (gensym-list req-anz))
+         (req-vars (gensym-list (sig-req-num signature)))
          (restp (gf-sig-restp signature))
          (rest-var (if restp (gensym)))
          (apply-fun (if restp 'APPLY 'FUNCALL))
@@ -534,8 +547,8 @@
   ;; Check the lambda-list.
   (let* ((signature
            (generic-function-lambda-list-to-signature lambdalist
-             #'(lambda (detail errorstring &rest arguments)
-                 (funcall errfunc detail
+             #'(lambda (lalist detail errorstring &rest arguments)
+                 (funcall errfunc lalist detail
                           (TEXT "Invalid generic function lambda-list: ~A")
                           (apply #'format nil errorstring arguments)))))
          (reqnum (sig-req-num signature))
@@ -582,11 +595,12 @@
       method (sig-opt-num m-sign) gf (sig-opt-num gf-sign)))
   (when (and (sig-rest-p m-sign) (not (sig-rest-p gf-sign)))
     (error-of-type 'error
-      #1=(TEXT "~S accepts &REST or &KEY, but ~S does not.")
+      (TEXT "~S accepts &REST or &KEY, but ~S does not.")
       method gf))
   (when (and (sig-rest-p gf-sign) (not (sig-rest-p m-sign)))
     (error-of-type 'error
-      #1# gf method))
+      (TEXT "~S accepts &REST or &KEY, but ~S does not.")
+      gf method))
   (when (sig-keys-p gf-sign)    ; gf has keywords?
     ;; yes ==> method must accept it
     (unless (if (sig-keys-p m-sign)
@@ -765,8 +779,6 @@
 (defvar |#'slot-boundp-using-class| nil)
 (defvar |#'slot-makunbound-using-class| nil)
 
-(defvar *gf-warn-on-replacing-method* t)
-
 ;; More general notification.
 (defun map-dependents-<generic-function> (gf function)
   (dolist (dependent (gf-listeners gf))
@@ -818,9 +830,8 @@
   (warn-if-gf-already-called gf)
   (let ((old-method (find method (safe-gf-methods gf) :test #'methods-agree-p)))
     (when old-method
-      (when *gf-warn-on-replacing-method*
-        (warn (TEXT "Replacing method ~S in ~S")
-              old-method gf))
+      (clos-warn 'simple-gf-replacing-method-warning
+        (TEXT "Replacing method ~S in ~S") old-method gf)
       ;; Call remove-method without warnings.
       (let ((*dynamically-modifiable-generic-function-names*
               (cons (sys::closure-name gf) *dynamically-modifiable-generic-function-names*)))
@@ -864,17 +875,16 @@
   gf)
 
 ;; Preliminary.
-(defun add-method (gf method)
+(predefun add-method (gf method)
   (std-add-method gf method))
 
 ;; Remove a method from a generic function.
 (defun std-remove-method (gf method)
   (let ((old-method (find method (safe-gf-methods gf))))
     (when old-method
-      (warn-if-gf-already-called gf)
       (when (need-gf-already-called-warning-p gf)
-        (warn (TEXT "Removing method ~S in ~S")
-              old-method gf))
+        (gf-already-called-warning gf)
+        (clos-warning (TEXT "Removing method ~S in ~S") old-method gf))
       (cond ((eq gf |#'allocate-instance|) (note-ai-change method))
             ((eq gf |#'initialize-instance|) (note-ii-change method))
             ((eq gf |#'reinitialize-instance|) (note-ri-change method))
@@ -906,7 +916,7 @@
   gf)
 
 ;; Preliminary.
-(defun remove-method (gf method)
+(predefun remove-method (gf method)
   (std-remove-method gf method))
 
 ;; Find a method in a generic function.
@@ -1052,7 +1062,7 @@
 ;; ======================= Installing the Dispatch Code =======================
 
 #||
-(defun make-gf (generic-function-class name lambdabody lambda-list argument-precedence-order method-combination user-defined-args methods)
+ (defun make-gf (generic-function-class name lambdabody lambda-list argument-precedence-order method-combination user-defined-args methods)
   (let ((final
           (apply #'make-generic-function-instance generic-function-class
             :name name
@@ -1063,7 +1073,7 @@
                     user-defined-args)))
         (preliminary
          (eval `(LET ()
-                  (DECLARE (COMPILE))
+                  (DECLARE ,@(compile-no-jitc name))
                   (%GENERIC-FUNCTION-LAMBDA ,@lambdabody)))))
     (assert (<= (sys::%record-length preliminary) 3))
     (set-funcallable-instance-function final preliminary)
@@ -1087,7 +1097,7 @@
                      user-defined-args)))
          (preliminary
            (eval `(LET ((GF ',final))
-                    (DECLARE (COMPILE))
+                    (DECLARE ,@(compile-no-jitc name))
                     (%GENERIC-FUNCTION-LAMBDA (&REST ARGS)
                       (DECLARE (INLINE APPLY))
                       (APPLY 'SLOW-FUNCALL-GF GF ARGS))))))
@@ -1096,8 +1106,8 @@
     (setf (std-gf-methods final) methods)
     final))
 
-(flet ((prototype-factory (gf)
-           (declare (compile))
+ (flet ((prototype-factory (gf)
+           (declare ,@(compile-no-jitc (sys::closure-name gf)))
            (%generic-function-lambda (&rest args)
              (declare (inline apply))
              (apply 'slow-funcall-gf gf args))))
@@ -1135,11 +1145,11 @@
         (make-hash-table :key-type '(cons fixnum boolean) :value-type '(cons function (simple-array (unsigned-byte 8) (*)))
                          :test 'ext:stablehash-equal :warn-if-needs-rehash-after-gc t))
       (uninitialized-prototype-factory
-        (eval `#'(LAMBDA (GF)
-                   (DECLARE (COMPILE))
-                   (%GENERIC-FUNCTION-LAMBDA (&REST ARGS)
-                     (DECLARE (INLINE FUNCALL) (IGNORE ARGS))
-                     (FUNCALL 'NO-METHOD-CALLER 'NO-APPLICABLE-METHOD GF))))))
+       (eval `#'(LAMBDA (GF)
+                  (DECLARE ,@(compile-no-jitc 'uninitialized-prototype-factory))
+                  (%GENERIC-FUNCTION-LAMBDA (&REST ARGS)
+                    (DECLARE (INLINE FUNCALL) (IGNORE ARGS))
+                    (FUNCALL 'NO-METHOD-CALLER 'NO-APPLICABLE-METHOD GF))))))
   (defun finalize-fast-gf (gf)
     (let ((prototype-factory
             (if (safe-gf-undeterminedp gf)
@@ -1154,15 +1164,16 @@
                       (setf (gethash hash-key prototype-factory-table)
                             (let* ((reqvars (gensym-list reqnum))
                                    (prototype-factory
-                                     (eval `#'(LAMBDA (GF)
-                                                (DECLARE (COMPILE))
-                                                (%GENERIC-FUNCTION-LAMBDA
-                                                  (,@reqvars ,@(if restp '(&REST ARGS) '()))
-                                                  (DECLARE (INLINE FUNCALL) (IGNORABLE ,@reqvars ,@(if restp '(ARGS) '())))
-                                                  (FUNCALL 'INITIAL-FUNCALL-GF GF))))))
-                              (assert (<= (sys::%record-length (funcall prototype-factory 'dummy)) 3))
+                                    (eval `#'(LAMBDA (GF)
+                                               (DECLARE ,@(compile-no-jitc (sys::closure-name gf) 'prototype-factory))
+                                               (%GENERIC-FUNCTION-LAMBDA
+                                                (,@reqvars ,@(if restp '(&REST ARGS) '()))
+                                                (DECLARE (INLINE FUNCALL) (IGNORABLE ,@reqvars ,@(if restp '(ARGS) '())))
+                                                (FUNCALL 'INITIAL-FUNCALL-GF GF)))))
+                                   (dummy-f (funcall prototype-factory 'dummy)))
+                              (assert (<= (sys::%record-length dummy-f) 3))
                               (cons prototype-factory
-                                    (sys::closure-codevec (funcall prototype-factory 'dummy)))))))))))
+                                    (sys::closure-codevec dummy-f))))))))))
       (set-funcallable-instance-function gf (funcall prototype-factory gf))))
   (defun gf-never-called-p (gf)
     (or (safe-gf-undeterminedp gf)
@@ -1208,16 +1219,17 @@
       writer-method-class
       ;; Similar functions that are CLISP extensions.
       (setf method-generic-function) no-primary-method))
-  (defvar *warn-if-gf-already-called* t)
   (defun need-gf-already-called-warning-p (gf)
-    (and *warn-if-gf-already-called* (not (gf-never-called-p gf))
+    (and (not (gf-never-called-p gf))
          (not (member (sys::closure-name gf)
                       *dynamically-modifiable-generic-function-names*
                       :test #'equal))))
+  (defun gf-already-called-warning (gf)
+    (clos-warn 'simple-gf-already-called-warning
+      (TEXT "The generic function ~S is being modified, but has already been called.")
+      gf))
   (defun warn-if-gf-already-called (gf)
-    (when (need-gf-already-called-warning-p gf)
-      (warn (TEXT "The generic function ~S is being modified, but has already been called.")
-            gf)))
+    (when (need-gf-already-called-warning-p gf) (gf-already-called-warning gf)))
 ) ; let
 
 

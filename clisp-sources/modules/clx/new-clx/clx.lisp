@@ -1,11 +1,11 @@
-;;;; Copyright: (c) copyright 1996 by Gilbert Baumann, distributed under GPL.
+;;;; Copyright (C) 1996 by Gilbert Baumann
+;;;; Copyright (C) 2001-2008 by Sam Steingold
+;;;; Distributed under GPL.
 ;;;; Some parts are from the MIT-CLX Distribution, copyrighted by
 ;;;; Texas Instruments Incorporated, but freely distributable
 ;;;; for details see image.lisp or the MIT-CLX distribution.
 
-(defpackage "XLIB"
-  ;; (:use "COMMON-LISP" "CLOS")
-  (:import-from "SYS" "STRING-CONCAT"))
+(defpackage #:xlib)
 
 (provide "clx")
 
@@ -48,6 +48,7 @@
    define-keysym-set delete-property delete-resource destroy-subwindows
    destroy-window device-busy device-event-mask device-event-mask-class
    discard-current-event discard-font-info display display-after-function
+   display-authorization        ; extension
    display-authorization-data display-authorization-name
    display-bitmap-format display-byte-order display-default-screen
    display-display display-error-handler display-finish-output
@@ -124,8 +125,8 @@
    screen-min-installed-maps screen-p screen-plist screen-root
    screen-root-depth screen-root-visual screen-root-visual-info
    screen-save-unders-p screen-saver screen-white-pixel screen-width
-   screen-width-in-millimeters seg-seq selection-owner send-event
-   sequence-error set-input-focus
+   screen-width-in-millimeters seg-seq selection-owner set-selection-owner
+   send-event sequence-error set-input-focus
    set-modifier-mapping  set-screen-saver
    set-standard-colormap set-standard-properties
    set-wm-class set-wm-properties set-wm-resources state-keysym-p
@@ -168,6 +169,16 @@
    untrace-display show-trace
    display-trace ; for backwards compatibility describe-request describe-event describe-reply
    closed-display-p
+   ;; extensions
+   open-default-display with-open-display events-queued
+   display-get-default display-resource-manager-string screen-resource-string
+   *canonicalize-encoding*
+   ;;; Only when using libXt:
+   ;; last-event-processed last-timestamp-processed
+   ;;; Only when using the native resource database, not resource.lisp:
+   ;; display-xdefaults resource-database-to-string resource-database-of-string
+   ;; resource-database-locale
+   ;; not implemented
    describe-error describe-trace))
 
 ;;; SHAPE extension
@@ -178,7 +189,7 @@
 ;;;;  Types
 ;;;; --------------------------------------------------------------------------
 ;;;;
-;;;; Lots of deftypes randomly gathers from MIT-CLX implementation
+;;;; Lots of deftypes randomly gathered from MIT-CLX implementation
 ;;;;
 
 (deftype card4 ()       '(unsigned-byte 4))    ;not exported
@@ -323,8 +334,9 @@
   red-mask green-mask blue-mask
   bits-per-rgb
   colormap-entries
-  ;; There appears also a plist and a display slot in the MIT-CLX, but not in the manual
-  ;; To what should we be compatible?!
+  ;; There appears also a plist and a display slot in the MIT-CLX,
+  ;; but not in the manual!
+  ;; With what should we be compatible?!
   ;; plist display
   )
 
@@ -332,15 +344,34 @@
                     (:constructor nil)
                     (:copier nil)
                     (:conc-name %display-))
-  foreign-pointer ;; these two slots are for use in clx.d only.
-  hash-table      ;; .. so leave hands off here!
+  foreign-pointer ;; these two slots are for use in clx.f only.
+  hash-table      ;; .. so keep hands off here!
   plist
   after-function
-  error-handler)
+  error-handler
+  display)
+
+;; (defstruct (resource-database (:constructor %make-rdb (foreign-pointer)))
+;;   (foreign-pointer nil :read-only t))
+;; (defstruct (search-table (:constructor %make-search-table (foreign-pointer)))
+;;   (foreign-pointer nil :read-only t))
 
 ;; ***************************************************************************
-;; ... CAUTION ending here.
+;; ... CAUTION ending here (resume careless coding)
 ;; ***************************************************************************
+
+;; (eval-when (:compile-toplevel)
+;;   (defpackage #:posix (:export #:mkstemp)))
+;; (defun resource-database-to-string (rdb)
+;;   (let ((tmp-file (posix:mkstemp "/tmp/rdb")))
+;;     (close tmp-file)
+;;     (write-resources rdb tmp-file)
+;;     (unwind-protect
+;;         (with-open-file (in tmp-file)
+;;           (let ((st (make-string (file-length in))))
+;;             (read-sequence st in)
+;;             st))
+;;       (delete-file tmp-file))))
 
 (defun make-color (&key (red 1.0s0) (green 1.0s0) (blue 1.0s0)
                    &allow-other-keys)
@@ -379,6 +410,8 @@
 (defsetf DISPLAY-AFTER-FUNCTION       SET-DISPLAY-AFTER-FUNCTION)
 (defsetf DISPLAY-ERROR-HANDLER        SET-DISPLAY-ERROR-HANDLER)
 (defsetf DISPLAY-PLIST                SET-DISPLAY-PLIST)
+(defsetf DISPLAY-DEFAULT-SCREEN       SET-DISPLAY-DEFAULT-SCREEN)
+(defsetf DISPLAY-XDEFAULTS            SET-DISPLAY-XDEFAULTS)
 (defsetf DRAWABLE-BORDER-WIDTH        SET-DRAWABLE-BORDER-WIDTH)
 (defsetf DRAWABLE-HEIGHT              SET-DRAWABLE-HEIGHT)
 (defsetf DRAWABLE-PLIST               SET-DRAWABLE-PLIST)
@@ -418,7 +451,7 @@
 (defsetf POINTER-MAPPING              SET-POINTER-MAPPING)
 (defsetf SCREEN-PLIST                 SET-SCREEN-PLIST)
 (defsetf SELECTION-OWNER (display selection &optional time) (owner)
-  `(SET-SELECTION-OWNER ,owner ,display ,selection ,time))
+  `(SET-SELECTION-OWNER ,display ,selection ,owner ,time))
 (defsetf WINDOW-BACKGROUND            SET-WINDOW-BACKGROUND)
 (defsetf WINDOW-BACKING-PIXEL         SET-WINDOW-BACKING-PIXEL)
 (defsetf WINDOW-BACKING-PLANES        SET-WINDOW-BACKING-PLANES)
@@ -512,25 +545,25 @@
         dashes? clip-mask?)
     (do ((q options (cddr q)))
         ((null q))
-        (cond ((eq (car q) :dashes)    (setf dashes? t))
-              ((eq (car q) :clip-mask) (setf clip-mask? t)))
-        (setf comps      (logior comps (%gcontext-key->mask (car q)))
-              setf-forms (nconc setf-forms
-                                (list (list (find-symbol (string-concat "GCONTEXT-" (symbol-name (car q))) :xlib)
-                                            gcon)
-                                      (cadr q)))) )
+      (cond ((eq (car q) :dashes)    (setf dashes? t))
+            ((eq (car q) :clip-mask) (setf clip-mask? t)))
+      (setf comps      (logior comps (%gcontext-key->mask (car q)))
+            setf-forms (nconc setf-forms
+                              (list (list (find-symbol (ext:string-concat "GCONTEXT-" (symbol-name (car q))) :xlib)
+                                          gcon)
+                                    (cadr q)))))
     `(LET* ((,gcon ,gcontext)
             (,saved (%SAVE-GCONTEXT-COMPONENTS ,gcon ,comps))
             ,@(if dashes?    (list `(,g0 (GCONTEXT-DASHES    ,gcon))))
-            ,@(if clip-mask? (list `(,g1 (GCONTEXT-CLIP-MASK ,gcon)))) )
+            ,@(if clip-mask? (list `(,g1 (GCONTEXT-CLIP-MASK ,gcon)))))
        (UNWIND-PROTECT
-           (PROGN
-             (SETF ,@setf-forms)
-             ,@body)
+            (PROGN
+              (SETF ,@setf-forms)
+              ,@body)
          (PROGN
            (%RESTORE-GCONTEXT-COMPONENTS ,gcon ,saved)
-           ,@(if dashes?    (list `(SETF (GCONTEXT-DASHES ,gcon) ,g0)) )
-           ,@(if clip-mask? (list `(SETF (GCONTEXT-CLIP-MASK ,gcon) ,g1)) )))) ))
+           ,@(if dashes?    (list `(SETF (GCONTEXT-DASHES ,gcon) ,g0)))
+           ,@(if clip-mask? (list `(SETF (GCONTEXT-CLIP-MASK ,gcon) ,g1))))))))
 
 (defmacro WITH-SERVER-GRABBED ((display) &body body)
   ;; The body is not surrounded by a with-display.
@@ -572,23 +605,29 @@
   `(set-string-property ,window :WM_CLIENT_MACHINE ,name))
 
 (defun get-wm-class (window)
-  (let ((value (get-property window :WM_CLASS :type :STRING :result-type 'string :transform #'card8->char)))
+  (let ((value (get-property window :WM_CLASS :type :STRING
+                             :result-type 'string :transform #'card8->char)))
     (when value
-      (let* ((name-len (position (load-time-value (card8->char 0)) (the string value)))
-             (name (subseq (the string value) 0 name-len))
-             (class (subseq (the string value) (1+ name-len) (1- (length value)))))
+      ;; Buggy clients may not comply with the format,
+      ;; so deal with the unexpected.
+      (let* ((first-zero (position #\Null (the string value)))
+             (second-zero (and first-zero
+                               (position #\Null (the string value)
+                                         :start (1+ first-zero))))
+             (name (subseq (the string value) 0 first-zero))
+             (class (and first-zero
+                         (subseq (the string value) (1+ first-zero)
+                                 second-zero))))
         (values (and (plusp (length name)) name)
                 (and (plusp (length class)) class))))))
 
 (defun set-wm-class (window resource-name resource-class)
   (set-string-property window :WM_CLASS
-                       (string-concat
-                        (string (or resource-name ""))
-                        (load-time-value
-                         (make-string 1 :initial-element (card8->char 0)))
-                        (string (or resource-class ""))
-                        (load-time-value
-                         (make-string 1 :initial-element (card8->char 0)))))
+                       (ext:string-concat
+                        (string (or resource-name #1=""))
+                        #2=#,(string #\Null)
+                        (string (or resource-class #1#))
+                        #2#))
   (values))
 
 (defun wm-command (window)
@@ -601,7 +640,7 @@
         (end 0)
         (len (length command-string)))
        ((>= start len) (nreverse command))
-    (setq end (position (load-time-value (card8->char 0)) command-string :start start))
+    (setq end (position #\Null command-string :start start))
     (push (subseq command-string start end) command)))
 
 (defsetf wm-command set-wm-command)
@@ -617,7 +656,7 @@
       (with-standard-io-syntax
         (dolist (c command)
           (prin1 c stream)
-          (write-char (load-time-value (card8->char 0)) stream)))))
+          (write-char #\Null stream)))))
   command)
 
 ;;-----------------------------------------------------------------------------
@@ -625,7 +664,8 @@
 
 ;; Some of the functions below need decode-type and encode-type,
 ;; I provide here a limited implementation to get these functions working.
-;;
+;; sds: I am pretty sure that these should be eliminated and the code using
+;;      them should be moved to C for the same reasong (set-)wm-hints had to
 (defmacro decode-type (type value)
   (cond ((eq type 'pixmap) `(lookup-pixmap %buffer ,value))
         ((eq type 'window) `(lookup-window %buffer ,value))
@@ -645,6 +685,7 @@
         (t (error "Unknown type ~S." type)) ))
 
 (defstruct wm-hints
+  ;; keep in sync with clx.f
   (input nil )
   (initial-state nil )
   (icon-pixmap nil )
@@ -657,96 +698,14 @@
   ;; may be extended in the future
   )
 
-(defun wm-hints (window)
-  (let ((prop (get-property window :WM_HINTS :type :WM_HINTS
-                            :result-type 'vector)))
-    (when prop
-      (decode-wm-hints prop (window-display window)))))
-
 (defsetf wm-hints set-wm-hints)
-(defun set-wm-hints (window wm-hints)
-  (change-property window :WM_HINTS (encode-wm-hints wm-hints) :WM_HINTS 32)
-  wm-hints)
-
-(defun decode-wm-hints (vector display)
-  (let ((input-hint 0)
-        (state-hint 1)
-        (icon-pixmap-hint 2)
-        (icon-window-hint 3)
-        (icon-position-hint 4)
-        (icon-mask-hint 5)
-        (window-group-hint 6))
-    (let ((flags (aref vector 0))
-          (hints (make-wm-hints))
-          (%buffer display))
-      (setf (wm-hints-flags hints) flags)
-      (when (logbitp input-hint flags)
-        (setf (wm-hints-input hints) (decode-type (member :off :on)
-                                                  (aref vector 1))))
-      (when (logbitp state-hint flags)
-        (setf (wm-hints-initial-state hints)
-              (decode-type (member :dont-care :normal :zoom :iconic :inactive)
-                           (aref vector 2))))
-      (when (logbitp icon-pixmap-hint flags)
-        (setf (wm-hints-icon-pixmap hints) (decode-type pixmap (aref vector 3))))
-      (when (logbitp icon-window-hint flags)
-        (setf (wm-hints-icon-window hints) (decode-type window (aref vector 4))))
-      (when (logbitp icon-position-hint flags)
-        (setf (wm-hints-icon-x hints) (aref vector 5)
-              (wm-hints-icon-y hints) (aref vector 6)))
-      (when (logbitp icon-mask-hint flags)
-        (setf (wm-hints-icon-mask hints) (decode-type pixmap (aref vector 7))))
-      (when (and (logbitp window-group-hint flags) (> (length vector) 7))
-        (setf (wm-hints-window-group hints) (aref vector 8)))
-      hints)))
-
-(defun encode-wm-hints (wm-hints)
-  (let ((input-hint         #b1)
-        (state-hint         #b10)
-        (icon-pixmap-hint   #b100)
-        (icon-window-hint   #b1000)
-        (icon-position-hint #b10000)
-        (icon-mask-hint     #b100000)
-        (window-group-hint  #b1000000)
-        (mask               #b1111111)
-        )
-    (let ((vector (make-array 9 :initial-element 0))
-          (flags 0))
-      (declare (type (simple-vector 9) vector)
-               (type card16 flags))
-      (when (wm-hints-input wm-hints)
-        (setf flags input-hint
-              (aref vector 1) (encode-type (member :off :on) (wm-hints-input wm-hints))))
-      (when (wm-hints-initial-state wm-hints)
-        (setf flags (logior flags state-hint)
-              (aref vector 2) (encode-type (member :dont-care :normal :zoom :iconic :inactive)
-                                           (wm-hints-initial-state wm-hints))))
-      (when (wm-hints-icon-pixmap wm-hints)
-        (setf flags (logior flags icon-pixmap-hint)
-              (aref vector 3) (encode-type pixmap (wm-hints-icon-pixmap wm-hints))))
-      (when (wm-hints-icon-window wm-hints)
-        (setf flags (logior flags icon-window-hint)
-              (aref vector 4) (encode-type window (wm-hints-icon-window wm-hints))))
-      (when (and (wm-hints-icon-x wm-hints) (wm-hints-icon-y wm-hints))
-        (setf flags (logior flags icon-position-hint)
-              (aref vector 5) (encode-type card16 (wm-hints-icon-x wm-hints))
-              (aref vector 6) (encode-type card16 (wm-hints-icon-y wm-hints))))
-      (when (wm-hints-icon-mask wm-hints)
-        (setf flags (logior flags icon-mask-hint)
-              (aref vector 7) (encode-type pixmap (wm-hints-icon-mask wm-hints))))
-      (when (wm-hints-window-group wm-hints)
-        (setf flags (logior flags window-group-hint)
-              (aref vector 8) (wm-hints-window-group wm-hints)))
-      (setf (aref vector 0) (logior flags (logandc2 (wm-hints-flags wm-hints) mask)))
-      vector)))
-
 
 ;;-----------------------------------------------------------------------------
 ;; WM_SIZE_HINTS
 
 ;; XXX
 
-;; This code is buggy. My interpretation of chnage-property and get-property is
+;; This code is buggy. My interpretation of change-property and get-property is
 ;; that they only deal with unsigned data, but the as obsolete marked fields x
 ;; and y are signed, and the code below does not take care.  Running it
 ;; interpreted, hence with type checks gets errors.
@@ -824,8 +783,12 @@
         (setf (wm-size-hints-width-inc hints) (aref vector 9)
               (wm-size-hints-height-inc hints) (aref vector 10)))
       (when (logbitp 7 flags)
-        (setf (wm-size-hints-min-aspect hints) (/ (aref vector 11) (aref vector 12))
-              (wm-size-hints-max-aspect hints) (/ (aref vector 13) (aref vector 14))))
+        (let ((low (aref vector 12)))
+          (unless (zerop low)
+            (setf (wm-size-hints-min-aspect hints) (/ (aref vector 11) low))))
+        (let ((low (aref vector 14)))
+          (unless (zerop low)
+            (setf (wm-size-hints-max-aspect hints) (/ (aref vector 13) low)))))
       (when (> (length vector) 15)
         ;; This test is for backwards compatibility since old Xlib programs
         ;; can set a size-hints structure that is too small.  See ICCCM.
@@ -1184,7 +1147,7 @@
 (defun cut-buffer (display &key (buffer 0) (type :STRING) (result-type 'string)
                    (transform #'card8->char) (start 0) end)
   ;; Return the contents of cut-buffer BUFFER
-  (let* ((root (screen-root (first (display-roots display))))
+  (let* ((root (screen-root (display-default-screen display)))
          (property (aref '#(:CUT_BUFFER0 :CUT_BUFFER1 :CUT_BUFFER2 :CUT_BUFFER3
                             :CUT_BUFFER4 :CUT_BUFFER5 :CUT_BUFFER6 :CUT_BUFFER7)
                          buffer)))
@@ -1192,20 +1155,23 @@
                   :start start :end end :transform transform)))
 
 (defun (setf cut-buffer) (data display &key (buffer 0) (type :STRING) (format 8)
-                               (start 0) end (transform #'char->card8))
-  (let* ((root (screen-root (first (display-roots display))))
+                          (start 0) end (transform #'char->card8))
+  (let* ((root (screen-root (display-default-screen display)))
          (property (aref '#(:CUT_BUFFER0 :CUT_BUFFER1 :CUT_BUFFER2 :CUT_BUFFER3
-                                         :CUT_BUFFER4 :CUT_BUFFER5 :CUT_BUFFER6 :CUT_BUFFER7)
+                            :CUT_BUFFER4 :CUT_BUFFER5 :CUT_BUFFER6 :CUT_BUFFER7)
                          buffer)))
-    (change-property root property data type format :transform transform :start start :end end)
+    (change-property root property data type format
+                     :start start :end end :transform transform)
     data))
 
 (defun rotate-cut-buffers (display &optional (delta 1) (careful-p t))
-  ;; Positive rotates left, negative rotates right (opposite of actual protocol request).
-  ;; When careful-p, ensure all cut-buffer properties are defined, to prevent errors.
-  (let* ((root (screen-root (first (display-roots display))))
-         (buffers '#(:cut_buffer0 :cut_buffer1 :cut_buffer2 :cut_buffer3
-                     :cut_buffer4 :cut_buffer5 :cut_buffer6 :cut_buffer7)))
+  ;; Positive rotates left, negative rotates right
+  ;; (opposite of actual protocol request).
+  ;; When careful-p, ensure all cut-buffer properties are defined,
+  ;; to prevent errors.
+  (let* ((root (screen-root (display-default-screen display)))
+         (buffers '#(:CUT_BUFFER0 :CUT_BUFFER1 :CUT_BUFFER2 :CUT_BUFFER3
+                     :CUT_BUFFER4 :CUT_BUFFER5 :CUT_BUFFER6 :CUT_BUFFER7)))
     (when careful-p
       (let ((props (list-properties root)))
         (dotimes (i 8)
@@ -1219,8 +1185,10 @@
 ;;;; --------------------------------------------------------------------------
 
 ;;; NOTE:
-;;;   I used here a (funcall #,#'fun ..) klugde, but by clisp-1996-07-22 this now considered
-;;;   illegal, so I save the untraced functions by copying them. This allows me to trace all or arbitrary
+;;;   I used here a (funcall #,#'fun ..) klugde,
+;;;   but by clisp-1996-07-22 this now considered illegal,
+;;;   so I save the untraced functions by copying them.
+;;;   This allows me to trace all or arbitrary
 ;;;   xlib functions without getting into infinite recursion.
 
 (setf (fdefinition '%untraced-color-blue) #'color-blue
@@ -1303,6 +1271,68 @@
 ;;;; --------------------------------------------------------------------------
 ;;;;  Misc
 ;;;; --------------------------------------------------------------------------
+
+;;; from dependent.lisp in http://common-lisp.net/~crhodes/clx
+;;; this particular defaulting behaviour is typical to most Unices, I think
+(defun get-default-display (&optional display-name)
+  "Parse the argument DISPLAY-NAME, or the environment variable $DISPLAY
+if it is NIL.  Display names have the format
+
+  [protocol/] [hostname] : [:] displaynumber [.screennumber]
+
+There are two special cases in parsing, to match that done in the Xlib
+C language bindings
+
+ - If the hostname is ``unix'' or the empty string, any supplied
+   protocol is ignored and a connection is made using the :local
+   transport.
+
+ - If a double colon separates hostname from displaynumber, the
+   protocol is assumed to be decnet.
+
+Returns a list of (host display-number screen protocol)."
+  (let* ((name (or display-name
+                   (ext:getenv "DISPLAY")
+                   (error "DISPLAY environment variable is not set")))
+         (slash-i (or (position #\/ name) -1))
+         (colon-i (position #\: name :start (1+ slash-i)))
+         (decnet-colon-p (eql (elt name (1+ colon-i)) #\:))
+         (host (subseq name (1+ slash-i) colon-i))
+         (dot-i (and colon-i (position #\. name :start colon-i)))
+         (display (when colon-i
+                    (parse-integer name
+                                   :start (if decnet-colon-p
+                                              (+ colon-i 2)
+                                              (1+ colon-i))
+                                   :end dot-i)))
+         (screen (when dot-i
+                   (parse-integer name :start (1+ dot-i))))
+         (protocol
+          (cond ((or (string= host "") (string-equal host "unix")) :local)
+                (decnet-colon-p :decnet)
+                ((> slash-i -1) (intern
+                                 (string-upcase (subseq name 0 slash-i))
+                                 :keyword))
+                (t :internet))))
+    (list host (or display 0) (or screen 0) protocol)))
+
+(defun open-default-display (&optional display-name)
+  "Open a connection to DISPLAY-NAME if supplied, or to the appropriate
+default display as given by GET-DEFAULT-DISPLAY otherwise."
+  (destructuring-bind (host display screen protocol)
+      (get-default-display display-name)
+    (let ((dpy (open-display host :display display :protocol protocol)))
+       (setf (display-default-screen dpy) screen)
+       dpy)))
+
+(defmacro with-open-display ((display &rest options) &body body)
+  "Open a DISPLAY, execute BODY, close the DISPLAY."
+  `(let ((,display ,(if options
+                        `(open-display ,@options)
+                        `(open-default-display))))
+     (unwind-protect (progn ,@body)
+       (when ,display
+         (close-display ,display)))))
 
 
 ;;;; --------------------------------------------------------------------------
@@ -1483,16 +1513,24 @@
 
 ;;; Error handler, we probably want a proper condition hierarchy, but for a first approach this may be enough:
 
-(defun default-error-handler (display error-code &key current-sequence sequence
-                              major minor resource-id atom-id value)
-  (cerror "Ignore this error and proceed."
-          "Asynchronous ~A on display ~S, sequence ~D. Opcode is ~D.~D. Current sequence is ~D.~A"
-          error-code display sequence major minor current-sequence
-          ;; at most one of RESOURCE-ID, ATOM-ID, and VALUE is available
-          (cond (resource-id (format nil " Resource ID is #x~8,'0x." resource-id))
-                (value (format nil " Bad value is ~D." value))
-                (atom-id (format nil " Bad atom ID is #x~8,'0x." atom-id))
-                (t ""))))
+(defun default-error-handler (display error-key &rest key-vals
+			      &key asynchronous &allow-other-keys)
+  (if asynchronous
+      (apply 'cerror "Ignore this error and proceed." error-key
+	     :display display :error-key error-key key-vals)
+      (apply 'error error-key
+	     :display display :error-key error-key key-vals)))
+
+(defun report-request-error (condition stream)
+  (let ((error-key (request-error-error-key condition))
+	(asynchronous (request-error-asynchronous condition))
+	(major (request-error-major condition))
+	(minor (request-error-minor condition))
+	(sequence (request-error-sequence condition))
+	(current-sequence (request-error-current-sequence condition)))
+    (format stream "~:[~;Asynchronous ~]~a in ~:[request ~d (last request was ~d) ~;current request~2* ~] Code ~d.~d"
+	    asynchronous error-key (= sequence current-sequence)
+	    sequence current-sequence major minor)))
 
 (define-condition x-error (error)
   ((caller :reader x-error-caller :initarg :caller)))
@@ -1505,34 +1543,215 @@
              (x-error-caller condition)
              (closed-display-display condition)))))
 
-(define-condition request-error (x-error) ())
-(define-condition resource-error (request-error) ())
+(define-condition request-error (x-error)
+  ((display :reader request-error-display :initarg :display)
+   (error-key :reader request-error-error-key :initarg :error-key)
+   (major :reader request-error-major :initarg :major)
+   (minor :reader request-error-minor :initarg :minor)
+   (sequence :reader request-error-sequence :initarg :sequence)
+   (current-sequence :reader request-error-current-sequence :initarg :current-sequence)
+   (asynchronous :reader request-error-asynchronous :initarg :asynchronous))
+  (:report report-request-error))
+
+(define-condition resource-error (request-error)
+  ((resource-id :reader resource-error-resource-id :initarg :resource-id))
+  (:report
+   (lambda (condition stream)
+     (report-request-error condition stream)
+     (format stream " ID #x~x" (resource-error-resource-id condition)))))
+
+(define-condition unknown-error (request-error)
+  ((error-code :reader unknown-error-error-code :initarg :error-code))
+  (:report
+   (lambda (condition stream)
+     (report-request-error condition stream)
+     (format stream " Error Code ~d." (unknown-error-error-code condition)))))
+
 (define-condition access-error (request-error) ())
+
 (define-condition alloc-error (request-error) ())
-(define-condition atom-error (request-error) ())
+
+(define-condition atom-error (request-error)
+  ((atom-id :reader atom-error-atom-id :initarg :atom-id))
+  (:report
+   (lambda (condition stream)
+     (report-request-error condition stream)
+     (format stream " Atom-ID #x~x" (atom-error-atom-id condition)))))
+
 (define-condition colormap-error (resource-error) ())
-(define-condition connection-failure (x-error) ())
+
 (define-condition cursor-error (resource-error) ())
-(define-condition device-busy (x-error) ())
+
 (define-condition drawable-error (resource-error) ())
+
 (define-condition font-error (resource-error) ())
+
 (define-condition gcontext-error (resource-error) ())
+
 (define-condition id-choice-error (resource-error) ())
-(define-condition implementation-error (resource-error) ())
-(define-condition length-error (resource-error) ())
-(define-condition lookup-error (x-error) ())
+
+(define-condition illegal-request-error (request-error) ())
+
+(define-condition length-error (request-error) ())
+
 (define-condition match-error (request-error) ())
-(define-condition missing-parameter (x-error) ())
+
 (define-condition name-error (request-error) ())
+
 (define-condition pixmap-error (resource-error) ())
-(define-condition reply-length-error (x-error) ())
-(define-condition reply-timeout (x-error) ())
-(define-condition sequence-error (x-error) ())
-(define-condition server-disconnect (x-error) ())
-(define-condition unexpected-reply (x-error) ())
-(define-condition unknown-error (request-error) ())
-(define-condition value-error (request-error) ())
-(define-condition window-error (resource-error) ())
+
+(define-condition value-error (request-error)
+  ((value :reader value-error-value :initarg :value))
+  (:report
+    (lambda (condition stream)
+      (report-request-error condition stream)
+      (format stream " Value ~d." (value-error-value condition)))))
+
+(define-condition x-type-error (type-error x-error)
+  ((type-string :reader x-type-error-type-string :initarg :type-string))
+  (:report
+    (lambda (condition stream)
+      (format stream "~s isn't a ~a"
+	      (type-error-datum condition)
+	      (or (x-type-error-type-string condition)
+		  (type-error-expected-type condition))))))
+
+(define-condition lookup-error (x-error)
+  ((id :reader lookup-error-id :initarg :id)
+   (display :reader lookup-error-display :initarg :display)
+   (type :reader lookup-error-type :initarg :type)
+   (object :reader lookup-error-object :initarg :object))
+  (:report
+    (lambda (condition stream)
+      (format stream "ID ~d from display ~s should have been a ~s, but was ~s"
+	      (lookup-error-id condition)
+	      (lookup-error-display condition)
+	      (lookup-error-type condition)
+	      (lookup-error-object condition)))))
+
+(define-condition connection-failure (x-error)
+  ((major-version :reader connection-failure-major-version :initarg :major-version)
+   (minor-version :reader connection-failure-minor-version :initarg :minor-version)
+   (host :reader connection-failure-host :initarg :host)
+   (display :reader connection-failure-display :initarg :display)
+   (reason :reader connection-failure-reason :initarg :reason))
+  (:report
+    (lambda (condition stream)
+      (format stream "Connection failure to X~d.~d server ~a display ~d: ~a"
+	      (connection-failure-major-version condition)
+	      (connection-failure-minor-version condition)
+	      (connection-failure-host condition)
+	      (connection-failure-display condition)
+	      (connection-failure-reason condition)))))
+
+(define-condition reply-length-error (x-error)
+  ((reply-length :reader reply-length-error-reply-length :initarg :reply-length)
+   (expected-length :reader reply-length-error-expected-length :initarg :expected-length)
+   (display :reader reply-length-error-display :initarg :display))
+  (:report
+    (lambda (condition stream)
+      (format stream "Reply length was ~d when ~d words were expected for display ~s"
+	      (reply-length-error-reply-length condition)
+	      (reply-length-error-expected-length condition)
+	      (reply-length-error-display condition)))))
+
+(define-condition reply-timeout (x-error)
+  ((timeout :reader reply-timeout-timeout :initarg :timeout)
+   (display :reader reply-timeout-display :initarg :display))
+  (:report
+    (lambda (condition stream)
+      (format stream "Timeout after waiting ~d seconds for a reply for display ~s"
+	      (reply-timeout-timeout condition)
+	      (reply-timeout-display condition)))))
+
+(define-condition sequence-error (x-error)
+  ((display :reader sequence-error-display :initarg :display)
+   (req-sequence :reader sequence-error-req-sequence :initarg :req-sequence)
+   (msg-sequence :reader sequence-error-msg-sequence :initarg :msg-sequence))
+  (:report
+    (lambda (condition stream)
+      (format stream "Reply out of sequence for display ~s.~%  Expected ~d, Got ~d"
+	      (sequence-error-display condition)
+	      (sequence-error-req-sequence condition)
+	      (sequence-error-msg-sequence condition)))))
+
+(define-condition unexpected-reply (x-error)
+  ((display :reader unexpected-reply-display :initarg :display)
+   (msg-sequence :reader unexpected-reply-msg-sequence :initarg :msg-sequence)
+   (req-sequence :reader unexpected-reply-req-sequence :initarg :req-sequence)
+   (length :reader unexpected-reply-length :initarg :length))
+  (:report
+    (lambda (condition stream)
+      (format stream "Display ~s received a server reply when none was expected.~@
+		      Last request sequence ~d Reply Sequence ~d Reply Length ~d bytes."
+	      (unexpected-reply-display condition)
+	      (unexpected-reply-req-sequence condition)
+	      (unexpected-reply-msg-sequence condition)
+	      (unexpected-reply-length condition)))))
+
+(define-condition missing-parameter (x-error)
+  ((parameter :reader missing-parameter-parameter :initarg :parameter))
+  (:report
+    (lambda (condition stream)
+      (let ((parm (missing-parameter-parameter condition)))
+	(if (consp parm)
+	    (format stream "One or more of the required parameters ~a is missing."
+		    parm)
+	  (format stream "Required parameter ~a is missing or null." parm))))))
+
+;; This can be signalled anywhere a pseudo font access fails.
+(define-condition invalid-font (x-error)
+  ((font :reader invalid-font-font :initarg :font))
+  (:report
+    (lambda (condition stream)
+      (format stream "Can't access font ~s" (invalid-font-font condition)))))
+
+(define-condition device-busy (x-error)
+  ((display :reader device-busy-display :initarg :display))
+  (:report
+    (lambda (condition stream)
+      (format stream "Device busy for display ~s"
+	      (device-busy-display condition)))))
+
+(define-condition unimplemented-event (x-error)
+  ((display :reader unimplemented-event-display :initarg :display)
+   (event-code :reader unimplemented-event-event-code :initarg :event-code))
+  (:report
+    (lambda (condition stream)
+      (format stream "Event code ~d not implemented for display ~s"
+	      (unimplemented-event-event-code condition)
+	      (unimplemented-event-display condition)))))
+
+(define-condition undefined-event (x-error)
+  ((display :reader undefined-event-display :initarg :display)
+   (event-name :reader undefined-event-event-name :initarg :event-name))
+  (:report
+    (lambda (condition stream)
+      (format stream "Event code ~d undefined for display ~s"
+	      (undefined-event-event-name condition)
+	      (undefined-event-display condition)))))
+
+(define-condition absent-extension (x-error)
+  ((name :reader absent-extension-name :initarg :name)
+   (display :reader absent-extension-display :initarg :display))
+  (:report
+    (lambda (condition stream)
+      (format stream "Extension ~a isn't defined for display ~s"
+	      (absent-extension-name condition)
+	      (absent-extension-display condition)))))
+
+(define-condition inconsistent-parameters (x-error)
+  ((parameters :reader inconsistent-parameters-parameters :initarg :parameters))
+  (:report
+    (lambda (condition stream)
+      (format stream "inconsistent-parameters:~{ ~s~}"
+	      (inconsistent-parameters-parameters condition)))))
+
+(define-condition window-error (resource-error)())
+
+(define-condition implementation-error (request-error) ())
+
+;; (define-condition server-disconnect (x-error) ())
 
 (pushnew "XLIB" custom:*system-package-list* :test #'string=)
 (pushnew "XPM" custom:*system-package-list* :test #'string=)
@@ -1543,13 +1762,20 @@
                 (declare (ignore args))
                 (progn (warn "~S is not implemented: ~S" ',name form)
                        form))))
-(undefined DISPLAY-RESOURCE-ID-BASE)
-(undefined DISPLAY-RESOURCE-ID-MASK)
 (undefined DISPLAY-TRACE)
 (undefined DRAW-GLYPH)
 (undefined DRAW-IMAGE-GLYPH)
 (undefined TRANSLATE-DEFAULT)
-(undefined QUEUE-EVENT)
-(undefined CHANGE-KEYBOARD-MAPPING)
-(undefined KEYBOARD-MAPPING)
 )
+
+;; canonicalize encodings supplied by X, see clx.f:get_font_info_and_display()
+(defvar *canonicalize-encoding*
+  ;; this encoding canonicalization was requested by
+  ;; Pascal J.Bourguignon <pjb@informatimago.com>
+  ;; in <http://article.gmane.org/gmane.lisp.clisp.general:7794>
+  `(,(lambda (s)
+       (if (and (<= 4 (length s))
+                (string-equal s "iso" :end1 3)
+                (not (char= #\- (char s 3))))
+           (concatenate 'string "ISO-" (subseq s 3))
+           s))))

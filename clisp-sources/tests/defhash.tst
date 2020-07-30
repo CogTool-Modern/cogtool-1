@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 
 (define-hash-table-test string-eq string= sxhash)
 string-eq

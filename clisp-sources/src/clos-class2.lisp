@@ -111,7 +111,7 @@
     ;; Should we do (setf (class-name h) nil) ? No, because CLHS of FIND-CLASS
     ;; says that "the class object itself is not affected".
     (sys::check-redefinition symbol '(setf find-class)
-                             (and (defined-class-p h) "class"))
+                             (and (defined-class-p h) (TEXT "class")))
     (when (and h (forward-reference-to-class-p h) new-value)
       ;; Move the list of subclasses from the old class object to the new one.
       (dolist (subclass (class-direct-subclasses h))

@@ -4,9 +4,10 @@
 
 #if defined(HAVE_SIGNALS) && defined(SIGPIPE)
 
-/* Variable to be set ONLY during write() calls to pipes directed to
- subprocesses. */
-global bool writing_to_subprocess = false;
+#if !defined(MULTITHREAD)
+/* Variable to be set ONLY during IO calls to pipes directed to subprocesses. */
+modexp bool writing_to_subprocess = false;
+#endif
 
 /* Install the signal handler for SIGPIPE. */
 local void install_sigpipe_handler (void);
@@ -43,11 +44,7 @@ local void sigpipe_handler (int sig)
   /* Revert to the default handler and re-raise the signal.
      This should be sufficient to kill us. */
   SIGNAL(SIGPIPE,SIG_DFL);
- #if !(defined(UNIX) && !defined(HAVE_RAISE))
   raise(SIGPIPE);
- #else
-  kill(getpid(),SIGPIPE);
- #endif
 }
 
 #if !defined(RELY_ON_WRITING_TO_SUBPROCESS)

@@ -12,7 +12,7 @@
 
 (defmethod reinitialize-instance ((instance specializer) &rest initargs)
   (declare (ignore initargs))
-  (error (TEXT "~S: The MOP does not allow reinitializing ~S")
+  (error (TEXT "~S: It is not allowed to reinitialize ~S")
          'reinitialize-instance instance))
 
 ;;; ===========================================================================

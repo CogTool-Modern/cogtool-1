@@ -2,84 +2,84 @@
 # operiert auf einzelnen 16-Bit-Wörtern und 32-Bit-Wörtern (unsigned).
 
 # Vorzeichen einer 32-Bit-Zahl bestimmen
-# sign_of_sint32(wert)
-# > wert: eine 32-Bit-Zahl
-# < sint16 ergebnis: 0 falls wert>=0, -1 falls wert<0.
-  extern sint16 sign_of_sint32 (sint32 wert);
+# sign_of_sint32(value)
+# > value: eine 32-Bit-Zahl
+# < sint16 result: 0 falls value>=0, -1 falls value<0.
+  extern sint16 sign_of_sint32 (sint32 value);
 # im 68000-Assembler (Input D0.L, Output D0.W):
 #   SWAP D0  # Vorzeichen nach Bit 15 schieben
 #   EXT.L D0 # nach Bit 31..16 kopieren
 #   SWAP D0  # nach Bit 15..0 schieben
   #if defined(GNU) && defined(MC680X0) && !defined(NO_ASM)
-    #define sign_of_sint32(wert)  \
-      ({var sint32 __wert = (wert);  \
-        var sint16 __ergebnis;        \
+    #define sign_of_sint32(value)  \
+      ({var sint32 __value = (value);  \
+        var sint16 __result;        \
         __asm__ ("\
           swap %0;  \
           extl %0;  \
           swap %0   \
-          " : "=d" (__ergebnis) : "0" (__wert));  \
-        __ergebnis;                               \
+          " : "=d" (__result) : "0" (__value));  \
+        __result;                               \
        })
   #elif defined(SPARC64)
-    #define sign_of_sint32(wert)  (((sint64)(sint32)(wert)) >> 63)
+    #define sign_of_sint32(value)  (((sint64)(sint32)(value)) >> 63)
   #elif defined(SPARC) || defined(ARM)
-    #define sign_of_sint32(wert)  (((sint32)(wert)) >> 31)
+    #define sign_of_sint32(value)  (((sint32)(value)) >> 31)
   #else
-    #define sign_of_sint32(wert)  ((sint32)(wert) >= 0 ? 0 : -1)
+    #define sign_of_sint32(value)  ((sint32)(value) >= 0 ? 0 : -1)
   #endif
 
 # Vorzeichen einer 16-Bit-Zahl bestimmen
-# sign_of_sint16(wert)
-# > wert: eine 16-Bit-Zahl
-# < sint16 ergebnis: 0 falls wert>=0, -1 falls wert<0.
-  extern sint16 sign_of_sint16 (sint16 wert);
+# sign_of_sint16(value)
+# > value: eine 16-Bit-Zahl
+# < sint16 result: 0 falls value>=0, -1 falls value<0.
+  extern sint16 sign_of_sint16 (sint16 value);
 # im 68000-Assembler (Input D0.W, Output D0.W):
 #   EXT.L D0 # Vorzeichen nach Bit 31..16 kopieren
 #   SWAP D0  # nach Bit 15..0 schieben
   #if defined(GNU) && defined(MC680X0) && !defined(NO_ASM)
-    #define sign_of_sint16(wert)  \
-      ({var sint16 __wert = (wert);  \
-        var sint16 __ergebnis;        \
+    #define sign_of_sint16(value)  \
+      ({var sint16 __value = (value);  \
+        var sint16 __result;        \
         __asm__ ("\
           extl %0;  \
           swap %0   \
-          " : "=d" (__ergebnis) : "0" (__wert));  \
-        __ergebnis;                               \
+          " : "=d" (__result) : "0" (__value));  \
+        __result;                               \
        })
   #elif defined(SPARC64)
-    #define sign_of_sint16(wert)  (((sint64)(sint16)(wert)) >> 63)
+    #define sign_of_sint16(value)  (((sint64)(sint16)(value)) >> 63)
   #elif defined(SPARC) || defined(ARM)
-    #define sign_of_sint16(wert)  (((sint32)(sint16)(wert)) >> 31)
+    #define sign_of_sint16(value)  (((sint32)(sint16)(value)) >> 31)
   #else
-    #define sign_of_sint16(wert)  ((sint16)(wert) >= 0 ? 0 : -1)
+    #define sign_of_sint16(value)  ((sint16)(value) >= 0 ? 0 : -1)
   #endif
 
 # High-Word einer 32-Bit-Zahl bestimmen
-# high16(wert)
-  extern uint16 high16 (uint32 wert);
+# high16(value)
+  extern uint16 high16 (uint32 value);
 # im 68000-Assembler (Input D0.L, Output D0.W):
 #   SWAP D0
   #ifdef GNU
     #if defined(MC680X0) && !defined(NO_ASM)
-      #define high16(wert)  \
-        ({var uint32 __wert = (wert);  \
-          var uint16 __ergebnis;        \
+      #define high16(value)  \
+        ({var uint32 __value = (value);  \
+          var uint16 __result;        \
           __asm__ ("\
             swap %0   \
-            " : "=d" (__ergebnis) : "0" (__wert));  \
-          __ergebnis;                               \
+            " : "=d" (__result) : "0" (__value));  \
+          __result;                               \
          })
     #endif
   #endif
   #ifndef high16
-    #define high16(wert)  ((uint16)((uint32)(wert)>>16))
+    #define high16(value)  ((uint16)((uint32)(value)>>16))
   #endif
 
 # Low-Word einer 32-Bit-Zahl bestimmen
-# low16(wert)
-  extern uint16 low16 (uint32 wert);
-  #define low16(wert)  ((uint16)(uint32)(wert))
+# low16(value)
+  extern uint16 low16 (uint32 value);
+  #define low16(value)  ((uint16)(uint32)(value))
 
 # Eine 32-Bit-Zahl aus ihrem High-Word und ihrem Low-Word bestimmen:
 # highlow32(uint16 high, uint16 low)
@@ -92,12 +92,12 @@
       #define highlow32(high,low)  \
         ({var uint16 __high = (high);  \
           var uint16 __low = (low);    \
-          var uint32 __ergebnis;       \
+          var uint32 __result;       \
           __asm__ __volatile__ ("\
             swap %0;     \
             movew %2,%0  \
-            " : "=&d" (__ergebnis) : "0" (__high), "g" (__low));  \
-          __ergebnis;                                             \
+            " : "=&d" (__result) : "0" (__high), "g" (__low));  \
+          __result;                                             \
          })
     #endif
   #endif
@@ -117,12 +117,12 @@
     #if defined(MC680X0) && !defined(NO_ASM)
       #define highlow32_0(high)  \
         ({var uint16 __high = (high);  \
-          var uint32 __ergebnis;       \
+          var uint32 __result;       \
           __asm__ __volatile__ ("\
             swap %0;     \
             clrw %0      \
-            " : "=d" (__ergebnis) : "0" (__high));  \
-          __ergebnis;                               \
+            " : "=d" (__result) : "0" (__high));  \
+          __result;                               \
          })
     #endif
   #endif
@@ -133,14 +133,14 @@
 #if (intVsize>32)
 
 # High-Word einer 64-Bit-Zahl bestimmen
-# high32(wert)
-  extern uint32 high32 (uint64 wert);
-  #define high32(wert)  ((uint32)((uint64)(wert)>>32))
+# high32(value)
+  extern uint32 high32 (uint64 value);
+  #define high32(value)  ((uint32)((uint64)(value)>>32))
 
 # Low-Word einer 64-Bit-Zahl bestimmen
-# low32(wert)
-  extern uint32 low32 (uint64 wert);
-  #define low32(wert)  ((uint32)(uint64)(wert))
+# low32(value)
+  extern uint32 low32 (uint64 value);
+  #define low32(value)  ((uint32)(uint64)(value))
 
 # Eine 64-Bit-Zahl aus ihrem High-Word und ihrem Low-Word bestimmen:
 # highlow64(uint32 high, uint32 low)
@@ -158,7 +158,7 @@
 # Multipliziert zwei 16-Bit-Zahlen miteinander und liefert eine 32-Bit-Zahl:
 # mulu16(arg1,arg2)
 # > arg1, arg2 : zwei 16-Bit-Zahlen
-# < ergebnis: eine 32-Bit-Zahl
+# < result: eine 32-Bit-Zahl
   extern uint32 mulu16 (uint16 arg1, uint16 arg2);
 # in 68000-Assembler (Input D0.W, D1.W, Output D0.L):
 #   MULU D1,D0
@@ -205,14 +205,14 @@
 # > arg1, arg2 : zwei 24-Bit-Zahlen
 # < 2^32*hi+lo : eine 48-Bit-Zahl
   #if defined(SPARC) && !defined(SPARC64) && defined(FAST_DOUBLE)
-    #define mulu24(x,y,hi_zuweisung,lo_zuweisung)  \
+    #define mulu24(x,y,hi_assignment,lo_assignment)  \
       { var uint32 _x = (x);                                                            \
         var uint32 _y = (y);                                                            \
         var union { double f; uint32 i[2]; uint16 s[4]; } __fi;                         \
         __fi.f = (double)(sint32)(_x)*(double)(sint32)(_y)                              \
                  + (double)(4503599627370496.0L); # + 2^52, zum Normalisieren           \
-        hi_zuweisung __fi.s[1]; # mittlere 16 Bit herausholen, (benutzt BIG_ENDIAN_P !) \
-        lo_zuweisung __fi.i[1]; # untere 32 Bit herausholen (benutzt BIG_ENDIAN_P !)    \
+        hi_assignment __fi.s[1]; # mittlere 16 Bit herausholen, (benutzt BIG_ENDIAN_P !) \
+        lo_assignment __fi.i[1]; # untere 32 Bit herausholen (benutzt BIG_ENDIAN_P !)    \
       }
   #elif defined(MC680X0) && !defined(MC680Y0)
     # Methode:
@@ -224,7 +224,7 @@
     # Summanden die beiden höherwertigen Words des Ergebnisses (und
     # hierbei gibt es keinen Überlauf, da das Produkt in 3 Words passt!),
     # das Low-Word des dritten Summanden ist auch das des Ergebnisses.
-    #define mulu24(x,y,hi_zuweisung,lo_zuweisung)  \
+    #define mulu24(x,y,hi_assignment,lo_assignment)  \
       { var uint32 _x = (x);                                       \
         var uint32 _y = (y);                                       \
         var uint32 _erg21; # Teilresultat für Words 2 und 1 des Ergebnisses \
@@ -237,8 +237,8 @@
         _erg10 = mulu16(low16(_x),low16(_y));                      \
         # Teilresultate kombinieren:                               \
         _erg21 += high16(_erg10);                                  \
-        hi_zuweisung high16(_erg21);                               \
-        lo_zuweisung highlow32(low16(_erg21),low16(_erg10));       \
+        hi_assignment high16(_erg21);                               \
+        lo_assignment highlow32(low16(_erg21),low16(_erg10));       \
       }
   #else
     #define mulu24  mulu32
@@ -270,7 +270,7 @@
   #if defined(GNU) || defined(INTEL)
     #ifdef MC680X0
       #if !(defined(MC680Y0) && !defined(NO_ASM))
-        #define mulu32(x,y,hi_zuweisung,lo_zuweisung)  \
+        #define mulu32(x,y,hi_assignment,lo_assignment)  \
           ({ var uint32 _x = (x);                                          \
              var uint32 _y = (y);                                          \
              var uint16 _x1 = high16(_x);                                  \
@@ -287,73 +287,73 @@
               _hi += high16(_mid); _mid = highlow32_0(low16(_mid));        \
               _lo += _mid; if (_lo < _mid) { _hi += 1; } # 64-Bit-Addition \
              }                                                             \
-             hi_zuweisung _hi;                                             \
-             lo_zuweisung _lo;                                             \
+             hi_assignment _hi;                                             \
+             lo_assignment _lo;                                             \
            })
       #else
-        #define mulu32(x,y,hi_zuweisung,lo_zuweisung)  \
+        #define mulu32(x,y,hi_assignment,lo_assignment)  \
           ({ var uint32 _x = (x); \
              var uint32 _y = (y); \
              var uint32 _hi;      \
              var uint32 _lo;      \
              __asm__("mulul %3,%0:%1" : "=d" (_hi), "=d"(_lo) : "1" (_x), "dm" (_y) ); \
-             hi_zuweisung _hi;    \
-             lo_zuweisung _lo;    \
+             hi_assignment _hi;    \
+             lo_assignment _lo;    \
            })
       #endif
     #elif defined(ARM) && 0 # see comment ariarm.d
-      #define mulu32(x,y,hi_zuweisung,lo_zuweisung)  \
-        ({ lo_zuweisung mulu32_(x,y); # extern in Assembler \
+      #define mulu32(x,y,hi_assignment,lo_assignment)  \
+        ({ lo_assignment mulu32_(x,y); # extern in Assembler \
           {var register uint32 _hi __asm__("%r1"/*"%a2"*/); \
-           hi_zuweisung _hi;                                \
+           hi_assignment _hi;                                \
          }})
     #elif defined(I80386) && !defined(NO_ASM)
-      #define mulu32(x,y,hi_zuweisung,lo_zuweisung)  \
+      #define mulu32(x,y,hi_assignment,lo_assignment)  \
         ({ var register uint32 _hi;                                   \
            var register uint32 _lo;                                   \
            __asm__("mull %2"                                          \
                    : "=d" /* %edx */ (_hi), "=a" /* %eax */ (_lo)     \
                    : "rm" ((uint32)(x)), "1" /* %eax */ ((uint32)(y)) \
                   );                                                  \
-           hi_zuweisung _hi; lo_zuweisung _lo;                        \
+           hi_assignment _hi; lo_assignment _lo;                        \
          })
     #elif defined(SPARC64) && !defined(NO_ASM)
-      #define mulu32(x,y,hi_zuweisung,lo_zuweisung)  \
+      #define mulu32(x,y,hi_assignment,lo_assignment)  \
         ({ var register uint64 _hi;                            \
            var register uint64 _lo;                            \
            __asm__("umul %2,%3,%0\n\trd %%y,%1"                \
                    : "=&r" (_lo), "=r" (_hi)                   \
                    : "r" ((uint32)(x)), "r" ((uint32)(y))      \
                   );                                           \
-           hi_zuweisung (uint32)_hi; lo_zuweisung (uint32)_lo; \
+           hi_assignment (uint32)_hi; lo_assignment (uint32)_lo; \
          })
     #elif defined(MIPS) && !defined(NO_ASM)
-      #define mulu32(x,y,hi_zuweisung,lo_zuweisung)  \
+      #define mulu32(x,y,hi_assignment,lo_assignment)  \
         ({ var register uint32 _hi;                       \
            var register uint32 _lo;                       \
            __asm__("multu %3,%2 ; mfhi %0 ; mflo %1"      \
                    : "=r" (_hi), "=r" (_lo)               \
                    : "r" ((uint32)(x)), "r" ((uint32)(y)) \
                   );                                      \
-           hi_zuweisung _hi; lo_zuweisung _lo;            \
+           hi_assignment _hi; lo_assignment _lo;            \
          })
     #elif defined(SPARC)
-      #define mulu32(x,y,hi_zuweisung,lo_zuweisung)  \
-        ({ lo_zuweisung mulu32_(x,y); # extern in Assembler \
+      #define mulu32(x,y,hi_assignment,lo_assignment)  \
+        ({ lo_assignment mulu32_(x,y); # extern in Assembler \
           {var register uint32 _hi __asm__("%g1");          \
-           hi_zuweisung _hi;                                \
+           hi_assignment _hi;                                \
          }})
-    #elif defined(HAVE_LONGLONG) && !defined(ARM)
-      #define mulu32(x,y,hi_zuweisung,lo_zuweisung)  \
+    #elif defined(HAVE_LONG_LONG_INT) && !defined(ARM)
+      #define mulu32(x,y,hi_assignment,lo_assignment)  \
         ({ var register uint64 _prod = (uint64)(x) * (uint64)(y); \
-           hi_zuweisung (uint32)(_prod>>32);                      \
-           lo_zuweisung (uint32)(_prod);                          \
+           hi_assignment (uint32)(_prod>>32);                      \
+           lo_assignment (uint32)(_prod);                          \
          })
     #endif
   #endif
   #ifndef mulu32
-    #define mulu32(x,y,hi_zuweisung,lo_zuweisung)  \
-      { lo_zuweisung mulu32_(x,y); hi_zuweisung mulu32_high; }
+    #define mulu32(x,y,hi_assignment,lo_assignment)  \
+      { lo_assignment mulu32_(x,y); hi_assignment mulu32_high; }
     #if defined(MC680X0) || defined(SPARC) || defined(SPARC64) || defined(ARM) || (defined(I80386) && !defined(BORLAND)) || defined(MIPS) || defined(HPPA) || defined(VAX)
       # mulu32_ extern in Assembler
       #if defined(SPARC) || defined(SPARC64)
@@ -390,7 +390,7 @@
 # Multipliziert zwei 32-Bit-Zahlen miteinander und liefert eine 32-Bit-Zahl:
 # mulu32_unchecked(arg1,arg2)
 # > arg1, arg2 : zwei 32-Bit-Zahlen
-# < ergebnis : eine 32-Bit-Zahl
+# < result : eine 32-Bit-Zahl
 # Es wird vorausgesetzt, dass arg1*arg2 < 2^32.
   #if (defined(GNU) && defined(MC680X0) && !defined(MC680Y0))
     extern uint32 mulu32_unchecked (uint32 x, uint32 y);
@@ -435,7 +435,7 @@
 # Multipliziert zwei 32-Bit-Zahlen miteinander und liefert eine 64-Bit-Zahl:
 # mulu32_64(arg1,arg2)
 # > arg1, arg2 : zwei 32-Bit-Zahlen
-# < ergebnis : eine 64-Bit-Zahl
+# < result : eine 64-Bit-Zahl
   extern_C uint64 mulu32_64 (uint32 arg1, uint32 arg2);
   #if defined(GNU) || defined(INTEL)
     #if defined(I80386) && !defined(NO_ASM)
@@ -471,9 +471,9 @@
     #elif defined(SPARC)
       #define mulu32_64(x,y)  \
         ({ var register uint32 _lo = mulu32_(x,y); # extern in Assembler \
-          {var register uint32 _hi __asm__("%g1");                       \
+           var register uint32 _hi __asm__("%g1");                       \
            highlow64(_hi,_lo);                                           \
-         }})
+         })
     #endif
   #endif
   #ifndef mulu32_64
@@ -491,11 +491,11 @@
 # < uint16 q: floor(x/y)
 # < uint16 r: x mod y
 # < x = q*y+r
-  #define divu_1616_1616(x,y,q_zuweisung,r_zuweisung)  \
+  #define divu_1616_1616(x,y,q_assignment,r_assignment)  \
     { var uint16 __x = (x);       \
       var uint16 __y = (y);       \
-      q_zuweisung floor(__x,__y); \
-      r_zuweisung (__x % __y);    \
+      q_assignment floor(__x,__y); \
+      r_assignment (__x % __y);    \
     }
 
 # Dividiert eine 32-Bit-Zahl durch eine 16-Bit-Zahl und
@@ -519,7 +519,7 @@
 #   SWAP D1
   #if defined(GNU) || defined(INTEL)
     #if defined(SPARC64) && !defined(NO_ASM)
-      #define divu_3216_1616(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_3216_1616(x,y,q_assignment,r_assignment)  \
         ({var uint32 __x = (x);        \
           var uint16 __y = (y);        \
           var uint64 __q;              \
@@ -531,28 +531,28 @@
             "sub %2,%1,%1"             \
             : "=&r" (__q), "=&r" (__r) \
             : "r" (__x), "r" (__y));   \
-          q_zuweisung (uint16)__q;     \
-          r_zuweisung (uint16)__r;     \
+          q_assignment (uint16)__q;     \
+          r_assignment (uint16)__r;     \
          })
     #elif defined(SPARC) || defined(SPARC64)
-      #define divu_3216_1616(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_3216_1616(x,y,q_assignment,r_assignment)  \
         ({ var uint32 __qr = divu_3216_1616_(x,y); # extern in Assembler \
-           q_zuweisung low16(__qr);  \
-           r_zuweisung high16(__qr); \
+           q_assignment low16(__qr);  \
+           r_assignment high16(__qr); \
          })
     #elif defined(MC680X0) && !defined(NO_ASM)
-      #define divu_3216_1616(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_3216_1616(x,y,q_assignment,r_assignment)  \
         ({var uint32 __x = (x);      \
           var uint16 __y = (y);      \
           var uint32 __qr;           \
           __asm__ __volatile__ ("\
             divu %2,%0   \
             " : "=d" (__qr) : "0" (__x), "dm" (__y));  \
-          q_zuweisung low16(__qr);   \
-          r_zuweisung high16(__qr);  \
+          q_assignment low16(__qr);   \
+          r_assignment high16(__qr);  \
          })
     #elif defined(I80386) && !defined(NO_ASM)
-      #define divu_3216_1616(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_3216_1616(x,y,q_assignment,r_assignment)  \
         ({var uint32 __x = (x);  \
           var uint16 __y = (y);  \
           var uint16 __q;        \
@@ -561,43 +561,43 @@
                   : "=a" /* %ax */ (__q), "=d" /* %dx */ (__r) \
                   : "1" /* %dx */ ((uint16)(high16(__x))), "0" /* %ax */ ((uint16)(low16(__x))), "rm" (__y) \
                  );              \
-          q_zuweisung __q;       \
-          r_zuweisung __r;       \
+          q_assignment __q;       \
+          r_assignment __r;       \
          })
     #elif defined(ARM) && 0 # see comment ariarm.d
-      #define divu_3216_1616(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_3216_1616(x,y,q_assignment,r_assignment)  \
         { var uint32 _q = divu_3216_1616_(x,y); # extern in Assembler \
           var register uint32 _r __asm__("%r1"/*"%a2"*/);             \
-          q_zuweisung _q; r_zuweisung _r;                             \
+          q_assignment _q; r_assignment _r;                             \
         }
     #elif !defined(ARM)
-      #define divu_3216_1616(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_3216_1616(x,y,q_assignment,r_assignment)  \
         ({var uint32 __x = (x);            \
           var uint16 __y = (y);            \
           var uint16 __q = floor(__x,__y); \
-          q_zuweisung __q;                 \
-          r_zuweisung (__x - __q * __y);   \
+          q_assignment __q;                 \
+          r_assignment (__x - __q * __y);   \
          })
     #endif
   #endif
   #ifndef divu_3216_1616
     #if defined(SPARC) || defined(SPARC64)
-      #define divu_3216_1616(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_3216_1616(x,y,q_assignment,r_assignment)  \
         { var uint32 __qr = divu_3216_1616_(x,y); # extern in Assembler \
-          q_zuweisung low16(__qr);  \
-          r_zuweisung high16(__qr); \
+          q_assignment low16(__qr);  \
+          r_assignment high16(__qr); \
         }
     #elif defined(ARM)
-      #define divu_3216_1616(x,y,q_zuweisung,r_zuweisung)  \
-        { q_zuweisung divu_3216_1616_(x,y); # extern in Assembler \
-          r_zuweisung divu_16_rest;                               \
+      #define divu_3216_1616(x,y,q_assignment,r_assignment)  \
+        { q_assignment divu_3216_1616_(x,y); # extern in Assembler \
+          r_assignment divu_16_rest;                               \
         }
       #ifdef LISPARIT
       global uint16 divu_16_rest;
       #endif
     #else
-      #define divu_3216_1616(x,y,q_zuweisung,r_zuweisung)  \
-        { q_zuweisung divu_3216_1616_(x,y); r_zuweisung divu_16_rest; }
+      #define divu_3216_1616(x,y,q_assignment,r_assignment)  \
+        { q_assignment divu_3216_1616_(x,y); r_assignment divu_16_rest; }
       #ifdef LISPARIT
       global uint16 divu_16_rest;
       global uint16 divu_3216_1616_ (uint32 x, uint16 y) {
@@ -646,7 +646,7 @@
 #   MOVE.W D3,D0
 #   SWAP D0        ; beide Quotienten kombinieren, liefert q
   #if defined(GNU) && defined(SPARC64) && !defined(NO_ASM)
-    #define divu_3216_3216(x,y,q_zuweisung,r_zuweisung)  \
+    #define divu_3216_3216(x,y,q_assignment,r_assignment)  \
       ({var uint32 __x = (x);        \
         var uint16 __y = (y);        \
         var uint64 __q;              \
@@ -658,8 +658,8 @@
           "sub %2,%1,%1"             \
           : "=&r" (__q), "=&r" (__r) \
           : "r" (__x), "r" (__y));   \
-        q_zuweisung (uint32)__q;     \
-        r_zuweisung (uint16)__r;     \
+        q_assignment (uint32)__q;     \
+        r_assignment (uint16)__r;     \
        })
   #elif defined(SPARC) || defined(SPARC64) || defined(I80386)
     #define divu_3216_3216  divu_3232_3232
@@ -673,31 +673,31 @@
     # und x = x1*beta+x0 = (q1*beta+q0)*y + r0.
     # Setze q := q1*beta+q0 und r := r0.
     #ifdef GNU
-      #define divu_3216_3216(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_3216_3216(x,y,q_assignment,r_assignment)  \
         ({var uint32 _x = (x);            \
           var uint16 _y = (y);            \
           var uint16 _q1;                 \
           var uint16 _q0;                 \
           var uint16 _r1;                 \
           divu_3216_1616(high16(_x),_y, _q1 = , _r1 = ); \
-          divu_3216_1616(highlow32(_r1,low16(_x)),_y, _q0 = , _EMA_ r_zuweisung); \
-          q_zuweisung highlow32(_q1,_q0); \
+          divu_3216_1616(highlow32(_r1,low16(_x)),_y, _q0 = , _EMA_ r_assignment); \
+          q_assignment highlow32(_q1,_q0); \
          })
     #else
-      #define divu_3216_3216(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_3216_3216(x,y,q_assignment,r_assignment)  \
         {var uint32 _x = (x);            \
          var uint16 _y = (y);            \
          var uint16 _q1;                 \
          var uint16 _q0;                 \
          var uint16 _r1;                 \
          divu_3216_1616(high16(_x),_y, _q1 = , _r1 = ); \
-         divu_3216_1616(highlow32(_r1,low16(_x)),_y, _q0 = , _EMA_ r_zuweisung); \
-         q_zuweisung highlow32(_q1,_q0); \
+         divu_3216_1616(highlow32(_r1,low16(_x)),_y, _q0 = , _EMA_ r_assignment); \
+         q_assignment highlow32(_q1,_q0); \
         }
     #endif
   #else
-    #define divu_3216_3216(x,y,q_zuweisung,r_zuweisung)  \
-      { q_zuweisung divu_3216_3216_(x,y); r_zuweisung divu_16_rest; }
+    #define divu_3216_3216(x,y,q_assignment,r_assignment)  \
+      { q_assignment divu_3216_3216_(x,y); r_assignment divu_16_rest; }
     #if 0
       # divu_3216_3216_ extern in Assembler
     #else
@@ -726,7 +726,7 @@
   extern_C uint32 divu_3232_3232_ (uint32 x, uint32 y); # -> Quotient q
   extern uint32 divu_32_rest;                           # -> Rest r
   #if defined(GNU) && defined(SPARC64) && !defined(NO_ASM)
-    #define divu_3232_3232(x,y,q_zuweisung,r_zuweisung)  \
+    #define divu_3232_3232(x,y,q_assignment,r_assignment)  \
       ({var uint32 __x = (x);        \
         var uint32 __y = (y);        \
         var uint64 __q;              \
@@ -738,8 +738,8 @@
           "sub %2,%1,%1"             \
           : "=&r" (__q), "=&r" (__r) \
           : "r" (__x), "r" (__y));   \
-        q_zuweisung (uint32)__q;     \
-        r_zuweisung (uint32)__r;     \
+        q_assignment (uint32)__q;     \
+        r_assignment (uint32)__r;     \
        })
     #define divu_3232_3232_(x,y)  \
       ({var uint32 __x = (x);        \
@@ -753,8 +753,8 @@
         (uint32)__q;                 \
        })
   #elif defined(SPARC) || defined(SPARC64) || defined(I80386) || defined(HPPA_DIV_WORKS)
-    #define divu_3232_3232(x,y,q_zuweisung,r_zuweisung)  \
-      divu_6432_3232(0,x,y,_EMA_ q_zuweisung,_EMA_ r_zuweisung)
+    #define divu_3232_3232(x,y,q_assignment,r_assignment)  \
+      divu_6432_3232(0,x,y,_EMA_ q_assignment,_EMA_ r_assignment)
     #define divu_3232_3232_(x,y) divu_6432_3232_(0,x,y)
   #elif 1
     # Methode: (beta = 2^n = 2^16, n = 16)
@@ -780,43 +780,43 @@
     # und x-q*y und muss hiervon noch höchstens 2 mal y abziehen und q
     # incrementieren, um den Quotienten  q = floor(x/y)  und den Rest
     # x-floor(x/y)*y  der Division zu bekommen.
-    #define divu_3232_3232(x,y,q_zuweisung,r_zuweisung)  \
-      { var uint32 _x = (x);                                                    \
-        var uint32 _y = (y);                                                    \
-        if (_y <= (uint32)(bit(16)-1))                                          \
-          { var uint16 _q1;                                                     \
-            var uint16 _q0;                                                     \
-            var uint16 _r1;                                                     \
-            divu_3216_1616(high16(_x),_y, _q1 = , _r1 = );                      \
-            divu_3216_1616(highlow32(_r1,low16(_x)),_y, _q0 = , _EMA_ r_zuweisung); \
-            q_zuweisung highlow32(_q1,_q0);                                     \
-          }                                                                     \
-          else                                                                  \
-          { var uint32 _x1 = _x; # x1 := x                                      \
-            var uint32 _y1 = _y; # y1 := y                                      \
-            var uint16 _q;                                                      \
-            do { _x1 = floor(_x1,2); _y1 = floor(_y1,2); } # k erhöhen          \
-               until (_y1 <= (uint32)(bit(16)-1)); # bis y1 < beta              \
-            { var uint16 _y2 = low16(_y1)+1; # y1+1 bilden                      \
-              if (_y2==0)                                                       \
-                { _q = high16(_x1); } # y1+1=beta -> ein Shift                  \
-                else                                                            \
-                { divu_3216_1616(_x1,_y2,_q=,); } # Division von x1 durch y1+1  \
-            }                                                                   \
-            # _q = q = floor(x1/(y1+1))                                         \
-            # x-q*y bilden (eine 16-mal-32-Bit-Multiplikation ohne Überlauf):   \
-            _x -= highlow32_0(mulu16(_q,high16(_y))); # q * high16(y) * beta    \
-            # gefahrlos, da q*high16(y) <= q*y/beta <= x/beta < beta            \
-            _x -= mulu16(_q,low16(_y)); # q * low16(y)                          \
-            # gefahrlos, da q*high16(y)*beta + q*low16(y) = q*y <= x            \
-            # Noch höchstens 2 mal y abziehen:                                  \
-            if (_x >= _y)                                                       \
-              { _q += 1; _x -= _y;                                              \
-                if (_x >= _y)                                                   \
-                  { _q += 1; _x -= _y;                                          \
-              }   }                                                             \
-            r_zuweisung _x;                                                     \
-            q_zuweisung (uint32)(_q);                                           \
+    #define divu_3232_3232(x,y,q_assignment,r_assignment)  \
+      { var uint32 _x = (x);                                            \
+        var uint32 _y = (y);                                            \
+        if (_y <= (uint32)(bit(16)-1))                                  \
+          { var uint16 _q1;                                             \
+            var uint16 _q0;                                             \
+            var uint16 _r1;                                             \
+            divu_3216_1616(high16(_x),_y, _q1 = , _r1 = );              \
+            divu_3216_1616(highlow32(_r1,low16(_x)),_y, _q0 = , _EMA_ r_assignment); \
+            q_assignment highlow32(_q1,_q0);                            \
+          }                                                             \
+          else                                                          \
+          { var uint32 _x1 = _x; # x1 := x                              \
+            var uint32 _y1 = _y; # y1 := y                              \
+            var uint16 _q;                                              \
+            do { _x1 = floor(_x1,2); _y1 = floor(_y1,2); } # k erhöhen  \
+            while (_y1 > (uint32)(bit(16)-1)); # bis y1 < beta          \
+            { var uint16 _y2 = low16(_y1)+1; # y1+1 bilden              \
+              if (_y2==0)                                               \
+                { _q = high16(_x1); } # y1+1=beta -> ein Shift          \
+                else                                                    \
+                { divu_3216_1616(_x1,_y2,_q=,); } # Division von x1 durch y1+1 \
+            }                                                           \
+            # _q = q = floor(x1/(y1+1))                                 \
+            # x-q*y bilden (eine 16-mal-32-Bit-Multiplikation ohne Überlauf): \
+            _x -= highlow32_0(mulu16(_q,high16(_y))); # q * high16(y) * beta \
+            # gefahrlos, da q*high16(y) <= q*y/beta <= x/beta < beta    \
+            _x -= mulu16(_q,low16(_y)); # q * low16(y)                  \
+            # gefahrlos, da q*high16(y)*beta + q*low16(y) = q*y <= x    \
+            # Noch höchstens 2 mal y abziehen:                          \
+            if (_x >= _y)                                               \
+              { _q += 1; _x -= _y;                                      \
+                if (_x >= _y)                                           \
+                  { _q += 1; _x -= _y;                                  \
+              }   }                                                     \
+            r_assignment _x;                                            \
+            q_assignment (uint32)(_q);                                  \
       }   }
     #ifdef LISPARIT
     # Dies dient nur noch als Hilfsfunktion für arilev1.d.
@@ -828,8 +828,8 @@
     }
     #endif
   #else
-    #define divu_3232_3232(x,y,q_zuweisung,r_zuweisung)  \
-      { q_zuweisung divu_3232_3232_(x,y); r_zuweisung divu_32_rest; }
+    #define divu_3232_3232(x,y,q_assignment,r_assignment)  \
+      { q_assignment divu_3232_3232_(x,y); r_assignment divu_32_rest; }
     #if 0
       # divu_3232_3232_ extern in Assembler
     #else
@@ -856,7 +856,7 @@
   extern uint32 divu_32_rest;                                         # -> Rest r
   #if defined(GNU) || defined(INTEL)
     #if defined(MC680Y0) && !defined(NO_ASM)
-      #define divu_6432_3232(xhi,xlo,y,q_zuweisung,r_zuweisung)  \
+      #define divu_6432_3232(xhi,xlo,y,q_assignment,r_assignment)  \
         ({var uint32 __xhi = (xhi);  \
           var uint32 __xlo = (xlo);  \
           var uint32 __y = (y);      \
@@ -865,13 +865,13 @@
           __asm__ __volatile__ ("\
             divul %4,%1:%0   \
             " : "=d" (__q), "=d" (__r) : "1" (__xhi), "0" (__xlo), "dm" (__y));  \
-          q_zuweisung __q;           \
-          r_zuweisung __r;           \
+          q_assignment __q;           \
+          r_assignment __r;           \
          })
       #define divu_6432_3232_(xhi,xlo,y) \
         ({var uint32 ___q; divu_6432_3232(xhi,xlo,y,___q=,); ___q; })
     #elif defined(SPARC64) && !defined(NO_ASM)
-      #define divu_6432_3232(xhi,xlo,y,q_zuweisung,r_zuweisung)  \
+      #define divu_6432_3232(xhi,xlo,y,q_assignment,r_assignment)  \
         ({var uint32 __xhi = (xhi);    \
           var uint32 __xlo = (xlo);    \
           var uint32 __y = (y);        \
@@ -884,23 +884,23 @@
             "sub %3,%1,%1"             \
             : "=&r" (__q), "=&r" (__r) \
             : "r" (__xhi), "r" (__xlo), "r" (__y)); \
-          q_zuweisung (uint32)__q;     \
-          r_zuweisung (uint32)__r;     \
+          q_assignment (uint32)__q;     \
+          r_assignment (uint32)__r;     \
          })
     #elif defined(SPARC) || defined(SPARC64)
-      #define divu_6432_3232(xhi,xlo,y,q_zuweisung,r_zuweisung)  \
+      #define divu_6432_3232(xhi,xlo,y,q_assignment,r_assignment)  \
         ({ var uint32 _q = divu_6432_3232_(xhi,xlo,y); # extern in Assembler \
            var register uint32 _r __asm__("%g1");                            \
-           q_zuweisung _q; r_zuweisung _r;                                   \
+           q_assignment _q; r_assignment _r;                                   \
          })
     #elif defined(ARM) && 0 # see comment ariarm.d
-      #define divu_6432_3232(xhi,xlo,y,q_zuweisung,r_zuweisung)  \
+      #define divu_6432_3232(xhi,xlo,y,q_assignment,r_assignment)  \
         ({ var uint32 _q = divu_6432_3232_(xhi,xlo,y); # extern in Assembler \
            var register uint32 _r __asm__("%r1"/*"%a2"*/);                   \
-           q_zuweisung _q; r_zuweisung _r;                                   \
+           q_assignment _q; r_assignment _r;                                   \
          })
     #elif defined(I80386) && !defined(NO_ASM)
-      #define divu_6432_3232(xhi,xlo,y,q_zuweisung,r_zuweisung)  \
+      #define divu_6432_3232(xhi,xlo,y,q_assignment,r_assignment)  \
         ({var uint32 __xhi = (xhi);  \
           var uint32 __xlo = (xlo);  \
           var uint32 __y = (y);      \
@@ -911,27 +911,27 @@
              : "=a" /* %eax */ (__q), "=d" /* %edx */ (__r)               \
              : "1" /* %edx */ (__xhi), "0" /* %eax */ (__xlo), "rm" (__y) \
              );                      \
-          q_zuweisung __q;           \
-          r_zuweisung __r;           \
+          q_assignment __q;           \
+          r_assignment __r;           \
          })
       #define divu_6432_3232_(xhi,xlo,y) \
         ({var uint32 ___q; divu_6432_3232(xhi,xlo,y,___q=,); ___q; })
-    #elif defined(HAVE_LONGLONG) && !defined(ARM) && !defined(HPPA_DIV_WORKS)
-      #define divu_6432_3232(xhi,xlo,y,q_zuweisung,r_zuweisung) \
+    #elif defined(HAVE_LONG_LONG_INT) && !defined(ARM) && !defined(HPPA_DIV_WORKS)
+      #define divu_6432_3232(xhi,xlo,y,q_assignment,r_assignment) \
         ({var uint32 __xhi = (xhi);                           \
           var uint32 __xlo = (xlo);                           \
           var uint64 __x = (uint64)__xhi<<32 | (uint64)__xlo; \
           var uint32 __y = (y);                               \
           var uint32 __q = floor(__x,(uint64)__y);            \
-          q_zuweisung __q; r_zuweisung __xlo - __q * __y;     \
+          q_assignment __q; r_assignment __xlo - __q * __y;     \
          })
       #define divu_6432_3232_(xhi,xlo,y) \
         ({var uint32 ___q; divu_6432_3232(xhi,xlo,y,___q=,); ___q; })
     #endif
   #endif
   #ifndef divu_6432_3232
-    #define divu_6432_3232(xhi,xlo,y,q_zuweisung,r_zuweisung)  \
-      { q_zuweisung divu_6432_3232_(xhi,xlo,y); r_zuweisung divu_32_rest; }
+    #define divu_6432_3232(xhi,xlo,y,q_assignment,r_assignment)  \
+      { q_assignment divu_6432_3232_(xhi,xlo,y); r_assignment divu_32_rest; }
     #if defined(MC680Y0) || defined(SPARC) || defined(SPARC64) || defined(ARM) || (defined(I80386) && !defined(BORLAND)) || defined(HPPA)
       # divu_6432_3232_ extern in Assembler
       #if defined(SPARC) || defined(SPARC64)
@@ -1075,31 +1075,31 @@
     # und x = x1*beta+x0 = (q1*beta+q0)*y + r0.
     # Setze q := q1*beta+q0 und r := r0.
     #ifdef GNU
-      #define divu_6432_6432(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_6432_6432(x,y,q_assignment,r_assignment)  \
         ({var uint64 _x = (x);            \
           var uint32 _y = (y);            \
           var uint32 _q1;                 \
           var uint32 _q0;                 \
           var uint32 _r1;                 \
           divu_6432_3232(0,high32(_x),_y, _q1 = , _r1 = ); \
-          divu_6432_3232(_r1,low32(_x),_y, _q0 = , _EMA_ r_zuweisung); \
-          q_zuweisung highlow64(_q1,_q0); \
+          divu_6432_3232(_r1,low32(_x),_y, _q0 = , _EMA_ r_assignment); \
+          q_assignment highlow64(_q1,_q0); \
          })
     #else
-      #define divu_6432_6432(x,y,q_zuweisung,r_zuweisung)  \
+      #define divu_6432_6432(x,y,q_assignment,r_assignment)  \
         {var uint64 _x = (x);            \
          var uint32 _y = (y);            \
          var uint32 _q1;                 \
          var uint32 _q0;                 \
          var uint32 _r1;                 \
          divu_6432_3232(0,high32(_x),_y, _q1 = , _r1 = ); \
-         divu_6432_3232(_r1,low32(_x),_y, _q0 = , _EMA_ r_zuweisung); \
-         q_zuweisung highlow64(_q1,_q0); \
+         divu_6432_3232(_r1,low32(_x),_y, _q0 = , _EMA_ r_assignment); \
+         q_assignment highlow64(_q1,_q0); \
         }
     #endif
   #else
-    #define divu_6432_6432(x,y,q_zuweisung,r_zuweisung)  \
-      { q_zuweisung divu_6432_6432_(x,y); r_zuweisung divu_32_rest; }
+    #define divu_6432_6432(x,y,q_assignment,r_assignment)  \
+      { q_assignment divu_6432_6432_(x,y); r_assignment divu_32_rest; }
     #if 0
       # divu_6432_6432_ extern in Assembler
     #else
@@ -1151,47 +1151,47 @@
     # und x-q*y und muss hiervon noch höchstens 2 mal y abziehen und q
     # incrementieren, um den Quotienten  q = floor(x/y)  und den Rest
     # x-floor(x/y)*y  der Division zu bekommen.
-    #define divu_6464_6464(x,y,q_zuweisung,r_zuweisung)  \
-      { var uint64 _x = (x);                                                    \
-        var uint64 _y = (y);                                                    \
-        if (_y <= (uint64)(((uint64)1<<32)-1))                                  \
-          { var uint32 _q1;                                                     \
-            var uint32 _q0;                                                     \
-            var uint32 _r1;                                                     \
-            divu_6432_3232(0,high32(_x),_y, _q1 = , _r1 = );                    \
-            divu_6432_3232(_r1,low32(_x),_y, _q0 = , _EMA_ r_zuweisung);        \
-            q_zuweisung highlow64(_q1,_q0);                                     \
-          }                                                                     \
-          else                                                                  \
-          { var uint64 _x1 = _x; # x1 := x                                      \
-            var uint64 _y1 = _y; # y1 := y                                      \
-            var uint32 _q;                                                      \
-            do { _x1 = floor(_x1,2); _y1 = floor(_y1,2); } # k erhöhen          \
-               until (_y1 <= (uint64)(((uint64)1<<32)-1)); # bis y1 < beta      \
-            { var uint32 _y2 = low32(_y1)+1; # y1+1 bilden                      \
-              if (_y2==0)                                                       \
-                { _q = high32(_x1); } # y1+1=beta -> ein Shift                  \
-                else                                                            \
+    #define divu_6464_6464(x,y,q_assignment,r_assignment)  \
+      { var uint64 _x = (x);                                            \
+        var uint64 _y = (y);                                            \
+        if (_y <= (uint64)(((uint64)1<<32)-1))                          \
+          { var uint32 _q1;                                             \
+            var uint32 _q0;                                             \
+            var uint32 _r1;                                             \
+            divu_6432_3232(0,high32(_x),_y, _q1 = , _r1 = );            \
+            divu_6432_3232(_r1,low32(_x),_y, _q0 = , _EMA_ r_assignment); \
+            q_assignment highlow64(_q1,_q0);                            \
+          }                                                             \
+          else                                                          \
+          { var uint64 _x1 = _x; # x1 := x                              \
+            var uint64 _y1 = _y; # y1 := y                              \
+            var uint32 _q;                                              \
+            do { _x1 = floor(_x1,2); _y1 = floor(_y1,2); } # k erhöhen  \
+            while (_y1 > (uint64)(((uint64)1<<32)-1)); # bis y1 < beta  \
+            { var uint32 _y2 = low32(_y1)+1; # y1+1 bilden              \
+              if (_y2==0)                                               \
+                { _q = high32(_x1); } # y1+1=beta -> ein Shift          \
+                else                                                    \
                 { divu_6432_3232(high32(_x1),low32(_x1),_y2,_q=,); } # Division von x1 durch y1+1 \
-            }                                                                   \
-            # _q = q = floor(x1/(y1+1))                                         \
-            # x-q*y bilden (eine 32-mal-64-Bit-Multiplikation ohne Überlauf):   \
+            }                                                           \
+            # _q = q = floor(x1/(y1+1))                                 \
+            # x-q*y bilden (eine 32-mal-64-Bit-Multiplikation ohne Überlauf): \
             _x -= highlow64_0(mulu32_64(_q,high32(_y))); # q * high32(y) * beta \
-            # gefahrlos, da q*high32(y) <= q*y/beta <= x/beta < beta            \
-            _x -= mulu32_64(_q,low32(_y)); # q * low32(y)                       \
-            # gefahrlos, da q*high32(y)*beta + q*low32(y) = q*y <= x            \
-            # Noch höchstens 2 mal y abziehen:                                  \
-            if (_x >= _y)                                                       \
-              { _q += 1; _x -= _y;                                              \
-                if (_x >= _y)                                                   \
-                  { _q += 1; _x -= _y;                                          \
-              }   }                                                             \
-            r_zuweisung _x;                                                     \
-            q_zuweisung (uint64)(_q);                                           \
+            # gefahrlos, da q*high32(y) <= q*y/beta <= x/beta < beta    \
+            _x -= mulu32_64(_q,low32(_y)); # q * low32(y)               \
+            # gefahrlos, da q*high32(y)*beta + q*low32(y) = q*y <= x    \
+            # Noch höchstens 2 mal y abziehen:                          \
+            if (_x >= _y)                                               \
+              { _q += 1; _x -= _y;                                      \
+                if (_x >= _y)                                           \
+                  { _q += 1; _x -= _y;                                  \
+              }   }                                                     \
+            r_assignment _x;                                            \
+            q_assignment (uint64)(_q);                                  \
       }   }
   #else
-    #define divu_6464_6464(x,y,q_zuweisung,r_zuweisung)  \
-      { q_zuweisung divu_6464_6464_(x,y); r_zuweisung divu_64_rest; }
+    #define divu_6464_6464(x,y,q_assignment,r_assignment)  \
+      { q_assignment divu_6464_6464_(x,y); r_assignment divu_64_rest; }
     #if 0
       # divu_6464_6464_ extern in Assembler
     #else
@@ -1225,21 +1225,21 @@
   #     floor(y/2 + x/(2*y)) >= floor(sqrt(x)) ).
   #  3. Am Schluss gilt x >= y^2.
   # )
-  #define isqrt_32_16(x,y_zuweisung,sqrtp_zuweisung)  \
+  #define isqrt_32_16(x,y_assignment,sqrtp_assignment)  \
     { var uint32 _x = (x);                                               \
       var uint16 _x1 = high16(_x);                                       \
       var uint16 _y = floor(_x1,2) | bit(16-1);                          \
-      loop                                                               \
-        { var uint16 _z;                                                 \
-          var uint16 _r;                                                 \
-          if (_x1 >= _y) # Division _x/_y ergäbe Überlauf -> _z > _y     \
-            { unused (sqrtp_zuweisung false); break; }                   \
-          divu_3216_1616(_x,_y, _z=,_r=); # Dividiere _x/_y              \
-          if (_z >= _y)                                                  \
-            { unused (sqrtp_zuweisung (_z == _y) && (_r == 0)); break; } \
-          _y = floor((uint16)(_z+_y),2) | bit(16-1); # _y muss >= 2^15 bleiben \
-        }                                                                \
-      y_zuweisung _y;                                                    \
+      while (1) {                                                       \
+        var uint16 _z;                                                  \
+        var uint16 _r;                                                  \
+        if (_x1 >= _y) # Division _x/_y ergäbe Überlauf -> _z > _y      \
+          { unused (sqrtp_assignment false); break; }                   \
+        divu_3216_1616(_x,_y, _z=,_r=); # Dividiere _x/_y               \
+        if (_z >= _y)                                                   \
+          { unused (sqrtp_assignment (_z == _y) && (_r == 0)); break; } \
+        _y = floor((uint16)(_z+_y),2) | bit(16-1); # _y muss >= 2^15 bleiben \
+      }                                                                 \
+      y_assignment _y;                                                  \
     }
 
 # Zieht die Ganzzahl-Wurzel aus einer 64-Bit-Zahl und
@@ -1261,21 +1261,21 @@
     #     floor(y/2 + x/(2*y)) >= floor(sqrt(x)) ).
     #  3. Am Schluss gilt x >= y^2.
     # )
-    #define isqrt_64_32(xhi,xlo,y_zuweisung,sqrtp_zuweisung)  \
+    #define isqrt_64_32(xhi,xlo,y_assignment,sqrtp_assignment)  \
       { var uint32 _xhi = (xhi);                                        \
         var uint32 _xlo = (xlo);                                        \
         var uint32 _y = floor(_xhi,2) | bit(32-1);                      \
-        loop                                                            \
-          { var uint32 _z;                                              \
-            var uint32 _rest;                                           \
-            if (_xhi >= _y) # Division _x/_y ergäbe Überlauf -> _z > _y \
-              { sqrtp_zuweisung false; break; }                         \
-            divu_6432_3232(_xhi,_xlo,_y, _z=,_rest=); # Dividiere _x/_y \
-            if (_z >= _y)                                               \
-              { sqrtp_zuweisung (_z == _y) && (_rest == 0); break; }    \
-            _y = floor(_z+_y,2) | bit(32-1); # _y muss >= 2^31 bleiben  \
-          }                                                             \
-        y_zuweisung _y;                                                 \
+        while (1) {                                                     \
+          var uint32 _z;                                                \
+          var uint32 _rest;                                             \
+          if (_xhi >= _y) # Division _x/_y ergäbe Überlauf -> _z > _y   \
+            { sqrtp_assignment false; break; }                          \
+          divu_6432_3232(_xhi,_xlo,_y, _z=,_rest=); # Dividiere _x/_y   \
+          if (_z >= _y)                                                 \
+            { sqrtp_assignment (_z == _y) && (_rest == 0); break; }     \
+          _y = floor(_z+_y,2) | bit(32-1); # _y muss >= 2^31 bleiben    \
+        }                                                               \
+        y_assignment _y;                                                \
       }
   #else
     # Methode:
@@ -1304,7 +1304,7 @@
     #   xhi*2^32+xlo >= 2*2^16*yhi*ylo' >= 2*2^16*yhi*(ylo'-1) + 2^32
     #                >= 2*2^16*yhi*(ylo'-1) + (ylo'-1)^2,
     #   also ylo >= ylo'-1 nach Definition von ylo.)
-    #define isqrt_64_32(xhi,xlo,y_zuweisung,sqrtp_zuweisung)  \
+    #define isqrt_64_32(xhi,xlo,y_assignment,sqrtp_assignment)  \
       { var uint32 _xhi = (xhi);                                            \
         var uint32 _xlo = (xlo);                                            \
         var uint16 _yhi;                                                    \
@@ -1334,13 +1334,13 @@
         # Rest := Rest + 2^17*yhi = xlo + 2^17*yhi >= 2^32 > z, also x>y^2. \
         if (_r < bit(15))                                                   \
           { if (_xlo < _z)                                                  \
-              { _ylo -= 1; sqrtp_zuweisung false; }                         \
+              { _ylo -= 1; sqrtp_assignment false; }                         \
               else                                                          \
-              { sqrtp_zuweisung (_xlo == _z); }                             \
+              { sqrtp_assignment (_xlo == _z); }                             \
           }                                                                 \
           else                                                              \
-          { sqrtp_zuweisung false; }                                        \
-        y_zuweisung highlow32(_yhi,_ylo);                                   \
+          { sqrtp_assignment false; }                                        \
+        y_assignment highlow32(_yhi,_ylo);                                   \
       }}
   #endif
 

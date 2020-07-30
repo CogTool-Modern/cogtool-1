@@ -1,4 +1,6 @@
-make clisp-module CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}" INCLUDES="$absolute_linkkitdir"
+${MAKE-make} clisp-module \
+  CC="${CC}" CPPFLAGS="${CPPFLAGS}" CFLAGS="${CFLAGS}"
+  CLISP_LINKKIT="$absolute_linkkitdir" CLISP="${CLISP}"
 NEW_FILES=''
 NEW_LIBS=''
 NEW_MODULES=''

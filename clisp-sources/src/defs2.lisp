@@ -1,6 +1,6 @@
-;;; ANSI-compatible definitions
-;;; Bruno Haible 21.7.1994
-;;; Sam Steingold 1999-2004
+;;; ANSI-compatible definitions + some extensions
+;;; Bruno Haible 21.7.1994 - 2006
+;;; Sam Steingold 1999-2004, 2007-2009
 
 ;; ============================================================================
 
@@ -8,6 +8,7 @@
 (export '(declaim destructuring-bind complement
           constantly with-standard-io-syntax with-hash-table-iterator
           read-sequence write-sequence))
+(export '(ext::trim-if) "EXT")
 (in-package "SYSTEM")
 
 ;; ----------------------------------------------------------------------------
@@ -28,14 +29,14 @@
                               lambdalist form &body body)
   (multiple-value-bind (body-rest declarations) (system::parse-body body)
     (if declarations (setq declarations `((DECLARE ,@declarations))))
-    (let ((%whole-form whole-form)
-          (%arg-count 0) (%min-args 0) (%restp nil) (%ignored nil)
+    (let ((%whole-form whole-form) (%proper-list-p nil)
+          (%arg-count 0) (%min-args 0) (%restp nil) (%null-tests nil)
           (%let-list nil) (%keyword-tests nil) (%default-form nil))
       (analyze1 lambdalist '<DESTRUCTURING-FORM> 'destructuring-bind '<DESTRUCTURING-FORM>)
       (let ((lengthtest (make-length-test '<DESTRUCTURING-FORM> 0))
             (mainform `(LET* ,(nreverse %let-list)
                          ,@declarations
-                         ,@(if %ignored `((DECLARE (IGNORE ,%ignored))))
+                         ,@(nreverse %null-tests)
                          ,@(nreverse %keyword-tests)
                          ,@body-rest
            ))          )
@@ -53,10 +54,17 @@
 (defun destructuring-error (destructuring-form min.max) ; ABI
   (let ((min (car min.max))
         (max (cdr min.max)))
-    (error-of-type 'program-error
-      (TEXT "The object to be destructured should be a list with ~:[at least ~*~S~;~:[from ~S to ~S~;~S~]~] elements, not ~4@*~S.")
-      max (eql min max) min max destructuring-form
-) ) )
+    (multiple-value-bind (length tail) (sys::list-length-dotted destructuring-form)
+      (declare (ignore tail))
+      (if (null length)
+        (let ((*print-circle* t))
+          (error-of-type 'program-error
+            (TEXT "The object to be destructured should be a list with at most ~S elements, not the circular list ~S")
+            min destructuring-form))
+        (error-of-type 'program-error
+          (TEXT "The object to be destructured should be a list with ~:[at least ~*~S~;~:[from ~S to ~S~;~S~]~] elements, not ~4@*~S.")
+          max (eql min max) min max destructuring-form)
+) ) ) )
 
 ;; Like destructuring-bind, except that it works only with ordinary
 ;; lambda-lists and generates more efficient code.
@@ -104,7 +112,7 @@
            (*PRINT-LEVEL*               NIL)
            (*PRINT-LINES*               NIL)
            (*PRINT-MISER-WIDTH*         NIL)
-           (*PRINT-PPRINT-DISPATCH*     NIL)
+           (*PRINT-PPRINT-DISPATCH*     (COPY-PPRINT-DISPATCH NIL))
            (*PRINT-PRETTY*              NIL)
            (*PRINT-RADIX*               NIL)
            (*PRINT-READABLY*            T)
@@ -115,7 +123,7 @@
            (SYSTEM::*PRIN-STREAM*       NIL) ; CLISP specific
            (SYSTEM::*PRIN-LINELENGTH*   79)  ; CLISP specific
            (SYSTEM::*PRIN-LINE-PREFIX*  NIL) ; CLISP specific
-           (COMPILER::*LOAD-FORMS*      NIL) ; CLISP specific
+           (SYSTEM::*LOAD-FORMS*        NIL) ; CLISP specific
            ;; reader variables:
            (*READ-BASE*                 10)
            (*READ-DEFAULT-FLOAT-FORMAT* 'SINGLE-FLOAT)
@@ -133,7 +141,7 @@
   (unless (symbolp macroname)
     (error (TEXT "~S: macro name should be a symbol, not ~S")
            'with-hash-table-iterator macroname))
-  (let ((var (gensym)))
+  (let ((var (gensym "WHTI-")))
     `(LET ((,var (SYS::HASH-TABLE-ITERATOR ,hashtable)))
        (MACROLET ((,macroname () '(SYS::HASH-TABLE-ITERATE ,var) ))
          ,@body))))
@@ -162,7 +170,7 @@
                     (unless nextch
                       (error-of-type 'end-of-file
                         :stream stream
-                        (TEXT "~S: input stream ~S ends within read macro beginning to ~S")
+                        (TEXT "~S: input stream ~S ends within read macro beginning with ~S")
                         'read stream ch
                     ) )
                     (unless (characterp nextch)
@@ -199,7 +207,7 @@
   (let ((vector-index
           (do ((i 0 (1+ i)))
                (nil)
-            (when (eq (%record-ref #'dispatch-reader i) vector) (return i)))))
+            (when (eq (closure-const #'dispatch-reader i) vector) (return i)))))
     (%defio #'dispatch-reader vector-index)
   )
 )
@@ -235,7 +243,7 @@
       (T (return))))
   (stream-element-type stream))
 
-(defun read-sequence (sequence stream &rest rest &key (start 0) (end nil))
+(defun %read-sequence (sequence stream &rest rest &key (start 0) (end nil))
   (declare (ignore start end))
   (let ((seltype (stream-input-element-type stream))
         (veltype (if (vectorp sequence) (array-element-type sequence) t)))
@@ -249,7 +257,13 @@
                   'read-sequence sequence stream
                   'read-char-sequence 'read-byte-sequence)))))
 
-(defun write-sequence (sequence stream &rest rest &key (start 0) (end nil))
+(defun read-sequence (sequence stream &rest rest &key (start 0) (end nil))
+  (declare (ignore start end))
+  (if (built-in-stream-p stream)
+      (apply #'%read-sequence sequence stream rest)
+      (apply 'gray::stream-read-sequence sequence stream rest)))
+
+(defun %write-sequence (sequence stream &rest rest &key (start 0) (end nil))
   (declare (ignore start end))
   (let ((seltype (stream-output-element-type stream))
         (veltype (if (vectorp sequence) (array-element-type sequence) t)))
@@ -265,6 +279,20 @@
            (error (TEXT "~S: element types of ~S and ~S are ambiguous. Please use ~S or ~S.")
                   'write-sequence sequence stream
                   'write-char-sequence 'write-byte-sequence)))))
+
+(defun write-sequence (sequence stream &rest rest &key (start 0) (end nil))
+  (declare (ignore start end))
+  (if (built-in-stream-p stream)
+      (apply #'%write-sequence sequence stream rest)
+      (apply 'gray::stream-write-sequence sequence stream rest)))
+
+(defun trim-if (predicate sequence)
+  (let ((beg (position-if-not predicate sequence)))
+    (if beg
+        (let ((end (1+ (position-if-not predicate sequence :from-end t))))
+          (if (and (= beg 0) (= end (length sequence))) sequence
+              (subseq sequence beg end)))
+        (subseq sequence 0 0))))  ; empty sequence of the same type as argument
 
 ;; ----------------------------------------------------------------------------
 
@@ -398,11 +426,41 @@
 ;; ----------------------------------------------------------------------------
 
 (defmacro define-hash-table-test (name test hash)
-  (loop (when (symbolp name) (return))
-    ;; check-value will be defined in condition.lisp
-    (setq name (check-value
-                nil (make-condition 'simple-type-error
-                      :format-control (TEXT "~S: ~S should be a symbol")
-                      :format-arguments (list 'define-hash-table-test name)
-                      :datum name :expected-type 'symbol))))
+  (setq name (check-symbol name 'define-hash-table-test))
   `(progn (setf (get ',name 'hash-table-test) (cons #',test #',hash)) ',name))
+
+;; (default-directory) is a Synonym for (cd).
+(defun default-directory () (cd))
+
+;; (setf (default-directory) dir) is a Synonym for (cd dir).
+(defsetf default-directory () (value)
+  `(PROGN (CD ,value) ,value))
+
+;; FORMAT-Control-String for output of dates,
+;; applicable to a List (sec min hour day month year ...),
+;; occupies 17-19 characters
+(definternational date-format
+  (t ENGLISH))
+(deflocalized date-format ENGLISH
+  (formatter
+   "~1{~5@*~D-~4@*~2,'0D-~3@*~2,'0D ~2@*~2,'0D:~1@*~2,'0D:~0@*~2,'0D~:}"))
+(defun date-format ()
+  (localized 'date-format))
+(defun date-string ()
+  (with-output-to-string (s)
+    (funcall (date-format) s (multiple-value-list (get-decoded-time)))))
+
+;; list a directory
+(defun dir (&optional (pathnames #+(or UNIX WIN32) '("*/" "*")))
+  (flet ((onedir (pathname)
+           (let ((pathname-list (directory pathname :full t :circle t)))
+             (if (every #'atom pathname-list)
+               (format t "~{~&~A~.~}"
+                       (sort pathname-list #'string< :key #'namestring))
+               (let ((date-format (date-format)))
+                 (dolist (l (sort pathname-list #'string<
+                                  :key #'(lambda (l) (namestring (first l)))))
+                   (format t "~&~A~40T~7D~52T~21<~@?~>~."
+                           (first l) (fourth l) date-format (third l))))))))
+    (if (listp pathnames) (mapc #'onedir pathnames) (onedir pathnames)))
+  (values))

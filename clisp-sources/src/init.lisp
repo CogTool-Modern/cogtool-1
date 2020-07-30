@@ -211,9 +211,9 @@
 (common-lisp:eval-when (common-lisp:compile common-lisp:load common-lisp:eval)
   (common-lisp:setq common-lisp:*package* (sys::%find-package "SYSTEM")))
 
-(proclaim '(special compiler::*compiling* compiler::*compiling-from-file*
-            compiler::*c-error-output*)) ; for load/compiling
-(setq compiler::*compiling* nil)
+(proclaim '(special sys::*compiling* sys::*compiling-from-file*
+            sys::*c-error-output*)) ; for load/compiling
+(setq sys::*compiling* nil)
 
 #-COMPILER ; only for bootstrapping
 (progn
@@ -236,14 +236,15 @@
       |#
       (let ((name (cadr form)))
         (list 'sys::%putd (list 'quote name)
-              (list 'function name (cons 'lambda (cddr form)))))))))
+              (list 'function name (cons 'lambda (cddr form)))))))
+    '(function-name lambda-list &body forms)))
 
 )
 
 (sys::%putd 'sys::make-preliminary
   (function sys::make-preliminary (lambda (closure) ; ABI
-    (sys::\(setf\ closure-name\) (list 'ext::preliminary (sys::closure-name closure))
-                                 closure)
+    (sys::\(setf\ closure-name\)
+     (list 'ext::preliminary (sys::closure-name closure)) closure)
     closure)))
 
 (sys::%putd 'in-package
@@ -253,7 +254,8 @@
       (let ((package-name (string (cadr form))))
         (list 'EVAL-WHEN '(:COMPILE-TOPLEVEL LOAD EVAL)
               (list 'SETQ 'COMMON-LISP::*PACKAGE*
-                    (list 'SYS::%FIND-PACKAGE package-name))))))))
+                    (list 'SYS::%FIND-PACKAGE package-name))))))
+    '(package-name)))
 
 ;; A preliminary definition that understands only ~S, ~A and ~C.
 (sys::%putd 'format
@@ -330,10 +332,10 @@
  '(re-export featurep make-encoding encoding
    encoding-line-terminator #+UNICODE encoding-charset
    times show-stack gc exit quit bye expand-form xor mapcap maplap
-   proper-list-p elastic-newline absolute-pathname
-   probe-directory cd make-dir delete-dir default-directory dir
+   proper-list-p elastic-newline absolute-pathname default-directory cd dir
+   probe-directory make-directory delete-directory rename-directory
    xgcd exquo mod-expt ! evalhook applyhook substring string-concat
-   string-char make-char string-width char-width
+   string-char make-char string-width char-width probe-pathname
    int-char char-bits char-font char-bit set-char-bit char-key
    base-char-code-limit char-font-limit char-bits-limit char-control-bit
    char-meta-bit char-super-bit char-hyper-bit string-char-p
@@ -354,6 +356,7 @@
    simple-32bit-vector 32bit-vector special-form system-function
    function-macro foreign-pointer symbol-macro global-symbol-macro designator
    address special-operator finalize finalizer
+   ;; weak containers
    weak-pointer make-weak-pointer weak-pointer-p weak-pointer-value
    weak-list make-weak-list weak-list-p weak-list-list
    weak-and-relation make-weak-and-relation weak-and-relation-p
@@ -368,6 +371,11 @@
    weak-or-mapping-value
    weak-alist make-weak-alist weak-alist-p weak-alist-type weak-alist-contents
    weak-alist-assoc weak-alist-rassoc weak-alist-value
+   ;; structure MOP
+   structure-slots structure-direct-slots ; structure-instance-size
+   structure-keyword-constructor structure-boa-constructors
+   structure-copier structure-predicate
+   ;; i/o
    read-integer read-float write-integer write-float
    read-byte-lookahead read-byte-will-hang-p read-byte-no-hang
    read-char-will-hang-p
@@ -380,14 +388,15 @@
    make-buffered-input-stream make-buffered-output-stream
    get-setf-method preliminary local module-info
    source-program-error source-program-error-form source-program-error-detail
-   compiler-let load-time-eval)
+   compiler-let load-time-eval compile-time-value)
  "EXT")
 
 (common-lisp:in-package "CUSTOM")
 
 (common-lisp:export
  '(*load-paths* *editor* *clhs-root-default* *browsers* *browser* *http-proxy*
-   clhs-root *impnotes-root-default* impnotes-root
+   *http-log-stream* clhs-root *impnotes-root-default* impnotes-root
+   *saveinitmem-verbose*
    *load-echo* *applyhook* *evalhook* *load-compiling* *compile-warnings*
    *load-obsolete-action* *suppress-check-redefinition*
    *eq-hashfunction* *eql-hashfunction* *equal-hashfunction*
@@ -520,6 +529,7 @@
           method-call-error-generic-function
           method-call-error-method method-call-error-argument-list
           standard-stablehash structure-stablehash
+          clos-warning gf-already-called-warning gf-replacing-method-warning
      ))  )
   ;; not in ANSI - export separately, after `re-export' above
   (export clos-extra "CLOS")
@@ -540,12 +550,14 @@
     (cond ((special-operator-p sym) (TEXT "special operator"))
           ((macro-function sym)
            (if (not (and (sys::closurep (macro-function sym))
-                         (sys::preliminary-p (sys::closure-name (macro-function sym)))))
+                         (sys::preliminary-p (sys::closure-name
+                                              (macro-function sym)))))
              (TEXT "macro")
              nil))
           ((fboundp sym)
            (if (not (and (sys::closurep (symbol-function sym))
-                         (sys::preliminary-p (sys::closure-name (symbol-function sym)))))
+                         (sys::preliminary-p (sys::closure-name
+                                              (symbol-function sym)))))
              (TEXT "function")
              nil))))))
 
@@ -557,15 +569,24 @@
       funname
       (get-setf-symbol (second funname))))))
 
-;; return the symbol on whose plist the object's documentation will be kept
-(sys::%putd 'get-doc-entity-symbol
-  (function get-doc-entity-symbol (lambda (object)
-    ;; object can be a symbol, (setf symbol), or (func-name quals specs)
+;; return the SYMBOL on whose plist the object's documentation will be kept
+;; and the CALLER that indicates what the doc pertains to.
+;; OBJECT can be a symbol, (setf symbol), or (func-name quals specs)
+;; CALLER is a symbol
+;; the doc entity symbol is a symbol from object
+;; and doc entity caller is a symbol or list from caller
+;; e.g.: (defun foo ...) ==> (FOO DEFUN/DEFMACRO) -> (FOO DEFUN/DEFMACRO)
+;; (defmethod foo ...) ==> ((FOO ...) DEFMETHOD) -> (FOO (DEFMETHOD ...))
+(sys::%putd 'sys::get-doc-entity-symbol
+  (function sys::get-doc-entity-symbol (lambda (object)
     (get-funname-symbol (if (function-name-p object) object (first object))))))
+(sys::%putd 'sys::get-doc-entity-caller
+  (function sys::get-doc-entity-caller (lambda (object caller)
+    (if (function-name-p object) caller (cons caller (rest object))))))
 
 (sys::%putd 'sys::%set-documentation
   (function sys::%set-documentation (lambda (object doctype value) ; ABI
-    (let* ((symbol (get-doc-entity-symbol object))
+    (let* ((symbol (sys::get-doc-entity-symbol object))
            (rec (get symbol 'sys::doc)))
       (if value
         (let ((new-val (sys::%putf rec doctype value)))
@@ -585,14 +606,58 @@
       *current-source-line-2* nil
       *current-source-file* nil)
 
+(sys::%putd 'sys::check-special-operator
+  (function sys::check-special-operator (lambda (caller symbol)
+    (when (special-operator-p symbol)
+      (error-of-type 'source-program-error
+        ;; note that caller may be SYS::DEFUN/DEFMACRO !
+        ;; maybe (SETF FDEFINITION) is better?
+        :form (list caller symbol) :detail symbol
+        (TEXT "~A: ~S is a special operator and may not be redefined.")
+        caller symbol)))))
+
+;; sys::file doc is an alist ((caller . file-location) ...)
+(sys::%putd 'sys::get-file-doc
+  (function sys::get-file-doc (lambda (object caller)
+    (assoc (sys::get-doc-entity-caller object caller)
+           (getf (get (sys::get-doc-entity-symbol object) 'sys::doc) 'sys::file)
+           ;; caller can be (list* funname qualifiers spec-list)
+           :test #'equal))))
+(sys::%putd 'sys::set-file-doc
+  (function sys::set-file-doc (lambda (object caller value)
+    (let* ((symbol (sys::get-doc-entity-symbol object))
+           (caller (sys::get-doc-entity-caller object caller))
+           (doc-plist (get symbol 'sys::doc))
+           (file-alist (getf doc-plist 'sys::file))
+           (old-pair (assoc caller file-alist :test #'equal)))
+      (if old-pair
+        ;; In theory, we should remove the OLD-PAIR from FILE-ALIST
+        ;; and then maybe remove the SYS::FILE & SYS::DOC properties...
+        ;; Alas, DELETE does not work at this point yet, so it is not trivial.
+        ;; Note however that VALUE=NIL & OLD-PAIR/=NIL ==> top-level
+        ;; ==> performance non-critical
+        (rplacd old-pair value)
+        (when value             ; VALUE=NIL, OLD-PAIR=NIL => do nothing
+          (let ((new-doc-plist  ; nil if %PUTF worked in-place
+                 (sys::%putf doc-plist 'sys::file
+                             (acons caller value file-alist))))
+            (when new-doc-plist
+              (sys::%put symbol 'sys::doc new-doc-plist)))))))))
+
 (sys::%putd 'sys::check-redefinition
   (function sys::check-redefinition (lambda (object caller what)
+    (when (and (symbolp object)
+               (not (eq caller 'define-setf-expander))
+               (not (equal caller '(setf find-class))))
+      ;; see (define-setf-expander THE) in places.lisp
+      ;; and (def <t> <function>...) in clos-class3.lisp
+      (sys::check-special-operator caller object))
     (let ((cur-file *current-source-file*)
           (old-file ; distinguish between undefined and defined at top-level
-           (if (and (not (eq what 'SYSTEM::SETF-EXPANDER))
+           (if (and (not (or (eq caller 'define-setf-expander)
+                             (eq caller 'defsetf)))
                     (sys::subr-info object))
-               "C" (getf (get (get-doc-entity-symbol object) 'sys::doc)
-                         'sys::file))))
+               "C" (cdr (sys::get-file-doc object caller)))))
       (when (consp old-file) (setq old-file (car old-file)))
       (unless (or custom:*suppress-check-redefinition*
                   (equalp old-file cur-file)
@@ -613,34 +678,33 @@
           (warn (TEXT "~A: redefining ~A ~S in ~A, was defined in ~A")
                 caller what object (or cur-file #1="top-level")
                 (or old-file #1#))))
-      (system::%set-documentation
-       object 'sys::file
+      (sys::set-file-doc
+       object caller
        ;; note that when CUR-FILE is "foo.fas",
        ;; *current-source-line-[12]* point into "foo.lisp"!
        (and cur-file (list cur-file *current-source-line-1*
                            *current-source-line-2*)))))))
 
+;; in-package has to be defined very early, so we have to do it now
+(let ((sys::*current-source-file* "init")) ; still using C load at this time
+  (sys::check-redefinition 'in-package 'defmacro nil))
+
 (sys::%putd 'sys::remove-old-definitions
   (function sys::remove-old-definitions (lambda (symbol &optional (preliminary nil)) ; ABI
     ;; removes the old function-definitions of a symbol
-    (when (special-operator-p symbol)
-      (error-of-type 'error
-        (TEXT "~S is a special operator and may not be redefined.")
-        symbol))
-    (unless preliminary
-      (sys::check-redefinition symbol "DEFUN/DEFMACRO"
+    (if preliminary
+      (sys::check-special-operator 'defun/defmacro symbol)
+      (sys::check-redefinition symbol 'defun/defmacro
                                (sys::fbound-string symbol)))
     (fmakunbound symbol) ; discard function & macro definition
-    ;; Property sys::definition is not discarded, because it is
-    ;; soon reset, anyway.
+    (remprop symbol 'sys::definition) ; discard function lambda expression
     (remprop symbol 'sys::macro) ; discard macro definition
     (remprop symbol 'sys::defstruct-reader) ; discard DEFSTRUCT information
     (sys::%set-documentation symbol 'FUNCTION nil)
     (when (get symbol 'sys::inline-expansion)
       (sys::%put symbol 'sys::inline-expansion t))
     (when (get symbol 'sys::traced-definition) ; discard Trace
-      (warn (TEXT "DEFUN/DEFMACRO: redefining ~S; it was traced!")
-            symbol)
+      (warn (TEXT "~A: redefining ~S; it was traced!") 'defun/defmacro symbol)
       (untrace2 symbol)))))
 
 ;; THE-ENVIRONMENT as in SCHEME
@@ -661,7 +725,11 @@
       (declare (ignore form env))
       '(progn
         (eval-when ((not eval)) (%uncompilable 'the-environment))
-        (let ((*evalhook* #'%the-environment)) 0))))))
+        (let ((*evalhook* #'%the-environment)) 0))))
+    '()))
+(let ((sys::*current-source-file* "init"))
+  (sys::check-redefinition 'the-environment 'defmacro nil))
+
 ;; The toplevel environment
 (proclaim '(special *toplevel-environment*))
 (setq *toplevel-environment* (eval '(the-environment)))
@@ -768,7 +836,7 @@
           ((= i l) (venv-assoc s (svref venv i) from-inside-macrolet))
         (if (eq s (svref venv i))
           (if (and from-inside-macrolet
-                   (not (eq (svref venv (1+ i)) compiler::specdecl))
+                   (not (eq (svref venv (1+ i)) sys::specdecl))
                    (not (symbol-macro-p (svref venv (1+ i)))))
             (error-of-type 'source-program-error
               :form s
@@ -818,6 +886,15 @@
   (if (or flagf flagr)
     (values (cons expf expr) t)
     (values form nil)))
+
+;; cons specs on top of *fenv*
+(defun cons-*fenv* (specs) (apply #'vector (nreverse (cons *fenv* specs))))
+
+(defun illegal-syntax (detail form-name &optional (whole-form %whole-form))
+  (error-of-type 'source-program-error
+    :form whole-form :detail detail
+    (TEXT "Illegal syntax in ~A: ~S")
+    form-name detail))
 
 ;; (%expand-form form) expands a whole Form. returns 2 values.
 (defun %expand-form (form &aux (%whole-form form))
@@ -993,8 +1070,10 @@
                      (%expand-list (rest form))))))
               ((FLET) ; expand function definitions
                (if (null (second form))
-                 (values (%expand-form (cons 'PROGN (cddr form))) t)
-                 (let ((newfenv (%expand-fundefs-1 (second form))))
+                 (values (%expand-form (cons 'LOCALLY (cddr form))) t)
+                 (let ((newfenv (%expand-fundefs-1 (second form)))
+                       (*venv* *venv*))
+                   (%expand-special-declarations (cddr form))
                    (multiple-value-call #'%expand-cons form
                      (first form) nil
                      (multiple-value-call #'%expand-cons (rest form)
@@ -1005,8 +1084,10 @@
                ;; expand function definitions and body
                ;; in the extended environment
                (if (null (second form))
-                 (values (%expand-form (cons 'PROGN (cddr form))) t)
-                 (let ((newfenv (%expand-fundefs-1 (second form))))
+                 (values (%expand-form (cons 'LOCALLY (cddr form))) t)
+                 (let ((newfenv (%expand-fundefs-1 (second form)))
+                       (*venv* *venv*))
+                   (%expand-special-declarations (cddr form))
                    (let ((*fenv* (apply #'vector newfenv)))
                      (multiple-value-call #'%expand-cons form
                        (first form) nil
@@ -1023,8 +1104,9 @@
                         :detail L1
                         (TEXT "code after MACROLET contains a dotted list, ending with ~S")
                         L1)
-                      (let ((*fenv* (apply #'vector
-                                           (nreverse (cons *fenv* L2)))))
+                      (let ((*fenv* (cons-*fenv* L2))
+                            (*venv* *venv*))
+                        (%expand-special-declarations (cddr form))
                         (values (%expand-form (cons 'PROGN (cddr form))) t))))
                  (let ((macrodef (car L1)))
                    (if (and (consp macrodef)
@@ -1032,11 +1114,7 @@
                             (consp (cdr macrodef)))
                      (setq L2 (list* (make-macro-expander macrodef form)
                                      (car macrodef) L2))
-                     (error-of-type 'source-program-error
-                       :form form
-                       :detail macrodef
-                       (TEXT "illegal syntax in MACROLET: ~S")
-                       macrodef)))))
+                     (illegal-syntax macrodef 'MACROLET)))))
               ((FUNCTION-MACRO-LET)
                ;; expand function-definitions,
                ;; expand body in extended environment
@@ -1086,11 +1164,7 @@
                            'symbol-macrolet symbol)
                          (setq L2 (list* (make-symbol-macro expansion)
                                          symbol L2))))
-                     (error-of-type 'source-program-error
-                       :form form
-                       :detail symdef
-                       (TEXT "illegal syntax in SYMBOL-MACROLET: ~S")
-                       symdef)))))
+                     (illegal-syntax symdef 'SYMBOL-MACROLET)))))
               (t (cond ((and (symbolp f) (special-operator-p f))
                         ;; other Special-forms,
                         ;; e.g. IF, CATCH, THROW, PROGV, UNWIND-PROTECT, PROGN,
@@ -1367,11 +1441,7 @@
       (if (and (consp fundef) (function-name-p (car fundef))
                (consp (cdr fundef)))
         (list* (car fundef) nil (%expand-fundefs-1 (cdr fundefs)))
-        (error-of-type 'source-program-error
-          :form %whole-form
-          :detail fundef
-          (TEXT "illegal syntax in FLET/LABELS: ~S")
-          fundef)))))
+        (illegal-syntax fundef "FLET/LABELS")))))
 ;; (%expand-fundefs-2 fundefs) expands a function-definition-list,
 ;; like in FLET, LABELS. returns 2 values.
 (defun %expand-fundefs-2 (fundefs)
@@ -1400,11 +1470,7 @@
                (consp (cddr funmacdef)) (consp (third funmacdef))
                (null (cdddr funmacdef)))
         (list* (car funmacdef) nil (%expand-funmacdefs-1 (cdr funmacdefs)))
-        (error-of-type 'source-program-error
-          :form %whole-form
-          :detail funmacdef
-          (TEXT "illegal syntax in FUNCTION-MACRO-LET: ~S")
-          funmacdef)))))
+        (illegal-syntax funmacdef 'FUNCTION-MACRO-LET)))))
 ;; (%expand-funmacdefs-2 funmacdefs) expands a function-macro-
 ;; definition-list, like in FUNCTION-MACRO-LET. returns 2 values.
 (defun %expand-funmacdefs-2 (funmacdefs)
@@ -1438,9 +1504,6 @@
 (defun %expand-lambdabody-main (lambdabody *venv* *fenv*)
   (%expand-lambdabody lambdabody))
 
-(defun expand-form (form &aux *fenv* *venv*)
-  (%expand-form form))
-
 (VALUES) )
 
 ;; from now on, FUNCTION is operational,
@@ -1448,25 +1511,32 @@
 
 (PROGN
 
-(proclaim '(special *load-paths*))
-(setq *load-paths* nil)
+(proclaim '(special *load-paths*)) ; defined in spvw.d
 (proclaim '(special *source-file-types*))
 (setq *source-file-types* '("lisp" "lsp" "cl"))
+(proclaim '(special *internal-compiled-file-type*))
+(setq *internal-compiled-file-type* "fas")
 (proclaim '(special *compiled-file-types*))
-(setq *compiled-file-types* '("fas"))
+(setq *compiled-file-types* (list *internal-compiled-file-type*))
 
 ;; for the time being the files don't have to be searched:
 (sys::%putd 'search-file
  (sys::make-preliminary
-  (function search-file (lambda (filename extensions)
-    (mapcan #'(lambda (extension)
-                (let ((filename (merge-pathnames filename
-                                       (make-pathname :type extension))))
-                  (if (probe-file filename) (list filename) '())))
-            extensions)))))
+  (function search-file (lambda (filename &optional extensions (keep-dirs t))
+    (declare (ignore keep-dirs))
+    (mapcan #'(lambda (directory)
+                (let ((directory (pathname-directory directory)))
+                  (mapcan #'(lambda (extension)
+                              (let ((filename (merge-pathnames filename
+                                                (make-pathname
+                                                 :directory directory
+                                                 :type extension))))
+                                (if (probe-file filename) (list filename) '())))
+                          extensions)))
+            (cons #"" *load-paths*))))))
 
 (proclaim '(special *compile-verbose*))
-(setq *compile-verbose* t)         ; defined in spvw.d
+(setq *compile-verbose* t)      ; defined in spvw.d
 (proclaim '(special *load-verbose*))
 (setq *load-verbose* t)         ; defined in spvw.d
 (proclaim '(special *load-print*))
@@ -1486,6 +1556,9 @@
 #+ffi ; the default :language for DEF-CALL-* & C-FUNCTION -- see foreign1.lisp
 (proclaim '(special ffi::*foreign-language*))
 #+ffi (setq ffi::*foreign-language* nil)
+#+ffi ; default :LIBRARY argument for DEF-CALL-OUT and DEF-C-VAR
+(proclaim '(special ffi::*foreign-library*))
+#+ffi (setq ffi::*foreign-library* nil)
 
 ;; preliminary; needed here for open-for-load
 (sys::%putd 'warn
@@ -1545,22 +1618,22 @@
                      stream
                      (or (eq *load-obsolete-action* :error)
                          (eq present-files t)
-                     (cdr present-files))
-                   (setq obj (read stream)))
-                 #+compiler
-                 (if (and bad-file (eq *load-obsolete-action* :compile))
-                   ;; assume that BAD-FILE was compiled from STREAM
-                   (let ((compiled-file ; try to compile
-                           (compile-file stream :output-file bad-file)))
-                     (if compiled-file ; ==> compiled-file == bad-file
-                       (progn
-                         (sys::built-in-stream-close stream)
-                         (setq stream (my-open compiled-file)
-                               path compiled-file))
-                       ;; compilation failed - try to load the source
-                       stream))
-                   stream)
-                 #-compiler stream))
+                         (cdr present-files))
+                     (setq obj (read stream)))
+                   #+compiler
+                   (if (and bad-file (eq *load-obsolete-action* :compile))
+                     ;; assume that BAD-FILE was compiled from STREAM
+                     (let ((compiled-file ; try to compile
+                            (compile-file stream :output-file bad-file)))
+                       (if compiled-file ; ==> compiled-file == bad-file
+                         (progn
+                           (sys::built-in-stream-close stream)
+                           (setq stream (my-open compiled-file)
+                                 path compiled-file))
+                         ;; compilation failed - try to load the source
+                         stream))
+                     stream)
+                   #-compiler stream))
         (return-from open-for-load (values stream path)))
       (when (eq present-files t)
         ;; File with precisely this name not present OR bad
@@ -1569,7 +1642,8 @@
         (setq present-files (search-file filename
                                          (append extra-file-types
                                                  *compiled-file-types*
-                                                 *source-file-types*))))
+                                                 *source-file-types*)
+                                         nil)))
       (if present-files
         ;; proceed with the next present file
         (setq path (car present-files) present-files (cdr present-files)
@@ -1613,12 +1687,12 @@
       (declare (ignore file))
       (eval-loaded-form-low obj)))))
 
-(defun loading-message (format argument)
+(defun loading-message (format &rest arguments)
   (when *load-verbose*
     (fresh-line)
     (write-string ";;")
     (write-spaces *load-level*)
-    (format t format argument)
+    (apply #'format t format arguments)
     (elastic-newline)))
 
 ;; (LOAD filename [:verbose] [:print] [:if-does-not-exist] [:external-format]
@@ -1657,13 +1731,13 @@
            (*current-source-line-1* nil)
            (*current-source-line-2* nil)
            #+ffi (ffi::*foreign-language* ffi::*foreign-language*)
+           #+ffi (ffi::*foreign-library* ffi::*foreign-library*)
            (*package* *package*) ; bind *PACKAGE*
            (*readtable* *readtable*) ; bind *READTABLE*
-           (compiler::*c-error-output* *error-output*) ; for compiling
+           (*c-error-output* *error-output*) ; for compiling
            (eof-indicator input-stream))
       (loading-message (TEXT "Loading file ~A ...") filename)
-      (when *load-compiling* (compiler::c-reset-globals))
-      (sys::allow-read-eval input-stream t)
+      (when *load-compiling* (sys::c-reset-globals))
       ;; see `with-compilation-unit' -- `:compiling' sets a compilation unit
       ;; the user might set `*load-compiling*' to T either directly
       ;; or using the -C option, so we have to check that
@@ -1673,30 +1747,34 @@
                '(*error-count* *warning-count* *style-warning-count*))
              '(0 0 0)
         (unwind-protect
-            (tagbody weiter
+            (tagbody proceed
               (when *load-echo* (fresh-line))
               (peek-char t input-stream nil eof-indicator)
               (setq *current-source-line-1* (line-number input-stream))
-              (let ((obj (read input-stream nil eof-indicator)))
+              (let ((obj (read input-stream nil eof-indicator)) res)
                 (setq *current-source-line-2* (line-number input-stream))
                 (when (eql obj eof-indicator) (go done))
-                (case (setq obj (eval-loaded-form obj *load-truename*))
-                  (skip (go weiter))
-                  (stop (go done)))
+                (tagbody ext::retry ; exported in condition.lisp
+                  (case (setq res (eval-loaded-form obj *load-truename*))
+                    (skip (go proceed))
+                    (ext::retry (go ext::retry))
+                    (stop (go done))))
                 (when *load-print*
-                  (when obj
+                  (when res
                     (fresh-line)
-                    (prin1 (first obj))
+                    (prin1 (first res))
                     (elastic-newline))))
-              (go weiter) done)
+              (go proceed) done)
           (or (eq input-stream stream)
               (sys::built-in-stream-close input-stream))
           (or (eq stream filename)
               (sys::built-in-stream-close stream))
           (when (and *load-compiling* *load-verbose* *compile-verbose*)
-            (compiler::c-report-problems))))
+            (c-report-problems))))
       (loading-message (TEXT "Loaded file ~A") filename)
       t)))
+(let ((sys::*current-source-file* "init"))
+  (sys::check-redefinition 'load 'defun nil))
 
 (sys::%putd 'defun              ; preliminary:
   (sys::make-macro
@@ -1737,7 +1815,8 @@
                                   (list* 'DECLARE (list 'SYS::IN-DEFUN name)
                                          declarations)
                                   (list* 'BLOCK name body-rest))))
-                (list 'quote name))))))))
+                (list 'quote name))))))
+    '(function-name lambda-list &body forms)))
 
 (sys::%putd 'do               ; preliminary definition of the macro DO
   (sys::make-macro
@@ -1805,7 +1884,10 @@
                                  (list* (third varclause)
                                         (first varclause)
                                         reinitlist)))))
-                (go 1))))))))))
+                (go 1))))))))
+    '((&body var-init-step-forms)
+      (end-test-form &body result-forms)
+      &body statements)))
 
 (sys::%putd 'dotimes       ; preliminary Definition of the Macro DOTIMES
   (sys::make-macro
@@ -1825,7 +1907,8 @@
             (list* 'do (list (list var '0 (list '1+ var)) (list g countform))
                    (list (list '>= var g) resultform)
                    (cons 'declare declarations)
-                   body-rest))))))))
+                   body-rest))))))
+    '((var count-form &optional result-form) &body statements)))
 
 (VALUES) )
 
@@ -1843,33 +1926,41 @@
 
 (PROGN
 
+(sys::%putd 'sys::maybe-arglist ; arglist if permitted by compiler optimizations
+  (function sys::maybe-arglist (lambda (arglist)
+    (if (and sys::*compiling* (< 2 (sys::declared-optimize 'space)))
+        0 arglist))))
+
 (sys::%putd 'defmacro
 (sys::%putd 'sys::predefmacro ; predefmacro means "preliminary defmacro"
   (sys::make-macro
     (function defmacro (lambda (form env)
       (declare (ignore env))
       (let ((preliminaryp (eq (car form) 'sys::predefmacro)))
-        (multiple-value-bind (expansion expansion-lambdabody name lambdalist docstring)
+        (multiple-value-bind
+              (expansion expansion-lambdabody name lambdalist docstring)
             (sys::make-macro-expansion (cdr form) form)
-          (declare (ignore expansion-lambdabody lambdalist))
+          (declare (ignore expansion-lambdabody docstring))
           `(LET ()
              (EVAL-WHEN ,(if preliminaryp '(LOAD EVAL) '(COMPILE LOAD EVAL))
                (SYSTEM::REMOVE-OLD-DEFINITIONS ',name
                  ,@(if preliminaryp '('T)))
-               ,@(if docstring
-                   `((SYSTEM::%SET-DOCUMENTATION ',name 'FUNCTION ',docstring))
-                   '())
                (SYSTEM::%PUTD ',name
-                 (SYSTEM::MAKE-MACRO ,(if preliminaryp
-                                        `(SYSTEM::MAKE-PRELIMINARY ,expansion)
-                                        expansion))))
+                 (SYSTEM::MAKE-MACRO
+                  ,(if preliminaryp
+                       `(SYSTEM::MAKE-PRELIMINARY ,expansion)
+                       expansion)
+                  ',(sys::maybe-arglist lambdalist))))
              (EVAL-WHEN (EVAL)
                (SYSTEM::%PUT ',name 'SYSTEM::DEFINITION
                              (CONS ',form (THE-ENVIRONMENT))))
-             ',name))))))))
+             ',name)))))
+    '(macro-name macro-lambda-list &body forms))))
+(let ((sys::*current-source-file* "init"))
+  (sys::check-redefinition 'defmacro 'defmacro nil))
 
 #-compiler
-(predefmacro COMPILER::EVAL-WHEN-COMPILE (&body body) ; preliminary
+(predefmacro SYS::EVAL-WHEN-COMPILE (&body body) ; preliminary
   `(eval-when (compile) ,@body))
 
 ;; return 2 values: ordinary lambda list and reversed list of type declarations
@@ -1938,27 +2029,27 @@
                (SYSTEM::REMOVE-OLD-DEFINITIONS ,symbolform
                  ,@(if preliminaryp '('T)))
                ,@(if ; Is name declared inline?
-                  (if (and compiler::*compiling*
-                           compiler::*compiling-from-file*)
-                    (member name compiler::*inline-functions* :test #'equal)
+                  (if (and sys::*compiling*
+                           sys::*compiling-from-file*)
+                    (member name sys::*inline-functions* :test #'equal)
                     (eq (get (get-funname-symbol name) 'inlinable) 'inline))
                   ;; Is the lexical environment the top-level environment?
                   ;; If yes, save the lambdabody for inline compilation.
-                  (if compiler::*compiling*
-                    (if (and (null compiler::*venv*)
-                             (null compiler::*fenv*)
-                             (null compiler::*benv*)
-                             (null compiler::*genv*)
-                             (eql compiler::*denv* *toplevel-denv*))
-                      `((COMPILER::EVAL-WHEN-COMPILE
-                         (COMPILER::C-DEFUN
+                  (if sys::*compiling*
+                    (if (and (null sys::*venv*)
+                             (null sys::*fenv*)
+                             (null sys::*benv*)
+                             (null sys::*genv*)
+                             (eql sys::*denv* *toplevel-denv*))
+                      `((SYS::EVAL-WHEN-COMPILE
+                         (SYS::C-DEFUN
                           ',name (lambda-list-to-signature ',lambdalist)
                           ',lambdabody))
                         (EVAL-WHEN (LOAD)
                           (SYSTEM::%PUT ,symbolform 'SYSTEM::INLINE-EXPANSION
                                         ',lambdabody)))
-                      `((COMPILER::EVAL-WHEN-COMPILE
-                         (COMPILER::C-DEFUN
+                      `((SYS::EVAL-WHEN-COMPILE
+                         (SYS::C-DEFUN
                           ',name (lambda-list-to-signature ',lambdalist)))))
                     (if (and (null (svref env 0))  ; venv
                              (null (svref env 1))) ; fenv
@@ -1973,13 +2064,9 @@
                                              'SYSTEM::INLINE-EXPANSION
                                              ',lambdabody)))))
                        '()))
-                  `((COMPILER::EVAL-WHEN-COMPILE
-                     (COMPILER::C-DEFUN
+                  `((SYS::EVAL-WHEN-COMPILE
+                     (SYS::C-DEFUN
                       ',name (lambda-list-to-signature ',lambdalist)))))
-               ,@(if docstring
-                   `((SYSTEM::%SET-DOCUMENTATION ,symbolform
-                                                 'FUNCTION ',docstring))
-                   '())
                (SYSTEM::%PUTD ,symbolform
                  ,(if preliminaryp
                     `(SYSTEM::MAKE-PRELIMINARY (FUNCTION ,name (LAMBDA ,@lambdabody)))
@@ -1987,7 +2074,13 @@
                (EVAL-WHEN (EVAL)
                  (SYSTEM::%PUT ,symbolform 'SYSTEM::DEFINITION
                                (CONS ',form (THE-ENVIRONMENT))))
-               ',name)))))))))
+               ',name))))))
+    '(function-name lambda-list &body forms))))
+(let ((sys::*current-source-file* "init"))
+  (sys::check-redefinition 'defun 'defmacro nil))
+
+;; see condition.lisp for the final definition
+(predefun check-not-declaration (symbol caller) (check-symbol symbol caller))
 
 (VALUES) )
 
@@ -2034,94 +2127,100 @@
 
 (in-package "SYSTEM")
 
-;; (default-directory) is a Synonym for (cd).
-(defun default-directory () (cd))
-
-;; (setf (default-directory) dir) is a Synonym for (cd dir).
-(defsetf default-directory () (value)
-  `(PROGN (CD ,value) ,value))
-
-;; FORMAT-Control-String for output of dates,
-;; applicable to a List (sec min hour day month year ...),
-;; occupies 17-19 characters
-(definternational date-format
-  (t ENGLISH))
-(deflocalized date-format ENGLISH
-  (formatter
-   "~1{~5@*~D-~4@*~2,'0D-~3@*~2,'0D ~2@*~2,'0D:~1@*~2,'0D:~0@*~2,'0D~:}"))
-(defun date-format ()
-  (localized 'date-format))
-
-;; list a directory
-(defun dir (&optional (pathnames #+(or UNIX WIN32) '("*/" "*")))
-  (flet ((onedir (pathname)
-           (let ((pathname-list (directory pathname :full t :circle t)))
-             (if (every #'atom pathname-list)
-               (format t "~{~&~A~.~}"
-                       (sort pathname-list #'string< :key #'namestring))
-               (let ((date-format (date-format)))
-                 (dolist (l (sort pathname-list #'string<
-                                  :key #'(lambda (l) (namestring (first l)))))
-                   (format t "~&~A~40T~7D~52T~21<~@?~>~."
-                           (first l) (fourth l) date-format (third l))))))))
-    (if (listp pathnames) (mapc #'onedir pathnames) (onedir pathnames)))
-  (values))
-
 ;; A piece of "DO-WHAT-I-MEAN":
 ;; Searches for a program file.
-;; We search in the current directory and then in the directories
+;;   We search in the current directory and then in the directories
 ;; listed in *load-paths*.
-;; If an extension is specified in the filename, we search only for
-;; files with this extension. If no extension is specified, we search
-;; only for files with an extension from the given list.
-;; The return value is a list of all matching files from the first directory
+;;   If an extension is specified in the filename, we search only for
+;; files with this extension. If no extension is specified, we additionally
+;; search for files with an extension from the given list.
+;;   The return value is a list of all matching files from the FIRST directory
+;; [because otherwise every load will mean a full traversal of ~/lisp/**/]
 ;; containing any matching file, sorted according to decreasing FILE-WRITE-DATE
 ;; (i.e. from new to old), or NIL if no matching file was found.
-(defun search-file (filename extensions
-                    &aux (use-extensions (null (pathname-type filename))) )
-  ;; merge in the defaults:
-  (setq filename (merge-pathnames filename '#"*.*"))
-  ;; search:
-  (let ((already-searched nil))
-    (dolist (dir (cons '#""
+;;   The file names are NOT truenames, this is important so that symlinks
+;; are compiled into the target directory, not the original one.
+;;   If the searched filename is a directory, the directory pathname
+;; is returned, NOT its contents.
+(defun ppn-fwd (f keep-dirs)    ; probe-pathname + file-write-date
+  (multiple-value-bind (true-name phys-name fwd) (probe-pathname f)
+    (when (and true-name (or keep-dirs (pathname-name true-name)))
+      (cons phys-name fwd))))
+(defun search-file (filename &optional extensions (keep-dirs t))
+  ;; <http://article.gmane.org/gmane.lisp.clisp.general:9893>
+  ;; <http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=443520>
+  ;; <http://article.gmane.org/gmane.lisp.clisp.devel/18532>
+  ;; we use DIRECTORY only for *LOAD-PATHS* elements with wild components
+  ;; to avoid the denial-of-service attack whereas a file in $HOME
+  ;; with a name incompatible with *PATHNAME-ENCODING* prevents CLISP from
+  ;; starting up (unless -norc or -E 1:1 is passed)
+  ;; because (DIRECTORY "~/*") fails
+  (let* ((already-searched nil) found
+         (path-nonW (merge-pathnames filename))
+         (path-wild (if (pathname-name path-nonW)
+                        (merge-pathnames path-nonW '#P"*.*")
+                        ;; do not append *.* to directories
+                        path-nonW))
+         (use-extensions (null (pathname-type path-nonW))))
+    (dolist (dir (cons '#P""
                        ;; when filename has "..", ignore *load-paths*
                        ;; (to avoid errors with "**/../foo"):
-                       (if (memq :UP (pathname-directory filename))
+                       (if (memq :UP (pathname-directory path-nonW))
                            '()
                            (mapcar #'pathname *load-paths*))))
-      (let ((search-filename (merge-pathnames (merge-pathnames filename dir))))
+      (let* ((wild-p (wild-pathname-p dir))
+             (search-filename
+              (merge-pathnames (if wild-p path-wild path-nonW) dir)))
         (unless (member search-filename already-searched :test #'equal)
-          (let ((xpathnames (directory search-filename :full t :circle t
-                                       :if-does-not-exist :ignore)))
-            (when (eq :wild (pathname-type search-filename))
-              (setq xpathnames
-                    (nconc xpathnames
-                           (directory (make-pathname
-                                       :type nil :defaults search-filename)
-                                      :if-does-not-exist :ignore
-                                      :full t :circle t))))
-            (when (and use-extensions extensions)
-              ;; filter the extensions
-              (setq xpathnames
-                (delete-if-not ; does xpathname have the given extensions?
-                 #'(lambda (xpathname)
-                     (member (pathname-type (first xpathname)) extensions
-                             :test #-WIN32 #'string=
-                                   #+WIN32 #'string-equal))
-                 xpathnames)))
+          (push search-filename already-searched)
+          (let ((xpathnames
+                 (if wild-p
+                     (nconc
+                      (directory search-filename :full t :circle t
+                                 :if-does-not-exist :ignore)
+                      (and (eq :wild (pathname-type search-filename))
+                           (nconc
+                            (directory (make-pathname
+                                        :type nil :defaults search-filename)
+                                       :if-does-not-exist :ignore
+                                       :full t :circle t)
+                            (directory (make-pathname
+                                        :type nil :name nil
+                                        :directory (append (pathname-directory search-filename) (list (pathname-name search-filename)))
+                                        :defaults search-filename)
+                                       :if-does-not-exist :ignore
+                                       :full t :circle t))))
+                     (let ((f (ppn-fwd search-filename keep-dirs))
+                           (e (and use-extensions extensions
+                                   (mapcan #'(lambda (ext)
+                                               (let ((f (ppn-fwd (make-pathname :type ext :defaults search-filename) keep-dirs)))
+                                                 (and f (list f))))
+                                           extensions))))
+                       (if f (cons f e) e)))))
+            (when wild-p
+              (when (and use-extensions extensions) ; filter the extensions
+                (setq xpathnames
+                      (delete-if-not
+                       #'(lambda (xpathname)
+                           (let ((ext (pathname-type (first xpathname))))
+                             (or (null ext) ; no extension - good!
+                                 (member ext extensions
+                                         :test #+WIN32 #'string-equal
+                                               #-WIN32 #'string=))))
+                       xpathnames))))
             (when xpathnames
-              ;; reverse sort by date:
-              (dolist (xpathname xpathnames)
-                (setf (rest xpathname)
-                      (apply #'encode-universal-time (third xpathname))))
-              (return (mapcar #'first (sort xpathnames #'> :key #'rest)))))
-          (push search-filename already-searched))))))
+              (setq found
+                    (if wild-p
+                      (dolist (xpathname xpathnames xpathnames)
+                        (setf (rest xpathname)
+                              (apply #'encode-universal-time
+                                     (third xpathname))))
+                      xpathnames))
+              (return))))))
+    (mapcar #'car (sort (delete-duplicates found :test #'equal)
+                        #'> :key #'cdr))))
 
 (LOAD "room")                   ; room, space
-
-(LOAD "savemem")                ; saveinitmem
-
-;; At this point saveinitmem works.
 
 ;; preliminary definition of CERROR, CLtL2 p. 887
 (predefun cerror (continue-format-string error-format-string &rest args)
@@ -2211,9 +2310,9 @@
 
 (LOAD "reploop")                ; prompt, debugger, stepper
 
-(LOAD "dribble")                ; dribble
+(LOAD "savemem")                ; saveinitmem
 
-(LOAD "complete")               ; completion
+(LOAD "dribble")                ; dribble
 
 (load "pprint")                 ; pretty printer
 
@@ -2229,22 +2328,20 @@
 
 (LOAD "macros3")                ; more macros, optional
 
+(LOAD "complete")               ; gnu readline completion (requires macros3)
+
 (LOAD "case-sensitive")         ; case-sensitive packages
 
 #+FFI ; when (find-package "FFI")
 (LOAD "foreign1")               ; foreign function interface, optional
 
-#+AFFI
-(when (find-symbol "%LIBCALL" "SYSTEM")
-  (LOAD "affi1"))               ; simple FFI, optional
-
 (LOAD "exporting")              ; auto-exporting defining macros
 
-#+(and GETTEXT UNICODE) (LOAD "danish") ; Danish messages
-#+GETTEXT (LOAD "german")       ; German messages
-#+(and GETTEXT UNICODE) (LOAD "french") ; French messages
+#+(and GETTEXT UNICODE) (LOAD "danish")  ; Danish messages
+#+(and GETTEXT UNICODE) (LOAD "german")  ; German messages
+#+(and GETTEXT UNICODE) (LOAD "french")  ; French messages
 #+(and GETTEXT UNICODE) (LOAD "spanish") ; Spanish messages
-#+GETTEXT (LOAD "dutch")        ; Dutch messages
+#+(and GETTEXT UNICODE) (LOAD "dutch")   ; Dutch messages
 #+(and GETTEXT UNICODE) (LOAD "russian") ; Russian messages
 
 (load "deprecated")             ; the deprecated functionality -- optional

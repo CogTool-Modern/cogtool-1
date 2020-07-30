@@ -1,6 +1,6 @@
 /*
  * Garbage collection with weak references in CLISP
- * Bruno Haible 2004-2005
+ * Bruno Haible 2004-2008
  */
 
 /* An array that contains the addresses of those objects whose mark bit is
@@ -20,6 +20,11 @@ local uintM markwatchset_size;
 local uintL markwatchset_count;
 /* Tail of the queue. */
 local markwatch_t** markwatch_queue_tail;
+
+#ifdef MULTITHREAD
+/* mutex for guarding globals and O(all_weeakpointers)*/
+global xmutex_t all_weakpointers_lock;
+#endif
 
 /* The markwatchset is sorted according to the address. */
 #define SORTID  markwatch
@@ -93,8 +98,8 @@ local void markwatch_enqueue (markwatch_t* entry) {
    that are held in memory only through weak mappings. */
 #define gc_mark gc_mark_with_watchset
 #define MARK(obj)  \
-  { mark(obj);                                                  \
-    markwatch_enqueue(markwatchset_lookup(canon((aint)(obj)))); \
+  { mark(obj);                                           \
+    markwatch_enqueue(markwatchset_lookup((aint)(obj))); \
   }
 #include "spvw_gcmark.c"
 #undef MARK
@@ -155,7 +160,7 @@ local inline void add_watchable (markwatch_t** accumulatorp, object obj, uintL i
   /* NB: For ptr = unbound, nothing is done, because unbound is gcinvariant. */
   if (!gcinvariant_object_p(ptr))
     if (!marked(ThePointer(ptr))) {
-      (*accumulatorp)->address = canonaddr(ptr);
+      (*accumulatorp)->address = (aint)ThePointer(ptr);
       (*accumulatorp)->weakobj = obj;
       (*accumulatorp)->weakindex = index;
       (*accumulatorp)->q_next = NULL;
@@ -486,20 +491,22 @@ local void propagate_through_weak (object obj, uintL index) {
 }
 
 /* Straightens one pointer into a WeakHashedAlist. */
-local inline object weak_hashed_alist_update_one (object kvtable, uintL n, object x) {
-  loop {
+local inline object weak_hashed_alist_update_one (object kvtable, uintL n,
+                                                  object x) {
+  while (1) {
     if (!(posfixnump(x) && posfixnum_to_V(x) < n)) abort();
-    var gcv_object_t* KVptr = &TheWeakHashedAlist(kvtable)->whal_data[3*posfixnum_to_V(x)];
+    var gcv_object_t* KVptr =
+      &TheWeakHashedAlist(kvtable)->whal_data[3*posfixnum_to_V(x)];
     if (!eq(KVptr[0],unbound))
-      # Found an alive key/value pair at index x.
+      /* Found an alive key/value pair at index x. */
       break;
-    # The key/value pair at index x is dead, continue following the chain.
+    /* The key/value pair at index x is dead, continue following the chain. */
     var object y = KVptr[2];
-    # Move the cell at index x to the freelist.
+    /* Move the cell at index x to the freelist. */
     KVptr[2] = TheWeakHashedAlist(kvtable)->whal_freelist;
     TheWeakHashedAlist(kvtable)->whal_freelist = x;
     x = y;
-    # Test whether the last element of the list was removed.
+    /* Test whether the last element of the list was removed. */
     if (eq(x,unbound))
       break;
   }
@@ -714,7 +721,7 @@ local bool weak_clean_dead (object obj) {
           ;
         else if ((!eq(key,unbound) && (gcinvariant_object_p(key) || alive(key)))
                  && (!eq(value,unbound) && (gcinvariant_object_p(value) || alive(value))))
-          # both alive
+          /* both alive */
           keep = true;
         else {
           TheWeakAlist(obj)->wal_data[2*i+0] = unbound;
@@ -737,7 +744,7 @@ local bool weak_clean_dead (object obj) {
           bool key_alive = (!eq(key,unbound) && (gcinvariant_object_p(key) || alive(key)));
           bool value_alive = (!eq(value,unbound) && (gcinvariant_object_p(value) || alive(value)));
           if (key_alive || value_alive) {
-            # key or value alive; the other one must be kept alive too.
+            /* key or value alive; the other one must be kept alive too. */
             if (!(key_alive && value_alive)) abort();
             keep = true;
           } else {
@@ -777,9 +784,9 @@ local bool weak_clean_dead (object obj) {
       }
       if (any_died)
         weak_hashed_alist_update(obj);
-      # Must keep obj active, even if its whal_count is 0: the whal_itable is
-      # not seen by spvw_gcmark (due to Lrecord_nonweak_length(obj) = 0) and
-      # must nevertheless be updated during the next GCs.
+      /* Must keep obj active, even if its whal_count is 0: the whal_itable is
+       not seen by spvw_gcmark (due to Lrecord_nonweak_length(obj) = 0) and
+       must nevertheless be updated during the next GCs. */
       return true;
     }
     case Rectype_WeakHashedAlist_Value: {
@@ -810,9 +817,9 @@ local bool weak_clean_dead (object obj) {
       }
       if (any_died)
         weak_hashed_alist_update(obj);
-      # Must keep obj active, even if its whal_count is 0: the whal_itable is
-      # not seen by spvw_gcmark (due to Lrecord_nonweak_length(obj) = 0) and
-      # must nevertheless be updated during the next GCs.
+      /* Must keep obj active, even if its whal_count is 0: the whal_itable is
+       not seen by spvw_gcmark (due to Lrecord_nonweak_length(obj) = 0) and
+       must nevertheless be updated during the next GCs. */
       return true;
     }
     case Rectype_WeakHashedAlist_Either: {
@@ -833,7 +840,7 @@ local bool weak_clean_dead (object obj) {
           ;
         else if ((!eq(key,unbound) && (gcinvariant_object_p(key) || alive(key)))
                  && (!eq(value,unbound) && (gcinvariant_object_p(value) || alive(value))))
-          # both alive
+          /* both alive */
           ;
         else {
           TheWeakHashedAlist(obj)->whal_data[3*i+0] = unbound;
@@ -846,9 +853,9 @@ local bool weak_clean_dead (object obj) {
       }
       if (any_died)
         weak_hashed_alist_update(obj);
-      # Must keep obj active, even if its whal_count is 0: the whal_itable is
-      # not seen by spvw_gcmark (due to Lrecord_nonweak_length(obj) = 0) and
-      # must nevertheless be updated during the next GCs.
+      /* Must keep obj active, even if its whal_count is 0: the whal_itable is
+       not seen by spvw_gcmark (due to Lrecord_nonweak_length(obj) = 0) and
+       must nevertheless be updated during the next GCs. */
       return true;
     }
     case Rectype_WeakHashedAlist_Both: {
@@ -871,7 +878,7 @@ local bool weak_clean_dead (object obj) {
           bool key_alive = (!eq(key,unbound) && (gcinvariant_object_p(key) || alive(key)));
           bool value_alive = (!eq(value,unbound) && (gcinvariant_object_p(value) || alive(value)));
           if (key_alive || value_alive) {
-            # key or value alive; the other one must be kept alive too.
+            /* key or value alive; the other one must be kept alive too. */
             if (!(key_alive && value_alive)) abort();
           } else {
             TheWeakHashedAlist(obj)->whal_data[3*i+0] = unbound;
@@ -885,9 +892,9 @@ local bool weak_clean_dead (object obj) {
       }
       if (any_died)
         weak_hashed_alist_update(obj);
-      # Must keep obj active, even if its whal_count is 0: the whal_itable is
-      # not seen by spvw_gcmark (due to Lrecord_nonweak_length(obj) = 0) and
-      # must nevertheless be updated during the next GCs.
+      /* Must keep obj active, even if its whal_count is 0: the whal_itable is
+       not seen by spvw_gcmark (due to Lrecord_nonweak_length(obj) = 0) and
+       must nevertheless be updated during the next GCs. */
       return true;
     }
     default: abort();
@@ -1029,6 +1036,13 @@ local bool weak_must_activate (object obj) {
  > obj: A fresh but filled object of type Rectype_Weak* */
 global void activate_weak (object obj) {
   if (weak_must_activate(obj)) {
+    #ifdef MULTITHREAD
+    /* this is the only place where all_weakpointers_lock is used.
+       we do not allow GC here (no GC safe region) !*/
+     begin_system_call();
+     xmutex_lock(&all_weakpointers_lock);
+     end_system_call();
+    #endif
     /* Ensure that markwatchset has enough room for the next GC. */
     var uintL need = 1 + max_watchset_count(obj);
     var uintM new_markwatchset_size = markwatchset_size + need;
@@ -1037,7 +1051,7 @@ global void activate_weak (object obj) {
       var uintM new_markwatchset_allocated = markwatchset_allocated + markwatchset_allocated/2;
       if (new_markwatchset_allocated < new_markwatchset_size)
         new_markwatchset_allocated = new_markwatchset_size;
-      var markwatch_t* new_markwatchset = (markwatch_t*)my_malloc(new_markwatchset_allocated*sizeof(markwatch_t));
+      var markwatch_t* new_markwatchset = (markwatch_t*)clisp_malloc(new_markwatchset_allocated*sizeof(markwatch_t));
       /* Now that malloc() succeeded, we can free the old markwatchset and
          update the variables. */
       var markwatch_t* old_markwatchset = markwatchset;
@@ -1050,5 +1064,10 @@ global void activate_weak (object obj) {
     /* Now that markwatchset is large enough, add obj to O(all_weakpointers). */
     ((Weakpointer)TheRecord(obj))->wp_cdr = O(all_weakpointers);
     O(all_weakpointers) = obj;
+    #ifdef MULTITHREAD
+     begin_system_call();
+     xmutex_unlock(&all_weakpointers_lock);
+     end_system_call();
+    #endif
   }
 }

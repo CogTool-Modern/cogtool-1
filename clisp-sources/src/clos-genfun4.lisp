@@ -2,7 +2,7 @@
 ;;;; Generic Functions
 ;;;; Part n-2: make/initialize-instance methods, generic functions.
 ;;;; Bruno Haible 21.8.1993 - 2004
-;;;; Sam Steingold 1998 - 2005
+;;;; Sam Steingold 1998 - 2005, 2008, 2010
 ;;;; German comments translated into English: Stefan Kain 2002-04-08
 
 (in-package "CLOS")
@@ -167,10 +167,10 @@
                                 '(call-next-method)))
       (let ((qualifiers (method-qualifiers method)))
         (if qualifiers
-          (cerror cont-mesg 'program-error
+          (cerror cont-mesg 'sys::simple-program-error
             :format-control (TEXT "~S: ~S is invalid within ~{~S~^ ~} methods")
             :format-arguments (list gf 'CALL-NEXT-METHOD qualifiers))
-          (cerror cont-mesg 'program-error
+          (cerror cont-mesg 'sys::simple-program-error
             :format-control (TEXT "~S: ~S is invalid within primary methods")
             :format-arguments (list gf 'CALL-NEXT-METHOD)))))))
 
@@ -385,13 +385,15 @@
 (setq |#'generic-function-method-class| #'generic-function-method-class)
 (initialize-extended-method-check #'generic-function-method-class)
 
+(defun check-gf-lambda-list (gf caller)
+  (when (std-gf-undeterminedp gf)
+    (error (TEXT "~S: the lambda-list of ~S is not yet known") caller gf)))
+
 ;; MOP p. 79
 (defgeneric generic-function-lambda-list (generic-function)
   (:method ((gf standard-generic-function))
     (check-generic-function-initialized gf)
-    (when (eq (std-gf-signature gf) (sys::%unbound))
-      (error (TEXT "~S: the lambda-list of ~S is not yet known")
-             'generic-function-lambda-list gf))
+    (check-gf-lambda-list gf 'generic-function-lambda-list)
     (std-gf-lambda-list gf)))
 (initialize-extended-method-check #'generic-function-lambda-list)
 
@@ -401,16 +403,14 @@
     (:method ((gf generic-function))
       (let ((lambdalist (generic-function-lambda-list gf)))
         (generic-function-lambda-list-to-signature lambdalist
-          #'(lambda (detail errorstring &rest arguments)
-              (declare (ignore detail))
-              (error (TEXT "Invalid ~S result ~S: ~A")
-                     'generic-function-lambda-list lambdalist
-                     (apply #'format nil errorstring arguments))))))
+          #'(lambda (lalist detail errorstring &rest arguments)
+              (sys::lambda-list-error lalist detail
+                 (TEXT "Invalid ~S result ~S: ~A")
+                 'generic-function-lambda-list lambdalist
+                 (apply #'format nil errorstring arguments))))))
     (:method ((gf standard-generic-function))
       (check-generic-function-initialized gf)
-      (when (eq (std-gf-signature gf) (sys::%unbound))
-        (error (TEXT "~S: the lambda-list of ~S is not yet known")
-               'generic-function-lambda-list gf))
+      (check-gf-lambda-list gf 'generic-function-signature)
       (std-gf-signature gf))))
 (setq |#'generic-function-signature| #'generic-function-signature)
 
@@ -442,9 +442,7 @@
 (defgeneric generic-function-argument-precedence-order (generic-function)
   (:method ((gf standard-generic-function))
     (check-generic-function-initialized gf)
-    (when (eq (std-gf-signature gf) (sys::%unbound))
-      (error (TEXT "~S: the lambda-list of ~S is not yet known")
-             'generic-function-argument-precedence-order gf))
+    (check-gf-lambda-list gf 'generic-function-argument-precedence-order)
     (let ((argorder (std-gf-argorder gf))
           (lambdalist (std-gf-lambda-list gf)))
       (mapcar #'(lambda (i) (nth i lambdalist)) argorder))))
@@ -468,9 +466,7 @@
                    (apply #'format nil errorstring arguments))))))
   (:method ((gf standard-generic-function))
     (check-generic-function-initialized gf)
-    (when (eq (std-gf-signature gf) (sys::%unbound))
-      (error (TEXT "~S: the lambda-list of ~S is not yet known")
-             'generic-function-argument-precedence-order gf))
+    (check-gf-lambda-list gf 'generic-function-argorder)
     (std-gf-argorder gf)))
 (setq |#'generic-function-argorder| #'generic-function-argorder)
 

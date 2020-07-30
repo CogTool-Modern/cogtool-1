@@ -1,4 +1,4 @@
-# Copyright (C) 1998-2005 by Sam Steingold
+# Copyright (C) 1998-2008 by Sam Steingold
 # Distributed under the terms of the GNU General Public License.
 # See <http://www.gnu.org/copyleft/gpl.html>.
 
@@ -24,7 +24,7 @@
 #%define release %(test -f .release || echo 0 >> .release; echo "1 + " `cat .release` | bc > .,release; mv -fv .,release .release; cat .release)
 #%define release %(cat .release)
 %define release 1
-%define modules rawsock berkeley-db pcre bindings/glibc clx/new-clx zlib
+%define modules libsvm rawsock berkeley-db pcre bindings/glibc clx/new-clx zlib
 
 Summary:      Common Lisp (ANSI CL) implementation
 Name:         %{name}
@@ -38,16 +38,17 @@ Source:       ftp://ftp.gnu.org/pub/gnu/clisp/latest/
 URL:          http://clisp.cons.org/
 Packager:     Sam Steingold <sds@gnu.org>
 Provides:     clisp, ansi-cl
-Distribution: Fedora Core GNU/Linux
+Distribution: Fedora GNU/Linux
 BuildRoot:    %{_tmppath}/%{name}-root
 %description
 %(cat SUMMARY)
 
 This binary distribution was built with the following modules:
- base: i18n regexp syscalls (run "clisp" or "clisp -K base" to use them)
+ base: i18n regexp syscalls readline
+  (run "clisp" or "clisp -K base" to use them)
  full: in addition to the above, also
    %{modules}
- (run "clisp -K full" to use them)
+  (run "clisp -K full" to use them)
 
 %prep
 cat <<EOF
@@ -62,7 +63,7 @@ EOF
 # this has to be done just once - comment it out if you did this already
 #rm -rf %{builddir}
 #MODS=''; for m in %{modules}; do MODS=${MODS}' '--with-module=$m; done
-#./configure --prefix=%{prefix} --fsstnd=redhat ${MODS} --build %{builddir}
+#./configure --prefix=%{prefix} --fsstnd=redhat ${MODS} --cbc %{builddir}
 %install
 cd %{builddir}
 make DESTDIR=$RPM_BUILD_ROOT install
@@ -77,6 +78,12 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %{prefix}/bin/clisp
 %{prefix}/lib/clisp/
+%{prefix}/share/emacs/site-lisp/clhs.el
+%{prefix}/share/emacs/site-lisp/clisp-coding.el
+%{prefix}/share/emacs/site-lisp/clisp-indent.el
+%{prefix}/share/emacs/site-lisp/clisp-indent.lisp
+%{prefix}/share/emacs/site-lisp/clisp-ffi.el
+%{prefix}/share/vim/vimfiles/after/syntax/lisp.vim
 %{prefix}/share/doc/%{name}-%{version}/
 %{prefix}/share/man/man1/clisp.1.gz
 %{prefix}/share/locale/de/LC_MESSAGES/clisp.mo

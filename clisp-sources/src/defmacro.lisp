@@ -41,11 +41,25 @@
 |#
 
 (defun macro-call-error (macro-form) ; ABI
-  (error-of-type 'source-program-error
-    :form macro-form
-    :detail macro-form
-    (TEXT "The macro ~S may not be called with ~S arguments: ~S")
-    (car macro-form) (1- (length macro-form)) macro-form))
+  (multiple-value-bind (length tail) (sys::list-length-dotted macro-form)
+    (if (null length)
+      (let ((*print-circle* t))
+        (error-of-type 'source-program-error
+          :form macro-form
+          :detail macro-form
+          (TEXT "The macro ~S may not be called with a circular argument list: ~S")
+          (car macro-form) macro-form))
+      (if tail
+        (error-of-type 'source-program-error
+          :form macro-form
+          :detail macro-form
+          (TEXT "The macro ~S may not be called with a dotted argument list: ~S")
+          (car macro-form) macro-form)
+        (error-of-type 'source-program-error
+          :form macro-form
+          :detail macro-form
+          (TEXT "The macro ~S may not be called with ~S arguments: ~S")
+          (car macro-form) (1- (length macro-form)) macro-form)))))
 
 (defun macro-nonnull-element-error (macro-form macro-name element) ; ABI
   (error-of-type 'source-program-error
@@ -57,8 +71,11 @@
 (proclaim '(special
         %whole-form ;; the whole source form being macroexpanded or compiled
 
+        %proper-list-p ;; check whether the whole list is proper,
+                       ;; even if %restp is true
+
         %restp ;; indicates whether &REST/&BODY/&KEY was given,
-               ;; and therefore the number of arguments is unbound.
+               ;; and therefore the number of arguments is unlimited.
 
         %min-args ;; indicates the mininum number of arguments
 
@@ -99,9 +116,9 @@ as environment (or the original lambda list and NIL, if &ENVIRONMENT
 is not found).
 
  (MAKE-LENGTH-TEST symbol)
-creates a testform from %restp, %min-args, %arg-count, which indicates
-during evaluation whether the variable value of the symbol can be a
-function call for the macro.
+creates a testform from %restp, %min-args, %arg-count, %proper-list-p,
+which indicates during evaluation whether the variable value of the symbol
+can be a function call for the macro.
 
  (MAKE-MACRO-EXPANSION macrodef whole-form)
 returns, for a macro definition macrodef = (name lambdalist . body),
@@ -120,8 +137,8 @@ the actual object #<MACRO expander> for the FENV.
       ((atom listr)
        (if listr
          (cerror (TEXT "The rest of the lambda list will be ignored.")
-                 (TEXT "The lambda list of macro ~S contains a dot after &AUX.")
-                 name)))
+                 (TEXT "The lambda list of macro ~S contains a dot after ~S.")
+                 name '&aux)))
     (cond ((symbolp (car listr)) (setq %let-list (cons `(,(car listr) nil) %let-list)))
           ((atom (car listr))
            (error-of-type 'source-program-error
@@ -161,8 +178,8 @@ the actual object #<MACRO expander> for the FENV.
       ((atom listr)
        (if listr
          (cerror (TEXT "The rest of the lambda list will be ignored.")
-                 (TEXT "The lambda list of macro ~S contains a dot after &KEY.")
-                 name)))
+                 (TEXT "The lambda list of macro ~S contains a dot after ~S.")
+                 name '&key)))
     (setq next (car listr))
     (cond ((eq next '&ALLOW-OTHER-KEYS) (setq other-keys-forbidden nil))
           ((eq next '&AUX)
@@ -404,12 +421,12 @@ the actual object #<MACRO expander> for the FENV.
                   (if test
                     (rplaca (cdr (assoc g1 %let-list))
                             `(if ,test
-                                 (error-of-type 'source-program-error
-                                   :form ,wholevar
-                                   :detail ,g
-                                   (TEXT "~S: ~S does not match lambda list element ~:S")
-                                   ',name ,g ',item)
-                                 ,g)))))
+                               (error-of-type 'source-program-error
+                                 :form ,wholevar
+                                 :detail ,g
+                                 (TEXT "~S: ~S does not match lambda list element ~:S")
+                                 ',name ,g ',item)
+                               ,g)))))
            (setq accessexp (cons-cdr accessexp))))))
 
 (defun remove-env-arg (lambdalist name)
@@ -431,14 +448,19 @@ the actual object #<MACRO expander> for the FENV.
           (TEXT "In the lambda list of macro ~S, &ENVIRONMENT must be followed by a non-NIL symbol: ~S")
           name lambdalist)))))
 
-(defun make-length-test (var &optional (header 1) (accept-dotted t))
-  (let ((len `(,(if accept-dotted 'LIST-LENGTH-DOTTED 'LIST-LENGTH) ,var)))
-    (cond ((and (zerop %min-args) %restp) NIL)
-          ((zerop %min-args) `(> ,len ,(+ header %arg-count)))
-          (%restp `(< ,len ,(+ header %min-args)))
-          ((= %min-args %arg-count) `(/= ,len ,(+ header %min-args)))
-          (t `(NOT (<= ,(+ header %min-args)
-                       ,len ,(+ header %arg-count)))))))
+(defun make-length-test (var &optional (header 1))
+  (if (and (zerop %min-args) %restp)
+    ; No length constraint, test only whether the list is a proper list.
+    (if %proper-list-p
+      `(NOT (PROPER-LIST-P ,var))
+      NIL)
+    ; Perform all tests in a single function call.
+    `(NOT
+       ,(if %proper-list-p
+          `(SYS::PROPER-LIST-LENGTH-IN-BOUNDS-P ,var ,(+ header %min-args)
+             ,@(if %restp '() (list (+ header %arg-count))))
+          `(SYS::LIST-LENGTH-IN-BOUNDS-P ,var ,(+ header %min-args)
+             ,(+ header %arg-count) ,(not (not %restp)))))))
 
 (defun make-macro-expansion (macrodef whole-form
                              ;; Optional arguments, for define-compiler-macro:
@@ -468,7 +490,7 @@ the actual object #<MACRO expander> for the FENV.
     (multiple-value-bind (body-rest declarations docstring) (parse-body body t)
       (if declarations
         (setq declarations (list (cons 'DECLARE declarations))))
-      (let ((%whole-form whole-form))
+      (let ((%whole-form whole-form) (%proper-list-p nil))
         (multiple-value-bind (newlambdalist envvar)
             (remove-env-arg lambdalist name)
           (let ((%arg-count 0) (%min-args 0) (%restp nil) (%null-tests nil)
@@ -523,7 +545,8 @@ the actual object #<MACRO expander> for the FENV.
                                            *denv*
                                            *toplevel-denv*))))
   (make-macro
-    (evalhook (make-macro-expansion macrodef whole-form) nil nil env)))
+    (evalhook (make-macro-expansion macrodef whole-form) nil nil env)
+    (second whole-form)))
 
 ;; Creates a macro expander for FUNCTION-MACRO-LET.
 ;; Unlike in MACROLET, the macro is defined in the null lexical environment.
@@ -536,4 +559,5 @@ the actual object #<MACRO expander> for the FENV.
 (defun make-funmacro-expander (name full-lambdabody)
   (make-macro
     (evalhook `(FUNCTION ,name (LAMBDA ,@full-lambdabody)) nil nil
-              *toplevel-environment*)))
+              *toplevel-environment*)
+    (first full-lambdabody)))

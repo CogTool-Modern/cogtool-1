@@ -1,7 +1,8 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;; some tests for I18N
 ;; clisp -q -norc -i ../tests/tests -x '(run-test "i18n/test")'
 
+(require "i18n") NIL
 (listp (show (multiple-value-list (ext:module-info "i18n" t)) :pretty t)) T
 
 (i18n:gettext "foo") "foo"

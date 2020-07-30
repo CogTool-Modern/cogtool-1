@@ -1,5 +1,6 @@
 ;;;; SUBTYPEP
 ;;;; Bruno Haible 2004-03-28, 2004-04-03
+;;;; Sam Steingold 2004-2005
 
 ;; SUBTYPEP is very powerful. It can tell:
 ;; - whether a type is empty:
@@ -1369,8 +1370,11 @@
                    (when (member class1 type2parts :test #'canonicalized-types-equal-p)
                      (yes))
                    (dolist (class2 type2parts)
-                     (when (clos::subclassp class1 class2)
-                       (yes))))))))
+                     (multiple-value-bind (is known)
+                         (indefinite-subclassp class1 class2)
+                       (declare (ignore known))
+                       (when is
+                         (yes)))))))))
     (when try-prove-no
       ;; For classes, all checks already done. Any common instance of type1
       ;; would be a testimony.
@@ -1378,6 +1382,40 @@
         (no)))
     (unknown))
 )
+;; (indefinite-subclassp class1 class2) is like (clos::subclassp class1 class2),
+;; except that it doesn't signal an error if class1 is not finalizable, and
+;; it has the same return value convention as SUBTYPEP: NIL, NIL for
+;; "unknown"; boolean, T for a definite result.
+(defun indefinite-subclassp (class1 class2)
+  ;; Can we guarantee that every class with metaclass <standard-class> will be
+  ;; a subclass of <standard-object>? I don't think so, because the user can
+  ;; play weird games by installing methods on VALIDATE-SUPERCLASSES.
+  #|
+  (when (and (eq (class-of class1) clos::<standard-class>)
+             (eq class2 clos::<standard-object>))
+    (return-from indefinite-subclassp (values t t)))
+  |#
+  ;; Recurse through the known direct superclasses, starting from class1.
+  ;; Use a hash table of the already visited classes, to avoid exponential
+  ;; running time or running into cycles.
+  (let ((ht (make-hash-table :key-type 'class :value-type '(eql t)
+                             :test 'ext:stablehash-eq :warn-if-needs-rehash-after-gc t))
+        (definite t))
+    (labels ((recurse (class)
+               (unless (gethash class ht) ; don't visit the same class twice
+                 (if (eq class class2)
+                   (return-from indefinite-subclassp (values t t))
+                   (progn
+                     (setf (gethash class ht) t)
+                     (if (clos:class-finalized-p class)
+                       (when (clos::subclassp class class2)
+                         (return-from indefinite-subclassp (values t t)))
+                       (dolist (sc (clos:class-direct-superclasses class))
+                         (if (clos::forward-reference-to-class-p sc)
+                           (setq definite nil)
+                           (recurse sc)))))))))
+      (recurse class1)
+      (values nil definite))))
 
 ;; Determine the category of the given type.
 ;; Returns NIL for types about which nothing is known, such as SATISFIES types.

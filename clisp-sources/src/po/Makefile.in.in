@@ -3,6 +3,7 @@
 # Copyright (C) 1995, 1996, 1997 Free Software Foundation, Inc.
 # Copyright (C) 1996 Marcus Daniels.
 # Copyright (C) 1997 Bruno Haible.
+# Copyright (C) 2007-2008 Sam Steingold
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,8 +31,8 @@ top_srcdir = @top_srcdir@
 
 prefix = @prefix@
 exec_prefix = @exec_prefix@
-datadir = @datadir@
-localedir = $(datadir)/locale
+datarootdir = @datarootdir@
+localedir = @localedir@
 
 # Programs used by "make":
 
@@ -77,16 +78,13 @@ install-data-no: all force
 
 install-data-yes: all force
 	@catalogs='$(CATALOGS)'; \
+	destdir=$(DESTDIR)$(localedir); \
 	for cat in $$catalogs; do \
 	  cat=`basename $$cat`; \
-	  destdir=$(localedir); \
 	  lang=`echo $$cat | sed 's/\.gmo$$//'`; \
 	  dir="$$destdir/$$lang/LC_MESSAGES"; \
-	  datadir=`echo "$$destdir" | sed -e 's,/[^/]*$$,,'`; \
-	  test -d "$$datadir" || mkdir "$$datadir" ; \
-	  test -d "$$destdir" || mkdir "$$destdir" ; \
-	  test -d "$$destdir/$$lang" || mkdir "$$destdir/$$lang" ; \
-	  test -d "$$dir" || mkdir "$$dir" ; \
+	  datarootdir=`echo "$$destdir" | sed -e 's,/[^/]*$$,,'`; \
+	  mkdir -p "$$datarootdir" "$$destdir/$$lang" "$$dir" ; \
 	  if test -r $$cat; then \
 	    echo "installing $$cat as $$dir/$(PACKAGE).mo"; \
 	    $(INSTALL_DATA) $$cat "$$dir/$(PACKAGE).mo"; \
@@ -107,14 +105,11 @@ installdirs: force
 	@catalogs='$(CATALOGS)'; \
 	for cat in $$catalogs; do \
 	  cat=`basename $$cat`; \
-	  destdir=$(localedir); \
+	  destdir=$(DESTDIR)$(localedir); \
 	  lang=`echo $$cat | sed 's/\.gmo$$//'`; \
 	  dir="$$destdir/$$lang/LC_MESSAGES"; \
-	  datadir=`echo "$$destdir" | sed -e 's,/[^/]*,,'`; \
-	  test -d "$$datadir" || mkdir "$$datadir" ; \
-	  test -d "$$destdir" || mkdir "$$destdir" ; \
-	  test -d "$$destdir/$$lang" || mkdir "$$destdir/$$lang" ; \
-	  test -d "$$dir" || mkdir "$$dir" ; \
+	  datarootdir=`echo "$$destdir" | sed -e 's,/[^/]*,,'`; \
+	  mkdir -p "$$datarootdir" "$$destdir/$$lang" "$$dir" ; \
 	done
 
 uninstall:

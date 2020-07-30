@@ -8,41 +8,41 @@
 #        sintWL exp = Exponent (vorzeichenbehaftet),
 #        uintL mant = Mantisse (>= 2^FF_mant_len, < 2^(FF_mant_len+1))
   #define FF_uexp(x)  (((x) >> FF_mant_len) & (bit(FF_exp_len)-1))
-  #define FF_decode(obj, zero_statement, sign_zuweisung,exp_zuweisung,mant_zuweisung)  \
+  #define FF_decode(obj, zero_statement, sign_assignment,exp_assignment,mant_assignment)  \
     {                                                                      \
       var ffloat _x = ffloat_value(obj);                                   \
       var uintBWL uexp = FF_uexp(_x);                                      \
       if (uexp==0) {                                                       \
         zero_statement # e=0 -> Zahl 0.0                                   \
       } else {                                                             \
-        exp_zuweisung (sintWL)((uintWL)uexp - FF_exp_mid); # Exponent      \
-        unused (sign_zuweisung sign_of_sint32((sint32)(_x))); # Vorzeichen \
-        mant_zuweisung (bit(FF_mant_len) | (_x & (bit(FF_mant_len)-1)));   \
+        exp_assignment (sintWL)((uintWL)uexp - FF_exp_mid); # Exponent     \
+        unused (sign_assignment sign_of_sint32((sint32)(_x))); # Vorzeichen \
+        mant_assignment (bit(FF_mant_len) | (_x & (bit(FF_mant_len)-1)));  \
       }                                                                    \
     }
 
 # Einpacken eines Single-Float:
-# encode_FF(sign,exp,mant, ergebnis=);
+# encode_FF(sign,exp,mant, result=);
 # liefert ein Single-Float.
 # > signean sign: Vorzeichen, 0 für +, -1 für negativ.
 # > sintWL exp: Exponent
 # > uintL mant: Mantisse, sollte >= 2^FF_mant_len und < 2^(FF_mant_len+1) sein.
-# < object ergebnis: ein Single-Float
+# < object result: ein Single-Float
 # Der Exponent wird auf Überlauf/Unterlauf getestet.
 # can trigger GC
-  #define encode_FF(sign,exp,mant, erg_zuweisung)  \
+  #define encode_FF(sign,exp,mant, res_assignment)  \
     {                                                               \
       if ((exp) < (sintWL)(FF_exp_low-FF_exp_mid)) {                \
         if (underflow_allowed()) {                                  \
-          fehler_underflow();                                       \
+          error_underflow();                                       \
         } else {                                                    \
-          erg_zuweisung FF_0;                                       \
+          res_assignment FF_0;                                       \
         }                                                           \
       } else                                                        \
       if ((exp) > (sintWL)(FF_exp_high-FF_exp_mid)) {               \
-        fehler_overflow();                                          \
+        error_overflow();                                          \
       } else                                                        \
-      erg_zuweisung allocate_ffloat                                 \
+      res_assignment allocate_ffloat                                 \
         (  ((sint32)(sign) & bit(31))                  # Vorzeichen \
          | ((uint32)((exp)+FF_exp_mid) << FF_mant_len) # Exponent   \
          | ((uint32)(mant) & (bit(FF_mant_len)-1))     # Mantisse   \
@@ -74,7 +74,7 @@
 #   maybe_underflow: Ergebnis sehr klein und /=0, liefert IEEE-Null
 #   maybe_divide_0: Ergebnis unbestimmt, liefert IEEE-Infinity
 #   maybe_nan: Ergebnis unbestimmt, liefert IEEE-NaN
-  #define float_to_FF(expr,ergebnis_zuweisung,maybe_overflow,maybe_subnormal,maybe_underflow,maybe_divide_0,maybe_nan)  \
+  #define float_to_FF(expr,result_assignment,maybe_overflow,maybe_subnormal,maybe_underflow,maybe_divide_0,maybe_nan)  \
     {                                                                    \
       var ffloatjanus _erg; _erg.machine_float = (expr);                 \
       if ((_erg.eksplicit & ((uint32)bit(FF_exp_len+FF_mant_len)-bit(FF_mant_len))) == 0) { # e=0 ? \
@@ -83,11 +83,11 @@
             )                                                            \
             && underflow_allowed()                                       \
            ) {                                                           \
-          fehler_underflow(); # subnormal oder noch kleiner-> Underflow  \
+          error_underflow(); # subnormal oder noch kleiner-> Underflow  \
         } else {                                                         \
-          ergebnis_zuweisung FF_0; # +/- 0.0 -> 0.0                      \
+          result_assignment FF_0; # +/- 0.0 -> 0.0                      \
         }                                                                \
-      } elif ((maybe_overflow || maybe_divide_0)                         \
+      } else if ((maybe_overflow || maybe_divide_0)                     \
               && (((~_erg.eksplicit) & ((uint32)bit(FF_exp_len+FF_mant_len)-bit(FF_mant_len))) == 0) # e=255 ? \
              ) {                                                         \
         if (maybe_nan && !((_erg.eksplicit << (32-FF_mant_len)) == 0)) { \
@@ -98,10 +98,10 @@
           if (!maybe_overflow || maybe_divide_0)                         \
             divide_0(); # Infinity, Division durch 0                     \
           else                                                           \
-            fehler_overflow(); # Infinity, Overflow                      \
+            error_overflow(); # Infinity, Overflow                      \
         }                                                                \
       } else {                                                           \
-        ergebnis_zuweisung allocate_ffloat(_erg.eksplicit);              \
+        result_assignment allocate_ffloat(_erg.eksplicit);              \
       }                                                                  \
     }
 #endif
@@ -196,7 +196,7 @@
     } else {
       if (uexp > FF_exp_mid+FF_mant_len) { # e > 23 ?
         return x;
-      } elif (uexp > FF_exp_mid+1) { # e>1 ?
+      } else if (uexp > FF_exp_mid+1) { # e>1 ?
         var uint32 bitmask = # Bitmaske: Bit 23-e gesetzt, alle anderen gelöscht
           bit(FF_mant_len+FF_exp_mid-uexp);
         var uint32 mask = # Bitmaske: Bits 22-e..0 gesetzt, alle anderen gelöscht
@@ -216,7 +216,7 @@
              + 1 # letzte Stelle erhöhen, dabei evtl. Exponenten incrementieren
             );
         }
-      } elif (uexp == FF_exp_mid+1) { # e=1 ?
+      } else if (uexp == FF_exp_mid+1) { # e=1 ?
         # Wie bei 1 < e <= 23, nur dass Bit 24-e stets gesetzt ist.
         if ((x_ & bit(FF_mant_len-1)) ==0) # Bit 23-e =0 -> abrunden
           # abrunden
@@ -466,9 +466,9 @@
  #endif
 
 # Liefert zu zwei Single-Float x und y : (* x y), ein FF.
-# FF_FF_mal_FF(x,y)
+# FF_FF_mult_FF(x,y)
 # can trigger GC
-  local maygc object FF_FF_mal_FF (object x, object y);
+  local maygc object FF_FF_mult_FF (object x, object y);
 # Methode:
 # Falls x1=0.0 oder x2=0.0 -> Ergebnis 0.0
 # Sonst: Ergebnis-Vorzeichen = VZ von x1 xor VZ von x2.
@@ -485,7 +485,7 @@
 #            Aufrunden: Falls =2^24, um 1 Bit nach rechts schieben. Sonst
 #            Exponenten um 1 erniedrigen.
  #ifdef FAST_FLOAT
-  local maygc object FF_FF_mal_FF (object x1, object x2)
+  local maygc object FF_FF_mult_FF (object x1, object x2)
   {
     float_to_FF(FF_to_float(x1) * FF_to_float(x2), return ,
                 true, true, # Overflow und subnormale Zahl abfangen
@@ -495,7 +495,7 @@
                );
   }
  #else
-  local maygc object FF_FF_mal_FF (object x1, object x2)
+  local maygc object FF_FF_mult_FF (object x1, object x2)
   {
     # x1,x2 entpacken:
     var signean sign1;
@@ -555,9 +555,9 @@
  #endif
 
 # Liefert zu zwei Single-Float x und y : (/ x y), ein FF.
-# FF_FF_durch_FF(x,y)
+# FF_FF_div_FF(x,y)
 # can trigger GC
-  local maygc object FF_FF_durch_FF (object x, object y);
+  local maygc object FF_FF_div_FF (object x, object y);
 # Methode:
 # x2 = 0.0 -> Error
 # x1 = 0.0 -> Ergebnis 0.0
@@ -577,7 +577,7 @@
 #   Falls der Quotient <2^25 ist, runde das letzte Bit weg. Bei rounding
 #     overflow schiebe um ein weiteres Bit nach rechts, incr. Exponenten.
 #if defined(FAST_FLOAT) && !defined(FLOAT_DIV0_EXCEPTION) && !defined(I80386)
-  local maygc object FF_FF_durch_FF (object x1, object x2)
+  local maygc object FF_FF_div_FF (object x1, object x2)
   {
     float_to_FF(FF_to_float(x1) / FF_to_float(x2), return ,
                 true, true, # Overflow und subnormale Zahl abfangen
@@ -588,7 +588,7 @@
                );
   }
  #else
-  local maygc object FF_FF_durch_FF (object x1, object x2)
+  local maygc object FF_FF_div_FF (object x1, object x2)
   {
     # x1,x2 entpacken:
     var signean sign1;
@@ -792,10 +792,10 @@ local maygc object I_to_FF (object x, bool signal_overflow)
         mant = mant>>1; exp = exp+1;
       }
     }
-    #define fehler_overflow() \
-      if (signal_overflow) (fehler_overflow)(); else return nullobj;
+    #define error_overflow() \
+      if (signal_overflow) (error_overflow)(); else return nullobj;
     encode_FF(sign,(sintL)exp,mant, return);
-    #undef fehler_overflow
+    #undef error_overflow
   }
 }
 
@@ -821,8 +821,8 @@ local maygc object I_to_FF (object x, bool signal_overflow)
     if (RA_integerp(x))
       return I_to_FF(x,signal_overflow);
     # x Ratio
-    #define fehler_overflow() \
-      if (signal_overflow) (fehler_overflow)(); else return nullobj;
+    #define error_overflow() \
+      if (signal_overflow) (error_overflow)(); else return nullobj;
     pushSTACK(TheRatio(x)->rt_den); # b
     var signean sign = RT_sign(x); # Vorzeichen
     x = TheRatio(x)->rt_num; # +/- a
@@ -833,11 +833,11 @@ local maygc object I_to_FF (object x, bool signal_overflow)
     var sintL lendiff = I_integer_length(x) # (integer-length a)
                         - I_integer_length(STACK_1); # (integer-length b)
     if (lendiff > FF_exp_high-FF_exp_mid) { # Exponent >= n-m > Obergrenze ?
-      fehler_overflow(); # -> Overflow
+      skipSTACK(2); error_overflow();       /* -> Overflow */
     }
     if (lendiff < FF_exp_low-FF_exp_mid-2) { # Exponent <= n-m+2 < Untergrenze ?
       if (underflow_allowed()) {
-        fehler_underflow(); # -> Underflow
+        error_underflow(); # -> Underflow
       } else {
         skipSTACK(2); return FF_0;
       }
@@ -898,6 +898,6 @@ local maygc object I_to_FF (object x, bool signal_overflow)
     skipSTACK(2);
     # Fertig.
     encode_FF(sign,lendiff,mant, return);
-    #undef fehler_overflow
+    #undef error_overflow
   }
 

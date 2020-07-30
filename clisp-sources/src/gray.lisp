@@ -15,6 +15,8 @@
    fundamental-binary-output-stream
    ;; general generic functions:
    stream-position
+   stream-read-sequence
+   stream-write-sequence
    ;; Generic functions for character input:
    stream-read-char
    stream-unread-char
@@ -53,14 +55,15 @@
 
 ;; Classes
 
-(eval-when (compile load eval)
-  (defmethod clos:validate-superclass ((class class) (superclass (eql clos::<stream>)))
-    (or (call-next-method)
-        (eq (clos:class-name class) 'fundamental-stream)))
+(defmethod clos:validate-superclass ((class class)
+                                     (superclass (eql clos::<stream>)))
+  (or (call-next-method)
+      (eq (clos:class-name class) 'fundamental-stream)))
+(ext:compiler-let ((clos::*allow-mixing-metaclasses* t))
   (let ((clos::*allow-mixing-metaclasses* t))
     (clos:defclass fundamental-stream (stream clos:standard-object)
       (($open :type boolean :initform t) ; whether the stream is open
-       ($reval :type boolean :initform nil) ; whether read-eval is allowed
+       ($fasl :type boolean :initform nil) ; read-eval is allowed; \r=#\Return
        ($penl :type boolean :initform nil) ; whether an elastic newline is pending
 ) ) ) )
 
@@ -154,6 +157,27 @@
         (cl:file-position stream)))
   (:method ((stream fundamental-stream) position)
     (clos:no-applicable-method #'stream-position stream position)))
+
+
+(clos:defgeneric stream-read-sequence (sequence stream &key start end)
+  (:method (sequence (stream fundamental-binary-input-stream)
+            &key (start 0) (end nil))
+    (stream-read-byte-sequence stream sequence start end))
+  (:method (sequence (stream fundamental-character-input-stream)
+            &key (start 0) (end nil))
+    (stream-read-char-sequence stream sequence start end))
+  (:method (sequence (stream fundamental-input-stream) &rest rest)
+    (apply #'sys::%read-sequence sequence stream rest)))
+
+(clos:defgeneric stream-write-sequence (sequence stream &key start end)
+  (:method (sequence (stream fundamental-binary-output-stream)
+            &key (start 0) (end nil))
+    (stream-write-byte-sequence stream sequence start end))
+  (:method (sequence (stream fundamental-character-output-stream)
+            &key (start 0) (end nil))
+    (stream-write-char-sequence stream sequence start end))
+  (:method (sequence (stream fundamental-output-stream) &rest rest)
+    (apply #'sys::%write-sequence sequence stream rest)))
 
 ;; Generic functions for character input
 

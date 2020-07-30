@@ -1,4 +1,4 @@
-;; -*- Lisp -*-
+;; -*- Lisp -*- vim:filetype=lisp
 ;;*****************************************************************************
 ;;*    Rosenmueller            format.tst                                     *
 ;;*****************************************************************************
@@ -52,14 +52,12 @@
 #+(or GCL CMU SBCL) "foo bar  baz"
 #-(or CLISP GCL ALLEGRO CMU SBCL OpenMCL LISPWORKS) UNKNOWN
 
-(progn
-(setq liste '(aaaaaaa bbbbbb cccccccccccc dddddddddddddd eeee fffffffff
-gggggggg
- hhhhh iiii j kk lll mmmm nnnnnn oooooooooo ppppppppppppppp qqqqqqq
-rrrrrrrrrrrr
-s ttt uuuuuuuuu vvvvvvv wwwwwwwwww xxxxx yyyyyy zzzzzzzz))              ;26
-T)
-T
+(defparameter liste
+  '(aaaaaaa bbbbbb cccccccccccc dddddddddddddd eeee fffffffff
+    gggggggg hhhhh iiii j kk lll mmmm nnnnnn oooooooooo ppppppppppppppp
+    qqqqqqq rrrrrrrrrrrr s ttt uuuuuuuuu vvvvvvv wwwwwwwwww
+    xxxxx yyyyyy zzzzzzzz))     ; 26
+LISTE
 
 (format nil "~%;; ~<~%;; ~1:; ~s~; ~s~; ~s~; ~s~; ~s~; ~s~; ~s~; ~s~; ~s~; ~s~;~
  ~s~; ~s~; ~s~; ~s~; ~s~; ~s~; ~s~; ~s~; ~s~; ~s~;~
@@ -320,13 +318,57 @@ FOO
 (format nil "~9,2,1E" 0.0314159)
 "  3.14E-2"
 
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1790496&group_id=1355&atid=101355
+(format nil "~ve" 21 46d7)
+"               4.6d+8"
+(format nil "~21e" 466d17)
+"             4.66d+19"
+
+;; this code generates the following 12 tests
+;; not long, see http://clisp.podval.org/impnotes/num-concepts.html#long-float-wider-than-bignum
+(dolist (lm '("LEAST" "MOST"))
+  (dolist (pn '("POSITIVE" "NEGATIVE"))
+    (dolist (ty '("DOUBLE" "SINGLE" "SHORT")) ; "LONG"
+      (let* ((s (concatenate 'string lm "-" pn "-" ty "-FLOAT"))
+             (v (symbol-value (find-symbol s)))
+             (e (format nil "~E" v)))
+        (format t "(format nil \"~~E\" ~A) ~S~%" s e)
+        (unless (eql v (ignore-errors (read-from-string e)))
+          (princ " === fails: "))
+        (format t "(= ~A (read-from-string ~S)) T~%" s e)))))
+NIL
+
+(format nil "~E" LEAST-POSITIVE-DOUBLE-FLOAT) "2.2250738585072014d-308"
+(= LEAST-POSITIVE-DOUBLE-FLOAT (read-from-string "2.2250738585072014d-308")) T
+(format nil "~E" LEAST-POSITIVE-SINGLE-FLOAT) "1.17549434E-38"
+(= LEAST-POSITIVE-SINGLE-FLOAT (read-from-string "1.17549434E-38")) T
+(format nil "~E" LEAST-POSITIVE-SHORT-FLOAT) "1.1755s-38"
+(= LEAST-POSITIVE-SHORT-FLOAT (read-from-string "1.1755s-38")) T
+(format nil "~E" LEAST-NEGATIVE-DOUBLE-FLOAT) "-2.2250738585072014d-308"
+(= LEAST-NEGATIVE-DOUBLE-FLOAT (read-from-string "-2.2250738585072014d-308")) T
+(format nil "~E" LEAST-NEGATIVE-SINGLE-FLOAT) "-1.17549434E-38"
+(= LEAST-NEGATIVE-SINGLE-FLOAT (read-from-string "-1.17549434E-38")) T
+(format nil "~E" LEAST-NEGATIVE-SHORT-FLOAT) "-1.1755s-38"
+(= LEAST-NEGATIVE-SHORT-FLOAT (read-from-string "-1.1755s-38")) T
+(format nil "~E" MOST-POSITIVE-DOUBLE-FLOAT) "1.7976931348623157d+308"
+(= MOST-POSITIVE-DOUBLE-FLOAT (read-from-string "1.7976931348623157d+308")) T
+(format nil "~E" MOST-POSITIVE-SINGLE-FLOAT) "3.4028235E+38"
+(= MOST-POSITIVE-SINGLE-FLOAT (read-from-string "3.4028235E+38")) T
+(format nil "~E" MOST-POSITIVE-SHORT-FLOAT) "3.4028s+38"
+(= MOST-POSITIVE-SHORT-FLOAT (read-from-string "3.4028s+38")) T
+(format nil "~E" MOST-NEGATIVE-DOUBLE-FLOAT) "-1.7976931348623157d+308"
+(= MOST-NEGATIVE-DOUBLE-FLOAT (read-from-string "-1.7976931348623157d+308")) T
+(format nil "~E" MOST-NEGATIVE-SINGLE-FLOAT) "-3.4028235E+38"
+(= MOST-NEGATIVE-SINGLE-FLOAT (read-from-string "-3.4028235E+38")) T
+(format nil "~E" MOST-NEGATIVE-SHORT-FLOAT) "-3.4028s+38"
+(= MOST-NEGATIVE-SHORT-FLOAT (read-from-string "-3.4028s+38")) T
+
 ;; ~% ~d ~e (v) ---------------------------------------------------------------
 (let (x)
  (dotimes (k 13 x)
   (setq x (cons (format nil "~%Scale factor ~2D: |~13,6,2,VE|"
           (- k 5) (- k 5) 3.14159) x))))
-(
-"
+("
 Scale factor  7: | 3141590.E-06|" "
 Scale factor  6: | 314159.0E-05|" "
 Scale factor  5: | 31415.90E-04|" "
@@ -341,6 +383,30 @@ Scale factor -3: | 0.000314E+04|" "
 Scale factor -4: | 0.000031E+05|" "
 Scale factor -5: | 0.000003E+06|")
 
+(format nil "~G" 1d22) "10000000000000000000000.    "
+(format nil "~G" 1d23) "100000000000000000000000.    "
+(format nil "~G" 1d24) "1000000000000000000000000.    "
+(format nil "~F" 1d22) "10000000000000000000000.0"
+(format nil "~F" 1d23) "100000000000000000000000.0"
+(format nil "~F" 1d24) "1000000000000000000000000.0"
+(format nil "~E" 1d22) "1.0d+22"
+(format nil "~E" 1d23) "1.0d+23"
+(format nil "~E" 1d24) "1.0d+24"
+
+(loop :for i :from 0 :to 50
+  :for x = (expt 1d1 i)
+  :for s = (format nil "~G" x)
+  :when (char= #\0 (char s (1+ (position #\. s))))
+  :collect x)
+()
+
+;; http://sourceforge.net/tracker/index.php?func=detail&aid=1928759&group_id=1355&atid=101355
+(format nil "~8e" .8999999d0)  "  9.0d-1"
+(format nil "~8e" .999999d0)   "  1.0d+0"
+(format nil "~8e" .999999d9)   "  1.0d+9"
+(format nil "~8e" .999999d10)  " 1.0d+10"
+(format nil "~8e" .999999d-10) " 1.0d-10"
+(format nil "~8e" .999999d-9)  "  1.0d-9"
 
 ;; ~g -------------------------------------------------------------------------
 (defun foo (x)
@@ -385,8 +451,7 @@ foo
 (FORMAT NIL "format-a:--~a--ende" (QUOTE AB\c))
 "format-a:--ABc--ende"
 
-(SETQ Y "elephant")
-"elephant"
+(defparameter Y "elephant") Y
 
 (FORMAT NIL "Look at the ~A!" Y)
 "Look at the elephant!"
@@ -486,8 +551,7 @@ foo
 #+(or CLISP AKCL ALLEGRO CMU SBCL LISPWORKS) "format-s:--(|ABc| NIL XYZ)--ende-*"
 #-(or XCL CLISP AKCL ALLEGRO CMU SBCL LISPWORKS) UNKNOWN
 
-(SETQ X 5)
-5
+(defparameter X 5) X
 
 (FORMAT NIL "The answer is ~D." X)
 "The answer is 5."
@@ -809,8 +873,7 @@ freshline:
 new line but at beginning   same line, but spaced out
 new line and over two tabs-*"
 
-(SETQ N 3)
-3
+(defparameter N 3) N
 
 (FORMAT NIL "~D item~:P found." N)
 "3 items found."
@@ -895,16 +958,16 @@ but it was called with an argument of type SHORT-FLOAT.-*"
 (FORMAT NIL "~@R ~(~@R~)" 14 14)
 "XIV xiv"
 
-(DEFUN F (N) (FORMAT NIL "~@(~R~) error~:P detected." N))
-F
+(DEFUN FOO (N) (FORMAT NIL "~@(~R~) error~:P detected." N))
+FOO
 
-(F 0)
+(FOO 0)
 "Zero errors detected."
 
-(F 1)
+(FOO 1)
 "One error detected."
 
-(F 23)
+(FOO 23)
 "Twenty-three errors detected."
 
 (SETQ *PRINT-LEVEL* NIL *PRINT-LENGTH* 5)
@@ -918,11 +981,9 @@ F
 (SETQ *PRINT-LENGTH* NIL)
 NIL
 
-(SETQ FOO
+(defparameter FOO
 "Items:~#[none~; ~s~; ~S and ~S~
-          ~:;~@{~#[~; and~] ~S~^,~}~].")
-"Items:~#[none~; ~s~; ~S and ~S~
-          ~:;~@{~#[~; and~] ~S~^,~}~]."
+          ~:;~@{~#[~; and~] ~S~^,~}~].") FOO
 
 (FORMAT NIL FOO)
 "Items:none."
@@ -956,8 +1017,8 @@ NIL
 (C 3)))
 "Pairs: <A,1> <B,2> <C,3>."
 
-(SETQ DONESTR "done.~^ ~D warning~:P.~^ ~D error~:P.")
-"done.~^ ~D warning~:P.~^ ~D error~:P."
+(defparameter DONESTR "done.~^ ~D warning~:P.~^ ~D error~:P.")
+DONESTR
 
 (FORMAT NIL DONESTR)
 "done."
@@ -968,8 +1029,8 @@ NIL
 (FORMAT NIL DONESTR 1 5)
 "done. 1 warning. 5 errors."
 
-(SETQ TELLSTR "~@(~@[~R~]~^ ~A.~)")
-"~@(~@[~R~]~^ ~A.~)"
+(defparameter TELLSTR "~@(~@[~R~]~^ ~A.~)")
+TELLSTR
 
 (FORMAT NIL TELLSTR 23)
 "Twenty-three"
@@ -1026,11 +1087,6 @@ NIL
 #+XCL "**#\\**"
 #+CLISP (FORMAT NIL "**~@c**" (CODE-CHAR 27))
 #+CLISP "**#\\Escape**"
-
-(progn (fmakunbound 'foo)
-       (makunbound 'liste)
-t)
-T
 
 (string= (format nil "~10I")
          (with-output-to-string (s)
@@ -1217,8 +1273,17 @@ def"
 def")
 
 
-; Cleanup.
-(unintern 'x)
+(progn
+  (symbol-cleanup 'format-blocksatz) 
+  (symbol-cleanup 'type-clash-error)
+  (symbol-cleanup 'foo) 
+  (symbol-cleanup 'x)
+  (symbol-cleanup 'y) 
+  (symbol-cleanup 'n) 
+  (symbol-cleanup 'liste) 
+  (symbol-cleanup 'donestr) 
+  (symbol-cleanup 'tellstr) 
+  (symbol-cleanup 'gray-string-output-stream))
 T
 
 ;; local variables:

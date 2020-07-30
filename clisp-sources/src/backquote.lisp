@@ -176,7 +176,8 @@
     (function BACKQUOTE
       (lambda (form env)
         (declare (ignore env))
-        (bq-expand (second form))))))
+        (bq-expand (second form))))
+    '(form)))
 
 ;;; ----------------------- Recursive Expansion Engine -----------------------
 
@@ -275,7 +276,7 @@
 (proclaim '(special *backquote-optimize-vector*))
 (setq *backquote-optimize-vector* t)
 
-;;; This simplifes CONS, LIST, APPEND, NCONC calls that are emitted by the
+;;; This simplifies CONS, LIST, APPEND, NCONC calls that are emitted by the
 ;;; backquote expander. We are *not* allowed to collapse CONS or LIST calls
 ;;; given by the user.
 ;;; E.g. `((,a ,b 3) (,a ,@(list b 3)))
@@ -382,7 +383,11 @@
           ((and (consp form1) (eq (first form1) 'QUOTE)
                 (consp (cdr form1)) (null (cddr form1))
                 (not (bq-splicing-p (second form1))) ; too hairy
-                (listp (second form1)) (null (cdr (last (second form1)))))
+                ; Cannot append to l if l is not a proper list.
+                (listp (second form1)) (null (cdr (last (second form1))))
+                ; Cannot append to l if l starts with UNQUOTE, because
+                ; UNQUOTE expects exactly one argument.
+                (not (eq (first (second form1)) 'UNQUOTE)))
            ; (APPEND (QUOTE l) form2) -> (LIST* ... form2)
            ; Test cases: `(c1 c2) and `(c1 ,(f2))
            (setq form2 (bq-non-splicing form2))

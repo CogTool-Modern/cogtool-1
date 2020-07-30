@@ -1,7 +1,7 @@
 /*
  * Auxiliary functions for CLISP on Win32
  * Bruno Haible 1997-2003
- * Sam Steingold 1999-2003
+ * Sam Steingold 1999-2009
  */
 
 #include "lispbibl.c"
@@ -11,11 +11,8 @@ global Handle stdin_handle = INVALID_HANDLE_VALUE;
 global Handle stdout_handle = INVALID_HANDLE_VALUE;
 global Handle stderr_handle = INVALID_HANDLE_VALUE;
 
-/* Auxiliary event for fd_read and fd_write. */
-local HANDLE aux_event;
-
-#ifndef UNICODE
-/* when UNICODE is defined, console i/o is translated through
+#ifndef ENABLE_UNICODE
+/* when ENABLE_UNICODE is defined, console i/o is translated through
  the encoding mechanism.
  The encodings for *TERMINAL-IO* and *KEYBOARD-INPUT* should be
  set to the OEM codepage (see GetConsole[Output]CP() in Windows API) */
@@ -28,15 +25,8 @@ local char ANSI2OEM_table[256+1];
 
 #endif
 
-/* Auxiliary event for interrupt handling. */
-local HANDLE sigint_event;
-local HANDLE sigbreak_event;
-
 /* Winsock library initialization flag */
 local bool winsock_initialized = false;
-
-/* COM library initialization flag */
-local bool com_initialized = false;
 
 /* Early/late error print function. The problem of early/late errors is
    complex, this is a simple kind of temporary solution */
@@ -45,56 +35,13 @@ local void earlylate_asciz_error (const char * description, bool fatal_p) {
   if (fatal_p) _exit(1); /* FIXME: no finalization, no closing files! */
 }
 
-/* Initialization. */
-global void init_win32 (void)
-{
-  /* Standard input/output handles. */
-  stdin_handle = GetStdHandle(STD_INPUT_HANDLE);
-  stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-  stderr_handle = GetStdHandle(STD_ERROR_HANDLE);
-  /* What to do if one of these is == INVALID_HANDLE_VALUE ?? */
-  /* Auxiliary events. */
-  aux_event = CreateEvent(NULL, true, false, NULL);
-  sigint_event = CreateEvent(NULL, true, false, NULL);
-  sigbreak_event = CreateEvent(NULL, true, false, NULL);
- #ifndef UNICODE
-  { /* Translation table for console input. */
-    var int i;
-    for (i = 0; i < 256; i++)
-      OEM2ANSI_table[i] = i;
-    OEM2ANSI_table[i] = '\0';
-    OemToChar(&OEM2ANSI_table[1],&OEM2ANSI_table[1]);
-  }
-  { /* Translation table for console output. */
-    var int i;
-    for (i = 0; i < 256; i++)
-      ANSI2OEM_table[i] = i;
-    ANSI2OEM_table[i] = '\0';
-    CharToOem(&ANSI2OEM_table[1],&ANSI2OEM_table[1]);
-  }
- #endif
-  /* Initialize COM for shell link resolution */
-  if (CoInitialize(NULL) == S_OK)
-    com_initialized = true;
-  { /* Winsock. */
-    var WSADATA data;
-    if (WSAStartup(MAKEWORD(1,1),&data)) {
-      winsock_initialized = 0;
-      earlylate_asciz_error("\n*** - Failed to initialize winsock library\n",0);
-    } else winsock_initialized = true;
-  }
-}
+#ifndef MULTITHREAD
 
-global void done_win32 (void) {
-  if (winsock_initialized && WSACleanup()) {
-    earlylate_asciz_error("\n*** - Failed to shutdown winsock library\n",0);
-  }
-  winsock_initialized = 0;
-  if (com_initialized) {
-    CoUninitialize();
-    com_initialized = false;
-  }
-}
+/* Auxiliary event for fd_read and fd_write. */
+local HANDLE aux_event;
+/* Auxiliary event for interrupt handling. */
+local HANDLE sigint_event;
+local HANDLE sigbreak_event;
 
 /* Ctrl-C-interruptibility.
  We treat Ctrl-C as under Unix: Enter a break loop, continuable if possible.
@@ -107,6 +54,11 @@ global void done_win32 (void) {
 local BOOL DoInterruptible (LPTHREAD_START_ROUTINE fn, LPVOID arg, BOOL socketp);
 local BOOL interruptible_active;
 local HANDLE interruptible_thread;
+local HANDLE interruptible_call_event;
+local HANDLE interruptible_return_event;
+local LPTHREAD_START_ROUTINE interruptible_routine;
+local LPVOID interruptible_arg;
+local DWORD  interruptible_result;
 local BOOL interruptible_socketp;
 local DWORD interruptible_abort_code;
 
@@ -125,12 +77,17 @@ local BOOL temp_interrupt_handler (DWORD CtrlType)
         WSACancelBlockingCall();
        #endif
       }
-      /* We treat error as nonexistent thread which shouldn't be closed */
+      /* We think error means thread doesn't exist */
       if (GetExitCodeThread(interruptible_thread,&thread_exit_code)
-          && thread_exit_code == STILL_ACTIVE)
+          && thread_exit_code == STILL_ACTIVE) {
         if (!TerminateThread(interruptible_thread,0)) {
           OS_error();
         }
+        interruptible_thread = NULL;
+      }
+      SetEvent(interruptible_return_event);
+      CloseHandle(interruptible_call_event);
+      CloseHandle(interruptible_return_event);
       interruptible_abort_code = 1+CtrlType;
     }
     /* Don't invoke the other handlers (in particular, the default handler) */
@@ -141,34 +98,60 @@ local BOOL temp_interrupt_handler (DWORD CtrlType)
   }
 }
 
+local DWORD WINAPI standbythreadf (LPVOID arg) {
+/*
+"Plus I remember being impressed with Ada because you could write an
+ infinite loop without a faked up condition.  The idea being that in Ada
+ the typical infinite loop would normally be terminated by detonation."
+                                             -Larry Wall
+*/
+  while (true) {
+    if (WaitForSingleObject(interruptible_call_event,
+        INFINITE)==WAIT_OBJECT_0) {
+      ResetEvent(interruptible_call_event);
+      interruptible_result = interruptible_routine(interruptible_arg);
+      SetEvent(interruptible_return_event);
+    }
+    if (!interruptible_thread) return 0;
+  }
+}
+
 local BOOL DoInterruptible(LPTHREAD_START_ROUTINE fn, LPVOID arg, BOOL socketp)
 {
-  var HANDLE thread;
   var DWORD thread_id;
-  thread = CreateThread(NULL,10000,fn,arg,0,&thread_id);
-  if (thread==NULL) {
-    OS_error();
+  if (!interruptible_thread) {
+    interruptible_call_event = CreateEvent(NULL,true,false,NULL);
+    if (!interruptible_call_event) OS_error();
+    interruptible_return_event = CreateEvent(NULL,true,false,NULL);
+    if (!interruptible_return_event) OS_error();
+    interruptible_thread =
+      CreateThread(NULL,10000,&standbythreadf,NULL,0,&thread_id);
+    if (!interruptible_thread) OS_error();
   }
   interruptible_active = false;
-  interruptible_thread = thread;
   interruptible_abort_code = 0;
   interruptible_socketp = socketp;
   SetConsoleCtrlHandler((PHANDLER_ROUTINE)temp_interrupt_handler,true);
   interruptible_active = true;
-  WaitForSingleObject(interruptible_thread,INFINITE);
-  interruptible_active = false;
-  SetConsoleCtrlHandler((PHANDLER_ROUTINE)temp_interrupt_handler,false);
-  CloseHandle(interruptible_thread);
-  if (!interruptible_abort_code) {
-    return true;                /* successful termination */
-  } else {
-    if (interruptible_abort_code == 1+CTRL_BREAK_EVENT) {
-      final_exitcode = 130; quit(); /* aborted by Ctrl-Break */
+  interruptible_routine = fn;
+  interruptible_arg = arg;
+  if (!SetEvent(interruptible_call_event)) OS_error();
+  if (WaitForSingleObject(interruptible_return_event,INFINITE)
+      == WAIT_OBJECT_0)
+  {
+    ResetEvent(interruptible_return_event);
+    interruptible_active = false;
+    SetConsoleCtrlHandler((PHANDLER_ROUTINE)temp_interrupt_handler,false);
+    if (!interruptible_abort_code) {
+      return true;                /* successful termination */
+    } else {
+      if (interruptible_abort_code == 1+CTRL_BREAK_EVENT) {
+        final_exitcode = 130; quit(); /* aborted by Ctrl-Break */
+      }
+      return false;               /* aborted by Ctrl-C */
     }
-    return false;               /* aborted by Ctrl-C */
-  }
+  } else OS_error();
 }
-
 
 /* Sleep a certain time.
  Return true after normal termination, false if interrupted by Ctrl-C. */
@@ -189,7 +172,6 @@ global unsigned int sleep (unsigned int seconds)
   msleep(seconds*1000);
   return 0;                     /* the return value is wrong */
 }
-
 
 /* To catch Ctrl-C events, we use a separate thread which waits for an event,
  and install (using SetConsoleCtrlHandler()) a Ctrl-C handler which sends
@@ -220,7 +202,7 @@ local BOOL normal_interrupt_handler (DWORD CtrlType)
       if (!PulseEvent(sigint_event)) {
         OS_error();
       }
-    } elif (CtrlType == CTRL_BREAK_EVENT) {
+    } else if (CtrlType == CTRL_BREAK_EVENT) {
       if (!PulseEvent(sigbreak_event)) {
         OS_error();
       }
@@ -307,6 +289,84 @@ global void install_sigint_handler (void)
     OS_error();
   }
 }
+#else /* MULTITHREAD (WIN32_THREADs) */
+
+ /* OVERLAPPED is used with files that are openned without
+    FILE_FLAG_OVERLAPPED - so the operations are still synchronous,
+    just a read can be comined with seek (overlapped offset).
+    no event is needed in single thread as well I think) */
+ #define aux_event NULL
+
+ /* just call it and return success ?*/
+ #define DoInterruptible(pfn,arg,socketp) ((*(LPTHREAD_START_ROUTINE)pfn)(arg),true)
+ global BOOL msleep (DWORD milliseconds)
+ {
+   Sleep(milliseconds);
+   return true;
+ }
+ global unsigned int sleep (unsigned int seconds)
+ {
+   msleep(seconds*1000);
+   return 0;                     /* the return value is wrong */
+ }
+#endif
+
+
+/* Initialization. */
+global void init_win32 (void)
+{
+  /* Standard input/output handles. */
+  stdin_handle = GetStdHandle(STD_INPUT_HANDLE);
+  stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+  stderr_handle = GetStdHandle(STD_ERROR_HANDLE);
+#ifndef MULTITHREAD
+  /* What to do if one of these is == INVALID_HANDLE_VALUE ?? */
+  /* Auxiliary events. */
+  aux_event = CreateEvent(NULL, true, false, NULL);
+  sigint_event = CreateEvent(NULL, true, false, NULL);
+  sigbreak_event = CreateEvent(NULL, true, false, NULL);
+#endif
+ #ifndef ENABLE_UNICODE
+  { /* Translation table for console input. */
+    var int i;
+    for (i = 0; i < 256; i++)
+      OEM2ANSI_table[i] = i;
+    OEM2ANSI_table[i] = '\0';
+    OemToChar(&OEM2ANSI_table[1],&OEM2ANSI_table[1]);
+  }
+  { /* Translation table for console output. */
+    var int i;
+    for (i = 0; i < 256; i++)
+      ANSI2OEM_table[i] = i;
+    ANSI2OEM_table[i] = '\0';
+    CharToOem(&ANSI2OEM_table[1],&ANSI2OEM_table[1]);
+  }
+ #endif
+  { /* Winsock. */
+    var WSADATA data;
+    if (WSAStartup(MAKEWORD(1,1),&data)) {
+      winsock_initialized = 0;
+      earlylate_asciz_error("\n*** - Failed to initialize winsock library\n",0);
+    } else winsock_initialized = true;
+  }
+}
+
+global void done_win32 (void) {
+  if (winsock_initialized && WSACleanup()) {
+    earlylate_asciz_error("\n*** - Failed to shutdown winsock library\n",0);
+  }
+  winsock_initialized = 0;
+ #ifndef MULTITHREAD
+  CoUninitialize(); /* in MT version this is done by delete_thread */
+  if (interruptible_thread) {
+    TerminateThread(interruptible_thread,0);
+    interruptible_thread = NULL;
+    CloseHandle(interruptible_call_event);
+    CloseHandle(interruptible_return_event);
+  }
+ #endif
+}
+
 
 
 /* Limit for the size of a buffer we pass to WriteFile() and similar calls.
@@ -371,85 +431,89 @@ global BOOL ReadConsoleInput1 (HANDLE ConsoleInput, PINPUT_RECORD Buffer,
 /* Determines whether ReadFile() on a file/pipe/console handle will hang.
    Returns 0 for yes, 1 for no (or 2 for known EOF or 3 for available byte),
    -1 for unknown. */
+#define CHECK_ERROR_IGNORE_INVALID   switch (GetLastError()) {          \
+    case ERROR_INVALID_FUNCTION: case ERROR_INVALID_HANDLE: break;      \
+    default: OS_error();                                                \
+ }
 global int fd_read_wont_hang_p (HANDLE fd)
 {
-  # This is pretty complex. To test this, create a file "listen.lisp"
-  # containing the code
-  #   (tagbody 1 (prin1 (listen *terminal-io*)) (sys::%sleep 0 500) (go 1))
-  # and execute "lisp.exe -q -i listen.lisp" with redirected standard input.
+  /* This is pretty complex. To test this, create a file "listen.lisp"
+   containing the code
+     (tagbody 1 (prin1 (listen *terminal-io*)) (sys::%sleep 0 500) (go 1))
+   and execute "lisp.exe -q -i listen.lisp" with redirected standard input. */
   switch (GetFileType(fd)) {
-    case FILE_TYPE_CHAR:
-      {
-        var DWORD nevents;
-        if (GetNumberOfConsoleInputEvents(fd,&nevents)) { # It's a console.
-          if (nevents==0)
-            return 0;
-          var INPUT_RECORD* events =
-            (INPUT_RECORD*)alloca(nevents*sizeof(INPUT_RECORD));
-          var DWORD nevents_read;
-          var DWORD mode;
-          if (!PeekConsoleInput(fd,events,nevents,&nevents_read)) {
-            OS_error();
-          }
-          if (nevents_read==0)
-            return 0;
-          if (!GetConsoleMode(fd,&mode)) {
-            OS_error();
-          }
-          if (mode & ENABLE_LINE_INPUT) {
-            # Look out for a Key-Down event corresponding to CR/LF.
-            var DWORD i;
-            for (i = 0; i < nevents_read; i++) {
-              if (events[i].EventType == KEY_EVENT
-                  && events[i].Event.KeyEvent.bKeyDown
-                  && events[i].Event.KeyEvent.uAsciiChar == CR)
-                # probably a byte available (except if it is Ctrl-Z)
-                return -1;
-            }
-          } else { # Look out for any Key-Down event.
-            var DWORD i;
-            for (i = 0; i < nevents_read; i++) {
-              if (events[i].EventType == KEY_EVENT
-                  && events[i].Event.KeyEvent.bKeyDown
-                  && events[i].Event.KeyEvent.uAsciiChar != 0)
-                # probably a byte available (except if it is Ctrl-Z)
-                return -1;
-            }
-          }
+    case FILE_TYPE_CHAR: {
+      var DWORD nevents;
+      if (GetNumberOfConsoleInputEvents(fd,&nevents)) { /* It's a console. */
+        if (nevents==0)
           return 0;
-        } else if (!(GetLastError()==ERROR_INVALID_HANDLE)) {
+        var INPUT_RECORD* events =
+          (INPUT_RECORD*)alloca(nevents*sizeof(INPUT_RECORD));
+        var DWORD nevents_read;
+        var DWORD mode;
+        if (!PeekConsoleInput(fd,events,nevents,&nevents_read))
           OS_error();
+        if (nevents_read==0)
+          return 0;
+        if (!GetConsoleMode(fd,&mode))
+          OS_error();
+        if (mode & ENABLE_LINE_INPUT) {
+          /* Look out for a Key-Down event corresponding to CR/LF. */
+          var DWORD i;
+          for (i = 0; i < nevents_read; i++) {
+            if (events[i].EventType == KEY_EVENT
+                && events[i].Event.KeyEvent.bKeyDown
+                && events[i].Event.KeyEvent.uAsciiChar == CR)
+              /* probably a byte available (except if it is Ctrl-Z) */
+              return -1;
+          }
+        } else {              /* Look out for any Key-Down event. */
+          var DWORD i;
+          for (i = 0; i < nevents_read; i++)
+            if (events[i].EventType == KEY_EVENT
+                && events[i].Event.KeyEvent.bKeyDown
+                && events[i].Event.KeyEvent.uAsciiChar != 0)
+              /* probably a byte available (except if it is Ctrl-Z) */
+              return -1;
         }
-      }
-      # Not a console.
+        return 0;
+      } else CHECK_ERROR_IGNORE_INVALID;
+      var DWORD errors;
+      var COMSTAT stat;
+      if (ClearCommError(fd,&errors,&stat)) { /* it's a serial comm dev */
+        if (errors) return -1;                /* errors */
+        if (stat.fEof) return 2;
+        if (stat.cbInQue) return 3;
+        return 0;
+      } else CHECK_ERROR_IGNORE_INVALID;
+      /* neither a console nor a serial comm dev. */
       switch (WaitForSingleObject(fd,0)) {
-        case WAIT_OBJECT_0: # a byte is available, or EOF
+        case WAIT_OBJECT_0:     /* a byte is available, or EOF */
           return 1;
         case WAIT_TIMEOUT:
           return 0;
         default:
           OS_error();
       }
+    } NOTREACHED;
     case FILE_TYPE_DISK:
       return 1;
-    case FILE_TYPE_PIPE:
-      {
-        var DWORD nbytes;
-        if (PeekNamedPipe(fd,NULL,0,NULL,&nbytes,NULL)) { # input pipe
-          if (nbytes > 0)
-            return 3;
-          else
-            return 0;
-        } else if (GetLastError()==ERROR_BROKEN_PIPE) { # EOF reached
-          return 2;
-        } else if (GetLastError()==ERROR_ACCESS_DENIED) { # output pipe
-          # => fake EOF.
-          return 2;
-        } else {
-          OS_error();
-        }
-      }
-    default: # It's a file (or something unknown).
+    case FILE_TYPE_PIPE: {
+      var DWORD nbytes;
+      if (PeekNamedPipe(fd,NULL,0,NULL,&nbytes,NULL)) { /* input pipe */
+        if (nbytes > 0)
+          return 3;
+        else
+          return 0;
+      } else if (GetLastError()==ERROR_BROKEN_PIPE) { /* EOF reached */
+        return 2;
+      } else if (GetLastError()==ERROR_ACCESS_DENIED) { /* output pipe */
+        /* => fake EOF. */
+        return 2;
+      } else
+        OS_error();
+    }
+    default:                   /* It's a file (or something unknown). */
       return -1;
   }
 }
@@ -465,7 +529,8 @@ local int lowlevel_fd_read (HANDLE fd, void* bufarea, size_t nbyte, perseverance
     SetLastError(ERROR_IO_PENDING);
     return 0;
   }
- #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED)
+  /* in MT builds the heap protection is managed by pin_varobject() */
+ #if defined(GENERATIONAL_GC) && defined(SPVW_MIXED) && !defined(MULTITHREAD)
   handle_fault_range(PROT_READ_WRITE,(aint)bufarea,(aint)bufarea+nbyte);
  #endif
   var char* buf = (char*) bufarea;
@@ -538,7 +603,7 @@ local int lowlevel_fd_read (HANDLE fd, void* bufarea, size_t nbyte, perseverance
     if (persev == persev_partial)
       persev = persev_bonus;
   } while (nbyte != 0);
- #ifndef UNICODE
+ #ifndef ENABLE_UNICODE
   /* Possibly translate characters. */
   if (done > 0) {
     var int i;
@@ -575,8 +640,8 @@ local DWORD WINAPI do_fd_read (LPVOID arg) {
     params->errcode = GetLastError();
   return 0;
 }
-global ssize_t fd_read (HANDLE fd, void* buf, size_t nbyte,
-                        perseverance_t persev) {
+modexp ssize_t fd_read
+(HANDLE fd, void* buf, size_t nbyte, perseverance_t persev) {
   var struct fd_read_params params;
   params.fd      = fd;
   params.buf     = buf;
@@ -609,17 +674,18 @@ local inline int fd_write_will_hang_p (HANDLE fd)
    Return value like write().
    When the return value is 0, it sets errno to indicate whether EOWF has been
    seen (ERROR_HANDLE_EOF) or whether it is not yet known (ERROR_IO_PENDING). */
-global ssize_t fd_write (HANDLE fd, const void* b, size_t nbyte,
-                         perseverance_t persev) {
+modexp ssize_t fd_write
+(HANDLE fd, const void* b, size_t nbyte, perseverance_t persev) {
   if (nbyte == 0) {
     SetLastError(ERROR_IO_PENDING);
     return 0;
   }
-#if defined(GENERATIONAL_GC) && defined(SPVW_MIXED)
+  /* in MT builds the heap protection is managed by pin_varobject() */
+#if defined(GENERATIONAL_GC) && defined(SPVW_MIXED) && !defined(MULTITHREAD)
   handle_fault_range(PROT_READ,(aint)b,(aint)b+nbyte);
 #endif
   var const char* buf = (const char*) b;
-#ifndef UNICODE
+#ifndef ENABLE_UNICODE
   /* Possibly translate characters. */
   if (nbyte > 0) {
     var int i;
@@ -711,10 +777,10 @@ global ssize_t fd_write (HANDLE fd, const void* b, size_t nbyte,
    Returns 1 for yes, 0 for no, -1 for unknown. */
 local inline int sock_read_will_hang_p (int fd)
 {
-  # Use select() with readfds = singleton set {fd}
-  # and timeout = zero interval.
-  var fd_set handle_set; # set of handles := {fd}
-  var struct timeval zero_time; # time interval := 0
+  /* Use select() with readfds = singleton set {fd}
+   and timeout = zero interval. */
+  var fd_set handle_set;         /* set of handles := {fd} */
+  var struct timeval zero_time;  /* time interval := 0 */
   FD_ZERO(&handle_set); FD_SET(fd,&handle_set);
  restart_select:
   zero_time.tv_sec = 0; zero_time.tv_usec = 0;
@@ -724,12 +790,12 @@ local inline int sock_read_will_hang_p (int fd)
       goto restart_select;
     SOCK_error();
   } else {
-    # result = number of handles in handle_set for which read() would
-    # return without blocking.
+    /* result = number of handles in handle_set for which read() would
+     return without blocking. */
     if (result==0)
       return 1;
   }
-  # Now we know that recv() will return immediately.
+  /* Now we know that recv() will return immediately. */
   return 0;
 }
 
@@ -745,7 +811,8 @@ local int lowlevel_sock_read (SOCKET fd, void* b, size_t nbyte, perseverance_t p
     sock_set_errno(EAGAIN);
     return 0;
   }
-#if defined(GENERATIONAL_GC) && defined(SPVW_MIXED)
+  /* in MT builds the heap protection is managed by pin_varobject() */
+#if defined(GENERATIONAL_GC) && defined(SPVW_MIXED) && !defined(MULTITHREAD)
   handle_fault_range(PROT_READ_WRITE,(aint)b,(aint)b+nbyte);
 #endif
   var char* buf = (char*) b;
@@ -821,10 +888,10 @@ global int sock_read (SOCKET fd, void* buf, size_t nbyte, perseverance_t persev)
    Returns 1 for yes, 0 for no, -1 for unknown. */
 local inline int sock_write_will_hang_p (int fd)
 {
-  # Use select() with writefds = singleton set {fd}
-  # and timeout = zero interval.
-  var fd_set handle_set; # set of handles := {fd}
-  var struct timeval zero_time; # time interval := 0
+  /* Use select() with writefds = singleton set {fd}
+   and timeout = zero interval. */
+  var fd_set handle_set;         /* set of handles := {fd} */
+  var struct timeval zero_time;  /* time interval := 0 */
   FD_ZERO(&handle_set); FD_SET(fd,&handle_set);
  restart_select:
   zero_time.tv_sec = 0; zero_time.tv_usec = 0;
@@ -834,12 +901,12 @@ local inline int sock_write_will_hang_p (int fd)
       goto restart_select;
     SOCK_error();
   } else {
-    # result = number of handles in handle_set for which write() would
-    # return without blocking.
+    /* result = number of handles in handle_set for which write() would
+     return without blocking. */
     if (result==0)
       return 1;
   }
-  # Now we know that send() will return immediately.
+  /* Now we know that send() will return immediately. */
   return 0;
 }
 
@@ -855,7 +922,8 @@ local int lowlevel_sock_write (SOCKET fd, const void* b, size_t nbyte, persevera
     sock_set_errno(EAGAIN);
     return 0;
   }
-#if defined(GENERATIONAL_GC) && defined(SPVW_MIXED)
+  /* in MT builds the heap protection is managed by pin_varobject() */
+#if defined(GENERATIONAL_GC) && defined(SPVW_MIXED) && !defined(MULTITHREAD)
   handle_fault_range(PROT_READ,(aint)b,(aint)b+nbyte);
 #endif
   var const char* buf = (const char*) b;
@@ -1073,25 +1141,21 @@ global void DumpProcessMemoryMap (void)
         default:          fputs("MEM_?",stderr); break;
       }
     }
-    fputs("\n",stderr);
+    fputc('\n',stderr);
     address = (aint)info.BaseAddress + info.RegionSize;
   }
   fputs("End of memory dump.\n",stderr);
 }
 
 /* file identification for check_file_re_open() */
-/* if file NAMESTRING exists, fill file_id and call function on it,
-   otherwise return NULL */
-global void* with_file_id (char * namestring, void *data,
-                           void* (*func) (struct file_id *, void *data)) {
+/* fill FI for an exiting namestring */
+global errno_t namestring_file_id (char * namestring, struct file_id *fi) {
   var HANDLE fh = CreateFile(namestring,0,FILE_SHARE_READ | FILE_SHARE_WRITE,
                              NULL,OPEN_EXISTING,OPEN_EXISTING,NULL);
-  if (fh == INVALID_HANDLE_VALUE) return NULL;
-  struct file_id fi;
-  var errno_t status = handle_file_id(fh,&fi);
-  var void* ret = status ? NULL : (*func)(&fi,data);
+  if (fh == INVALID_HANDLE_VALUE) return GetLastError();
+  var errno_t status = handle_file_id(fh,fi);
   CloseHandle(fh);
-  return ret;
+  return status;
 }
 
 /* fill FI for an existing file handle */

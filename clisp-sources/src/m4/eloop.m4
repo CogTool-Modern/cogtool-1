@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2003 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -12,10 +12,8 @@ AC_PREREQ(2.57)
 
 AC_DEFUN([CL_ELOOP],
 [AC_REQUIRE([AC_PROG_CC])dnl
-AC_CACHE_CHECK(for ELOOP, cl_cv_decl_eloop, [
-if test $cross_compiling = no; then
-cat > conftest.c <<EOF
-#include "confdefs.h"
+AC_CACHE_CHECK(for ELOOP, cl_cv_decl_eloop, [dnl
+AC_RUN_IFELSE([#include "confdefs.h"
 #include <stdlib.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -23,32 +21,30 @@ cat > conftest.c <<EOF
 #include <errno.h>
 #include <stdio.h>
 #ifdef ELOOP
-int main () { printf("ELOOP\n"); exit(0); }
+int main () {
+  if (freopen("conftest.out", "w", stdout) == NULL) return 1;
+  printf("ELOOP\n");
+  return ferror(stdout) || fclose(stdout);
+}
 #else
 extern int errno;
 #define foo "conflink"
 #define foobar "conflink/somefile"
-int main()
-{ /* If a system goes into an endless loop on this, it must be really broken. */
-  if (symlink(foo,foo)<0) exit(1);
-  if (unlink(foobar)>=0) { unlink(foo); exit(1); }
-  printf("%d\n",errno); unlink(foo); exit(0);
+int main() {
+  /* If a system goes into an endless loop on this, it must be really broken. */
+  if (symlink(foo,foo)<0) return 1;
+  if (unlink(foobar)>=0) { unlink(foo); return 1; }
+  if (freopen("conftest.out", "w", stdout) == NULL) return 1;
+  printf("%d\n",errno); unlink(foo);
+  return ferror(stdout) || fclose(stdout);
 }
-#endif
-EOF
-AC_TRY_EVAL(ac_link)
- if test -x conftest; then
-  cl_cv_decl_ELOOP=`./conftest`
-  if test "$cl_cv_decl_ELOOP" = "ELOOP"; then
-    cl_cv_decl_eloop=yes
-  else
-    cl_cv_decl_eloop="$cl_cv_decl_ELOOP"
-  fi
- else cl_cv_decl_eloop=no
-     cl_cv_decl_ELOOP="ELOOP"
- fi
+#endif],[cl_cv_decl_ELOOP=`cat conftest.out`
+if test "$cl_cv_decl_ELOOP" = "ELOOP"; then
+  cl_cv_decl_eloop=yes
 else
-AC_EGREP_CPP(yes,[
+  cl_cv_decl_eloop="$cl_cv_decl_ELOOP"
+fi],[cl_cv_decl_eloop=no
+cl_cv_decl_ELOOP="ELOOP"],[AC_EGREP_CPP(yes,[
 #include <stdlib.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -58,12 +54,9 @@ AC_EGREP_CPP(yes,[
 #ifdef ELOOP
 yes
 #endif
-],
-cl_cv_decl_eloop=yes,
-cl_cv_decl_eloop=no)
-cl_cv_decl_ELOOP="ELOOP"
-fi
-rm -f conftest*
+],[cl_cv_decl_eloop=yes],[cl_cv_decl_eloop=no])
+cl_cv_decl_ELOOP="ELOOP"])
+rm -f conftest.out
 ])
 AC_DEFINE_UNQUOTED(ELOOP_VALUE,$cl_cv_decl_ELOOP,[the real value of ELOOP even if it is hidden in <errno.h>])
 ])

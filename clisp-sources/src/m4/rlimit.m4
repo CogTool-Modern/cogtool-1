@@ -1,5 +1,5 @@
 dnl -*- Autoconf -*-
-dnl Copyright (C) 1993-2003 Free Software Foundation, Inc.
+dnl Copyright (C) 1993-2008 Free Software Foundation, Inc.
 dnl This file is free software, distributed under the terms of the GNU
 dnl General Public License.  As a special exception to the GNU General
 dnl Public License, this file may be distributed as part of a program
@@ -26,7 +26,6 @@ CL_PROTO_TRY([
 #include <sys/resource.h>
 ],
 [int getrlimit (int resource, struct rlimit * rlim);],
-[int getrlimit();],
 [cl_cv_proto_getrlimit_arg1="int"],
 [cl_cv_proto_getrlimit_arg1="enum __rlimit_resource"])
 ], [extern int getrlimit ($cl_cv_proto_getrlimit_arg1, struct rlimit *);])
@@ -41,7 +40,6 @@ CL_PROTO_CONST([
 #include <sys/time.h>
 #include <sys/resource.h>
 ], [int setrlimit (RLIMIT_RESOURCE_T resource, struct rlimit * rlim);],
-[int setrlimit();],
 cl_cv_proto_setrlimit_arg2)
 ], [extern int setrlimit ($cl_cv_proto_getrlimit_arg1, $cl_cv_proto_setrlimit_arg2 struct rlimit *);])
 AC_DEFINE_UNQUOTED(SETRLIMIT_CONST,$cl_cv_proto_setrlimit_arg2,[declaration of setrlimit() needs const])

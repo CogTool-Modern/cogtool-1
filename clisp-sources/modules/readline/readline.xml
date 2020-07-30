@@ -7,8 +7,10 @@
  of the &readline; functions using &ffi-pac;.</simpara>
 <simpara>This module is present even in the &base; &linkset; by default
  on platforms where both &readline; and &ffi-pac; are available.</simpara>
-<simpara>When this module is present, &features-var;
+<simpara>When this module is present, &features-my;
  contains the symbol <constant>:READLINE</constant>.</simpara>
+<simpara>See <filename role="clisp-cvs">modules/readline/test.tst</filename>
+ for sample usage.</simpara>
 
 <variablelist><title>Lisp-level Functionality</title>
 <varlistentry><term><varname>READLINE:*READLINE-INPUT-STREAM*</varname></term>

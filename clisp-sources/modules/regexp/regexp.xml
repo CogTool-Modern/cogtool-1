@@ -2,24 +2,22 @@
 
 <section id="regexp-mod"><title>POSIX Regular Expressions</title>
 
-<para>The &regexp-pac; module implements the
- <ulink url="regexp.html">POSIX regular expressions</ulink>
-by calling the standard &c-lang; system facilities.
+<para>The &regexp-pac; module implements the &posix;
+ <ulink url="regexp.html">regular expressions</ulink>
+matching by calling the standard &c-lang; system facilities.
 The syntax of these &reg-exp;s is described in many places,
-such as your local <filename role="unix">regex.h</filename> manual
-and &emacs; info pages.</para>
+such as your local &regex; manual and &emacs; info pages.</para>
 &base-module;
-<simpara>When this module is present, &features-var;
+<simpara>When this module is present, &features-my;
  contains the symbol <constant>:REGEXP</constant>.</simpara>
 
-<section id="regexp-api"><title>Regular Expression API</title>
-<variablelist id="re-api">
+<variablelist id="regexp-api"><title>Regular Expression API</title>
 <varlistentry id="re-match"><term><code>(&re-match; &pattern-r;
    &string-r; &key-amp; (&start-k; 0) &end-k; &re-cflags-opts;
    &re-eflags-opts;)</code></term>
  <listitem><para>This macro returns as first value a &match-t; structure
   containing the indices of the start and end of the first match for the
-  &reg-exp; &pattern-r; in &string-r;; or &nil; if there is no match.
+  &reg-exp; &pattern-r; in &string-r;; or no values if there is no match.
   Additionally, a &match-t; structure is returned for every matched
   <literal>"\(...\)"</literal> group in &pattern-r;, in the
   order that the open parentheses appear in &pattern-r;.
@@ -64,8 +62,7 @@ and &emacs; info pages.</para>
   <example id="ex-re-quote"><title>&re-regexp-quote;</title>
    <programlisting language="lisp">
 (regexp-quote "^The cat$")
-<computeroutput>"\\^The cat\\$"</computeroutput>
-  </programlisting></example>
+<computeroutput>"\\^The cat\\$"</computeroutput></programlisting></example>
   One use of &re-regexp-quote; is to combine an exact string match with
   context described as a &reg-exp;.
   When <replaceable>extended</replaceable> is non-&nil;, also
@@ -78,18 +75,20 @@ and &emacs; info pages.</para>
   object suitable for &re-regexp-exec;.</simpara></listitem></varlistentry>
 
 <varlistentry id="re-regexp-exec"><term><code>(&re-regexp-exec;
-     &pattern-r; &string-r; &key-amp; (&start-k; 0) &end-k;
-     &re-eflags-opts;)</code></term>
+   &pattern-r; &string-r; &key-amp; :RETURN-TYPE :BOOLEAN
+   (&start-k; 0) &end-k; &re-eflags-opts;)</code></term>
  <listitem><simpara>Execute the &pattern-r;, which must be a compiled
-   &reg-exp; returned by &re-regexp-compile;, against the
-   appropriate portion of the &string-r;.</simpara>
-  <simpara>Negative &end-r; means <code>(&plus; (&length;
-    &string-r;) &end-r;)</code></simpara>
-  <simpara>Returns &match-t; structures as multiple values (one for each
+   &reg-exp; returned by &re-regexp-compile;, against the appropriate
+   portion of the &string-r;.</simpara>
+  <simpara>Returns &match-t; structures as &mul-val; (one for each
    subexpression which successfully matched and one for the whole pattern),
-   unless <literal>:BOOLEAN</literal> was non-&nil;, in which case
+   unless <constant>:BOOLEAN</constant> was non-&nil;, in which case
    return &t; as an indicator of success, but do not allocate anything.
-</simpara></listitem></varlistentry>
+  </simpara><simpara>If <constant>:RETURN-TYPE</constant> is &list-t; (or
+   &vector-t;), the &match-t; structures are returned as a &list-t; (or
+   a &vector-t;) instead.  If there are more than &multiple-values-limit;
+   &match-t; structures to return, a &list-t; is returned instead of
+   &mul-val;.</simpara></listitem></varlistentry>
 
 <varlistentry id="re-regexp-split"><term><code>(&re-regexp-split;
      &pattern-r; &string-r; &key-amp; (&start-k; 0) &end-k;
@@ -108,24 +107,21 @@ and &emacs; info pages.</para>
 
 <varlistentry id="re-cflags"><term>&re-cflags-opts;</term>
  <listitem><simpara>These options control compilation of a pattern.
-   See <filename role="unix">regex.h</filename> for their meaning.
-</simpara></listitem></varlistentry>
+   See &regex; for their meaning.</simpara></listitem></varlistentry>
 
 <varlistentry id="re-eflags"><term>&re-eflags-opts;</term>
- <listitem><simpara>These options constrol execution of a pattern.
-   See <filename role="unix">regex.h</filename> for their meaning.
-</simpara></listitem></varlistentry>
+ <listitem><simpara>These options control execution of a pattern.
+   See &regex; for their meaning.</simpara></listitem></varlistentry>
 
 <varlistentry id="re-matcher"><term>&re-matcher;</term>
  <listitem><simpara>A valid value for &apropos-matcher;.
    This will work only when your &locale; is &utf-8;
-   because &clisp; uses &utf-8; internally and POSIX constrains
-   <filename role="unix">regex.h</filename> to use the current &locale;.
-</simpara></listitem></varlistentry>
+   because &clisp; uses &utf-8; internally and &posix; constrains
+   &regex; to use the current &locale;.</simpara></listitem></varlistentry>
 
-</variablelist></section>
+</variablelist>
 
-<section id="re-example"><title>Example</title>
+<example id="re-count-shell-users"><title>Count unix shell users</title>
 
 <para>The following code computes the number of people who use a
  particular shell:<programlisting language="lisp">
@@ -142,8 +138,8 @@ and &emacs; info pages.</para>
             (format t "[~d] ~s~30t== ~5:d~%" (incf n) k v)))))
 </programlisting></para>
 
-<para>For comparison, the same can be done by the following &perl;:
-<programlisting language="perl">
+<para>For comparison, the almost same (except nice output formatting)
+can be done by the following &perl;: <programlisting language="perl">
 #!/usr/local/bin/perl -w
 
 use diagnostics;
@@ -164,6 +160,5 @@ for my $kk (keys(%hash)) {
   print "[",++$ii,"] \"",$kk,"\"  --  ",$hash{$kk},"\n";
 }
 close(INF);
-</programlisting></para>
-</section>
+</programlisting></para></example>
 </section>
