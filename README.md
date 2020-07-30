@@ -17,7 +17,3 @@ and for developers:
 
 [https://github.com/cogtool/documentation.git](https://github.com/cogtool/documentation.git)
 
-For building CogTool from source, see in particular
-
-[Processes/configuring-development-machines.txt](https://github.com/cogtool/documentation/blob/master/Processes/configuring-development-machines.txt)
-
