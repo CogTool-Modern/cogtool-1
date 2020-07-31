@@ -17,22 +17,21 @@ Addendum to CogTool Version 1.2 © IBM 2012
 CogTool User Guide Version 1.1 © Bonnie E. John and Carnegie Mellon
 University 2008, 2009
 
-Addendum for CogTool Version 1.2 
-================================
+## Front matter
+
+### Addendum for CogTool Version 1.2 
 
 CogTool 1.2 is essentially the same as CogTool 1.1 for making
 storyboards and predicting skilled performance time. Therefore, this
 User Guide presents the new features of CogTool 1.2 here and then the
 User Guide for version 1.1 follows in its entirety.
 
-New platforms for CogTool 1.2 
------------------------------
+### New platforms for CogTool 1.2 
 
 CogTool 1.2 now runs in Windows 7, Mac OS 10.6 (Snow Leopard), and Mac
 OS 10.7 (Lion).
 
-Improvements to the GUI in CogTool 1.2 
---------------------------------------
+### Improvements to the GUI in CogTool 1.2 
 
 **Widget Tool Tips**
 In response to user requests, we have expanded the tool tips on the
@@ -50,8 +49,7 @@ displayed in the transition's property pane as well.
 ![](/assets/user-guide/media/image5.png){width="5.801666666666667in"
 height="3.459385389326334in"}
 
-Changed or new functionality in CogTool 1.2 
--------------------------------------------
+### Changed or new functionality in CogTool 1.2 
 
 **Default starting position of the hands**
 Formerly defaulting to starting on the keyboard, our users told us
@@ -133,7 +131,7 @@ Carnegie Mellon University http://cogtool.org
 
 CogTool User Guide • 1
 
-### **Acknowledgments**
+### Acknowledgments
 
 The following people have contributed to CogTool. We would like to thank
 them for their hard work and patience with the process.
@@ -159,7 +157,7 @@ IBM or the U. S. Government.
 
 CogTool User Guide • 2
 
-### **contents**
+### Contents
 
 **Conventions for this User GUide
 \...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\....
@@ -619,7 +617,7 @@ Transition
 Widgets
 \...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\...\....147
 
-### **conventions for this User gUide**
+### Conventions for this User Guide
 
 CogTool runs on both Macintosh (10.3 and above) and Windows (XP and
 Vista) operating systems. Unless otherwise stated, this User Guide
@@ -655,7 +653,7 @@ Documented bugs in CogTool (bugs are fixed more often than the User
 Guide is revised, and so you may not encounter these bugs in your
 version of CogTool)
 
-### **chApter 1: overview**
+## Chapter 1: Overview
 
 **1.1 What is CogTool?**
 CogTool is a user interface (UI) prototyping tool that can produce
@@ -689,8 +687,7 @@ user choose to accomplish tasks (Luo, 2008; Luo & Siewiorek, 2007);
 these research results will migrate into the released version of
 CogTool as time and funding allow.
 
-1.2 How CogTool Works
----------------------
+### 1.2 How CogTool Works
 
 There are three steps to producing quantitative predictions of human
 performance with CogTool:
@@ -747,8 +744,7 @@ records your demonstration of a task on a design and creates the
 cognitive model. The Visualization window is you can see what ACT-R is
 doing "under the hood" to produce the prediction.
 
-1.3 Uses of CogTool
--------------------
+### 1.3 Uses of CogTool
 
 As a prototyping tool, CogTool design storyboards can be used to
 
@@ -787,10 +783,10 @@ from you with testimonials or suggestions. If you would like to share
 your experience with us, please visit the CogTool website
 (http://cogtool.org/) and participate in our User Forums or send email
 to cogtool\@cs.cmu.edu.
-**chApter 2: getting stArted with cogtool**
 
-2.1 Downloading CogTool
------------------------
+## Chapter 2: Getting started with cogtool
+
+### Downloading CogTool
 
 The latest public release of CogTool is available from the CogTool
 Project's website on the download page
