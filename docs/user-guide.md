@@ -655,7 +655,7 @@ version of CogTool)
 
 ## Chapter 1: Overview
 
-**1.1 What is CogTool?**
+### 1.1 What is CogTool?**
 CogTool is a user interface (UI) prototyping tool that can produce
 quantitative predictions of how users will behave when the prototype
 is ultimately implemented. Thus, CogTool provides you with a rapid and
@@ -735,24 +735,24 @@ papers in the HCI literature. CogTool inherits at least this accuracy,
 but is likely to be even more accurate because it generates the model
 automatically, removing the need for the analyst to be trained in the
 theory and practice of KLM (John, et. al., 2004).
-![](/assets/user-guide/media/image21.jpg){width="5.566666666666666in"
-height="3.5072615923009622in"}
-Figure 1-2: Three other windows from a CogTool Project comparing two
+
+<figure markdown="1">
+  ![](/assets/user-guide/media/image21.jpg)
+  <figcaption>Figure 1-2: Three other windows from a CogTool Project comparing two
 tasks on two designs. The Project window, as above, displays the grid
 of designs, tasks and predictions. The Script window is where CogTool
 records your demonstration of a task on a design and creates the
 cognitive model. The Visualization window is you can see what ACT-R is
-doing "under the hood" to produce the prediction.
+doing "under the hood" to produce the prediction.</figcaption>
+</figure>
 
 ### 1.3 Uses of CogTool
 
 As a prototyping tool, CogTool design storyboards can be used to
 
--   Build and record design ideas in an interactive form
-
--   Communicate interactive behavior to development teams or management
-
--   Produce HTML for quick-and-dirty user testing.
+* Build and record design ideas in an interactive form
+* Communicate interactive behavior to development teams or management
+* Produce HTML for quick-and-dirty user testing.
 
 While CogTool predictions are not intended to replace all user testing
 if accurate estimates of skilled performance time is highly valuable
@@ -763,17 +763,13 @@ they can be used to
 
 -   Compare design ideas, allowing you to explore widely, but only
     conduct expensive user tests with the few most promising ideas.
-
 -   Compare competitors' products to your own during a competitive
     analysis or for marketing purposes.
-
 -   Provide quantitative benchmarks for internal use during development
     to ensure that a new design is at least as efficient as the previous
     version.
-
 -   Determine requirements during acquisition and test that the
     delivered system will meet those requirements.
-
 -   Analyze an existing system for bottlenecks in user behavior,
     focussing your redesign effort on the aspects of the interface that
     need it most.
@@ -794,18 +790,17 @@ Project's website on the download page
 CogTool is available for Windows XP/Vista and Mac OS X versions 10.4.8
 and later.
 
-2.2 Installing CogTool
-----------------------
+### 2.2 Installing CogTool
 
-### 2.2.1 Installing on Mac OS X
+#### 2.2.1 Installing on Mac OS X
 
 -   When you download the CogTool file from the website, your browser
     will launch archive software, such as Stuffit, to unpack the CogTool
     executable. If it does not, double-click the downloaded CogTool file
     to expand it.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} The CogTool file is expanded in the
+![](/assets/user-guide/media/image17.jpg)
+The CogTool file is expanded in the
 same location as the down loaded file, which in most cases is the
 Desktop.
 
@@ -814,7 +809,7 @@ Desktop.
     folder, CogTool will run from any location on your hard drive or
     writable external storage media.
 
-### 2.2.2 Installing on Windows XP and Vista
+#### 2.2.2 Installing on Windows XP and Vista
 
 -   You must have the Java Runtime Environment (JRE 1.5 or later)
     installed in order to use CogTool. If you do not know if you have
@@ -838,30 +833,24 @@ Desktop.
 -   Once CogTool is installed, it can be launched from the Windows Start
     Menu, or double-clicked where ever its icon appears.
 
-2.3 Launching CogTool
----------------------
+### 2.3 Launching CogTool
 
 You can launch CogTool by double-clicking the application icon or by
 choosing the application from the listing in the Windows Start Menu.
-![](/assets/user-guide/media/image23.png){width="3.6866666666666665in"
-height="3.1733333333333333in"}
+![](/assets/user-guide/media/image23.png)
 Figure 2-1: The first window you see when you launch CogTool.
 
 ![](/assets/user-guide/media/image24.png)
-Double-clicking on a saved project file (.cgt file) to open it is not
-
-recommended. In Mac OS X, it does nothing, in Windows it
+Double-clicking on a saved project file (.cgt file) to open it is notrecommended. In Mac OS X, it does nothing, in Windows it
 opens a new instance of CogTool even if one is already running.
 Instead, first launch CogTool. then click the **Open** button and
 navigate to the saved CogTool file. If you have been working with the
 project recently, it will show up in the **Open Recent** pulldown
 list.
-![](/assets/user-guide/media/image25.png){width="0.3433333333333333in"
-height="0.3466666666666667in"}With Mac OS X, you can launch the
-CogTool application from any location to which you save it.
+![](/assets/user-guide/media/image25.png)
+With Mac OS X, you can launch the CogTool application from any location to which you save it.
 
-2.4 Exploring CogTool
----------------------
+### 2.4 Exploring CogTool
 
 Although CogTool is not intended to be a walk-up-and-use system,
 especially if you want to get cognitively plausible quantitative
@@ -897,8 +886,7 @@ provides common facilities to aid exploration.
 -   *Undo*. Works. Multi-level. Fear not \-- you can undo anything
     you've done, so explore with impunity.
 
-2.5 CogTool Help
-----------------
+### 2.5 CogTool Help
 
 We do not currently have on-line help for CogTool;. However, user
 forums are available at http://cogtool.org/ where you can get
@@ -907,8 +895,7 @@ We encourage you to have this pdf document open in Adobe Reader as you
 work in CogTool. Be sure to use the Bookmarks feature of Reader, so
 you can navigate easily around the User Guide. We have enabled
 commenting, so you can mark up the document as you like.
-![](/assets/user-guide/media/image26.jpg){width="5.565812554680665in"
-height="4.982200349956256in"}
+![](/assets/user-guide/media/image26.jpg)
 Figure 2-2: The CogTool User Guide opened in AdobeReader (v7 or later)
 with the Bookmarks pane and Review and Comment toolbar.
 If you are running Mac OSX 10.5 or later, we encourage you to explore
@@ -918,6 +905,7 @@ forgotten where the alignment commands are in the menus. If you open
 the Help menu in MacOSX and search for "align", it lists all the menu
 items that contain "align" and if you roll over one of them, it opens
 the correct menu and points to the command (pointer in dark blue).
+
 ![](/assets/user-guide/media/image27.png)
 Figure 2-3: Help finding menu commands is automatically provided by
 Apple's Mac
@@ -925,21 +913,20 @@ OSX 10.5 or later. Menus change depending on which type of window is
 active, so explore different windows when looking for a particular
 command.
 
-### **chApter 3: mAnAging A project**
+## Chapter 3: Managing a Project
 
-**3.1 What is a Project?**
+### 3.1 What is a Project?
 A CogTool Project stores all the interface designs, tasks that can be
 performed on the designs, and predictions of user behavior. Projects
 are stored in files called cgt (CoGTool) files when a Project is
 saved.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} By default, the Project name is also
+![](/assets/user-guide/media/image17.jpg)
+By default, the Project name is also
 the name of the .cgt file created by CogTool. However, when the save
 box appears, you can
 save the file with another name.
 
-3.2 The Project Window
-----------------------
+### 3.2 The Project Window
 
 The Project window is laid out in a grid where the columns are Designs
 and the rows are Tasks that can be performed on those Designs (See
@@ -963,8 +950,7 @@ methods are shown for both Tasks and they are grouped. The Pop-Up
 design only uses the mouse, so only one prediction is shown for each
 Task Group.
 
-3.3 Creating a New Project
---------------------------
+### 3.3 Creating a New Project
 
 To create a Project, do one of the following:
 
@@ -1010,8 +996,7 @@ Figure 3-3: These windows appeared after creating a new Project with a
 Design called "NYC Guide" that has a keyboard and mouse as input
 devices.
 
-3.4 Opening an Existing Project
--------------------------------
+### 3.4 Opening an Existing Project
 
 To open an existing Project, do one of the following:
 
@@ -1044,25 +1029,23 @@ OR
 |                 |                                                   |
 |                 | -   Select the file name from the list.           |
 |                 |                                                   |
-|                 | **3.5 Saving a Project**                          |
-|                 |                                                   |
-|                 | To save a Project:                                |
-|                 |                                                   |
-|                 | -   From the **File** menu, choose **Save         |
-|                 |     Project**.                                    |
 +-----------------+---------------------------------------------------+
+
+### 3.5 Saving a Project
+
+To save a Project:
+
+-   From the **File** menu, choose **Save Project**.  
 
 The first time you save a file, you will be prompted for the filename
 and location. The file will be given a .cgt extension. The filename
 (minus the .cgt extension) will appear in the title bar of all CogTool
 windows for the Project.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} An asterisk (\*) in front of the word
+![](/assets/user-guide/media/image17.jpg) An asterisk (\*) in front of the word
 "Project" in the title bar of a window signifies that the Project has
 unsaved modifications (see
 Figure 3-4). When the file has been saved, the asterisk disappears.
-![](/assets/user-guide/media/image31.jpg){width="4.780555555555556in"
-height="0.8046478565179352in"}
+![](/assets/user-guide/media/image31.jpg)
 
 Figure 3-4: The asterisk in the tile bar denotes a Project with unsaved
 modifications.
@@ -1099,8 +1082,7 @@ the Project.
 height="0.2966666666666667in"} You can also close an open window by
 clicking the close button on the window title bar.
 
-3.7 Project Properties
-----------------------
+### 3.7 Project Properties
 
 To see the version number of the CogTool application last used to save
 the Project and the Project name:
@@ -1109,8 +1091,7 @@ the Project and the Project name:
 height="1.3221642607174102in"}
 Figure 3-5: A sample Project Properties window
 
-3.8 Reopening Project Windows and Understanding the Windowing System
---------------------------------------------------------------------
+### 3.8 Reopening Project Windows and Understanding the Windowing System
 
 As you create a design prototype, you will work in the Project window,
 a Design window and many Frame windows. As you make predictions of
@@ -1157,7 +1138,7 @@ To bring any open window to the top and make it active:
 
 -   Choose the desired window from the list.
 
-### **chApter 4: prototyping An interfAce**
+## Chapter 4: Prototyping an Interface
 
 The prototyping aspect of CogTool was inspired by James Landay's SYLK
 and DENIM systems (Landay and Meyers, 2005; Lin, et. al., 2000). It
@@ -1178,10 +1159,9 @@ This chapter will present how to build a design so that it not only
 records your design ideas, but can be used to make predictions of
 human performance (discussed in the next chapter).
 
-4.1 Designs
------------
+### 4.1 Designs
 
-4.1.1 What is a Design?
+#### 4.1.1 What is a Design?
 A Design is a prototype of the system you are proposing to build. It
 represented the system as a series of Frames and the user actions that
 transition between them. Each Frame represents how the interface looks
@@ -1196,7 +1176,7 @@ You work on Designs in the Project window and each Design's own
 window. You work with a Design's definition in the Project window
 (e.g., creating, renaming, moving, deleting), and with the Design's
 content in each Design's own window.
-4.1.2 What is a Device?
+#### 4.1.2 What is a Device?
 A Device is a representation of the hardware associated with you
 Design. CogTool can represent a fixed set of Devices. Input Devices
 include keyboard, mouse, touchscreen and microphone. Output Devices
@@ -1211,7 +1191,7 @@ See Appendix A for a list of the available Devices, definitions, and
 tips of how to use these devices to prototype a wide range of
 interactive systems.
 
-### 4.1.3 The Design Window
+#### 4.1.3 The Design Window
 
 The Design window shows the Frames and the Transitions between them.
 Design windows have a light yellow background to distinguish them from
@@ -1232,7 +1212,7 @@ canvas, its properties appear in the properties pane, discussed in the
 Frames and Transitions sections. The toolbar on the left holds tools
 for drawing Transitions, discussed in the Transition section.
 
-### 4.1.4 Creating a New Design 
+#### 4.1.4 Creating a New Design 
 
 Each Project must have at least one Design, which is created when a
 new Project is created. However, because CogTool allows you to compare
@@ -1299,13 +1279,13 @@ already includes interactive prototypes expressed in HTML or if you
 want to analyze existing web sites. This feature is discussed in
 Section 4.6.
 
-### 4.1.5 Selecting a Design
+#### 4.1.5 Selecting a Design
 
 In the Project window, click on a Design name to select the Design. A
 dot will appear to the left of the Design mane and the column will
 turn blue to indicate selection. You cannot select multiple Designs.
 
-### 4.1.6 Editing a Design 
+#### 4.1.6 Editing a Design 
 
 To open a Design window so you can edit a Design, do one of the
 following:
@@ -1334,14 +1314,14 @@ height="2.4833333333333334in"}
 Figure 4-4: The Design window that results from opening a new Design.
 The Design canvas has one empty Frame and nothing is selected.
 
-### 4.1.7 Saving a Design 
+#### 4.1.7 Saving a Design 
 
 Changes to your Design are saved when you save the Project. Choose
 **Save Project**.
 from the **File** menu, or use the shortcut key, at any time to save
 your work.
 
-### 4.1.8 Closing a Design
+#### 4.1.8 Closing a Design
 
 To close a Design window, when it is active:
 
@@ -1351,7 +1331,7 @@ To close a Design window, when it is active:
 window button ^**Win:**\ CTRL+W^ provided by the operating system on
 every window).
 
-### 4.1.9 Moving a Design
+#### 4.1.9 Moving a Design
 
 You can change the order of the Design columns in the Project window
 by clicking on the Design name and dragging the column to the desired
@@ -1365,7 +1345,7 @@ Box column underneath as you move the Pop Up Design.
 You can also change the order of the Design columns by cutting and
 pasting the Design columns into the desired location.
 
-### 4.1.10 Cutting, Copying, and Pasting a Design
+#### 4.1.10 Cutting, Copying, and Pasting a Design
 
 You can cut or copy a Design and paste it into another location of the
 same Project or into a different Project.
@@ -1415,7 +1395,7 @@ differently named Tasks are actually the same), move the pasted cells
 of the Design to the desired Task rows. See Tasks, later in this
 document for more information on creating and moving Tasks.
 
-### 4.1.11 Deleting a Design 
+#### 4.1.11 Deleting a Design 
 
 To delete a Design:
 • In the Project window, select the Design.
@@ -1484,7 +1464,7 @@ within the ASCII printable character set. See
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
 admissible characters.
 
-### 4.1.14 Bringing a Design Window to the Foreground
+#### 4.1.14 Bringing a Design Window to the Foreground
 
 To bring a Design window to the foreground, do one of the following:
 
@@ -1535,7 +1515,7 @@ OR
 
 **Win:** CTRL+/
 
-### 4.1.16 Adding Devices to a Design 
+#### 4.1.16 Adding Devices to a Design 
 
 To add a device to a Design:
 
@@ -1562,10 +1542,9 @@ you need is irrelevant items in the Widget toolbar and on the Frames.
 It does not prevent you from working, but it might be more difficult
 to explain the irrelevant information to colleagues.
 
-4.2 Frames
-----------
+### 4.2 Frames
 
-4.2.1 What is a Frame?
+#### 4.2.1 What is a Frame?
 A Design consists of Frames and the Transitions that link them. A
 Frame represents a single screen of a user interface. A Transition
 represents a user's action that changes one Frame into another. Frames
@@ -1576,7 +1555,7 @@ window. You work with a Frame's definition in the Design window (e.g.,
 creating, renaming, deleting), and with the Frame's content in each
 Frame's own window.
 
-### 4.2.2 The Frame Window
+#### 4.2.2 The Frame Window
 
 The main components of the Frame window are a toolbar of Widgets on
 the far left, a Frame canvas that contains the interface
@@ -1633,7 +1612,7 @@ Figure 4-10: Example of a Frame that is sufficiently wide to see all
 the buttons (top) and a Frame that is so narrow that the labels run
 together (bottom).
 
-### 4.2.3 Setting the Default size of a Frame
+#### 4.2.3 Setting the Default size of a Frame
 
 The default size of a frame is a good aspect ratio for prototyping
 systems that run on a desktop or laptop. However, it may be too wide
@@ -1650,7 +1629,7 @@ button for accessing re search commands. These are undocumented,
 untested, and unvali-
 dated. Explore at your own risk .
 
-### 4.2.4 Creating a New Frame
+#### 4.2.4 Creating a New Frame
 
 When a Design window is opened for the first time, a new Frame is
 automatically created.
@@ -1752,7 +1731,7 @@ To clear the Frame Template so your new Frames can be created empty,
 
 -   From the Modify menu, choose Clear Frame Template.
 
-### 4.2.5 Selecting Frames
+#### 4.2.5 Selecting Frames
 
 In the Design window, click on a Frame to select it. It will turn
 bright blue to indicate selection.
@@ -1765,7 +1744,7 @@ OR
 
 -   Shift-click each Frame separately.
 
-### 4.2.6 Renaming a Frame
+#### 4.2.6 Renaming a Frame
 
 +-----------------+---------------------------------------------------------+
 | **Mac:** R      | To change the name of a Frame, do one of the following: |
@@ -1790,7 +1769,7 @@ within the ASCII printable character set. See
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
 admissible characters.
 
-### 4.2.7 Moving and Aligning Frames
+#### 4.2.7 Moving and Aligning Frames
 
 You may arrange the Frames to make the Design more visually pleasing
 and easier to follow.
@@ -1933,7 +1912,7 @@ OR
 This creates new Frames at the point you released the mouse button,
 named with unique suffixes (e.g. "LastFrame\[1\]").
 
-### 4.2.11 Editing a Frame
+#### 4.2.11 Editing a Frame
 
 The content of a Frame represents what the user will see and hear as
 they operate the proposed system. You must construct that content by
@@ -2050,10 +2029,9 @@ From the Frame window:
 
 **Win:** CTRL+W
 
-4.3 Widgets
------------
+### 4.3 Widgets
 
-4.3.1 What is a Widget?
+#### 4.3.1 What is a Widget?
 A Widget is an element on a Frame with which a user may interact, such
 a button, check boxes, a hierarchical menu, etc.. You will populate
 your Frames with Widgets as needed to express your Design.
@@ -2089,7 +2067,7 @@ represent different user actions on that Widget. Transition link to a
 new Frame or the same Frame to represent the systems' response to a
 user's action (see **Section 4.4 Transitions** for more information).
 
-### 4.3.2 Types of Widgets
+#### 4.3.2 Types of Widgets
 
 Choosing appropriate types of Widgets is very important when
 populating your Frames. The type of Widget determines the types of
@@ -2167,9 +2145,9 @@ Finally, we present each of the more complex Widgets in their own
 sections in increasing complexity: Radio Buttons, Pull-down Lists,
 Menus and Context Menus, and Text Boxes and Text.
 
-### 4.3.3 Common Actions on Widgets
+#### 4.3.3 Common Actions on Widgets
 
-4.3.3.1 Creating a New Widget
+##### 4.3.3.1 Creating a New Widget
 After you have decided which Widget to use and whether your interface
 will require standard or custom mode, you can create your Widget.
 To create a Widget
@@ -2436,7 +2414,7 @@ To align Widgets:
 
 -   Select the desired alignment.
 
-4.3.3.6 Layering Widgets
+##### 4.3.3.6 Layering Widgets
 In CogTool, Widgets can be drawn on top of each other, therefore, they
 can partially or fully occlude other Widgets. You can set the order of
 this layering with the standard drawing program commands to "Bring to
@@ -2691,7 +2669,7 @@ To clear the Frame Template so your new Frames can be created empty,
 
 -   From the Modify menu, choose Clear Frame Template.
 
-### 4.3.4 Simple Widgets: Links, Graffiti®, and Non-Interactive
+#### 4.3.4 Simple Widgets: Links, Graffiti®, and Non-Interactive
 
 ![](/assets/user-guide/media/image66.png){width="0.25666666666666665in"
 height="0.21333333333333335in"} Link Widget tool
@@ -2725,7 +2703,7 @@ thought when using these Widgets
     on top of a background image with no Display Label, or they have a
     Widget image and again no Display Label.
 
-### 4.3.5 Moded Widgets: Buttons and Checkboxes
+#### 4.3.5 Moded Widgets: Buttons and Checkboxes
 
 ![](/assets/user-guide/media/image69.png){width="0.25666666666666665in"
 height="0.21in"} Button Widget tool
@@ -2889,7 +2867,7 @@ left blue line and moves it to the right, moving the column of buttons
 as shown in the center.. The user then grabs the top blue line and
 moves it down, resulting in the arrangement on the right.
 
-### 4.3.6 Radio Buttons: A Set of Widgets Working Together
+#### 4.3.6 Radio Buttons: A Set of Widgets Working Together
 
 ![](/assets/user-guide/media/image83.png){width="0.25666666666666665in"
 height="0.21in"} Radio Button Widget tool
@@ -3002,7 +2980,7 @@ the left blue line and moves it to the right, moving the column of
 buttons as shown in the center.. The user then grabs the top blue line
 and moves it down, resulting in the arrangement on the right.
 
-### 4.3.7 List Boxes: Widgets Combined to Make a Whole
+#### 4.3.7 List Boxes: Widgets Combined to Make a Whole
 
 ![](/assets/user-guide/media/image89.jpg){width="0.25in"
 height="0.20833333333333334in"} List Box Widget tool
@@ -3093,7 +3071,7 @@ A bold gray outline will appear around the entire List Box Widget.
     simple widgets or when rearranging list items) and drag the entire
     List Box Widget to a new location in the Frame.
 
-### 4.3.8 Pull-Down Lists: More Complex Behavior
+#### 4.3.8 Pull-Down Lists: More Complex Behavior
 
 ![](/assets/user-guide/media/image94.png){width="0.25666666666666665in"
 height="0.21333333333333335in"} Pull-Down List Header Widget tool
@@ -3208,7 +3186,7 @@ Widget.
     simple widgets or when rearranging list items) and drag the
     Pull-Down List Widget to a new location in the Frame.
 
-### 4.3.9 Menus and Context Menus: Highly Complex Behavior
+#### 4.3.9 Menus and Context Menus: Highly Complex Behavior
 
 The complex behavior of a hierarchical menu system, be it with regular
 menus at the top of a screen or window, or context menus that pop-up
@@ -3567,7 +3545,7 @@ height="0.2699704724409449in"} If you select non-contiguous menu
 headers when you copy or cut, the gaps between them will be removed
 when you paste
 
-### 4.3.10 Working with Text Boxes & Text
+#### 4.3.10 Working with Text Boxes & Text
 
 ![](/assets/user-guide/media/image120.jpg){width="0.20919947506561679in"
 height="0.20919947506561679in"} Text Box Widget tool
@@ -3750,10 +3728,9 @@ show one line of
 text. If your interface requires multiple lines of text, use multiple
 Text Widgets to simulate multiple lines of text.
 
-4.4 Transitions
----------------
+### 4.4 Transitions
 
-4.4.1 What is a Transition?
+#### 4.4.1 What is a Transition?
 A Transition represents the user's action that causes the system to
 move from one Frame to the next. Frames only depict the static
 pictures of how the system presents itself to the user; Transitions
@@ -3801,7 +3778,7 @@ After describing the operations possible on Transitions, this section
 examples of how to mock-up some common user actions, like
 drag-and-drop and editing text.
 
-### 4.4.2 Creating New Transitions
+#### 4.4.2 Creating New Transitions
 
 Transitions can emanate from a Widget that is operated on by a mouse
 or, when a touchscreen Device is included in the Design, by a stylus
@@ -4009,7 +3986,7 @@ gestures are letters, digits, comma, period, semi-colon, single-quote,
 dash, forward slash, back-slash, equal sign, back-quote and left and
 right square brackets.
 
-### 4.4.3 Prototyping a System Delay
+#### 4.4.3 Prototyping a System Delay
 
 Just as each user action can cause a system delay, each Transition
 includes a place to specify how long a delay to insert. At the bottom
@@ -4032,9 +4009,9 @@ ideas for a new system, you may not want to include system delays, but
 compare those ideas under the best possible conditions (i.e., no
 perceptible delay).
 
-### 4.4.4 Modifying a Transition
+#### 4.4.4 Modifying a Transition
 
-4.4.4.1 Changing the Properties of a Transition
+##### 4.4.4.1 Changing the Properties of a Transition
 Transitions have properties that are initially set when the Transition
 is created and are specific to each type of Transition.
 These properties can be viewed and changed at any time in the panel to
@@ -4048,7 +4025,7 @@ the right of the Design canvas.
 |                 | in the properties pane.                           |
 +-----------------+---------------------------------------------------+
 
-4.4.4.2 Changing the Source and Destination of a Transition
+##### 4.4.4.2 Changing the Source and Destination of a Transition
 You can change the source of a Transition to any other source on that
 or any other Frame that supports the action type of the Transition.
 Likewise, you can change the destination of a Transition to any Frame.
@@ -4070,7 +4047,7 @@ To change the destination of a Transition:
 -   Drag the white square located at the current destination Frame to
     the new destination Frame.
 
-### 4.4.5 Deleting a Transition
+#### 4.4.5 Deleting a Transition
 
 To delete a Transition:
 
@@ -4090,7 +4067,7 @@ OR
 
 -   In either case, a dialog box will ask you to confirm the deletion.
 
-### 4.4.6 Prototyping Some Common User Actions
+#### 4.4.6 Prototyping Some Common User Actions
 
 Some user actions require more than selecting the correct action type
 from the Transition property pane. Several common instances are
@@ -4200,8 +4177,7 @@ come in pairs. When you are simulating a drag user action, you must be
 careful to demonstrate first the "press" action and then the "release"
 action without any other mouse actions in between.
 
-4.5 Working with Sound
-----------------------
+### 4.5 Working with Sound
 
 There will be times when you will want to have sound capabilities with
 your prototype. You will either want to have the user issue voice
@@ -4214,7 +4190,7 @@ ing sound in a interface using text.
 height="0.2699704724409449in"} CogTool does NOT actually play or
 record sound. It represents us-
 
-### 4.5.1 Microphone
+#### 4.5.1 Microphone
 
 The microphone represents voice input from a user. You must have a
 microphone Device included in your Design. When you draw a Transition
@@ -4241,8 +4217,7 @@ the micro phone. It represents a user speaking into a microphone with
 the
 contents of the Spoken Input text box on the Transition.
 
-### 4.5.2 Speaker
-
+#### 4.5.2 Speaker
 Just as the microphone represents voice spoken by a user, the speaker
 represents voice or alerts uttered by the system. A speaker is an
 output device.
@@ -4275,10 +4250,9 @@ height="1.2713353018372704in"}
 Figure 4-31: Text typed in the speaker text box is "audible" after a
 Transition to this Frame.
 
-4.6 Working with HTML
----------------------
+### 4.6 Working with HTML
 
-### 4.6.1 Import a Design from HTML
+#### 4.6.1 Import a Design from HTML
 
 If your design already exists as HTML files, either on the web or
 locally on your computer, you can import those files making them into
@@ -4414,7 +4388,7 @@ nowhere result when the real web page has drop-down menus. This can be
 fixed, but it is one example of the imported Design being a starting
 place, not a perfect representation of the web site.
 
-### 4.6.2 Export a Design to HTML
+#### 4.6.2 Export a Design to HTML
 
 Export Design to HTML converts your Design into HTML pages, which can
 be viewed from any web browser. This allows you to share your Design
@@ -4501,7 +4475,7 @@ on one that doesn't have a transition defined from it. The HTML radio
 buttons and checkboxes do change state, even if that state is not
 necessary to accomplish the task.
 
-#### chApter 5: QUAntitAtive AnAlysis
+## Chapter 5: Quantitative Analysis
 
 As discussed in the Overview, CogTool can make predictions of human
 performance given the Design and some additional information about
@@ -4532,10 +4506,9 @@ create Tasks and Demonstrations of those Tasks on your Design. Model
 visualization illustrates how CogTool produced predictions about the
 Tasks.
 
-5.1 Tasks and Task Groups
--------------------------
+### 5.1 Tasks and Task Groups
 
-5.1.1 What are Tasks and Task Groups?
+#### 5.1.1 What are Tasks and Task Groups?
 CogTool uses the concept of a Task to represent the purpose of a
 specific sequence of actions, such as making a purchase on an online
 web site or setting a ring tone on your cell phone. The Task is
@@ -4552,7 +4525,7 @@ intersections of Task and Design are still blank.
 ![](/assets/user-guide/media/image161.jpg){width="5.199968285214348in"
 height="1.2713353018372704in"}
 
-### 5.1.2 Creating a New Task
+#### 5.1.2 Creating a New Task
 
 When you create a Project, a Task named "Task 1" is automatically
 inserted into the Project.
@@ -4585,13 +4558,9 @@ To create additional Tasks:
 height="0.3506342957130359in"}Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_](http://act-r.psy.cmu.edu/)
+[printable\_characters](http://act-r.psy.cmu.edu/) for the list of admissible characters.
 
-+--------------+------------------------------------------------------+
-|              | [printable\_characters](http://act-r.psy.cmu.edu/) |
-|              | for the list of admissible characters.             |
-|              |                                                      |
-|              | 5.1.3 Creating a New Task Group                      |
-|              |                                                      |
+#### 5.1.3 Creating a New Task Group
 |              | Use Task Groups to organize your Tasks in a          |
 |              | hierarchy. The Task Group can represent several      |
 |              | different methods for accomplishing the same user    |
@@ -4608,7 +4577,9 @@ within the ASCII printable character set. See
 |              | see the sum of the predictions of the subTasks in    |
 |              | the Task Group.                                      |
 |              |                                                      |
-|              | To create a Task Group:                              |
+To create a Task Group: 
+
++--------------+------------------------------------------------------+
 +==============+======================================================+
 | **Mac:** ⇧G  | -   Select the Tasks that should be part of the Task |
 |              |     Group.                                           |
@@ -4638,7 +4609,7 @@ within the ASCII printable character set. See
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
 admissible characters.
 
-### 5.1.4 Selecting Tasks or Task Groups
+#### 5.1.4 Selecting Tasks or Task Groups
 
 In the Project window, click on a the name of a Task or Task Group to
 select it. The entire row will turn bright blue to indicate selection.
@@ -4651,7 +4622,7 @@ To select multiple Tasks or Task Groups
 • Shift-click on each Task or Task Group you want to select. Their
 rows will turn bright blue to indicate selection.
 
-### 5.1.5 Cutting, Copying, and Pasting Tasks or Task Groups
+#### 5.1.5 Cutting, Copying, and Pasting Tasks or Task Groups
 
 To copy one or more Tasks or Task Groups:
 
@@ -4762,7 +4733,7 @@ within the ASCII printable character set. See
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
 admissible characters.
 
-### 5.1.8 Deleting Tasks or Task Groups
+#### 5.1.8 Deleting Tasks or Task Groups
 
 To delete one or more Tasks or Task Groups:
 
@@ -4780,7 +4751,7 @@ deletion before the Task or Task Group is removed from the Project.
 height="0.325in"}When you delete a Task Group, you will also delete
 all Tasks that are within that Group.
 
-### 5.1.9 Changing the Order of Tasks or Task Groups
+#### 5.1.9 Changing the Order of Tasks or Task Groups
 
 You can change the order of Tasks or Task Groups in the Project window
 by dragging the Tasks or Task Groups to the desired location.
@@ -4799,7 +4770,7 @@ To promote or demote Tasks or Task Groups:
 -   To demote the Task or Task Group, press the **Shift** and **Tab**
     key (or select Demote from the Modify menu).
 
-### 5.1.10 Changing the Display Value of a Task Group
+#### 5.1.10 Changing the Display Value of a Task Group
 
 Creating a Task Group allows you to group Tasks together and display
 the sum, mean, minimum and maximum times of the Tasks in the Group.
@@ -4824,8 +4795,7 @@ height="0.64in"}
 Figure 5-1: The computed value has been set to the mean and is
 displayed for all Designs in the Project.
 
-5.2 Demonstrating How to Do a Task
-----------------------------------
+### 5.2 Demonstrating How to Do a Task
 
 CogTool can make predictions of task execution time for a skilled user
 on a given Design. To do this, it needs a Design with Frames and
@@ -4836,7 +4806,8 @@ into cognitively valid code in a cognitive architecture called ACT-R.
 This code is run in ACT-R and it produces a prediction of performance.
 Thus, demonstrating how to do the Task is the final step in obtaining
 predictions of human performance.
-5.2.1 What are Demonstrations and Scripts?
+
+#### 5.2.1 What are Demonstrations and Scripts?
 A Demonstration is exactly what it sounds like, you demonstrate how to
 do each task on a Design. Your Demonstration is recorded in a Script,
 which adds some steps to your Demonstration so that it is cognitively
@@ -4865,13 +4836,13 @@ Demonstration. CogTool is using prior research on human performance to
 make its predictions from your demonstration, not a recording of the
 time it took you to do the demonstration.
 
-### 5.2.2 The Script Windows
-
+#### 5.2.2 The Script Windows
 There are two types of windows invoked when doing a Demonstration, one
 that lets you select the start Frame of the Demonstration and one
 where you demonstrate the task and CogTool shows you the Script it
 generates.
-5.2.2.1 The Select the Start Frame Window
+
+##### 5.2.2.1 The Select the Start Frame Window
 The Select the Start Frame window has two panes. The left pane lists
 the available Frames for that Design in alphabetical order. The right
 pane contains a picture of the Design with thumbnails of the Frames
@@ -4889,7 +4860,8 @@ the touchscreen Device.
 ![](/assets/user-guide/media/image166.jpg){width="4.961111111111111in"
 height="2.6227220034995624in"}
 Figure 5-2: The Select the Start Frame window
-5.2.2.2 The Script Edit Window
+
+##### 5.2.2.2 The Script Edit Window
 The Script Edit window appears once a starting Frame has been
 selected. or when a previously-demonstrated Script is opened. This
 window has two panes (see Figure 5-3).
@@ -4919,7 +4891,7 @@ Demonstrating Actions for a Script**.
 height="2.9573982939632546in"}
 Figure 5-3: The Script Edit window
 
-### 5.2.3 Opening a Script for Editing
+#### 5.2.3 Opening a Script for Editing
 
 To open or edit a Script, do one of the following:
 • Click on a cell at the intersection of a Task and a Design.
@@ -5024,9 +4996,9 @@ To open or edit a Script, do one of the following:
 |                          | fit the available space in the window. |
 +--------------------------+------------------------------------------+
 
-### 5.2.5 Demonstrating Actions for a Script
+#### 5.2.5 Demonstrating Actions for a Script
 
-5.2.5.1 Simple Demonstration
+##### 5.2.5.1 Simple Demonstration
 You can record steps for the Script by interacting with the Frame in
 the left pane in a way similar to how a user would interact with the
 actual device. Assuming you have added all the Devices, Widgets and
@@ -5109,7 +5081,8 @@ actually put the self-Transition into the Design, so if you think you
 will need it again, you should go back to the Design and add it.
 ![](/assets/user-guide/media/image239.jpg){width="4.050417760279965in"
 height="1.752351268591426in"}
-5.2.5.4 Adding Look-At Steps During Demonstration
+
+##### 5.2.5.4 Adding Look-At Steps During Demonstration
 When computing, CogTool will automatically produce a model of human
 performance that looks at the Widgets it clicks on as it does the
 task. All you have to do to produce such a model is demonstrate how to
@@ -5277,13 +5250,13 @@ the entire name, is certainly slower than the other two methods, but
 the first two methods are not reliably different.
 ![](/assets/user-guide/media/image246.png)
 
-### 5.2.6 Editing Think Script Steps
+#### 5.2.6 Editing Think Script Steps
 
 You may edit **Think** steps in your Demonstration by double-clicking
 them and then editing the duration and label. You may not directly
 edit any other steps in a Script.
 
-### 5.2.7 Deleting Script Steps
+#### 5.2.7 Deleting Script Steps
 
 It is not advisable to delete arbitrary steps in the middle of a
 Script. Although CogTool does not prevent you from deleting an
@@ -5309,9 +5282,9 @@ the Frame containing the Speaker information and give you a button to
 take you to that Frame. You can get to the Frame at any time by
 double-clicking on its title in the left pane of the Script window.
 
-### 5.2.8 Reviewing Your Scripts
+#### 5.2.8 Reviewing Your Scripts
 
-5.2.8.1 Reviewing the Steps in a Task Script
+##### 5.2.8.1 Reviewing the Steps in a Task Script
 When you click on the Script step in the Script list, the associated
 Frame appears in the left pane of the Script Edit window. You can
 review how to do the Task by clicking on the first step in the list
@@ -5331,8 +5304,7 @@ To view all the Steps for such a Task Group:
 You cannot edit the Scripts in this window, only review them. Open the
 individual Task's Scripts to edit them.
 
-5.3 Computing a Prediction
---------------------------
+### 5.3 Computing a Prediction
 
 Once you have finished creating and editing a Script, click the
 Compute button at the bottom of the right pane to compute a
@@ -5396,7 +5368,7 @@ behavior. However, for extremely skilled users of multiple-key
 keyboard shortcuts and navigation keys, the predictions will be too
 slow.
 
-### 5.3.1 Recomputing Scripts
+#### 5.3.1 Recomputing Scripts
 
 When you make changes to your Script, it will automatically
 regenerate. However, you should always recompute a changed Script to
@@ -5432,16 +5404,14 @@ Script must be re-demonstrated. If the Recompute Script command
 produces an erroneous result, you may need to re-demonstrate the
 Script from the beginning.
 
-5.4 Exporting Scripts and Results to CSV Files
-----------------------------------------------
+### 5.4 Exporting Scripts and Results to CSV Files
 
 Some CogTool users have found exporting Scripts and results to CSV
 (comma separated value) files useful and we present how to do that
 here. You can also export designs to HTML, which is discussed at the
 end of the last chapter.
 
-### 5.4.1 Exporting a Script to CSV
-
+#### 5.4.1 Exporting a Script to CSV
 You may want to export your Script to a CSV file to view the steps in
 a more concise and manipulable format than the Script windows, or to
 use them in reports about your analyses. Usually, you will want to
@@ -5485,8 +5455,7 @@ Figure 5-7: An exported Script with special keys: For a complete list
 of the special keys and their corresponding symbols, see **Appendix:
 Special Keys and Symbols**.
 
-### 5.4.2 Exporting All Results to CSV
-
+#### 5.4.2 Exporting All Results to CSV
 You can export all the results shown in the Project window to a CSV
 file. You might choose this function to manipulate (add, subtract,
 etc.) numbers in Microsoft Excel or Google Docs or to more easily
@@ -5512,9 +5481,7 @@ This Project had one Design, one Task Group with the minimum time
 displayed and
 two Tasks in the Task Group.
 
-5.5 Model Visualization
------------------------
-
+### 5.5 Model Visualization
 The underlying computation cognitive engine that makes predictions of
 human performance in CogTool is called ACT-R. It is complex and well
 validated with decades of research. To learn more about it, visit the
@@ -5639,7 +5606,7 @@ height="3.3254658792650917in"}
 Figure 5-11: Comparison of two methods for editing in the ACT-R
 visualization windows.
 
-### **references**
+## References
 
 Anderson, J. R., & Lebiere, C. (1998). *The atomic components of
 thought.* Mahwah, NJ: Erlbaum.
@@ -5691,16 +5658,14 @@ Teo, L., John, B. E., & Pirolli, P. (2007) Towards a tool for
 predicting user exploration. *Extended Abstracts of CHI 2007* (San
 Jose, USA, April 28 -- May 3, 2007) ACM, New York.
 
-**Appendix A: devices**
+## Appendix A: devices
 
 You must choose at least one input and one output device for your
 Design.
 
-Input Devices
--------------
+### Input Devices
 
-### Keyboard
-
+#### Keyboard
 A keyboard is a regular QWERTY keyboard that sits on a desk or lap, on
 which a person types with two hands. Use the keyboard device as an
 approximation to any QWERTY keyboard, e.g., full-sized hard-wired or
@@ -5719,7 +5684,7 @@ height="2.19375in"}
 Figure A-1: Example of a Frame shown in its Design widow that has only a
 keyboard Device.
 
-### Mouse
+#### Mouse
 
 A mouse is a regular computer mouse. That is, a pointing device that
 fits in the hand and is moved on a flat surface to position a cursor
@@ -5739,7 +5704,7 @@ the IBM TrackPoint, a track ball, or a track pad in
 
 CogTool.
 
-### Touchscreen
+#### Touchscreen
 
 A touchscreen is a display that reacts to touch. The touch can be with
 a finger or a stylus, but it doesn't require a click as a mouse does.
@@ -5756,7 +5721,7 @@ check boxes, etc. In addition, a Graffiti Widget becomes available.
 The Transitions can include touchscreen transitions, e.g., tap,
 double-tap, Graffiti strokes, etc.
 
-### Microphone
+#### Microphone
 
 A microphone inputs sound into the system so it can react to that
 sound. Use a microphone for any system with speech input or any
@@ -5777,18 +5742,15 @@ height="4.028846237970254in"}
 Figure A-2: Example of a Frame shown in its Design widow that has a
 keyboard, a mouse and a microphone.
 
-Output Devices
---------------
+### Output Devices
 
-### Display
-
+#### Display
 A display is any device that presents information visually to the
 user. CogTool assumes that every Design has a display Device, thus,
 the display device is selected by default and cannot be deselected.
 The display contains all the widgets you put in the Frames.
 
-### Speaker
-
+#### Speaker
 A speaker presents auditory sounds or words to the user. Use a speaker
 whenever the user gets information from the Design through sound, or
 any environment where you want to simulate users speaking to each
@@ -5810,7 +5772,7 @@ Figure A-3: Example of a Frame shown in its Design widow that has a
 speaker, as well as the keyboard, mouse and microphone. The speaker
 will emit the word "Hello" on entering this Frame..
 
-#### Appendix B: types of widgets And when to Use them 
+## Appendix B: types of widgets And when to Use them 
 
 +----------------------+----------------------+----------------------+
 | [Widget] | [E                   | [Use this            |
@@ -6731,7 +6693,7 @@ attachment.
 We will do our best to resolve the problem and will contact you with a
 fix or workaround as soon as one is available.
 
-#### f cogtool shortcUt keys
+#### Cogtool Shortcut Keys
 
 The following shortcut keys can be used whenever the action they perform
 is required.
@@ -6816,10 +6778,9 @@ CogTool window you are using.
 | Win: CTRL+=    | Win: CTRL+ -   | Win: CTRL+0    | Win: CTRL+/    |
 +----------------+----------------+----------------+----------------+
 
-**g cogtool context menUs**
+#### cogtool context menUs
 
-Project Window
---------------
+##### Project Window
 
 ![](/assets/user-guide/media/image630.png)
 ![](/assets/user-guide/media/image631.jpg){width="3.1657283464566928in"
@@ -6832,8 +6793,7 @@ height="3.465847550306212in"}
 
 Context Menu - Task selected
 
-Design Window
--------------
+##### Design Window
 
 ![](/assets/user-guide/media/image633.jpg){width="2.8249245406824146in"
 height="3.280557742782152in"}
@@ -6847,8 +6807,7 @@ height="3.3522725284339456in"}
 
 Context Menu - Transition selected
 
-Frame Window
-------------
+##### Frame Window
 
 ![](/assets/user-guide/media/image636.jpg){width="3.2777777777777777in"
 height="2.8832130358705164in"}
@@ -6857,8 +6816,7 @@ height="3.4583333333333335in"}
 
 Context Menu - Nothing selected Context Menu - Widget selected
 
-Script Editor
--------------
+##### Script Editor
 
 ![](/assets/user-guide/media/image639.png)
 ![](/assets/user-guide/media/image640.jpg){width="3.2777777777777777in"
@@ -6866,7 +6824,7 @@ height="3.4644127296587928in"}
 
 Context Menu - Left pane Context Menu - Step list
 
-**Appendix h: glossAry**
+## Appendix H: Glossary
 
 ACT-R
 -----
