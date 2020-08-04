@@ -152,7 +152,7 @@ public class DefaultScriptUIModel extends DefaultUIModel
     protected static final Color generatedScriptStepColor =
         new Color(null, 255, 255, 204);
     protected static final Color generatedScriptStepDarkColor =
-        new Color(null, 80, 80, 15);
+        new Color(null, 80, 80, 15); // Dark tan
 
     /**
      * Do not dispose since it is a static.
@@ -162,7 +162,7 @@ public class DefaultScriptUIModel extends DefaultUIModel
     protected static final Color obsoletingScriptStepColor =
         new Color(null, 153, 204, 255);
     protected static final Color obsoletingScriptStepDarkColor =
-        new Color(null, 50, 79, 108);
+        new Color(null, 50, 79, 108); // Dark powder blue
 
     /**
      * This color does not need to be disposed since it's static.
