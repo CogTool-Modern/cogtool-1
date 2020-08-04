@@ -110,4 +110,9 @@ public abstract class PlatformAdapter implements Platform
     {
         // do nothing unless overriden
     }
+
+    public boolean isSystemDarkAppearance() {
+        // Most OS do not have a dark mode at the time of this writing.
+        return false;
+    }
 }

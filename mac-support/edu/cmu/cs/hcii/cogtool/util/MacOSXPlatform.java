@@ -123,7 +123,7 @@ public class MacOSXPlatform extends PlatformAdapter
     public void setTheme(Display display) {
         try {
 			// changing the appearance works only after the shell has been created
-			OS.setTheme(OS.isSystemDarkAppearance());
+			OS.setTheme(isSystemDarkAppearance());
 			// workaround for a bug in SWT: colors need to be reinited after changing the appearance
 			Method initColor = display.getClass().getDeclaredMethod("initColors");
 			initColor.setAccessible(true);
@@ -132,7 +132,12 @@ public class MacOSXPlatform extends PlatformAdapter
 		catch (Exception e) {
 			e.printStackTrace();
 		}
-    }
+	}
+	
+	@Override
+	public boolean isSystemDarkAppearance() {
+		return OS.isSystemDarkAppearance();
+	}
 
     @Override
     public void initPlatformMenu(Display display,
