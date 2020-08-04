@@ -96,6 +96,11 @@ import org.eclipse.swt.widgets.Display;
 
 public abstract class PlatformAdapter implements Platform
 {
+    public void setTheme(Display d)
+    {
+        // do nothing unless overriden
+    }
+
     public void initPlatformMenu(Display d, PlatformMenuActions a)
     {
         // do nothing unless overriden

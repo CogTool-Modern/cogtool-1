@@ -120,10 +120,7 @@ import java.lang.reflect.Method;
 public class MacOSXPlatform extends PlatformAdapter
 {
     
-    @Override
-    public void initPlatformMenu(Display display,
-                                 final PlatformMenuActions actions)
-    {
+    public void setTheme(Display display) {
         try {
 			// changing the appearance works only after the shell has been created
 			OS.setTheme(OS.isSystemDarkAppearance());
@@ -135,7 +132,13 @@ public class MacOSXPlatform extends PlatformAdapter
 		catch (Exception e) {
 			e.printStackTrace();
 		}
+    }
 
+    @Override
+    public void initPlatformMenu(Display display,
+                                 final PlatformMenuActions actions)
+    {        
+        setTheme(display);
         String appName = "CogTool";
     	
     	 Menu systemMenu = Display.getDefault().getSystemMenu();
