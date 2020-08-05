@@ -110,6 +110,10 @@
 			<fileset dir="${builddir}" />
 		</jar>
 
+		<!-- Copy the Mac Help Bundle files -->
+		<copy todir="${resdir}/CogTool.tmp/Contents/Resources/CogTool.help/Contents/Resources/en.lproj/" overwrite="true">
+			<fileset dir="docs/_site/help"/>
+		</copy>
 		<!-- Create a Mac "app" bundle by copying the tmp bundle. -->
 		<copy todir="${distdir}/CogTool.app" overwrite="true">
 			<fileset dir="${resdir}/CogTool.tmp"/>
