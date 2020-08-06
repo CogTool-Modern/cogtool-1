@@ -5,24 +5,23 @@ layout: app_help
 ---
 ## Chapter 3: Managing a Project
 
-### 31 What is a Project?
+### 3.1 What is a Project?
 A CogTool Project stores all the interface designs, tasks that can be
 performed on the designs, and predictions of user behavior Projects
 are stored in files called cgt (CoGTool) files when a Project is
 saved
-![](/assets/user-guide/media/image17jpg)
-By default, the Project name is also
-the name of the cgt file created by CogTool However, when the save
-box appears, you can
-save the file with another name
 
-### 32 The Project Window
+<ul><li class="icon fyi">By default, the Project name is also the name of the cgt file created by CogTool However, when the save box appears, you can save the file with another name. </li></ul>
+
+### 3.2 The Project Window
 
 The Project window is laid out in a grid where the columns are Designs
 and the rows are Tasks that can be performed on those Designs (See
 Figure 3-1)
-![](/assets/user-guide/media/image17jpg) 
-The title bar of a Project window starts with the name "Project" and contains the name of the Project
+
+<ul><li class="icon fyi">
+The title bar of a Project window starts with the name "Project" and contains the name of the Project. </li></ul>
+
 Each column header, starting with the second column, is the name of an
 interface design you have prototyped in the Project
 The row headers are the names of the different Tasks and Task Groups
@@ -38,7 +37,7 @@ methods are shown for both Tasks and they are grouped The Pop-Up
 design only uses the mouse, so only one prediction is shown for each
 Task Group
 
-### 33 Creating a New Project
+### 3.3 Creating a New Project
 
 To create a Project, do one of the following:
 
@@ -81,7 +80,7 @@ Figure 3-3: These windows appeared after creating a new Project with a
 Design called "NYC Guide" that has a keyboard and mouse as input
 devices
 
-### 34 Opening an Existing Project
+### 3.4 Opening an Existing Project
 
 To open an existing Project, do one of the following:
 
@@ -116,7 +115,7 @@ OR
 |                 |                                                   |
 +-----------------+---------------------------------------------------+
 
-### 35 Saving a Project
+### 3.5 Saving a Project
 
 To save a Project:
 
@@ -167,7 +166,7 @@ the Project
  You can also close an open window by
 clicking the close button on the window title bar
 
-### 37 Project Properties
+### 3.7 Project Properties
 
 To see the version number of the CogTool application last used to save
 the Project and the Project name:
@@ -176,7 +175,7 @@ the Project and the Project name:
 
 Figure 3-5: A sample Project Properties window
 
-### 38 Reopening Project Windows and Understanding the Windowing System
+### 3.8 Reopening Project Windows and Understanding the Windowing System
 
 As you create a design prototype, you will work in the Project window,
 a Design window and many Frame windows As you make predictions of

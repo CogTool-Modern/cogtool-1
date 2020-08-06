@@ -5,7 +5,7 @@ layout: app_help
 ---
 ## Chapter 1: Overview
 
-### 1.1 What is CogTool?**
+### 1.1 What is CogTool?
 CogTool is a user interface (UI) prototyping tool that can produce
 quantitative predictions of how users will behave when the prototype
 is ultimately implemented. Thus, CogTool provides you with a rapid and
@@ -21,18 +21,14 @@ easy and infrequent tasks possible". That is, it is fast and easy to
 construct a UI prototype with standard UI widgets like menus, context
 menus, buttons, links, check boxes, radio buttons, pull-down lists,
 etc. It is possible, although slightly more labor-intensive, to mockup
-more unusual interfaces like pie menus or the slide bar on the iPhone.
-
-CogTool also exports prototypes to HTML, so you can share your designs
+more unusual interfaces like pie menus or the slide bar on the iPhone. CogTool also exports prototypes to HTML, so you can share your designs
 with colleagues or perform quick & dirty user tests.
 
 CogTool's quantitative predictions are based on extensive prior
 research in cognitive psychology. CogTool uses a "cognitive
 architecture" called ACT-R (Anderson and Lebiere, 1998) to simulate
 the cognitive, perceptual and motor behavior of humans interacting
-with the prototype to accomplish tasks the UI designer has defined.
-
-CogTool reliably predicts the task execution time for skilled users of
+with the prototype to accomplish tasks the UI designer has defined. CogTool reliably predicts the task execution time for skilled users of
 the UI (John, et. al., 2004; Luo & John, B., 2005). Recent research
 has demonstrated the ability to predict the exploration behavior of
 novice users (Teo & John, 2008a,b; Teo, John & Pirolli, 2007) and the
@@ -79,10 +75,9 @@ intersection of each column and row shows the prediction of skilled
 execution time for that task on that design. The Design window is
 where frames and the transitions between them are created. The Frame
 window is where widgets are placed to represent how the design appears
-in a particular state.</figcaption>
+in a particular state. (Designs and tasks in this example are from Nielsen & Phillips, 1993)</figcaption>
 </figure>
 
-(Designs and tasks in this example are from Nielsen & Phillips, 1993)
 To make predictions of how long it will take a skilled user to execute
 a task on a UI design, simply demonstrate the task on the design.
 CogTool uses the storyboard and the demonstration to produce a

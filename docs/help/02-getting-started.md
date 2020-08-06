@@ -1,15 +1,16 @@
 ---
-title: Getting started with cogtool
+title: Getting started with CogTool
 date: 2012-05-23T03:04:25+00:00
 layout: app_help
 ---
-## Chapter 2: Getting started with cogtool
+## Chapter 2: Getting started with CogTool
 
 ### Downloading CogTool
 
 The latest public release of CogTool is available from the CogTool
 Project's website on the download page
 (http://cogtool.hcii.cs.cmu.edu/use-today/download-cogtool).
+
 CogTool is available for Windows XP/Vista and Mac OS X versions 10.4.8
 and later.
 
@@ -20,12 +21,9 @@ and later.
 -   When you download the CogTool file from the website, your browser
     will launch archive software, such as Stuffit, to unpack the CogTool
     executable. If it does not, double-click the downloaded CogTool file
-    to expand it.
-
-![](/assets/user-guide/media/image17.jpg)
-The CogTool file is expanded in the
-same location as the down loaded file, which in most cases is the
-Desktop.
+    to expand it.<br>
+    
+    <ul><li class="icon fyi">The CogTool file is expanded in the same location as the down loaded file, which in most cases is the Desktop.</li></ul>
 
 -   Place the expanded CogTool application file whatever you like.
     Although many people prefer to put it in the **Applications**
@@ -68,15 +66,14 @@ Figure 2-1: The first window you see when you launch CogTool.
 </figcaption>
 </figure>
 
-![](/assets/user-guide/media/image24.png)
-Double-clicking on a saved project file (.cgt file) to open it is notrecommended. In Mac OS X, it does nothing, in Windows it
+<ul><li class="icon bug">Double-clicking on a saved project file (.cgt file) to open it is notrecommended. In Mac OS X, it does nothing, in Windows it
 opens a new instance of CogTool even if one is already running.
 Instead, first launch CogTool. then click the **Open** button and
 navigate to the saved CogTool file. If you have been working with the
 project recently, it will show up in the **Open Recent** pulldown
-list.
-![](/assets/user-guide/media/image25.png)
-With Mac OS X, you can launch the CogTool application from any location to which you save it.
+list.</li></ul>
+<ul><li class="icon remember">
+With Mac OS X, you can launch the CogTool application from any location to which you save it.</li></ul>
 
 ### 2.4 Exploring CogTool
 

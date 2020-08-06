@@ -1,0 +1,91 @@
+---
+---
+
+body {
+    // Odd that this is needed, but often there's some element that's busting out and taking all the paragraphs with them.
+    max-width:96vw;
+}
+
+h1,h2,h3,h4,h5,h6 {
+    font-family: sans-serif;
+}
+
+// Wrangle the images
+figure {
+    max-width: 100vw;
+    margin: 0;
+    padding: 0 1em;
+    box-sizing: border-box;
+
+    figcaption {
+        // font-variant: small-caps;
+    }
+}
+
+img {
+    max-width: 100%;
+}
+
+$icon-size: 3em;
+.icon {
+    margin-left:1.25em;
+    min-height: $icon-size;
+    
+    &::before {
+        float:left;
+        
+        font-size:$icon-size;
+        position:relative;
+        margin-right:-1em;
+        left:-1.25em;
+        top:-0.25em;
+    }
+
+    &.fyi {
+        // list-style-image: url('/assets/user-guide/media/image17.jpg');
+        list-style:none;
+        &::before {
+            content: "📝";
+        }
+    }
+    &.tip {
+        // list-style-image: url('/assets/user-guide/media/image18.png');
+        list-style:none;
+        &::before {
+            content: "💡";
+        }
+    }
+    &.warning {
+        list-style:none;
+        &::before {
+            content: "⚠️";
+        }
+    }
+    &.remember {
+        // list-style-image: url('/assets/user-guide/media/image25.png');
+        list-style:none;
+        &::before {
+            content: "🎗";
+        }
+    }
+    &.bug {
+        list-style:none;
+        &::before {
+            content: "🐞";
+        }
+        // list-style-image: url('/assets/user-guide/media/image24.png');
+        
+    }
+}
+
+// Special images
+// FYI 
+img[src*="image17.jpg"],
+// Tip
+img[src*="image18.png"] {
+    width: 3em;
+    margin: 0.5em;
+}
+
+
+  

@@ -166,17 +166,16 @@ CogTool, (e.g., Project, Frame, and Widget) and bold commands (e.g.,
 From the **File** menu, choose **New Project**). When we reference
 another section or appendix, we write the full name (with number and
 subtitle) and bold it (as in the previous paragraph).
+
 We use special graphics to denote the following items:
+<ul>
+<li class="icon fyi">Notes that explain the behavior of CogTool</li>
+<li class="icon tip">Tips for efficient or alternative ways to complete tasks</li>
+<li class="icon warning">Warnings of potential problems and ways to avoid them</li>
+<li class="icon remember">Information to remember while using CogTool</li>
+<li class="icon bug">Documented bugs in CogTool (bugs are fixed more often than the User Guide is revised, and so you may not encounter these bugs in your version of CogTool)</li>
+</ul>
 
-![](/assets/user-guide/media/image17.jpg) Notes that explain the behavior of
-CogTool
 
-![](/assets/user-guide/media/image18.png) Tips for efficient or alternative ways
-to complete tasks
 
-![](/assets/user-guide/media/image19.png)Warnings of potential problems and ways
-to avoid them
-Information to remember while using CogTool
-Documented bugs in CogTool (bugs are fixed more often than the User
-Guide is revised, and so you may not encounter these bugs in your
-version of CogTool)
+ 
