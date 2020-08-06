@@ -60,8 +60,13 @@ Desktop.
 
 You can launch CogTool by double-clicking the application icon or by
 choosing the application from the listing in the Windows Start Menu.
+<figure markdown="1">
+
 ![](/assets/user-guide/media/image23.png)
+<figcaption>
 Figure 2-1: The first window you see when you launch CogTool.
+</figcaption>
+</figure>
 
 ![](/assets/user-guide/media/image24.png)
 Double-clicking on a saved project file (.cgt file) to open it is notrecommended. In Mac OS X, it does nothing, in Windows it
@@ -112,15 +117,21 @@ provides common facilities to aid exploration.
 ### 2.5 CogTool Help
 
 We do not currently have on-line help for CogTool;. However, user
-forums are available at http://cogtool.org/ where you can get
+forums are available at {{ site.weburl }}/ where you can get
 questions answered and see what other people do.
 We encourage you to have this pdf document open in Adobe Reader as you
 work in CogTool. Be sure to use the Bookmarks feature of Reader, so
 you can navigate easily around the User Guide. We have enabled
 commenting, so you can mark up the document as you like.
+
+<figure markdown="1">
+
 ![](/assets/user-guide/media/image26.jpg)
+<figcaption>
 Figure 2-2: The CogTool User Guide opened in AdobeReader (v7 or later)
 with the Bookmarks pane and Review and Comment toolbar.
+</figcaption>
+</figure>
 If you are running Mac OSX 10.5 or later, we encourage you to explore
 the automatic help for menu items. Consider the case where you are
 trying to align several widgets (highlighted in purple) but you have
@@ -129,8 +140,13 @@ the Help menu in MacOSX and search for "align", it lists all the menu
 items that contain "align" and if you roll over one of them, it opens
 the correct menu and points to the command (pointer in dark blue).
 
+<figure markdown="1">
+
 ![](/assets/user-guide/media/image27.png)
+<figcaption>
 Figure 2-3: Help finding menu commands is automatically provided by
 Apple's Mac OSX 10.5 or later. Menus change depending on which type of window is
 active, so explore different windows when looking for a particular
 command.
+</figcaption>
+</figure>

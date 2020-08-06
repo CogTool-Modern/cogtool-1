@@ -50,8 +50,8 @@ Tasks are created and manipulated in the Project window. The following
 is a Project window with two Designs and two Tasks on those Designs.
 These Tasks have not yet been demonstrated, so the cells at the
 intersections of Task and Design are still blank.
-![](/assets/user-guide/media/image161.jpg){width="5.199968285214348in"
-height="1.2713353018372704in"}
+![](/assets/user-guide/media/image161.jpg)
+
 
 #### 5.1.2 Creating a New Task
 
@@ -66,13 +66,13 @@ To create additional Tasks:
 |              | currently selected.                                  |
 | CTRL+SHIFT+T |                                                      |
 |              | ![                                                 |
-|              | ](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in" |
-|              | height="0.2699704724409449in"}There is no limit on |
+|              | ](/assets/user-guide/media/image17.jpg) |
+|              | There is no limit on |
 |              | the number of Tasks in a Project.                  |
 |              |                                                    |
 |              | ![                                                 |
-|              | ](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in" |
-|              | height="0.2699704724409449in"}When the new Task is |
+|              | ](/assets/user-guide/media/image17.jpg) |
+|              | When the new Task is |
 |              | created, the Task name is already selected and     |
 |              | ready for you to type in a meaningful name. The    |
 |              | Task name can be anything you wish using the ASCII |
@@ -82,8 +82,8 @@ To create additional Tasks:
 |              | Design evolves over time.                          |
 +--------------+------------------------------------------------------+
 
-![](/assets/user-guide/media/image38.jpg){width="0.3506342957130359in"
-height="0.3506342957130359in"}Text in CogTool's item names must be
+![](/assets/user-guide/media/image38.jpg)
+Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_](http://act-r.psy.cmu.edu/)
 [printable\_characters](http://act-r.psy.cmu.edu/) for the list of admissible characters.
@@ -123,15 +123,15 @@ maximum).
 A Task Group can be comprised of Tasks and other Task Groups. There is
 no limit to the number of Tasks or Task Groups that may be nested
 within a Task Group.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} When the new Task Group is created, its
+![](/assets/user-guide/media/image17.jpg)
+ When the new Task Group is created, its
 name is already selected and ready for you to type in a meaningful
 name. The Task Group name can be anything you wish using the ASCII
 printable character set, but it should be unique in the Project and
 descriptive of the group. Try to use a name that will continue to
 apply as the Design evolves over time.
-![](/assets/user-guide/media/image38.jpg){width="0.3506342957130359in"
-height="0.3506342957130359in"}Text in CogTool's item names must be
+![](/assets/user-guide/media/image38.jpg)
+Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
@@ -141,8 +141,8 @@ admissible characters.
 
 In the Project window, click on a the name of a Task or Task Group to
 select it. The entire row will turn bright blue to indicate selection.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Single-click selects a Task or Task
+![](/assets/user-guide/media/image17.jpg)
+ Single-click selects a Task or Task
 Group and highlights the whole row in bright blue. Double-click
 selects the name of the Task or Task Group and highlights it for
 editing in light blue.
@@ -163,8 +163,8 @@ To copy one or more Tasks or Task Groups:
 |                 | pasting.                                        |
 +-----------------+---------------------------------------------------+
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} When you copy a Task or Task Group, it
+![](/assets/user-guide/media/image17.jpg)
+ When you copy a Task or Task Group, it
 does not copy any
 
 Demonstrations or computed execution times associated with the Task or
@@ -187,14 +187,14 @@ To cut one or more Tasks or Task Groups:
 |                 |     menu, choose **Paste**.                       |
 | **Win:** CTRL+D |                                                   |
 |                 | ![](.                                           |
-| **Mac:** R      | //media/image17.jpg){width="0.2699704724409449in" |
-|                 | height="0.2699704724409449in"}A Task or Task    |
+| **Mac:** R      | //media/image17.jpg) |
+|                 | A Task or Task    |
 | **Win:** CTRL+R | Group can be pasted into the same Project or    |
 |                 | into a different Project.                       |
 |                 |                                                 |
 |                 | ![](.                                           |
-|                 | //media/image17.jpg){width="0.2699704724409449in" |
-|                 | height="0.2699704724409449in"}When you paste a  |
+|                 | //media/image17.jpg) |
+|                 | When you paste a  |
 |                 | Task into a Task Group or Project that already  |
 |                 | has a Task of the same name, the pasted Task    |
 |                 | will be given a unique suffix (e.g.             |
@@ -220,15 +220,15 @@ To cut one or more Tasks or Task Groups:
 |                 |     Task** or **Duplicate Task Group**.           |
 |                 |                                                   |
 |                 | ![](.                                           |
-|                 | //media/image17.jpg){width="0.2699704724409449in" |
-|                 | height="0.2699704724409449in"}Duplicated Tasks  |
+|                 | //media/image17.jpg) |
+|                 | Duplicated Tasks  |
 |                 | are placed beneath the Task that has been       |
 |                 | duplicated. The Duplicated Task is given a      |
 |                 | unique suffix ("MyTask\[1\]").                  |
 |                 |                                                 |
 |                 | ![](./                                          |
-|                 | /media/image59.png){width="0.25333333333333335in" |
-|                 | height="0.29333333333333333in"}You can also     |
+|                 | /media/image59.png) |
+|                 | You can also     |
 |                 | duplicate a Task or Task Group by holding       |
 |                 | Control (PC) or Option (Mac) while dragging to  |
 |                 | a blank area of the Project window.             |
@@ -247,15 +247,15 @@ OR
 
 -   Double-click on the name of the Task or Task Group.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.26996937882764654in"} You may name the Task or Task Group
+![](/assets/user-guide/media/image17.jpg)
+ You may name the Task or Task Group
 anything you wish using the ASCII printable character set. However,
 you can have only one
 Task with that name in a Task Group or at the top level of a
 Project. Make the name meaningful and descriptive of the Task or
 Task Group.
-![](/assets/user-guide/media/image162.png){width="0.35333333333333333in"
-height="0.35333333333333333in"}Text in CogTool's item names must be
+![](/assets/user-guide/media/image162.png)
+Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
@@ -272,11 +272,11 @@ To delete one or more Tasks or Task Groups:
 **~Win:~** • From the **Edit** menu, choose **Delete Task** or **Delete
 Task Group.** CTRL+DELETE
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} You will be asked to confirm the
+![](/assets/user-guide/media/image17.jpg)
+ You will be asked to confirm the
 deletion before the Task or Task Group is removed from the Project.
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}When you delete a Task Group, you will also delete
+![](/assets/user-guide/media/image38.jpg)
+When you delete a Task Group, you will also delete
 all Tasks that are within that Group.
 
 #### 5.1.9 Changing the Order of Tasks or Task Groups
@@ -318,8 +318,8 @@ OR
     Min or Max) and select the desired value in the context menu (sum,
     mean, minimum, maximum)..
 
-![](/assets/user-guide/media/image163.png){width="4.6066666666666665in"
-height="0.64in"}
+![](/assets/user-guide/media/image163.png)
+
 Figure 5-1: The computed value has been set to the mean and is
 displayed for all Designs in the Project.
 
@@ -350,11 +350,11 @@ research has shown that people tend to pause before performing
 keystrokes or mouse actions; again, it is not necessary for you to
 learn the rules for placing these Think operators because those rules
 have been encoded into the operation of CogTool.
-![](/assets/user-guide/media/image164.png){width="0.3433333333333333in"
-height="0.3466666666666667in"}You demonstrate how to do a Task and
+![](/assets/user-guide/media/image164.png)
+You demonstrate how to do a Task and
 CogTool creates a cogni tively-plausible Script.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} A Demonstration is not a user test.
+![](/assets/user-guide/media/image17.jpg)
+ A Demonstration is not a user test.
 CogTool is not recording the time of your actions to make its
 predictions. You can start a
 Demonstration, go out for coffee in the middle, come back and
@@ -378,15 +378,15 @@ laid out spatially (see Figure 5-2).
 If the Design's input Devices include the mouse and at least on other
 Device, the bottom of the left pane contains an option to select the
 Mouse Hand and Initial Hand Location.
-![](/assets/user-guide/media/image165.png){width="0.28in"
-height="0.21333333333333335in"} When the Design has a mouse and a
+![](/assets/user-guide/media/image165.png)
+ When the Design has a mouse and a
 touch screen as input devices, CogTool does not know how to home
 between those two devices, nor does it know how to set the initial
 location of the hand correctly. Demonstrations will work, but
 predictions will not include the time to home between the mouse and
 the touchscreen Device.
-![](/assets/user-guide/media/image166.jpg){width="4.961111111111111in"
-height="2.6227220034995624in"}
+![](/assets/user-guide/media/image166.jpg)
+
 Figure 5-2: The Select the Start Frame window
 
 ##### 5.2.2.2 The Script Edit Window
@@ -415,8 +415,8 @@ whole task easily by clicking on the first step and using the
 down-arrow key to display the Frames as they would appear to the user.
 Details on working with Scripts start with **Section 5.2.5
 Demonstrating Actions for a Script**.
-![](/assets/user-guide/media/image182.png){width="3.9626629483814524in"
-height="2.9573982939632546in"}
+![](/assets/user-guide/media/image182.png)
+
 Figure 5-3: The Script Edit window
 
 #### 5.2.3 Opening a Script for Editing
@@ -468,15 +468,15 @@ To open or edit a Script, do one of the following:
 |                          | 183.jpg){width="1.1944444444444445e-2in" |
 |                          | height="                               |
 |                          | 2.985564304461942e-3in"}![](/assets/user-guide/media/ima |
-|                          | ge185.png){width="0.27666666666666667in" |
+|                          | ge185.png) |
 |                          | height="2.666666666666667e-2in"}!      |
-|                          | [](/assets/user-guide/media/image186.png){width="0.21in" |
+|                          | [](/assets/user-guide/media/image186.png) |
 |                          | height="                               |
 |                          | 7.666666666666666e-2in"}![](/assets/user-guide/media/ima |
-|                          | ge187.png){width="0.25333333333333335in" |
+|                          | ge187.png) |
 |                          | height="                               |
 |                          | 6.666666666666667e-2in"}![](/assets/user-guide/media/ima |
-|                          | ge188.jpg){width="0.20604221347331583in" |
+|                          | ge188.jpg) |
 |                          | height="4.777777777777778e-2in"} When  |
 |                          | the Design has a mouse and a touch     |
 |                          | screen as input devices, CogTool does  |
@@ -515,9 +515,9 @@ To open or edit a Script, do one of the following:
 |                          |     window.                              |
 |                          |                                          |
 |                          | ![](/assets/user-guide/media/i                         |
-|                          | mage17.jpg){width="0.2699704724409449in" |
+|                          | mage17.jpg) |
 |                          |                                        |
-|                          |  height="0.26996937882764654in"}**Normal |
+|                          |  **Normal |
 |                          | Zoom** makes the contents of the frame |
 |                          | revert to the default size. **Zoom     |
 |                          | to** Fit makes the contents of a frame |
@@ -545,13 +545,13 @@ want to follow), right-click (PC) or CTRL-click (Mac) on the Widget
 and the context menu will appear, giving you access to all the
 pre-defined Transitions as well as the option to define a new
 self-Transition or Look-At the Widget (discussed below).
-![](/assets/user-guide/media/image59.png){width="0.25333333333333335in"
-height="0.29333333333333333in"} If you have difficulty remembering
+![](/assets/user-guide/media/image59.png)
+ If you have difficulty remembering
 which Widgets have Transitions or actions to trigger them, hover the
 mouse over the Widget to display a tool tip. The context menu for the
 Widget will also have information about Transitions
-![](/assets/user-guide/media/image237.png){width="0.28in"
-height="0.21333333333333335in"} When a left-press Transition is
+![](/assets/user-guide/media/image237.png)
+ When a left-press Transition is
 defined on the Widget, CogTool follows the left-press Transition when
 you left-click on the Widget. CogTool is catching the "press" before
 it sees the "click", while understandable, but not as useful as having
@@ -561,8 +561,8 @@ the context menu.
 In the case of a touchscreen interface, CogTool automatically
 interprets left-clicks as taps, e.g., like a tourist guide on a iPhone
 with a Museums button (see Figure 5-4).
-![](/assets/user-guide/media/image238.png){width="3.486666666666667in"
-height="1.18in"}
+![](/assets/user-guide/media/image238.png)
+
 Figure 5-4: CogTool demonstrating a touchscreen action. You, the
 analyst, clicks on the Museum button, but CogTool knows you have
 prototyped a touchscreen interface and records a tap, not a click.
@@ -576,8 +576,8 @@ you defined a menu system that used hover to open submenus with a
 delay of 0.5 sec (typical for a PC), you will demonstrate by clicking
 on the menus and submenus, but the CogTool Script will list the hovers
 and system waits as defined.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} If your Frame has overlapping Widgets,
+![](/assets/user-guide/media/image17.jpg)
+ If your Frame has overlapping Widgets,
 a left-click will automati cally follow the Transition for the topmost
 Widget. Actions on all
 occluded Widgets are accessible through the context menu.
@@ -607,8 +607,8 @@ create a new step in the Script, just as if you had put the Transition
 in the Design prior to demonstrating the task. It will not, however,
 actually put the self-Transition into the Design, so if you think you
 will need it again, you should go back to the Design and add it.
-![](/assets/user-guide/media/image239.jpg){width="4.050417760279965in"
-height="1.752351268591426in"}
+![](/assets/user-guide/media/image239.jpg)
+
 
 ##### 5.2.5.4 Adding Look-At Steps During Demonstration
 When computing, CogTool will automatically produce a model of human
@@ -640,8 +640,8 @@ information, and therefore be thinking after doing the Look-At step.
 Therefore, CogTool places a Think step after every Look-At step you
 demonstrate.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Deliberately looking a widgets should be
+![](/assets/user-guide/media/image17.jpg)
+ Deliberately looking a widgets should be
 used sparingly. You do
 
 NOT need to use them just to look at a button to click on it; CogTool
@@ -676,13 +676,13 @@ To insert a Think step during Demonstration:
     that appears in your design. That would be a justifiable reason to
     add a Think step to the Script, as shown.
 
-![](/assets/user-guide/media/image240.jpg){width="2.7141415135608047in"
-height="1.1826990376202975in"}
+![](/assets/user-guide/media/image240.jpg)
+
 
 -   The Think step will be added at that point in the Script.
 
-![](/assets/user-guide/media/image38.jpg){width="0.3506342957130359in"
-height="0.3506342957130359in"}Numbers can only be entered into CogTool
+![](/assets/user-guide/media/image38.jpg)
+Numbers can only be entered into CogTool
 is US format, i.e.,
 using digits and a "." to represent the decimal point.
 To insert a Think step after Demonstration:
@@ -699,16 +699,16 @@ To insert a Think step after Demonstration:
     automatically-generated steps before it (e.g., homing), the Think
     step will appear before all the generated steps.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Because of prior research, CogTool will
+![](/assets/user-guide/media/image17.jpg)
+ Because of prior research, CogTool will
 not allow a Script to have two Think steps in a row. If you add a
 Think step in a position
 where it will be next to an automatically-generated Think step,
 CogTool will replace the automatically-generated Think step with your
 deliberately-added Think step.
-![](/assets/user-guide/media/image98.jpg){width="0.3379615048118985in"
-height="0.3506353893263342in"}![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.26996937882764654in"} You can also change the duration and
+![](/assets/user-guide/media/image98.jpg)
+![](/assets/user-guide/media/image17.jpg)
+ You can also change the duration and
 label of any Think step at any time by double-clicking on it in the
 Script window. The dialog box for changing the duration and label will
 appear. using digits and a "." to represent the decimal point. Numbers
@@ -728,8 +728,8 @@ subsections show pictures of how each of those method would be
 demonstrated.
 The Project is set up with a Task Group containing the three methods
 of editing the text.
-![](/assets/user-guide/media/image241.jpg){width="4.490647419072616in"
-height="1.45206583552056in"}
+![](/assets/user-guide/media/image241.jpg)
+
 The Design contains all the necessary Frames, Widgets and Transitions
 to demonstrate all three methods. Notice that the Transitions that
 highlight the text are all self-Transitions and that there are
@@ -737,8 +737,8 @@ multiple keyboard Transitions to the next Frame because the different
 methods require the user to type different things on the Keyboard. You
 can access any of these transitions, even if they overlap with others,
 by clicking on their names in the Design's properties pane.
-![](/assets/user-guide/media/image242.png){width="5.566666666666666in"
-height="3.3836603237095364in"}
+![](/assets/user-guide/media/image242.png)
+
 The Transitions are:
 
 -   For the first method: left-click self-Transition on text Widget
@@ -754,16 +754,16 @@ The Transitions are:
 
 The Script for the first method, clicking between e" and "y" in
 Harvey, backspacing twice and then typing "r" is:
-![](/assets/user-guide/media/image243.png){width="5.016184383202099in"
-height="4.373083989501312in"}
+![](/assets/user-guide/media/image243.png)
+
 The Script for the second method, double-clicking on "Harvey" to
 highlight it and then typing "Harry" is:
-![](/assets/user-guide/media/image244.png){width="4.9522058180227475in"
-height="4.317307524059492in"}
+![](/assets/user-guide/media/image244.png)
+
 The Script for the third method, dragging across the entire field to
 highlight it and then typing "Harry Q. Bovik" is:
-![](/assets/user-guide/media/image245.png){width="4.914600831146107in"
-height="4.2845242782152235in"}
+![](/assets/user-guide/media/image245.png)
+
 Below, you can see the Project window that compares these three
 predictions (after they have been computed, see the section on
 computing predictions). CogTool predicts that double-clicking and
@@ -802,8 +802,8 @@ To delete script steps from the end of the Script:
 
 -   Restart your Demonstration from the deleted step.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} You will not be able to delete steps
+![](/assets/user-guide/media/image17.jpg)
+ You will not be able to delete steps
 that are generated by a Speaker device in this window. If you
 double-click on a Speaker step, a dialog box will instruct you to edit
 the Frame containing the Speaker information and give you a button to
@@ -858,8 +858,8 @@ on the lefthand side of the "Script Step List." The Script will need
 to be edited before it can be recomputed (see Figure 5-5). This
 situation almost never occurs when you use Standard Widgets in your
 Design, but it is a common error when you use Custom Widgets.
-![](/assets/user-guide/media/image247.png){width="4.694431321084864in"
-height="1.474899387576553in"}
+![](/assets/user-guide/media/image247.png)
+
 Figure 5-5: Question marks in the Script cell and red lines in the
 "Script Step List"
 
@@ -877,13 +877,13 @@ Figure 5-5: Question marks in the Script cell and red lines in the
     you that can run a longer simulation).
 
 non-English contexts on a Mac, particularly those that use
-non![](/assets/user-guide/media/image154.png){width="0.42777777777777776in"
-height="0.3108519247594051in"}CogTool is known to have difficulty
+non![](/assets/user-guide/media/image154.png)
+CogTool is known to have difficulty
 computing when using it in
 Roman scripts in their input methods, as set by the International
 System Preferences.
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}Keyboard transitions that involve many special
+![](/assets/user-guide/media/image38.jpg)
+Keyboard transitions that involve many special
 characters in a row result in predictions of human performance that
 are slower than the performance of actual skilled computer users. This
 is because (1) KLM assumes all keystrokes are done in sequence even
@@ -912,8 +912,8 @@ From the Project window:
 
 -   From the **Modify** menu, choose **Recompute Script**.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} You can recompute all Scripts in a
+![](/assets/user-guide/media/image17.jpg)
+ You can recompute all Scripts in a
 Project window by selecting all the Scripts. To select all the
 Scripts, from the **Edit** menu, choose
 
@@ -923,8 +923,8 @@ Scripts, from the **Edit** menu, choose
 
 **Win:** CTRL+A
 
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}Some changes to a Design can prevent a Script from
+![](/assets/user-guide/media/image38.jpg)
+Some changes to a Design can prevent a Script from
 being recomputed properly, e.g., deleting a Frame or Widget that is
 used in the Script. Invalid Scripts must be re-demonstrated. The red
 areas in the Script window indicate from which point the associated
@@ -959,26 +959,26 @@ Project and Design names, and all the information from the Script
 window (the Frames, Actions, Widget Names and Types, and Displayed
 Labels) (see Figure 5-6).
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} When you export a Script that is a member
+![](/assets/user-guide/media/image17.jpg)
+ When you export a Script that is a member
 of a Task Group, the
 
 Task Hierarchy is displayed under the Design name (see Figure 5-6).
-![](/assets/user-guide/media/image304.jpg){width="5.566666666666666in"
-height="2.0813057742782153in"}
+![](/assets/user-guide/media/image304.jpg)
+
 Figure 5-6: The information from the Script window exported into
 Microsoft Excel
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} When you open the file in a spreadsheet
+![](/assets/user-guide/media/image17.jpg)
+ When you open the file in a spreadsheet
 application, such as
 
 Microsoft Excel, symbols for the special keys (e.g. ⇧ for Shift) may
 not be displayed. In these cases, the symbols are replaced by the key
 name, which is capitalized and in parentheses (e.g. (SHIFT)) (see
 Figure 5-7).
-![](/assets/user-guide/media/image305.jpg){width="2.383623140857393in"
-height="1.4345877077865268in"}
+![](/assets/user-guide/media/image305.jpg)
+
 Figure 5-7: An exported Script with special keys: For a complete list
 of the special keys and their corresponding symbols, see **Appendix:
 Special Keys and Symbols**.
@@ -1001,8 +1001,8 @@ The CSV file contains information on the version of CogTool, the
 Project Name, the date and time stamp, and all the information from
 the Project window (the Tasks and the computed times, in seconds) (see
 Figure 5-8).
-![](/assets/user-guide/media/image306.jpg){width="4.227083333333334in"
-height="1.4826388888888888in"}
+![](/assets/user-guide/media/image306.jpg)
+
 Figure 5-8: The information from the Project window exported into
 Microsoft Excel.
 This Project had one Design, one Task Group with the minimum time
@@ -1036,8 +1036,8 @@ From any Script window:
 
 -   Click the Show Visualization button (see Figure 5-9).
 
-![](/assets/user-guide/media/image307.jpg){width="2.948611111111111in"
-height="1.5048611111111112in"}
+![](/assets/user-guide/media/image307.jpg)
+
 
 Figure 5-9: The Show Visualization button in the Script window
 The Visualization window has two panes (see Figure 5-10). In the left
@@ -1052,8 +1052,8 @@ In the left pane, time runs from left to right and the widths of the
 boxes are proportional to the time they take to execute. The rows of
 boxes are different types of "operators" that happen in the course of
 performing these Tasks.
-![](/assets/user-guide/media/image308.jpg){width="5.558206474190726in"
-height="2.4659087926509184in"}
+![](/assets/user-guide/media/image308.jpg)
+
 Figure 5-10: The Model Visualization window
 The operators are grouped into four categories:
 
@@ -1064,8 +1064,8 @@ The operators are grouped into four categories:
 
     -   Wait (lighter gray) - represents the system response time.
 
-![](/assets/user-guide/media/image309.png){width="0.28in"
-height="0.21333442694663168in"} The Frames are not actually visible as
+![](/assets/user-guide/media/image309.png)
+ The Frames are not actually visible as
 long as these boxes indicate. When there is a System Wait, one Frame
 disappears and the next one does not show up for the duration of the
 System Wait. This is not shown correctly in the current visualization.
@@ -1098,13 +1098,13 @@ System Wait. This is not shown correctly in the current visualization.
         can type Backspace, Backspace and then the left had types "r".
         (see Figure 5-10).
 
-![](/assets/user-guide/media/image310.png){width="0.28in"
-height="0.21333333333333335in"} Hand movements on a touch screen
+![](/assets/user-guide/media/image310.png)
+ Hand movements on a touch screen
 should be labeled "Movefinger movement" but they currently appear in
 both the chart and the Trace as "Move-Mouse". The calculations are
 correct, its just the labels that are not.
-![](/assets/user-guide/media/image50.png){width="0.28in"
-height="0.21333333333333335in"} If you are trying to visualize a old
+![](/assets/user-guide/media/image50.png)
+ If you are trying to visualize a old
 .cgt file from a previous version of CogTool, the rows sometime comes
 out in a different order that presented here and many lines cross each
 other. If this happens, try recomputing and re-visualizing.
@@ -1129,7 +1129,7 @@ backspce, "r". The other shows dragging over he entire text box and
 typing "Harry Q. Bovik". The top model takes less time, but requires
 more thinking time to remember the function of the backspace key. The
 bottom model takes more time because of the typing.
-![](/assets/user-guide/media/image311.jpg){width="5.295832239720035in"
-height="3.3254658792650917in"}
+![](/assets/user-guide/media/image311.jpg)
+
 Figure 5-11: Comparison of two methods for editing in the ACT-R
 visualization windows.

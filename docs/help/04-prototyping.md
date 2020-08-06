@@ -92,8 +92,8 @@ for your existing Project:
 
 CTRL+SHIFT+D The New Design dialog box will appear.
 
-![](/assets/user-guide/media/image37.jpg){width="2.6057141294838146in"
-height="2.263888888888889in"}
+![](/assets/user-guide/media/image37.jpg)
+
 Figure 4-2: The New Design dialog box. The OK button will not be
 active until at least one input device is checked.
 In this dialog box, do the following:
@@ -103,8 +103,8 @@ In this dialog box, do the following:
     purpose of the Design when you have multiple Designs in your
     Project.
 
-![](/assets/user-guide/media/image38.jpg){width="0.3506342957130359in"
-height="0.3506353893263342in"}Text in CogTool's item names must be
+![](/assets/user-guide/media/image38.jpg)
+Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
@@ -118,13 +118,13 @@ admissible characters.
     able to click **OK** until you have selected at least one input
     device.
 
-![](/assets/user-guide/media/image39.png){width="0.3433333333333333in"
-height="0.3466666666666667in"}CogTool assumes every Design has a
+![](/assets/user-guide/media/image39.png)
+CogTool assumes every Design has a
 display. Thus, Display is selected as an output device and it is not
 possible to deselect the display. If your device has no display (e.g.,
 is audio only), this can be prototyped by all Frames being empty.
-![](/assets/user-guide/media/image40.png){width="0.25333333333333335in"
-height="0.29333333333333333in"} If you are prototyping a cell phone or
+![](/assets/user-guide/media/image40.png)
+ If you are prototyping a cell phone or
 other hand-held device that is operated with the fingers, use
 "Touchscreen" as the input device, even if the buttons are physical
 buttons not on an actual touchscreen. This will allow the user's
@@ -163,8 +163,8 @@ following:
 | **Win:** CTRL+E |                                                     |
 +-----------------+-----------------------------------------------------+
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.26996937882764654in"} A Design is selected when a dot
+![](/assets/user-guide/media/image17.jpg)
+ A Design is selected when a dot
 appears next to the Design name and the Script cells below the name
 are highlighted in blue (see Design 3 in the previous figure).
 OR
@@ -174,8 +174,8 @@ OR
 A Design window appears where you can add Frames and Transitions to
 prototype your system (see Figure 4-4). Editing Frames and defining
 Transitions are discussed in subsequent sections.
-![](/assets/user-guide/media/image42.png){width="3.63in"
-height="2.4833333333333334in"}
+![](/assets/user-guide/media/image42.png)
+
 Figure 4-4: The Design window that results from opening a new Design.
 The Design canvas has one empty Frame and nothing is selected.
 
@@ -202,8 +202,8 @@ You can change the order of the Design columns in the Project window
 by clicking on the Design name and dragging the column to the desired
 position. The Design you are dragging become transparent, which allows
 you to see when you have reached the desired position.
-![](/assets/user-guide/media/image43.jpg){width="3.593708442694663in"
-height="0.8965277777777778in"}
+![](/assets/user-guide/media/image43.jpg)
+
 Figure 4-5: The Pop Up Design is being moved from the right-most
 position to the left of the Dialog Box Design. You can see the Dialog
 Box column underneath as you move the Pop Up Design.
@@ -235,16 +235,16 @@ To paste a Design:
 
 -   In the Project window, from the **Edit** menu, choose **Paste**.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} If no Design is selected, the pasted
+![](/assets/user-guide/media/image17.jpg)
+ If no Design is selected, the pasted
 Design will be added to the
 
 right-most column. If an existing Design is selected, the pasted
 Design will be added immediately to the right of the selected Design.
 If the Design's name is already in use in the Project, a unique suffix
 is appended to the pasted Design's name (see Figure 4-6).
-![](/assets/user-guide/media/image44.jpg){width="5.566666666666666in"
-height="0.8052405949256343in"}
+![](/assets/user-guide/media/image44.jpg)
+
 Figure 4-6: CogTool added a unique suffix to the name of the Pop Up
 Design in the right-most column when it was pasted into the same
 Project.
@@ -274,8 +274,8 @@ To delete a Design:
 |                 | **OK** in the confirmation dialog box.            |
 | **Mac:** D      |                                                   |
 |                 | ![](.                                           |
-| **Win:** CTRL+D | //media/image17.jpg){width="0.2699704724409449in" |
-|                 | height="0.2699704724409449in"}Deleting a Design |
+| **Win:** CTRL+D | //media/image17.jpg) |
+|                 | Deleting a Design |
 | **Mac:** R      | has the same effect as cutting a Design, except |
 |                 | that the Design is not on the clipboard and     |
 | **Win:** CTRL+R | cannot then be pasted.                          |
@@ -290,15 +290,15 @@ To delete a Design:
 |                 |     Design**.                                     |
 |                 |                                                   |
 |                 | ![](.                                           |
-|                 | //media/image17.jpg){width="0.2699704724409449in" |
-|                 | height="0.2699704724409449in"}The Design is     |
+|                 | //media/image17.jpg) |
+|                 | The Design is     |
 |                 | duplicated to the right of the original Design, |
 |                 | and its name will be given a unique suffix      |
 |                 | (e.g. "MyDesign\[1\]").                         |
 |                 |                                                 |
 |                 | ![](.                                           |
-|                 | //media/image17.jpg){width="0.2699704724409449in" |
-|                 | height="0.2699704724409449in"}Within a Project, |
+|                 | //media/image17.jpg) |
+|                 | Within a Project, |
 |                 | duplicating a Design has the same effect as     |
 |                 | copying and pasting a Design. However,          |
 |                 | duplicating a Design does not put it on the     |
@@ -317,13 +317,13 @@ To delete a Design:
 
 Enter the new name for the Design when prompted. The name will be
 changed when you click **OK** (see Figure 4-7).
-![](/assets/user-guide/media/image45.jpg){width="2.555088582677165in"
-height="1.1465135608048993in"}
+![](/assets/user-guide/media/image45.jpg)
+
 Figure 4-7: The Rename Design dialog box
-![](/assets/user-guide/media/image46.png){width="0.3433333333333333in"
-height="0.35in"} Each Design name must be unique within a Project.
-![](/assets/user-guide/media/image47.png){width="0.35333333333333333in"
-height="0.35333333333333333in"}Text in CogTool's item names must be
+![](/assets/user-guide/media/image46.png)
+ Each Design name must be unique within a Project.
+![](/assets/user-guide/media/image47.png)
+Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
@@ -369,8 +369,8 @@ OR
 |                          |     window.                              |
 | **Mac:** /               |                                          |
 |                          | ![](/assets/user-guide/media/i                         |
-|                          | mage17.jpg){width="0.2699704724409449in" |
-|                          | height="0.26996937882764654in"}        |
+|                          | mage17.jpg) |
+|                          |         |
 |                          | default size. **Zoom to Fit** makes    |
 |                          | the contents of a Frame fit the        |
 |                          | **Normal Zoom** makes the contents of  |
@@ -396,12 +396,12 @@ OR
 
 -   Check the devices you want to add and click **OK**.
 
-![](/assets/user-guide/media/image48.jpg){width="1.9893810148731408in"
-height="2.2521292650918636in"}
+![](/assets/user-guide/media/image48.jpg)
+
 Figure 4-8: The Add Devices dialog box with one new device to be
 added.
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}You cannot undo the addition of a device, so choose
+![](/assets/user-guide/media/image38.jpg)
+You cannot undo the addition of a device, so choose
 carefully. However, the only consequence of having more devices than
 you need is irrelevant items in the Widget toolbar and on the Frames.
 It does not prevent you from working, but it might be more difficult
@@ -436,8 +436,8 @@ constructed for you automatically , so you don't need the widgets for
 custom menu items and submenus and they are grayed out. (See
 subsequent sections for more information on Widgets and the difference
 between Standard and Custom).
-![](/assets/user-guide/media/image49.jpg){width="5.566666666666666in"
-height="2.5796751968503937in"}
+![](/assets/user-guide/media/image49.jpg)
+
 Figure 4-9: Two different views of the Frame window with a Design for
 a NYC Guide on a PalmVx. This Frame has a background image (the
 PalmVx) and three standard button widgets have been defined (colored
@@ -465,13 +465,13 @@ its label (if any), and properties specific to each Widget type. (See
 subsequent sections for more information about Widgets and their
 properties.)
 and Zoom labels run into each other (see Figure 4-10). When it
-![](/assets/user-guide/media/image50.png){width="0.28in"
-height="0.21333333333333335in"} When a Frame window is made too
+![](/assets/user-guide/media/image50.png)
+ When a Frame window is made too
 narrow, the Standard, Custom,
 is too short, buttons on the bottom of the Properties pane disappear.
 
-![](/assets/user-guide/media/image51.jpg){width="2.3905183727034123in"
-height="0.7567968066491688in"}
+![](/assets/user-guide/media/image51.jpg)
+
 
 Figure 4-10: Example of a Frame that is sufficiently wide to see all
 the buttons (top) and a Frame that is so narrow that the labels run
@@ -488,8 +488,8 @@ File in Windows). Once set, each new Frame will be created at this
 minimum width. This is the minimum width - you can always create wider
 Frames by placing wider background images in them or placing Widgets
 further to the right.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.26996937882764654in"} The Preferences dialog box contains a
+![](/assets/user-guide/media/image17.jpg)
+ The Preferences dialog box contains a
 button for accessing re search commands. These are undocumented,
 untested, and unvali-
 dated. Explore at your own risk .
@@ -509,8 +509,8 @@ CTRL+SHIFT+F A new Frame appears in the Design window. It is selected,
 has been given a unique name by default, and this name is highlighted
 and ready for you to type in a meaningful name.
 
-![](/assets/user-guide/media/image38.jpg){width="0.3506342957130359in"
-height="0.3506342957130359in"}Text in CogTool's item names must be
+![](/assets/user-guide/media/image38.jpg)
+Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
@@ -527,8 +527,8 @@ You can import the entire folder of images for use in your Frames.
 Each image will become the background of its own Frame. The Frame's
 title will be the same as the corresponding file name, without the
 extension.
-![](/assets/user-guide/media/image52.png){width="0.3433333333333333in"
-height="0.3466666666666667in"} Only JPG, PNG, or GIF are acceptable
+![](/assets/user-guide/media/image52.png)
+ Only JPG, PNG, or GIF are acceptable
 file formats for CogTool.
 To import background images:
 
@@ -540,30 +540,30 @@ To import background images:
 
 -   Click **Choose**.
 
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}If the Design contains only the default Frame, the
+![](/assets/user-guide/media/image38.jpg)
+If the Design contains only the default Frame, the
 default Frame will be deleted when the images are imported.
 The Frames will be imported in alphabetical order, in rows from left
 to right, starting at the top right of the Design canvas. You can set
 the number of Frames in each row in the Preferences menu (under
 CogTool on the Mac; under File in Windows).
-![](/assets/user-guide/media/image53.png){width="0.25333333333333335in"
-height="0.2966666666666667in"} If you have a lot of images you wish to
+![](/assets/user-guide/media/image53.png)
+ If you have a lot of images you wish to
 import, consider beginning their names with numbers ordering them in
 the way you want them to appear in your Design. If there are more than
 9 and less than 100, name them 01\_ImageName1, 02\_ImageName2,
 03\_ImageName3, etc.
-![](/assets/user-guide/media/image54.png){width="5.083334426946632in"
-height="2.5966666666666667in"}
+![](/assets/user-guide/media/image54.png)
+
 Figure 4-11: The Design window after 11 frames have been imported. The
 Frames are imported in alphabetical order and the preferences were set
 to import 5 frames in each row.
-![](/assets/user-guide/media/image55.jpg){width="0.36760608048993876in"
-height="0.33819772528433945in"}The number of Frames in each row of the
+![](/assets/user-guide/media/image55.jpg)
+The number of Frames in each row of the
 Design window created by importing can be set in the Preferences
 dialog box (under the CogTool menu on a Mac; under File in Windows).
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} The Preferences dialog box contains a
+![](/assets/user-guide/media/image17.jpg)
+ The Preferences dialog box contains a
 button for accessing re search commands. These are undocumented,
 untested, and unvali-
 dated. Explore at your own risk .
@@ -583,8 +583,8 @@ To create a Frame Template of Widgets
 -   Create new Frames, and each of them will be pre-populated with the
     Widgets in the template.
 
-![](/assets/user-guide/media/image56.png){width="2.626061898512686in"
-height="3.518413167104112in"}
+![](/assets/user-guide/media/image56.png)
+
 
 Figure 4-12: All the Widgets that represent the hard keys on this
 cellphone have been selected and, from the Modify menu, the designer
@@ -624,11 +624,11 @@ OR
 -   Double-click the Frame's name. The Frame title bar turns light blue
     when the name can be changed.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"}A Frame name must be unique within a
+![](/assets/user-guide/media/image17.jpg)
+A Frame name must be unique within a
 Design.
-![](/assets/user-guide/media/image57.png){width="0.35333333333333333in"
-height="0.3566666666666667in"}Text in CogTool's item names must be
+![](/assets/user-guide/media/image57.png)
+Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
@@ -656,8 +656,8 @@ To move a Frame in fractional increments, use **Nudge**:
 |                  |     keyboard to move the Frame.                  |
 |                  |                                                  |
 |                  | ![](./                                         |
-|                  | /media/image17.jpg){width="0.2699704724409449in" |
-|                  | height="0.2699704724409449in"}To reduce        |
+|                  | /media/image17.jpg) |
+|                  | To reduce        |
 |                  | confusion, move the Frames apart so they are   |
 |                  | not overlapping or stacked.                    |
 |                  |                                                  |
@@ -683,8 +683,8 @@ To move a Frame in fractional increments, use **Nudge**:
 |                  | clipboard, ready to be pasted.                   |
 +------------------+--------------------------------------------------+
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} **W**hen you copy a Frame, only the
+![](/assets/user-guide/media/image17.jpg)
+ **W**hen you copy a Frame, only the
 contents of the Frame are copied; Transitions are not. If you want to
 preserve Transitions,
 use the **Duplicate** command.
@@ -712,8 +712,8 @@ To copy one or more Frames:
 | **Win:** CTRL+D | "LastFrame\[1\]").                              |
 |                 |                                                 |
 |                 | ![](.                                           |
-|                 | //media/image17.jpg){width="0.2699704724409449in" |
-|                 | height="0.2699704724409449in"}You can paste     |
+|                 | //media/image17.jpg) |
+|                 | You can paste     |
 |                 | frames into any Design. You can paste frames    |
 |                 | into the Design you just copied them from       |
 |                 | (similar to **Duplicate**), into a different    |
@@ -734,15 +734,15 @@ To copy one or more Frames:
 |                 |     disappear.                                    |
 |                 |                                                   |
 |                 | ![](.                                           |
-|                 | //media/image17.jpg){width="0.2699704724409449in" |
-|                 | height="0.2699704724409449in"}If you have       |
+|                 | //media/image17.jpg) |
+|                 | If you have       |
 |                 | already demonstrated your Design, you will have |
 |                 | to redo your Demonstration after deleting       |
 |                 | Frames that are used in the Demonstration.      |
 |                 |                                                 |
 |                 | ![](.                                           |
-|                 | //media/image17.jpg){width="0.2699704724409449in" |
-|                 | height="0.26996937882764654in"}Deleting a Frame |
+|                 | //media/image17.jpg) |
+|                 | Deleting a Frame |
 |                 | has the same effect as cutting a Frame, except  |
 |                 | that the Frame is not on the clipboard and      |
 |                 | cannot then be pasted.                          |
@@ -815,8 +815,8 @@ To edit a Frame, do one of the following:
 |                          |     window.                              |
 |                          |                                          |
 |                          | ![](/assets/user-guide/media/i                         |
-|                          | mage17.jpg){width="0.2699704724409449in" |
-|                          | height="0.26996937882764654in"}        |
+|                          | mage17.jpg) |
+|                          |         |
 |                          | default size. **Zoom to Fit** makes    |
 |                          | the contents of a Frame fit the        |
 |                          | **Normal Zoom** makes the contents of  |
@@ -854,8 +854,8 @@ From the Frame window:
 |                 | formats.                                          |
 | **Win:**        |                                                   |
 |                 | ![](./                                          |
-| CTRL+SHIFT+B    | /media/image40.png){width="0.25333333333333335in" |
-|                 | height="0.29333333333333333in"}On Windows, you  |
+| CTRL+SHIFT+B    | /media/image40.png) |
+|                 | On Windows, you  |
 | **Mac:** W      | can also paste images from the clipboard into   |
 |                 | your Frame.                                     |
 |                 |                                                   |
@@ -919,8 +919,8 @@ on a reasonable path to this goal, Maps, All Places, and Museums, so
 the UI designer need only place Widgets for those three buttons and
 leave all the rest unspecified until other tasks become important in
 the investigation.
-![](/assets/user-guide/media/image58.png){width="3.373840769903762in"
-height="3.3895702099737535in"}
+![](/assets/user-guide/media/image58.png)
+
 Figure 4-13: This Frame canvas shows a background image of the PalmVx
 running the
 ChoiceWay New York City Guide . Three standard button widgets have
@@ -1028,35 +1028,35 @@ To create a Widget
 **Win:** CTRL+SHIFT+I • From the **Create** menu, choose **New Widget**.
 
 cut keys, a square Widget will be placed in the upper left corner of
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} When you use the New Widget command
+![](/assets/user-guide/media/image17.jpg)
+ When you use the New Widget command
 from the menu or short-
 the Frame. You can move and resize the Widget as appropriate for your
 interface.
-![](/assets/user-guide/media/image59.png){width="0.25333333333333335in"
-height="0.29333333333333333in"} It is much more efficient to select a
+![](/assets/user-guide/media/image59.png)
+ It is much more efficient to select a
 Widget tool and then draw it on the canvas where you want it instead
 of using the **New Widget** command. (We included the New Widget
 command only for discoverability and compatibility with other similar
 systems; nobody we know uses it!)
 selected for all new Widgets until you change it, so you only have
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} When you select the Standard or Custom
+![](/assets/user-guide/media/image17.jpg)
+ When you select the Standard or Custom
 radio button, it stays
 to select it once for you entire Design if you do not need to mix
 modes. Standard is selected by default.
 The appearance of a new Widget is determined by its type, so please
 see the subsequent sections for the specific appearance and next steps
 for creating different types of Widgets.
-![](/assets/user-guide/media/image53.png){width="0.25333333333333335in"
-height="0.2966666666666667in"} When you have the same Widget on
+![](/assets/user-guide/media/image53.png)
+ When you have the same Widget on
 different Frames in a Design, prepare that widget completely in one
 Frame and then copy and paste it into all other Frames that need it.
 This will save you effort and also make CogTool's predictions more
 accurate because CogTool will know that it is exactly the same Widget
 with the same name, size and position on each Frame.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Widgets can only be rectangles. This is
+![](/assets/user-guide/media/image17.jpg)
+ Widgets can only be rectangles. This is
 an approximation that is sufficient for making predictions of human
 performance..
 4.3.3.2 Naming a Widget and Entering its Display Label
@@ -1091,27 +1091,27 @@ and changing the text in Widget Name or Display Label fields in the
 Properties pane. (see Figure 4-14) You can also change the Display Label
 by double-clicking on the Widget, which brings up an editable text box.
 
-![](/assets/user-guide/media/image60.png){width="0.25333333333333335in"
-height="0.2966666666666667in"} When not using Display Labels, we
+![](/assets/user-guide/media/image60.png)
+ When not using Display Labels, we
 suggest that you change the Name default to a more meaningful name so
 that when it appears in elsewhere in the system or in exported files,
 you can associate it with something more meaningful than "Widget 1."
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} You cannot change the size, type, or
+![](/assets/user-guide/media/image17.jpg)
+ You cannot change the size, type, or
 appearance of the font in the
 
 Display Label. The underlying cognitive model gives valid predictions
 of the performance time of skilled users no matter what the font looks
 like (just as skilled human users would have learned the procedures no
 matter what the font).
-![](/assets/user-guide/media/image61.jpg){width="4.63869094488189in"
-height="2.4823982939632545in"}
+![](/assets/user-guide/media/image61.jpg)
+
 
 Figure 4-14: This Widget has been named "Museums."
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Some words that are commonly used in
+![](/assets/user-guide/media/image17.jpg)
+ Some words that are commonly used in
 Button Names and Dis play Labels have special meaning to CogTool. They
 signal termination of a Task, which has been shown by prior psychology
 research to effect people's behavior. These words are: Cancel, Yes,
@@ -1121,8 +1121,8 @@ CogTool will make different human performance predictions than if it
 is something slightly different (e.g., "OKbutton" instead of "OK"). Be
 sure to use one of these exact words as the button's Name or Display
 Label if it does indeed function as the terminator of a task.
-![](/assets/user-guide/media/image38.jpg){width="0.3506342957130359in"
-height="0.3506353893263342in"}Text in CogTool's item names must be
+![](/assets/user-guide/media/image38.jpg)
+Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
@@ -1159,8 +1159,8 @@ CTRL+SHIFT+C A color-picker appears.
 
 • Choose the color you want from the color-picker. All widgets in that
 frame change to the new color.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} The Widget Layer color has no bearing
+![](/assets/user-guide/media/image17.jpg)
+ The Widget Layer color has no bearing
 on the appearance of Widgets when they are exported to HTML.
 4.3.3.4.2 Rendering a Widget Skin
 A Widget skin can be rendered to resemble objects, such as buttons, on
@@ -1175,11 +1175,11 @@ To render a Widget skin:
 -   From the **Modify** menu, choose **Set Design's Widget Skin**.
 
 Design. When you set the skin, it will change all rendered Widgets
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.26996937882764654in"} Rendering is done per Widget, but
+![](/assets/user-guide/media/image17.jpg)
+ Rendering is done per Widget, but
 selecting the skin is done per in the whole Design.
-![](/assets/user-guide/media/image40.png){width="0.25333333333333335in"
-height="0.29333333333333333in"} You can Render all the Widgets in a
+![](/assets/user-guide/media/image40.png)
+ You can Render all the Widgets in a
 Design, or Un-render all Widgets in a Design at once, using the
 **Render All Design's Widgets Skin** or **Un-render All Design's
 Widgets** commands in the Modify menu.
@@ -1190,8 +1190,8 @@ the background image (if any) shows through.
 **Mac OS X & Windows XP:** Each Widget has the appearance of the
 corresponding interactive Widget in the specified OS. These skins are
 opaque, so the background image (if any) does not show through.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} CogTool's skins may not be as
+![](/assets/user-guide/media/image17.jpg)
+ CogTool's skins may not be as
 professional as you would like for the Mac OS X and Windows XP. Try
 them out to see if you like them. You can always capture the
 background of any Widget from a screen shot to get the look you want.
@@ -1208,8 +1208,8 @@ To set an image for a Widget:
 
 -   From the standard Open File Dialog box, choose your file.
 
-![](/assets/user-guide/media/image62.png){width="0.3433333333333333in"
-height="0.3466666666666667in"}Only JPG, PNG, or GIF are acceptable
+![](/assets/user-guide/media/image62.png)
+Only JPG, PNG, or GIF are acceptable
 formats for Widget images.
 You may also choose to have the Widget match the background image of
 the Frame beneath it. You will then be able to maintain a consistent
@@ -1221,15 +1221,15 @@ To capture the image from the Frame's background:
 
 -   From the **Modify** menu, select **Capture Widget Image**.
 
-![](/assets/user-guide/media/image63.jpg){width="2.9305555555555554in"
-height="1.1548982939632546in"}
+![](/assets/user-guide/media/image63.jpg)
+
 
 Figure 4-15: The Museum button has been captured for the Widget from
 the upper right of the Frame background. The Widget has been moved to
 the Graffiti area (a silly thing to do) to illustrate how the captured
 image looks.
-![](/assets/user-guide/media/image64.png){width="0.25333333333333335in"
-height="0.29333333333333333in"} You can use this feature to create
+![](/assets/user-guide/media/image64.png)
+ You can use this feature to create
 entirely new layouts from a screen shot of a Frame. Create a Frame
 with the desired background and place Widgets over all the widgets
 that appear in the background. Capture the background for each Widget.
@@ -1241,8 +1241,8 @@ To remove the image from a Widget:
 
 -   From the **Modify** menu, select **Remove Widget Image**.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Removing the Widget image will not
+![](/assets/user-guide/media/image17.jpg)
+ Removing the Widget image will not
 remove the background image on the Frame, if there is one.
 4.3.3.5 Moving and Aligning Widgets
 Most Widgets can be moved by selecting them, then clicking and
@@ -1292,8 +1292,8 @@ To layer Widgets:
     desired layering command.
 
 tions and demonstrating tasks (see **Chapter 5: Quantitative**
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Drawing overlapping Widgets has
+![](/assets/user-guide/media/image17.jpg)
+ Drawing overlapping Widgets has
 implications for defining Transi**Analysis** for more information
 about).
 4.3.3.7 Resizing Widgets
@@ -1304,8 +1304,8 @@ To resize a Widget:
 -   Resize by clicking-and-dragging in the small white boxes at the
     corner of the Widget.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Resizing of complex Widgets may be more
+![](/assets/user-guide/media/image17.jpg)
+ Resizing of complex Widgets may be more
 complex; it will be discussed in the sections about those types of
 Widget.
 4.3.3.8 Cutting, Copying and Pasting Widgets
@@ -1334,8 +1334,8 @@ To cut one or more Widgets:
 |                 | to be pasted.                                   |
 +-----------------+---------------------------------------------------+
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} **W**hen you cut or copy a Widget, only
+![](/assets/user-guide/media/image17.jpg)
+ **W**hen you cut or copy a Widget, only
 the contents of the Widget are copied; Transitions from that Widget
 are not. If you want to preserve Transitions, use the **Duplicate**
 command.
@@ -1494,11 +1494,11 @@ This creates new Widgets at the point you released the mouse button,
 with the same Display Labels, but named with unique suffixes (e.g.
 "LastFrame\[1\]"). to the lower right of the original Widget and is
 given a new unique
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} When you duplicate a Widget, an
+![](/assets/user-guide/media/image17.jpg)
+ When you duplicate a Widget, an
 identically sized Widget appears suffix.
-![](/assets/user-guide/media/image65.png){width="0.35333333333333333in"
-height="0.3566666666666667in"}Text in CogTool's item names must be
+![](/assets/user-guide/media/image65.png)
+Text in CogTool's item names must be
 within the ASCII printable character set. See
 [http://en.wikipedia.org/wiki/ASCII\#ASCII\_
 printable\_characters](http://act-r.psy.cmu.edu/) for the list of
@@ -1521,8 +1521,8 @@ To create a Frame Template of Widgets
 -   Create new Frames, and each of them will be pre-populated with the
     Widgets in the template.
 
-![](/assets/user-guide/media/image56.png){width="2.626061898512686in"
-height="3.518413167104112in"}
+![](/assets/user-guide/media/image56.png)
+
 
 Figure 4-16: All the Widgets that represent the hard keys on this
 cellphone have been selected and, from the Modify menu, the designer
@@ -1536,12 +1536,12 @@ To clear the Frame Template so your new Frames can be created empty,
 
 #### 4.3.4 Simple Widgets: Links, Graffiti®, and Non-Interactive
 
-![](/assets/user-guide/media/image66.png){width="0.25666666666666665in"
-height="0.21333333333333335in"} Link Widget tool
-![](/assets/user-guide/media/image67.png){width="0.25666666666666665in"
-height="0.21333442694663168in"} Graffiti® Widget tool
-![](/assets/user-guide/media/image68.png){width="0.25666666666666665in"
-height="0.21333333333333335in"} Non-interactive Widget tool
+![](/assets/user-guide/media/image66.png)
+ Link Widget tool
+![](/assets/user-guide/media/image67.png)
+ Graffiti® Widget tool
+![](/assets/user-guide/media/image68.png)
+ Non-interactive Widget tool
 Links, Graffiti®, and Non-interactive Widgets are the simplest type of
 Widgets. Their Standard mode of creation and their Custom mode of
 creation are the same, and the only settable properties are their
@@ -1570,10 +1570,10 @@ thought when using these Widgets
 
 #### 4.3.5 Moded Widgets: Buttons and Checkboxes
 
-![](/assets/user-guide/media/image69.png){width="0.25666666666666665in"
-height="0.21in"} Button Widget tool
-![](/assets/user-guide/media/image70.png){width="0.25666666666666665in"
-height="0.21333333333333335in"} Checkbox Widget tool
+![](/assets/user-guide/media/image69.png)
+ Button Widget tool
+![](/assets/user-guide/media/image70.png)
+ Checkbox Widget tool
 Buttons and Checkboxes are moded Widgets, in that, when they are
 created as Standard Widgets, they can be in one of two states. Buttons
 can be defined so they can be toggled (selected and not-selected);
@@ -1584,15 +1584,15 @@ pane.
 Except for setting state, Buttons and Checkboxes respond to all the
 common actions on Widgets, as described in a previous section.
 state with custom Buttons and Checkboxes, you would have to
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Custom Buttons and Checkboxes do not
+![](/assets/user-guide/media/image17.jpg)
+ Custom Buttons and Checkboxes do not
 have state. To simulate
 have different images (one selected and one un-selected) on different
 Frames, with click transitions to move between those Frames. Standard
 Buttons and Checkboxes do this behavior for you.
 4.3.5.1 Buttons
-![](/assets/user-guide/media/image71.jpg){width="0.375in"
-height="0.3611111111111111in"} Button Widget tool
+![](/assets/user-guide/media/image71.jpg)
+ Button Widget tool
 After creating a Button Widget in standard mode, its Widget properties
 pane will appear. At the bottom of this pane is a check box
 determining whether this button should toggle or not. If you check
@@ -1606,8 +1606,8 @@ made toggleable and but not initially selected.
 When rendered in one of the operating system skins, the Button will
 look different when it is selected or not selected. (It will not look
 different rendered in wire frame or when not rendered.)
-![](/assets/user-guide/media/image73.jpg){width="3.143203193350831in"
-height="0.8881069553805774in"}
+![](/assets/user-guide/media/image73.jpg)
+
 Figure 4-18: Two toggleable buttons, rendered with the Mac OSX skin.
 The one on the left is selected; the one on the right is. When
 selected, the button appears depressed, whereas the un-selected button
@@ -1623,14 +1623,14 @@ different (e.g., "OK-button" instead of "OK"). Be sure to use one of
 these exact words as the button's Name or Display Label if it does
 indeed function as the terminator of a task.
 4.3.5.2 Checkboxes
-![](/assets/user-guide/media/image74.jpg){width="0.3611111111111111in"
-height="0.3611111111111111in"} Checkbox Widget tool Checkbox Widgets
+![](/assets/user-guide/media/image74.jpg)
+ Checkbox Widget tool Checkbox Widgets
 are always moded; they can be checked (selected) or unchecked (not
 selected). In the Widgets property pane of a Checkbox Widget, set the
 inital state of the Widget with the Inially-Selected chackbox at the
 bottom of the pane.
-![](/assets/user-guide/media/image75.jpg){width="1.830495406824147in"
-height="2.2517399387576553in"}
+![](/assets/user-guide/media/image75.jpg)
+
 Figure 4-19: Checkbox Widgets can be initially selected (checked).
 The biggest advantages of using standard Checkboxes is realized when
 you render them and use Display Labels. When rendered, a box is put to
@@ -1638,16 +1638,16 @@ the left of the Display Label to act as the Checkbox. A rendered
 Checkbox will look different when it is selected or not selected. It
 will have a check or X in it when selected, depending on which skin is
 used for rending.
-![](/assets/user-guide/media/image76.jpg){width="2.1614435695538057in"
-height="1.0128947944006998in"}
+![](/assets/user-guide/media/image76.jpg)
+
 Figure 4-20: Two Checkboxes, rendered with the Mac OSX skin. The one
 on the top is not selected; the one on the bottom is.
 4.3.5.2.1 Creating Checkbox Widgets
 In many interfaces, Checkboxes are aligned vertically in one or more
 columns.. Therefore, CogTool makes it easy to create a set of aligned
 Checkbox Widgets.
-![](/assets/user-guide/media/image74.jpg){width="0.3611111111111111in"
-height="0.3611111111111111in"}To create a set of Checkbox Widgets.
+![](/assets/user-guide/media/image74.jpg)
+To create a set of Checkbox Widgets.
 
 -   From the toolbar, select the Checkbox tool
 
@@ -1655,8 +1655,8 @@ height="0.3611111111111111in"}To create a set of Checkbox Widgets.
     contain the Checkbox square and the longest Display Label in the set
     of Checkboxes.
 
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} At this point, you are not sizing the
+![](/assets/user-guide/media/image77.jpg)
+ At this point, you are not sizing the
 area that will be occupied by the entire set of checkboxes; You are
 sizing only the single Checkbox that has the longest Display Label.
 
@@ -1670,29 +1670,29 @@ sizing only the single Checkbox that has the longest Display Label.
 -   Pressing the Enter key will create the first Checkbox and move the
     cursor to the Checkbox below the first.
 
-![](/assets/user-guide/media/image79.png){width="1.2066666666666668in"
-height="0.49333333333333335in"}
+![](/assets/user-guide/media/image79.png)
+
 
 -   Continue to label the Checkboxes by typing in the white box and
     hitting Enter to get to the next Checkbox. This creates a column of
     Checkboxes.
 
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} Checkboxes can be a column of items or
+![](/assets/user-guide/media/image77.jpg)
+ Checkboxes can be a column of items or
 a grid of items comprised of rows and columns. To create a second
 column of items, navigate to the Checkbox Widget in the top of the
 column using the arrow keys (or clicking on it), then press the right
 arrow key on the keyboard, and type the label in the white box that
 appears to the right of the top Checkbox Widget.
-![](/assets/user-guide/media/image80.jpg){width="1.84375in"
-height="1.1041666666666667in"}
+![](/assets/user-guide/media/image80.jpg)
+
 
 -   The checkbox image is inserted into the Checkbox Widget when the
     Widget is rendered (check **Render Widget Skin** in the Widget
     properties pane).
 
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} The checkbox image size is determined
+![](/assets/user-guide/media/image77.jpg)
+ The checkbox image size is determined
 by the size of the checkbox Widget. The size of the checkbox image
 itself can not be changed manually. However, you can use a background
 button image to get a box of the desired size if you like.
@@ -1702,8 +1702,8 @@ Figure 4-21 The Frame window with a set of Checkbox Widgets. The
 appear on the Widget (this example has the Mac skin set for the
 design). The first checkbox is initially selected, because that box is
 selected at the bottom of the Widget Properties pane.
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} You cannot reorder the individual
+![](/assets/user-guide/media/image77.jpg)
+ You cannot reorder the individual
 Checkbox Widgets after you have created the set. If you want to change
 the order of the Checkbox Widgets, you will have to retype the
 information in the Displayed Label field on the Widget or in the
@@ -1723,8 +1723,8 @@ or a set of check boxes).
 -   Grab the line and move it to wherever you want the Widgets to be
     placed.
 
-![](/assets/user-guide/media/image82.jpg){width="5.556953193350831in"
-height="1.054961723534558in"}
+![](/assets/user-guide/media/image82.jpg)
+
 Figure 4-22: A progression of checkboxes being arranged. At the left,
 the user selected the Widget called "item 4", which highlighted it and
 showed the bold blue lines on the top and left. The user grabs the
@@ -1734,8 +1734,8 @@ moves it down, resulting in the arrangement on the right.
 
 #### 4.3.6 Radio Buttons: A Set of Widgets Working Together
 
-![](/assets/user-guide/media/image83.png){width="0.25666666666666665in"
-height="0.21in"} Radio Button Widget tool
+![](/assets/user-guide/media/image83.png)
+ Radio Button Widget tool
 Standard Radio Buttons are created as a set and CogTool enforces that
 only one of them can be selected at any time. (If you create Radio
 Buttons in custom mode, you must manage that behavior yourself with
@@ -1752,15 +1752,15 @@ depending on which skin is used for rending.
 To create a set of Radio Button Widgets:
 
 -   From the toolbar, select the Radio Button tool
-    ![](/assets/user-guide/media/image84.png){width="0.25666666666666665in"
-    height="0.21333333333333335in"}
+    ![](/assets/user-guide/media/image84.png)
+    
 
 -   Drag a rectangle across an area of the open Frame large enough to
     contain the Radio Button circle and the longest Display Label in the
     set of Radio Buttons.
 
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} At this point, you are not sizing the
+![](/assets/user-guide/media/image77.jpg)
+ At this point, you are not sizing the
 area that will be occupied by the entire set of radio buttons,; You
 are sizing only a single Radio Button that has the longest Display
 Label.
@@ -1770,35 +1770,35 @@ Label.
     Display Label for the first radio button and it will appear in the
     white box that appears on the Widget.
 
-![](/assets/user-guide/media/image85.png){width="1.5166666666666666in"
-height="0.6233333333333333in"}
+![](/assets/user-guide/media/image85.png)
+
 
 -   Pressing the Enter key will create the first Radio Button and move
     the cursor to the Radio Button below the first.
 
-![](/assets/user-guide/media/image86.png){width="1.2066666666666668in"
-height="0.493332239720035in"}
+![](/assets/user-guide/media/image86.png)
+
 
 -   Continue to label the Radio Buttons by typing in the white box and
     hitting Enter to get to the next Radio Button. This creates a column
     of Radio Buttons.
 
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} Radio buttons can be a column of items
+![](/assets/user-guide/media/image77.jpg)
+ Radio buttons can be a column of items
 or a grid of items comprised of rows and columns. To create a second
 column of items, navigate to the radio button Widget in the top of the
 column using the arrow keys (or clicking on it), then press the right
 arrow key on the keyboard, and type the label in the white box that
 appears to the right of the top Radio Button Widget.
-![](/assets/user-guide/media/image80.jpg){width="1.84375in"
-height="1.1041666666666667in"}
+![](/assets/user-guide/media/image80.jpg)
+
 
 -   The radio button image is inserted into the radio button Widget when
     the Widget is rendered (check **Render Widget Skin** in the Widget
     properties pane).
 
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} The radio button image size is
+![](/assets/user-guide/media/image77.jpg)
+ The radio button image size is
 determined by the size of the radio button Widget. The size of the
 radio button image itself can not be changed manually. However, you
 can use a background button image to get a radio button of the desired
@@ -1808,15 +1808,15 @@ size.
     that item from the **Initially Selected Item** pull-down list on the
     property pane of any of the Radio Buttons in the set.
 
-![](/assets/user-guide/media/image87.png){width="4.297339238845145in"
-height="2.7513068678915134in"}
+![](/assets/user-guide/media/image87.png)
+
 Figure 4-23: The Frame window with a set of radio button Widgets,
 rendered with the
 Macintosh skin. The **Render Widget Skin** checkbox must be selected
 for the radio buttons to appear on the Widget. Item 1 is the
 **Initially Selected Item.**
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} You cannot reorder the individual radio
+![](/assets/user-guide/media/image77.jpg)
+ You cannot reorder the individual radio
 button Widgets after you have created the set. If you want to change
 the order of the buttons, you will have to retype the information in
 the Displayed Label field on the Widget or in the Widget Properties
@@ -1836,8 +1836,8 @@ buttons or set of check boxes).
 -   Grab the line and move it to wherever you want the Widgets to be
     placed.
 
-![](/assets/user-guide/media/image88.jpg){width="5.556953193350831in"
-height="0.7668832020997375in"}
+![](/assets/user-guide/media/image88.jpg)
+
 Figure 4-24: A progression of Radio Buttons being arranged. At the
 left, the user selected the Widget called "radio 5", which highlighted
 it and showed the bold blue lines on the top and left. The user grabs
@@ -1847,8 +1847,8 @@ and moves it down, resulting in the arrangement on the right.
 
 #### 4.3.7 List Boxes: Widgets Combined to Make a Whole
 
-![](/assets/user-guide/media/image89.jpg){width="0.25in"
-height="0.20833333333333334in"} List Box Widget tool
+![](/assets/user-guide/media/image89.jpg)
+ List Box Widget tool
 A standard List Box is created as a set of items combined into one
 List Box that is automatically aligned and can move together as one
 Widget. CogTool does not yet have the capability of making List Box
@@ -1864,14 +1864,14 @@ when you use Display Labels.
 4.3.7.1 Creating a List Box
 To create a list box:
 
--   Select the list box icon ![](/assets/user-guide/media/image89.jpg){width="0.25in"
-    height="0.20833333333333334in"} from the Widget toolbar.
+-   Select the list box icon ![](/assets/user-guide/media/image89.jpg)
+     from the Widget toolbar.
 
 -   Drag a rectangle across an area of the Frame large enough to contain
     the longest Display Label in list.
 
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} At this point, you are not sizing the
+![](/assets/user-guide/media/image77.jpg)
+ At this point, you are not sizing the
 area that will be occupied by the entire list; You are sizing only a
 single List Box item that has the longest Display Label.
 
@@ -1880,14 +1880,14 @@ single List Box item that has the longest Display Label.
     Display Label for the first item and it will appear in the white box
     that appears on the Widget.
 
-![](/assets/user-guide/media/image90.jpg){width="1.5602777777777779in"
-height="0.9227449693788277in"}
+![](/assets/user-guide/media/image90.jpg)
+
 
 -   Pressing the Enter key will create the first list item and move the
     cursor to the list item below the first.
 
-![](/assets/user-guide/media/image91.jpg){width="1.4977077865266841in"
-height="0.9339643482064742in"}
+![](/assets/user-guide/media/image91.jpg)
+
 
 -   Continue to label the items by typing in the white box and hitting
     Enter to get to the next item, until all the items in that part of
@@ -1895,8 +1895,8 @@ height="0.9339643482064742in"}
     entered.
 
 it than are visible at any one time, you can simulate that by having
-![](/assets/user-guide/media/image92.png){width="0.25333333333333335in"
-height="0.2966666666666667in"} If the real List Box you are trying to
+![](/assets/user-guide/media/image92.png)
+ If the real List Box you are trying to
 represent has more items in
 only the first visible lines in the List Box on the first Frame, put a
 custom Button Widget that looks like a down-scroll arrow next to the
@@ -1914,8 +1914,8 @@ To change the order of a List Box item:
 -   Drag the List Box item to a new location within the same List Box
     Widget or to another List Box Widget.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.26996937882764654in"} When you drag a Widget, an outline of
+![](/assets/user-guide/media/image17.jpg)
+ When you drag a Widget, an outline of
 the Widget and a bold black position indicator will appear. Drag the
 Widget until the
 position indicator is at the desired location, then release. In the
@@ -1923,8 +1923,8 @@ figure below, List item 3 is being moved up to be btween List item 1
 and 2. The thin black outline (shown intersecting the labels of List
 item 1 and 2) moves as you drag the widget and the bold black line
 indicates where it will be placed.
-![](/assets/user-guide/media/image93.jpg){width="1.5675in"
-height="1.2440474628171478in"}
+![](/assets/user-guide/media/image93.jpg)
+
 4.3.7.3 Moving List Box Widgets
 To move a List Box Widget:
 
@@ -1938,8 +1938,8 @@ A bold gray outline will appear around the entire List Box Widget.
 
 #### 4.3.8 Pull-Down Lists: More Complex Behavior
 
-![](/assets/user-guide/media/image94.png){width="0.25666666666666665in"
-height="0.21333333333333335in"} Pull-Down List Header Widget tool
+![](/assets/user-guide/media/image94.png)
+ Pull-Down List Header Widget tool
 Like the List-Box Widget, a standard Pull-Down List Widget is created
 as a set of items combined into one Pull-Down List that is
 automatically aligned and can move together as one Widget. In
@@ -1958,14 +1958,14 @@ To create a Pull-Down List Widget, follow steps very similar to
 creating a List Box Widget:
 
 -   Select the Pull-Down Header List tool
-    ![](/assets/user-guide/media/image95.png){width="0.25333333333333335in"
-    height="0.21333333333333335in"} from the Widget toolbar.
+    ![](/assets/user-guide/media/image95.png)
+     from the Widget toolbar.
 
 -   Drag a rectangle across an area of the Frame large enough to contain
     the longest Display Label in the Pull-Down List.
 
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} Make the rectangle wide enough to
+![](/assets/user-guide/media/image77.jpg)
+ Make the rectangle wide enough to
 contain the Pull-Down List item that has the longest Display Label.
 
 -   A Widget appear that has one highlighted Widget (in orange, below)
@@ -1973,11 +1973,11 @@ contain the Pull-Down List item that has the longest Display Label.
     Display Label for the first item and it will appear in the white box
     that appears on the Widget.
 
-![](/assets/user-guide/media/image96.png){width="0.9366666666666666in"
-height="0.6233333333333333in"}
+![](/assets/user-guide/media/image96.png)
+
 header of the list rather than a member of the list itself. As soon
-![](/assets/user-guide/media/image77.jpg){width="0.2552088801399825in"
-height="0.2552088801399825in"} The first item of a Pull-Down List
+![](/assets/user-guide/media/image77.jpg)
+ The first item of a Pull-Down List
 Widget is special. It acts as a
 as a member of the list is selected, this header will disappear from
 the user's view of the list. First items tend to be something like
@@ -1988,8 +1988,8 @@ from this pull-down list.
 -   Pressing the Enter key will create the first list item and move the
     cursor to the list item below the first.
 
-![](/assets/user-guide/media/image97.png){width="1.2066666666666668in"
-height="0.63in"}
+![](/assets/user-guide/media/image97.png)
+
 
 -   Continue to label the items by typing in the white box and hitting
     Enter to get to the next item, until all the items in that part of
@@ -1999,8 +1999,8 @@ height="0.63in"}
     (header) item, when you stop typing and click anywhere else in the
     Frame window, e.g., on the Widget properties pane.
 
--   ![](/assets/user-guide/media/image98.jpg){width="0.2552088801399825in"
-    height="0.2647790901137358in"}You can determine which list item
+-   ![](/assets/user-guide/media/image98.jpg)
+    You can determine which list item
     appears when the Pull-Down List Widget is contracted by choosing
     that item from the **Initially Selected Item** pull-down list at the
     bottom of the Widget's property pane (See Figure 4-25). If you leave
@@ -2023,20 +2023,20 @@ To change the order of a Pull-Down List item:
 -   Drag the desired Pull-Down List item to a new location within the
     same PullDown List Widget or to another Pull-Down List Widget.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} When you drag a Pull-Down List item, an
+![](/assets/user-guide/media/image17.jpg)
+ When you drag a Pull-Down List item, an
 outline of the item and a bold black position indicator will appear.
 Drag the item until the position indicator is at the desired location,
 then release. (See Figure 4-26).
-![](/assets/user-guide/media/image98.jpg){width="0.2552088801399825in"
-height="0.2647790901137358in"} list items cannot be dragged on top of
+![](/assets/user-guide/media/image98.jpg)
+ list items cannot be dragged on top of
 the header. If you try to The first item of a Pull-Down List Widget
 acts as a header. Other
 drag and item above the header, the cursor will change to a slashed
 circle to indicate that you cannot do that action. If you want to
 change the header, type in a new word in the header Display Label.
-![](/assets/user-guide/media/image100.png){width="2.2133333333333334in"
-height="1.46in"}
+![](/assets/user-guide/media/image100.png)
+
 Figure 4-26: Pull-down list item 2 is selected for reordering, drag it
 until the bold black line is in the position you want, then release.
 4.3.8.3 Moving Pull-Down List Widgets
@@ -2081,34 +2081,34 @@ submenus, and menu items. You can create menus that are always
 visible, like the ones at the top of the screen in a Mac or at the top
 of windows in Windows, or context menus that pop-up at your cursor.
 4.3.9.1.1 Creating Menus that are Always Visible
-![](/assets/user-guide/media/image101.png){width="0.22666666666666666in"
-height="0.21333442694663168in"} Menu Header Widget tool
+![](/assets/user-guide/media/image101.png)
+ Menu Header Widget tool
 To create a menu system that is always visible:
 
 -   Select the Menu Header tool
-    ![](/assets/user-guide/media/image102.png){width="0.22666666666666666in"
-    height="0.21in"} from the Widget toolbar.
+    ![](/assets/user-guide/media/image102.png)
+     from the Widget toolbar.
 
 -   Drag a rectangle across an area of the open Frame. Try to size this
     first menu header Widget to fit the longest label in the set.
 
 easier if you make the rectangle wide enough to contain the Menu
-![](/assets/user-guide/media/image40.png){width="0.25333333333333335in"
-height="0.29333333333333333in"} Although you can re-size the entire
+![](/assets/user-guide/media/image40.png)
+ Although you can re-size the entire
 menu system later, it will be
 Header that has the longest Display Label.
 
 -   Type you fist menu header into the white box that appears in the
     retangle.
 
-![](/assets/user-guide/media/image103.png){width="2.473333333333333in"
-height="0.9733333333333334in"}
+![](/assets/user-guide/media/image103.png)
+
 
 -   Hit Enter, This creates the File Menu Header and puts your cursor
     into the white box of the first menu item. Type the first menu item.
 
-![](/assets/user-guide/media/image104.png){width="2.5500010936132984in"
-height="1.1566666666666667in"}
+![](/assets/user-guide/media/image104.png)
+
 
 -   Each time you hit Enter, CogTool creates a new menu item (the one
     you just typed in) and a spot to enter the next menu item. So just
@@ -2119,8 +2119,8 @@ height="1.1566666666666667in"}
     keys to navigate to the menu item and out into the white box on the
     right.
 
-![](/assets/user-guide/media/image105.png){width="2.6066666666666665in"
-height="1.5533333333333332in"}
+![](/assets/user-guide/media/image105.png)
+
 
 -   As before, start typing in the top white box and every time you hit
     Enter, CogTool creates a submenu item and new spot for another one.
@@ -2128,8 +2128,8 @@ height="1.5533333333333332in"}
     pointing to the right, to indicate that a submenu is available at
     this menu item.
 
-![](/assets/user-guide/media/image106.jpg){width="2.5963068678915135in"
-height="1.9515102799650044in"}
+![](/assets/user-guide/media/image106.jpg)
+
 
 -   At any time, you can navigate around this menu system either by
     clicking on the menu item you want or navigating to it with the
@@ -2138,8 +2138,8 @@ height="1.9515102799650044in"}
     arrow pointing to the right indicates that its submenu will reappear
     if you select that item again.
 
-![](/assets/user-guide/media/image107.jpg){width="2.6679636920384953in"
-height="1.9646445756780402in"}
+![](/assets/user-guide/media/image107.jpg)
+
 
 -   Navigate up to the menu header (File) and examine the menu
     properties. There is a unique Widget Name automatically assigned by
@@ -2154,27 +2154,27 @@ height="1.9646445756780402in"}
     waits before opening the submenu to 0.0 seconds (typical for a Mac)
     or 0.5 seconds (typical for a PC).
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Each menu header has Hover and 0.0
+![](/assets/user-guide/media/image17.jpg)
+ Each menu header has Hover and 0.0
 seconds chosen by default.
 
 If you do not want the default, you must change each Menu Header
 separately in its property pane.
-![](/assets/user-guide/media/image108.png){width="3.8000010936132984in"
-height="2.8433333333333333in"}
+![](/assets/user-guide/media/image108.png)
+
 
 -   To add more menu headers, navigate back to the top row, and a spot
     for a new header appears to the right. Type the menu header name
     into it and hit Enter, then continue making its menu items as
     before.
 
-![](/assets/user-guide/media/image109.jpg){width="2.654507874015748in"
-height="1.7638888888888888in"}
+![](/assets/user-guide/media/image109.jpg)
+
 
 -   To make a menu separator, type "\-\--" as the menu item.
 
-![](/assets/user-guide/media/image110.jpg){width="2.478799212598425in"
-height="1.326375765529309in"}
+![](/assets/user-guide/media/image110.jpg)
+
 
 -   When you hit Enter, the \-\-- will be turned into a special menu
     item called a Separator, which is indicated by the checkbox under
@@ -2183,22 +2183,22 @@ height="1.326375765529309in"}
     change a Separator back to a regular menu item by un-checking the
     checkbox.
 
-![](/assets/user-guide/media/image111.png){width="5.57in"
-height="2.433333333333333in"}
+![](/assets/user-guide/media/image111.png)
+
 4.3.9.1.2 Creating a Context Menus
-![](/assets/user-guide/media/image112.jpg){width="0.24166666666666667in"
-height="0.21666666666666667in"} Context Menu Widget tool
+![](/assets/user-guide/media/image112.jpg)
+ Context Menu Widget tool
 To create a context menu and its children (submenus and menu items):
 
 -   Select the Context Menu tool
-    ![](/assets/user-guide/media/image112.jpg){width="0.24166666666666667in"
-    height="0.21666666666666667in"} from the Widget toolbar.
+    ![](/assets/user-guide/media/image112.jpg)
+     from the Widget toolbar.
 
 -   Drag a rectangle across an area of the open Frame where a user would
     click to bring up the context menu.
 
-![](/assets/user-guide/media/image55.jpg){width="0.2552088801399825in"
-height="0.2347911198600175in"} Make the rectangle big enough to
+![](/assets/user-guide/media/image55.jpg)
+ Make the rectangle big enough to
 contain the item that will be clicked on to pop-up the context menu.
 If it is a word, then you can use a Display Label in this widget. If
 it is a picture, you can use a background image (either on the Frame
@@ -2215,8 +2215,8 @@ or in this Widget).
     at once after typing them all in. Add submenus as needed to
     prototype your design.
 
-![](/assets/user-guide/media/image113.jpg){width="5.566666666666666in"
-height="2.4624168853893265in"}
+![](/assets/user-guide/media/image113.jpg)
+
 Figure 4-27: The right side (a) shows the behavior we would like to
 prototype, a context menu that comes up if you ctrl-click anywhere on
 the Fiefox toolbox the Mac. The left side (b) shows how it would be
@@ -2236,8 +2236,8 @@ menus.
     indicates selection). The Widget's properties are displayed in the
     properties pane.
 
-![](/assets/user-guide/media/image114.jpg){width="3.7316327646544183in"
-height="1.5916666666666666in"}
+![](/assets/user-guide/media/image114.jpg)
+
 
 -   The File menu header widget is selected in the picture above. The
     thick gray outline around the menu headers when a Menu Header is
@@ -2246,8 +2246,8 @@ height="1.5916666666666666in"}
     Menu Systems). The little white boxes in the corners indicate where
     to grab to re-size the menu headers. (See Re-Sizing Menus).
 
-![](/assets/user-guide/media/image115.png){width="3.736666666666667in"
-height="1.5966666666666667in"}
+![](/assets/user-guide/media/image115.png)
+
 
 -   Save is selected in the picture above. The little white boxes in the
     corners indicate where to grab to re-size the menu items. (See
@@ -2261,10 +2261,10 @@ To select multiple menu headers
     the Widget properties pane does not show the properties of any
     Widget.
 
-![](/assets/user-guide/media/image116.jpg){width="3.78708552055993in"
-height="1.0333333333333334in"}
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} You cannot select multiple menu items,
+![](/assets/user-guide/media/image116.jpg)
+
+![](/assets/user-guide/media/image17.jpg)
+ You cannot select multiple menu items,
 only menu headers. Menu items must be manipulated one at a time.
 When you are creating menu items, the item you are in the middle of
 creating is not selected until you hit Enter (because it doesn't exist
@@ -2274,8 +2274,8 @@ highlighted, and its information is in the properties pane. In the
 picture below, "Delete" has just been typed in, which is indicated by
 the white box surrounded by light blue. But the Paste menu item is
 selected and its properties appear in the properties pane.
-![](/assets/user-guide/media/image117.jpg){width="4.279709098862642in"
-height="2.0694444444444446in"}
+![](/assets/user-guide/media/image117.jpg)
+
 4.3.9.3 Re-sizing Menu Widgets
 To change the size of menu widgets,
 
@@ -2309,25 +2309,25 @@ system:
     indicator is in the location you wish to move the Widget, then
     release.
 
-![](/assets/user-guide/media/image118.jpg){width="2.5881977252843393in"
-height="1.7254647856517935in"}
+![](/assets/user-guide/media/image118.jpg)
+
 Figure 4-28: The Save menu item in being moved up in the menu. Save is
 purple because it is the menu item being moved. The black out line
 moves with your cursor as you drag the menu item around. The black bar
 indicates that if the mouse button were to be released now, the Save
 menu item would appear in between Open and Open Recent.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.26996937882764654in"} Holding the Option key (Mac) or
+![](/assets/user-guide/media/image17.jpg)
+ Holding the Option key (Mac) or
 Control key (Windows) while dragging duplicates the menu item, leaving
 the original in place.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.26996937882764654in"} You can move a menu header and all its
+![](/assets/user-guide/media/image17.jpg)
+ You can move a menu header and all its
 items will move with it.
 
 Likewise, you can move a submenu and all its items will move with it.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} You can move a menu item within its
+![](/assets/user-guide/media/image17.jpg)
+ You can move a menu item within its
 menu (as shown above), or another menu or submenu in the same menu
 system, or even to another menu system in the Frame. When moving menu
 items to menus other than its own, hover over the target menu long
@@ -2357,8 +2357,8 @@ To copy a menu header:
 |                 | -   From the **Edit** menu, choose **Paste**.       |
 +-----------------+-----------------------------------------------------+
 
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}Although you can select individual submenu or menu
+![](/assets/user-guide/media/image38.jpg)
+Although you can select individual submenu or menu
 item Widgets, cannot copy, cut, and paste them. When one of these
 items is selected, the Cut and Copy items in the CogTool Edit menu are
 grayed out and the keyboard shortcuts do not work.
@@ -2369,8 +2369,8 @@ To copy an entire menu system:
     holding Shift while dragging a rectangle across them. Be sure to
     capture all the menu headers you want to copy..
 
-![](/assets/user-guide/media/image119.jpg){width="3.667299868766404in"
-height="1.0477996500437445in"}
+![](/assets/user-guide/media/image119.jpg)
+
 
 +-----------------+---------------------------------------------------+
 |                 | Figure 4-29: Selecting all the menu Widgets in  |
@@ -2382,8 +2382,8 @@ height="1.0477996500437445in"}
 | **Win:** CTRL+C |                                                   |
 +-----------------+---------------------------------------------------+
 
-![](/assets/user-guide/media/image98.jpg){width="0.2552088801399825in"
-height="0.2647790901137358in"} copying any submenu and menu item
+![](/assets/user-guide/media/image98.jpg)
+ copying any submenu and menu item
 Widgets connected to them When you copy all the menu headers in a
 system, you are also
 (thus, the entire menu system).
@@ -2405,17 +2405,17 @@ To cut an entire menu system:
 |                 | -   From the **Edit** menu, choose **Paste**.     |
 +-----------------+---------------------------------------------------+
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} If you select non-contiguous menu
+![](/assets/user-guide/media/image17.jpg)
+ If you select non-contiguous menu
 headers when you copy or cut, the gaps between them will be removed
 when you paste
 
 #### 4.3.10 Working with Text Boxes & Text
 
-![](/assets/user-guide/media/image120.jpg){width="0.20919947506561679in"
-height="0.20919947506561679in"} Text Box Widget tool
-![](/assets/user-guide/media/image121.jpg){width="0.21829615048118986in"
-height="0.20920056867891512in"} Text Widget tool
+![](/assets/user-guide/media/image120.jpg)
+ Text Box Widget tool
+![](/assets/user-guide/media/image121.jpg)
+ Text Widget tool
 Text Box Widgets and Text Widgets are used together to prototype
 interactions with editable text in an interface. Text box Widgets
 typically contain Text Widgets, just as text boxes in an actual
@@ -2429,30 +2429,30 @@ you need. If, however, you need to prototype more sophisticated text
 interactions (e.g. dragging over some text to highlight it, clicking
 before words to add new text, clicking at the end of text to insert
 more, etc.) then you need to use text Widgets as well.
-![](/assets/user-guide/media/image122.png){width="0.3433333333333333in"
-height="0.3466666666666667in"} entering text, then you can use a Text
+![](/assets/user-guide/media/image122.png)
+ entering text, then you can use a Text
 Box Widget alone. If your prototype needs only clicking in an empty
 text box and
-![](/assets/user-guide/media/image39.png){width="0.3433333333333333in"
-height="0.3466666666666667in"} Text Widgets, too, usually inside a
+![](/assets/user-guide/media/image39.png)
+ Text Widgets, too, usually inside a
 Text Box Widget. If your prototype needs to select or edit existing
 text, you must use
 All common operations on simple Widgets apply to Text and Text Box
 Widgets.
 4.3.10.1 Creating a Text Box
-![](/assets/user-guide/media/image120.jpg){width="0.20919947506561679in"
-height="0.20919947506561679in"} Text Box Widget tool
+![](/assets/user-guide/media/image120.jpg)
+ Text Box Widget tool
 To create a text box Widget:
 
 -   Select the text box tool
-    ![](/assets/user-guide/media/image120.jpg){width="0.20920056867891512in"
-    height="0.20919947506561679in"} from the Widget toolbar.
+    ![](/assets/user-guide/media/image120.jpg)
+     from the Widget toolbar.
 
 -   Drag a rectangle across an area of the Frame where you want the text
     box to be.
 
-![](/assets/user-guide/media/image123.jpg){width="4.143562992125984in"
-height="1.5200885826771653in"}
+![](/assets/user-guide/media/image123.jpg)
+
 
 -   If you want this text box to be empty when this Frame is entered,
     then type in a meaningful Widget name for this text box (e.g., as
@@ -2460,19 +2460,19 @@ height="1.5200885826771653in"}
     Label, because this will be displayed inside the text Box Widget, as
     below.
 
-![](/assets/user-guide/media/image124.jpg){width="4.224507874015748in"
-height="1.5438003062117236in"}
-![](/assets/user-guide/media/image18.png){width="0.25333333333333335in"
-height="0.29333333333333333in"} If you want your text box to have
+![](/assets/user-guide/media/image124.jpg)
+
+![](/assets/user-guide/media/image18.png)
+ If you want your text box to have
 content when the prototype enters this frame, then put that content in
 the Display Label. For example, if you are prototyping a web site that
 remembers people's address after they have entered it, the first frame
 with an address text box will not have a Display Label in the Text Box
 Widget, but the second Frame will.
-![](/assets/user-guide/media/image53.png){width="4.795800524934383in"
-height="1.9527504374453193in"}
-![](/assets/user-guide/media/image126.png){width="0.25333333333333335in"
-height="0.32in"} Text boxes Widgets can be any size, and their display
+![](/assets/user-guide/media/image53.png)
+
+![](/assets/user-guide/media/image126.png)
+ Text boxes Widgets can be any size, and their display
 labels can be any number of characters, but CogTool will only show one
 line of text. If your interface requires multiple lines of text,
 create draw a Text Box of the correct size and use multiple Text
@@ -2491,26 +2491,26 @@ and a Text Widget with the text-to-be-edited inside it.
 -   Create a Text Box Widget as shown in the previous section.
 
 -   Select the text tool
-    ![](/assets/user-guide/media/image121.jpg){width="0.20920056867891512in"
-    height="0.20048337707786526in"} from the Widget toolbar.
+    ![](/assets/user-guide/media/image121.jpg)
+     from the Widget toolbar.
 
 -   Drag a rectangle the size of the text you are going to edit. This is
     typically smaller than the Text Box Widget it will be inside. The
     type in the text you want to edit into the Display Label.
 
-![](/assets/user-guide/media/image127.png){width="0.25333333333333335in"
-height="0.2966666666666667in"} It is easier to work with the Text
+![](/assets/user-guide/media/image127.png)
+ It is easier to work with the Text
 Widget if you create it outside the Text Box Widget (se shown below)
 and move it inside afterwards.
-![](/assets/user-guide/media/image128.png){width="4.23in"
-height="1.5466666666666666in"}
+![](/assets/user-guide/media/image128.png)
+
 
 -   Move the Text Widget into the Text Box Widget. You are now ready to
     prototype several ways of changing "Harvey Q. Bovik" to "Harry Q.
     Bovik".
 
-![](/assets/user-guide/media/image129.png){width="4.23in"
-height="1.546667760279965in"}
+![](/assets/user-guide/media/image129.png)
+
 4.3.10.2.1 Place the Cursor, Delete and Type the Right Letters.
 In a real interface, a user might place the cursor between the "e" and
 the "y" in "Harvey", and then delete the "ve" and type "r". To set up
@@ -2524,8 +2524,8 @@ widget between the "e" and the "y" to click on.
     in to
 
 400% to make this widget more visible.)
-![](/assets/user-guide/media/image130.jpg){width="2.842227690288714in"
-height="1.5438003062117236in"}
+![](/assets/user-guide/media/image130.jpg)
+
 Now your Frame has a target for the click that is needed to start this
 method. We will see how this plays out when defining Transitions in
 the next section and demonstrating this task in the next Chapter.
@@ -2543,8 +2543,8 @@ double-click on.
 
 -   Move it to lie on top of "Harvey" in the Text Wdiget.
 
-![](/assets/user-guide/media/image131.jpg){width="4.233854986876641in"
-height="1.5438003062117236in"}
+![](/assets/user-guide/media/image131.jpg)
+
 Now your Frame has a target for the double-click that is needed to
 start this method. We will see how this plays out when defining
 Transitions in the next section and demonstrating this task in the
@@ -2567,16 +2567,16 @@ the name.
 -   Move it to lie in the blank area in the Text Box Widget. This
     creates a target for starting the drag.
 
-![](/assets/user-guide/media/image132.jpg){width="4.204391951006124in"
-height="1.5438003062117236in"}
+![](/assets/user-guide/media/image132.jpg)
+
 
 -   Create a Text Widget the height of the Text Box Widget and the width
     of the area that it would legal to release the mouse button in you
     interface (usually outside of the text box). Give this a meaningful
     name (e.g., "Left\_Of\_Name") and position in the correct place.
 
-![](/assets/user-guide/media/image133.jpg){width="4.204391951006124in"
-height="1.533056649168854in"}
+![](/assets/user-guide/media/image133.jpg)
+
 Now your Frame has a target for the start of the drag and one for the
 end of the drag that will highlight the incorrect name. We will see
 how this plays out when defining Transitions in the next section (see
@@ -2586,8 +2586,8 @@ Designed in Previous Section").
 The interplay of Text Box Widgets and Text Widgets is complex only
 when you need to prototype editable text. Fortunately, many systems
 can be usefully prototyped without simulating editing text..
-![](/assets/user-guide/media/image134.png){width="0.25333333333333335in"
-height="0.3233333333333333in"} Text Widgets can be any size, and their
+![](/assets/user-guide/media/image134.png)
+ Text Widgets can be any size, and their
 display labels can be any number of characters, but CogTool will only
 show one line of
 text. If your interface requires multiple lines of text, use multiple
@@ -2619,8 +2619,8 @@ drawing types of Transitions action types:
 
 +----------------------------------+----------------------------------+
 | ![](.//me                        | = default Transition type        |
-| dia/image135.jpg){width="0.41in" |                                  |
-| height="2.25in"}                 | = mouse action (e.g. clicks and  |
+| dia/image135.jpg) |                                  |
+|                  | = mouse action (e.g. clicks and  |
 |                                  | hover)                           |
 |                                  |                                  |
 |                                  | = keyboard                       |
@@ -2633,8 +2633,8 @@ drawing types of Transitions action types:
 |                                  | = Microphone                     |
 +----------------------------------+----------------------------------+
 
-![](/assets/user-guide/media/image59.png){width="0.25333333333333335in"
-height="0.29333333333333333in"} Because each Widget type has its own
+![](/assets/user-guide/media/image59.png)
+ Because each Widget type has its own
 default set to the most common Transition from that Widget type, and
 because Transition types can be changed from the Transition properties
 pane, most CogTool users find that the default tool (selected by
@@ -2663,8 +2663,8 @@ To create a Transition from a Widget to an existing Frame:
 For example, the picture below shows a transition drawn from a small
 Button Widget at the top of the "Start" Frame (the button is obscured
 by the Transition's end) to the next Frame ("Map1").
-![](/assets/user-guide/media/image136.jpg){width="4.224507874015748in"
-height="1.5544728783902013in"}
+![](/assets/user-guide/media/image136.jpg)
+
 
 -   Examine the Transition Properties pane to make sure it is the
     Transition you intended. Here, we are prototyping a Palm Tungsten-5,
@@ -2679,10 +2679,10 @@ Design canvas that is not occupied by a Frame, as shown below from a
 different Button Widget in the Start Frame. Doing so causes a new
 Frame to be created, which can then be populated with images and
 Widgets.
-![](/assets/user-guide/media/image137.jpg){width="2.8262160979877518in"
-height="1.5438003062117236in"}
-![](/assets/user-guide/media/image138.jpg){width="2.8425524934383204in"
-height="1.5438003062117236in"}
+![](/assets/user-guide/media/image137.jpg)
+
+![](/assets/user-guide/media/image138.jpg)
+
 Transitions can also be drawn to the same Frame by dragging to an area
 of the same Frame outside the Widget that is the source of the
 Transition. The Frame will highlight and the Transition will snap to
@@ -2698,12 +2698,12 @@ with four Frames each showing a more zoomed-in map with single-tap
 transitions between them or you could reduce the number of Frames and
 use a triple-tap self-transition and then a single-tap regular
 transition to the next Frame (shown below).
-![](/assets/user-guide/media/image139.jpg){width="2.8262160979877518in"
-height="1.5474956255468066in"}
-![](/assets/user-guide/media/image140.jpg){width="2.8262160979877518in"
-height="1.5356321084864393in"}
-![](/assets/user-guide/media/image141.jpg){width="4.252097550306211in"
-height="1.9332327209098863in"}
+![](/assets/user-guide/media/image139.jpg)
+
+![](/assets/user-guide/media/image140.jpg)
+
+![](/assets/user-guide/media/image141.jpg)
+
 4.4.2.2 Transitions from an Interactive Widget: Standard Menus,
 Context Menus, and Pull-Down Lists
 Transitions can be drawn from interactive widgets that change their
@@ -2723,8 +2723,8 @@ To create a Transition from a complex Widget:
     drawn from the second item of that menu to an empty part of the
     Design canvas.
 
-![](/assets/user-guide/media/image142.jpg){width="2.8262160979877518in"
-height="1.499861111111111in"}
+![](/assets/user-guide/media/image142.jpg)
+
 
 -   When you release the mouse button on the destination Frame, the
     interactive Widget closes. There can be many Transitions from the
@@ -2732,8 +2732,8 @@ height="1.499861111111111in"}
     emanate from the closed Widget.
 
 Click on the Widget to see the individual Transitions again.
-![](/assets/user-guide/media/image143.jpg){width="2.8262160979877518in"
-height="1.4957797462817148in"}
+![](/assets/user-guide/media/image143.jpg)
+
 
 -   As the above picture shows, mouse Transitions have additional
     options in the Transitions Properties pane. You can set which mouse
@@ -2765,8 +2765,8 @@ To create a Transition from the keyboard
     shift is assumed, so clicking the Shift button followed by a "c" is
     the same as typing "C" into the Text field.
 
-![](/assets/user-guide/media/image144.jpg){width="4.948798118985127in"
-height="2.1484295713035872in"}
+![](/assets/user-guide/media/image144.jpg)
+
 
 -   *If the text the user types is not a command to the system*, that
     is, you are simply typing in text, like a name into a Name field, or
@@ -2797,8 +2797,8 @@ height="2.1484295713035872in"}
     CogTool will parse them correctly and create a plausible cognitive
     model automatically.
 
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}Although it looks like you can change a keyboard
+![](/assets/user-guide/media/image38.jpg)
+Although it looks like you can change a keyboard
 Transition to a mouse Transition at the top of this dialog box, that
 is not the case. You cannot have a mouse Transition from the keyboard
 and the dialog box will gray out if you select the mouse radio button.
@@ -2809,10 +2809,10 @@ and the dialog box will gray out if you select the mouse radio button.
     squares at its ends) and the properties pane will contain the
     properties of the Transition.
 
-![](/assets/user-guide/media/image145.jpg){width="2.529856736657918in"
-height="2.1512882764654417in"}
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}Keyboard transitions that involve many special
+![](/assets/user-guide/media/image145.jpg)
+
+![](/assets/user-guide/media/image38.jpg)
+Keyboard transitions that involve many special
 characters in a row result in predictions of human performance that
 are slower than how skilled computer users actually perform. This is
 because (1) KLM assumes all keystrokes are done in sequence even for
@@ -2825,8 +2825,8 @@ behavior. However, for extremely skilled users of multiple-key
 keyboard shortcuts and navigation keys, or for tasks that are
 extremely short (e.g., "Save the file" is accomplished with a single
 keyboard shortcut command), the predictions will be too slow.
-![](/assets/user-guide/media/image134.png){width="0.25333333333333335in"
-height="0.3233333333333333in"} It is possible to create typing and
+![](/assets/user-guide/media/image134.png)
+ It is possible to create typing and
 voice transitions from a Widget instead of from the Keyboard or
 Microphone Devices. This is is not recommended (because the user is
 not actually typing on the button on the screen or speaking into the
@@ -2845,8 +2845,8 @@ gestures are a command to the system, or data being entered into a
 field. In this case, CogTool does not recognize special characters, so
 all commands must be on separate transitions and explicitly indicated
 with the Is Command checkbox.
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}The only characters CogTool will accept for Graffiti®
+![](/assets/user-guide/media/image38.jpg)
+The only characters CogTool will accept for Graffiti®
 gestures are letters, digits, comma, period, semi-colon, single-quote,
 dash, forward slash, back-slash, equal sign, back-quote and left and
 right square brackets.
@@ -2859,8 +2859,8 @@ of each Transition properties pane, is a text box labeled "Wait for
 system response" and is measured in seconds (sec). The system will
 wait for that number of second after completing the user action and
 before presenting the next Frame.
-![](/assets/user-guide/media/image38.jpg){width="0.3506342957130359in"
-height="0.3506342957130359in"} using digits and a "." to represent the
+![](/assets/user-guide/media/image38.jpg)
+ using digits and a "." to represent the
 decimal point. Numbers can only be entered into CogTool is US format,
 i.e.,
 If you enter a number into this text box, you may then label the
@@ -2902,8 +2902,8 @@ To change the source of a Transition:
     source.
 
 a Widget that can accept the Transition.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} The mouse cursor will change to a
+![](/assets/user-guide/media/image17.jpg)
+ The mouse cursor will change to a
 crosshair when it is pointing at
 To change the destination of a Transition:
 
@@ -2919,8 +2919,8 @@ To delete a Transition:
 -   Select the Transition.
 
 endpoints of the Transition arrow.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} The Transition is selected when a white
+![](/assets/user-guide/media/image17.jpg)
+ The Transition is selected when a white
 square appears at the
 Then do one of the following:
 
@@ -2980,12 +2980,12 @@ from the trash Widget with action type "release" to the second Frame.
 This represent that when the user releases the mouse button on the
 trash icon, the file is now in the trash and it is no longer visible
 on the screen (bottom picture).
-![](/assets/user-guide/media/image146.jpg){width="2.665863954505687in"
-height="1.8465780839895014in"}
-![](/assets/user-guide/media/image147.jpg){width="2.655515091863517in"
-height="1.8465780839895014in"}
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}CogTool does not enforce that "press" and "release"
+![](/assets/user-guide/media/image146.jpg)
+
+![](/assets/user-guide/media/image147.jpg)
+
+![](/assets/user-guide/media/image38.jpg)
+CogTool does not enforce that "press" and "release"
 come in pairs. When demonstrating a task using drag-and-drop, you must
 be careful to demonstrate first the "press" action and then the
 "release" action without any other mouse actions in between.
@@ -3002,12 +3002,12 @@ type "release" to the second Frame. This represent that when the user
 releases the mouse button at the bottom of the scrollbar, the window
 has scrolled and the bottom of the file is now visible (bottom
 picture).
-![](/assets/user-guide/media/image148.jpg){width="2.6979472878390203in"
-height="2.7818438320209973in"}
-![](/assets/user-guide/media/image149.jpg){width="2.6914424759405073in"
-height="2.775in"}
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}CogTool does not enforce that "press" and "release"
+![](/assets/user-guide/media/image148.jpg)
+
+![](/assets/user-guide/media/image149.jpg)
+
+![](/assets/user-guide/media/image38.jpg)
+CogTool does not enforce that "press" and "release"
 come in pairs. When demonstrating scrolling in a wndow, you must be
 careful to demonstrate first the "press" action and then the "release"
 action without any other mouse actions in between.
@@ -3034,10 +3034,10 @@ label, and Keyboard.). There are three transitions (self-transition
 "press" on RightOfName, self-transition "release" in LeftOfName, and a
 typing transition to the other Frame "2CorrectName" with letters
 "Harry Q. Bovik")
-![](/assets/user-guide/media/image150.png){width="4.232232064741908in"
-height="2.6666666666666665in"}
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}CogTool does not enforce that "press" and "release"
+![](/assets/user-guide/media/image150.png)
+
+![](/assets/user-guide/media/image38.jpg)
+CogTool does not enforce that "press" and "release"
 come in pairs. When you are simulating a drag user action, you must be
 careful to demonstrate first the "press" action and then the "release"
 action without any other mouse actions in between.
@@ -3051,8 +3051,8 @@ informational or alert sounds or have other people talk to the user
 (e.g. the Air Traffic Controller giving instructions to a pilot).
 CogTool has devices for both microphone and speaker.
 ing sound in a interface using text.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} CogTool does NOT actually play or
+![](/assets/user-guide/media/image17.jpg)
+ CogTool does NOT actually play or
 record sound. It represents us-
 
 #### 4.5.1 Microphone
@@ -3063,8 +3063,8 @@ from the microphone box at the bottom of the Frame, a dialog box
 appears and asks for the words the user will speak. You can also enter
 these words by selecting the Transition and entering them in to the
 Transitions Properties pane (see Figure 4-30).
-![](/assets/user-guide/media/image38.jpg){width="0.2638888888888889in"
-height="0.325in"}If you want valid quantitative predictions of task
+![](/assets/user-guide/media/image38.jpg)
+If you want valid quantitative predictions of task
 execution time, you must write out the words people have to say. For
 example, enter "one two three" instead of "1 2 3."
 The "Is Command" property functions the same way for microphone
@@ -3073,11 +3073,11 @@ whether spoken words should be recognized as a command, (e.g. when you
 tell your cell phone to "Call Mom") which triggers an active behavior
 in the modeled system, or as simple voice input (e.g. when the pilot
 acknowledges the Air Traffic controller's instructions.)
-![](/assets/user-guide/media/image151.png){width="4.172040682414698in"
-height="2.5130555555555554in"}
+![](/assets/user-guide/media/image151.png)
+
 Figure 4-30: Microphone Transitions are used to enter spoken words.
-![](/assets/user-guide/media/image152.png){width="0.3433333333333333in"
-height="0.35in"}CogTool does not actually "hear" the words said into
+![](/assets/user-guide/media/image152.png)
+CogTool does not actually "hear" the words said into
 the micro phone. It represents a user speaking into a microphone with
 the
 contents of the Spoken Input text box on the Transition.
@@ -3086,8 +3086,8 @@ contents of the Spoken Input text box on the Transition.
 Just as the microphone represents voice spoken by a user, the speaker
 represents voice or alerts uttered by the system. A speaker is an
 output device.
-![](/assets/user-guide/media/image152.png){width="0.3433333333333333in"
-height="0.35in"}Microphone is input from the user. Speaker is output
+![](/assets/user-guide/media/image152.png)
+Microphone is input from the user. Speaker is output
 from the system.
 When a speaker Device is included in a Design, every Frame has a text
 box at the top that labeled with a Speaker icon. Type the text you
@@ -3096,8 +3096,8 @@ Transition is followed to this Frame, in this box. As an example, when
 a user performs an action on the keyboard that transitions to a Frame
 with Speaker content, the Speaker content will be audible as soon as
 the transition to the Frame is made.
-![](/assets/user-guide/media/image39.png){width="0.3433333333333333in"
-height="0.3466666666666667in"}CogTool does not actually "speak" the
+![](/assets/user-guide/media/image39.png)
+CogTool does not actually "speak" the
 words output by the speak er. It represents sounds presented to the
 user with the contents of
 the speaker text box at the top of the Frame.
@@ -3110,8 +3110,8 @@ specify that the speaker emits "beep" (which would be estimated to be
 200 ms) but you know that the beep in your system is 1 second long.
 You could either enter "beeeeeeeeeeeeeeeeeep" or enter "beep" and put
 1 in the duration text box, as shown below.
-![](/assets/user-guide/media/image153.jpg){width="3.8324300087489065in"
-height="1.2713353018372704in"}
+![](/assets/user-guide/media/image153.jpg)
+
 Figure 4-31: Text typed in the speaker text box is "audible" after a
 Transition to this Frame.
 
@@ -3152,8 +3152,8 @@ To import a Design from HTML
     mechanisms.
 
 fields in the dialog box to get the restriction paths to show their
-![](/assets/user-guide/media/image154.png){width="0.42777777777777776in"
-height="0.3108519247594051in"}After entering the URL, you have to
+![](/assets/user-guide/media/image154.png)
+After entering the URL, you have to
 click on the one of the other options.
 
 -   Uncheck the Capture an image for each page checkbox, if you want to
@@ -3179,17 +3179,17 @@ box will appear asking which Devices the New Design should include
 before beginning the import. If you chose to import into an existing
 Design, the import begins immediately and shows you a progress bar
 listing which page it is working on.
-![](/assets/user-guide/media/image55.jpg){width="0.36760608048993876in"
-height="0.33819772528433945in"}The number of Frames in each row of the
+![](/assets/user-guide/media/image55.jpg)
+The number of Frames in each row of the
 Design window created by importing can be set in the Preferences
 dialog box (under the CogTool menu on a Mac; under File in Windows).
-![](/assets/user-guide/media/image155.png){width="4.833333333333333in"
-height="4.71in"}
+![](/assets/user-guide/media/image155.png)
+
 Figure 4-32: Dialog box for importing a Design from HTML. The small
 "?" buttons provide more detailed information about the options this
 dialog box provides.
-![](/assets/user-guide/media/image38.jpg){width="0.3506342957130359in"
-height="0.3506342957130359in"}The resulting Design will include the
+![](/assets/user-guide/media/image38.jpg)
+The resulting Design will include the
 Frames and Transitions representing the pages and links in the URL(s)
 you imported. For example, the figure below shows the result of
 importing from the CogTool web site, with a Maximum depth of 1,
@@ -3199,8 +3199,8 @@ restricting the domain. For
 that redirects to "http://cogtool.hcii.cs.cmu.edu/". If you use
 "cogtool.org" and restrict the domain, you will only get one page
 because none of the linked pages are actually on that host.
-![](/assets/user-guide/media/image156.png){width="3.87in"
-height="4.546666666666667in"}
+![](/assets/user-guide/media/image156.png)
+
 Figure 4-33: Result of importing the CogTool web site (maximum
 depth=1; domain restricted to http://cogtool.hcii.cs.cmu.edu/).
 The figure below shows the Frame representing the CogTool homepage.
@@ -3212,8 +3212,8 @@ that Widgets other than links are not represented through the import
 process. I would have to place Textbox Widgets over the login and
 search textboxes (upper right of the page) by hand to complete this
 Frame.
-![](/assets/user-guide/media/image157.png){width="5.456666666666667in"
-height="4.35in"}
+![](/assets/user-guide/media/image157.png)
+
 Figure 4-34: Frame representing the CogTool home page, resulting from
 importing the CogTool web site. Notice that (1) only link Widgets and
 their Transitions are imported and (2) Widgets appear in places beyond
@@ -3221,21 +3221,21 @@ the background image, which means the user would have to scroll to see
 those widgets if their browser were the same size as was set in the
 import dialog box (in this case, the default setting).
 4.6.1.1 Known problems when importing from HTML
-![](/assets/user-guide/media/image77.jpg){width="0.3506342957130359in"
-height="0.3506342957130359in"}The ability to import from HTML is
+![](/assets/user-guide/media/image77.jpg)
+The ability to import from HTML is
 useful as a start, but far from perfect. It has the following known
 problems. non-HTML features, it may stop and wait for you to answer a
 If the importing process encounters any files to download or other
-![](/assets/user-guide/media/image77.jpg){width="0.3506342957130359in"
-height="0.3506353893263342in"}question in a dialog box (e.g., Do you
+![](/assets/user-guide/media/image77.jpg)
+question in a dialog box (e.g., Do you
 want to save or open this file?). Dismiss the dialog box by clicking
 whichever button tells it to ignore the question. CogTool will
 continue importing. because one link goes directly there and one link
 was redirected Sometimes importing creates duplicate Frames of a given
 URL
-![](/assets/user-guide/media/image77.jpg){width="0.3506342957130359in"
-height="0.3506353893263342in"}![](/assets/user-guide/media/image77.jpg){width="0.3506342957130359in"
-height="0.3506342957130359in"}from somewhere else. For example,
+![](/assets/user-guide/media/image77.jpg)
+![](/assets/user-guide/media/image77.jpg)
+from somewhere else. For example,
 http://www.alumni.cmu.edu, http://www.cmu.edu/alumni, and
 www.cmu.edu/alumni/index. html redirect to http://www.cmu.edu/alumni/
 and they all make new Frames. Just delete the duplicates in the
@@ -3246,8 +3246,8 @@ webpage appear as links from no-
 the Transition in the Design's property pain, deleting it, and
 creating a hierarchical menu Widget on the Frame with the dropdown
 menus.
-![](/assets/user-guide/media/image158.jpg){width="5.50374343832021in"
-height="2.30246062992126in"}
+![](/assets/user-guide/media/image158.jpg)
+
 Figure 4-35: One of the problems with importing from HTML; links from
 nowhere result when the real web page has drop-down menus. This can be
 fixed, but it is one example of the imported Design being a starting
@@ -3275,8 +3275,8 @@ From the Design window:
 -   Choose **Export Design to HTML**.
 
 CogTool saves the exported Design files in a folder of your choosing.
-![](/assets/user-guide/media/image32.png){width="0.25333333333333335in"
-height="0.2966666666666667in"} It is advisable to be sure the folder
+![](/assets/user-guide/media/image32.png)
+ It is advisable to be sure the folder
 is empty when you export to it, or CogTool's html files will get mixed
 up with the files already in the folder. If you use the same folder
 for multiple versions of the HTML, CogTool will overwrite files of the
@@ -3286,8 +3286,8 @@ intermingled in the same folder.
 These files include HTML pages of name for each of the Frames in your
 Design and an index.html page from which you can navigate to these
 other pages (see Figure 4-36).
-![](/assets/user-guide/media/image159.png){width="5.340001093613298in"
-height="4.326666666666667in"}
+![](/assets/user-guide/media/image159.png)
+
 Figure 4-36: An index page of Frames exported from a Design to HTML
 You can view the individual Frames from your Design by clicking the
 Frame name on the index page. If your Frames include interactive
@@ -3298,8 +3298,8 @@ drop-down menus, simply click the menus to choose your desired option;
 if you view an exported Frame with a form that includes text boxes and
 buttons, simply type text in the boxes and click the buttons as you
 would normally. (see Figure 4-37).
-![](/assets/user-guide/media/image160.png){width="5.3833344269466314in"
-height="6.64in"}
+![](/assets/user-guide/media/image160.png)
+
 Figure 4-37: An exported Frame in HTML with all the Widgets. The
 drop-down menu is circled in red.
 Exported HTML can be used for usability tests and two special features
@@ -3317,24 +3317,24 @@ CogTool's automatically-generated HTML will not suit all purposes.
 Previous CogTool users have used it as a starting point and edited the
 HTML directly to annotate it or make it work as they want it to.
 HTML to simulate the use of sound in an interface.
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} At the moment, CogTool cannot export
+![](/assets/user-guide/media/image17.jpg)
+ At the moment, CogTool cannot export
 anything sensible in select and copy them, but not change them.
-![](/assets/user-guide/media/image154.png){width="0.42777777777777776in"
-height="0.3108519247594051in"}Non-interactive widgets actually
+![](/assets/user-guide/media/image154.png)
+Non-interactive widgets actually
 interact in the HTML. You can the header does not appear at all; only
 the list items appear. Thus,
-![](/assets/user-guide/media/image154.png){width="0.42777777777777776in"
-height="0.3108519247594051in"}Standard Pulldown Lists do not export
+![](/assets/user-guide/media/image154.png)
+Standard Pulldown Lists do not export
 correctly. In the HTML,
 it is as if the first item were initially selected instead of having a
 header. help you accomplish your goal" if you click on a menu header
-that ![](/assets/user-guide/media/image154.png){width="0.42777777777777776in"
-height="0.3108519247594051in"}Standard Menu Widgets does not give the
+that ![](/assets/user-guide/media/image154.png)
+Standard Menu Widgets does not give the
 message "this will not has no items defined below it. message "this
 will not help you accomplish your goal" if you click
-![](/assets/user-guide/media/image154.png){width="0.42777777777777776in"
-height="0.3108519247594051in"}Standard Radio button and Checkboxe
+![](/assets/user-guide/media/image154.png)
+Standard Radio button and Checkboxe
 Widgets do not give the
 on one that doesn't have a transition defined from it. The HTML radio
 buttons and checkboxes do change state, even if that state is not

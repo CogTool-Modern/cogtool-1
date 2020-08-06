@@ -9,16 +9,13 @@ layout: app_help
 
 **May 23, 2012**
 
-Bonnie E. John
-IBM T. J. Watson Research Center
-Software Productivity
-19 Skyline Drive, Hawthorne NY 10532
-http://cogtool.org
-Addendum to CogTool Version 1.2 © IBM 2012
-CogTool User Guide Version 1.1 © Bonnie E. John and Carnegie Mellon
-University 2008, 2009
-
-## Front matter
+Bonnie E. John<br>
+IBM T. J. Watson Research Center<br>
+Software Productivity<br>
+19 Skyline Drive, Hawthorne NY 10532<br>
+{{ site.weburl }}<br>
+Addendum to CogTool Version 1.2 © IBM 2012<br>
+CogTool User Guide Version 1.1 © Bonnie E. John and Carnegie Mellon University 2008, 2009
 
 ### Addendum for CogTool Version 1.2 
 
@@ -41,14 +38,12 @@ Frame Editing windows. The tooltips now contain the prose in
 **Appendix B: Types of Widgets and When to Use Them** (but continue to
 refer to that appendix if you want to see pictures of example
 widgets).
-![](/assets/user-guide/media/image2.jpg){width="5.681666666666667in"
-height="2.840530402449694in"}
+![](/assets/user-guide/media/image2.jpg)
 **Transition Properties Pane now contains source & destination
 information** Formerly only available by rolling over a transition in
 a Design window, the source and destination of a transition are now
 displayed in the transition's property pane as well.
-![](/assets/user-guide/media/image5.png){width="5.801666666666667in"
-height="3.459385389326334in"}
+![](/assets/user-guide/media/image5.png)
 
 ### Changed or new functionality in CogTool 1.2 
 
@@ -100,8 +95,7 @@ user can answer by checking one or more of the checkboxes. This test
 is represented as a remote label of a standard checkbox widget, as
 shown below. The remote label is connected to the widget (or widget
 group) that owns it with a dashed line.
-![](/assets/user-guide/media/image12.png){width="5.583333333333333in"
-height="2.2993853893263343in"}
+![](/assets/user-guide/media/image12.png)
 The remote label is itself a widget of Type Text, so you can model
 interacting with it as you would any other text in an interface.
 If your interface is complex, it is possible that the remote label
@@ -111,11 +105,9 @@ selected, you can find its remote label by clicking on the
 Likewise, when a remote label is selected, you can always find its
 owner by clicking on the link below
 "Remote Label Owner:"
-![](/assets/user-guide/media/image14.png){width="5.583333333333333in"
-height="2.2927165354330707in"}
+![](/assets/user-guide/media/image14.png)
 
-![](/assets/user-guide/media/image16.jpg){width="2.2083333333333335in"
-height="1.6666666666666667in"}
+![](/assets/user-guide/media/image16.jpg)
 
 **CogTool User Guide**
 
@@ -126,7 +118,7 @@ height="1.6666666666666667in"}
 Bonnie E. John, Principle Investigator
 Human-Computer Interaction Institute
 School of Computer Science
-Carnegie Mellon University http://cogtool.org
+Carnegie Mellon University {{ site.weburl }}
 
 © 2008, 2009 Bonnie E. John and Carnegie Mellon University
 
@@ -176,16 +168,13 @@ another section or appendix, we write the full name (with number and
 subtitle) and bold it (as in the previous paragraph).
 We use special graphics to denote the following items:
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} Notes that explain the behavior of
+![](/assets/user-guide/media/image17.jpg) Notes that explain the behavior of
 CogTool
 
-![](/assets/user-guide/media/image18.png){width="0.25333333333333335in"
-height="0.29333333333333333in"} Tips for efficient or alternative ways
+![](/assets/user-guide/media/image18.png) Tips for efficient or alternative ways
 to complete tasks
 
-![](/assets/user-guide/media/image19.png){width="0.3433333333333333in"
-height="1.1033333333333333in"}Warnings of potential problems and ways
+![](/assets/user-guide/media/image19.png)Warnings of potential problems and ways
 to avoid them
 Information to remember while using CogTool
 Documented bugs in CogTool (bugs are fixed more often than the User

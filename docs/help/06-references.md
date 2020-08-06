@@ -75,8 +75,8 @@ When a keyboard is include as an input Device, an area labeled
 "Keyboard" appears on the bottom of each Frame so you can define
 Transitions from the keyboard.
 
-![](/assets/user-guide/media/image312.jpg){width="3.4648950131233596in"
-height="2.19375in"}
+![](/assets/user-guide/media/image312.jpg)
+
 
 Figure A-1: Example of a Frame shown in its Design widow that has only a
 keyboard Device.
@@ -95,8 +95,8 @@ widgets that require a pointing device, e.g., buttons, menus, check
 boxes, etc. The Transitions can include mouse transitions, e.g.,
 click, double-click, shift-click, etc.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} There is currently no way to represent
+![](/assets/user-guide/media/image17.jpg)
+ There is currently no way to represent
 the IBM TrackPoint, a track ball, or a track pad in
 
 CogTool.
@@ -133,8 +133,8 @@ When a microphone is included, an area labeled "Microphone" appears on
 the bottom of each Frame so you can define Transitions from the
 microphone.
 
-![](/assets/user-guide/media/image313.png){width="4.230624453193351in"
-height="4.028846237970254in"}
+![](/assets/user-guide/media/image313.png)
+
 
 Figure A-2: Example of a Frame shown in its Design widow that has a
 keyboard, a mouse and a microphone.
@@ -162,8 +162,8 @@ When a speaker is included as an output Device, a text field appears
 at the top of each Frame in the Design where you can type in the
 sounds or words the speaker will emit when this Frame is entered.
 
-![](/assets/user-guide/media/image314.png){width="5.241042213473316in"
-height="4.991071741032371in"}
+![](/assets/user-guide/media/image314.png)
+
 
 Figure A-3: Example of a Frame shown in its Design widow that has a
 speaker, as well as the keyboard, mouse and microphone. The speaker
@@ -178,10 +178,10 @@ will emit the word "Hello" on entering this Frame..
 +======================+======================+======================+
 | **Button**           | ![                   | \...anytime a Widget |
 |                      | ](/assets/user-guide/media/image323. | looks like a button  |
-| !                  | jpg){width="1.225in" | as defined by        |
+| !                  | jpg) | as defined by        |
 | [](/assets/user-guide/media/image315 | height="0.           | current conventions. |
 | .jpg) | The button can be a  |
-| height="0.25in"}   |                      | hardware button      |
+|    |                      | hardware button      |
 |                      | ![](/assets/user-guide/media/im      | (like the Palm®      |
 |                      | age325.jpg){width="1 | Datebook button to   |
 |                      | .6233333333333333in" | the left), a static  |
@@ -190,7 +190,7 @@ will emit the word "Hello" on entering this Frame..
 |                      |                      | calculator button),  |
 |                      | !                    | or a button that     |
 |                      | [](/assets/user-guide/media/image327 | appears dynamically  |
-|                      | .png){width="2.17in" | on a screen (like    |
+|                      | .png) | on a screen (like    |
 |                      | height="0.           | the New and Sign In  |
 |                      | 5766666666666667in"} | buttons). A button   |
 |                      |                      | Widget is also used  |
@@ -273,10 +273,10 @@ will emit the word "Hello" on entering this Frame..
 +======================+======================+======================+
 | **Checkbox**         | !                    | \...anytime there is |
 |                      | [](/assets/user-guide/media/image343 | an interactive box   |
-| ![](/assets/user-guide/media/ima   | .jpg){width="1.25in" | that can be toggled  |
+| ![](/assets/user-guide/media/ima   | .jpg) | that can be toggled  |
 | ge333.jpg){width="0. | height="0.2          | on or off (checked   |
 | 24333333333333335in" | 9333333333333333in"} | or not checked)      |
-| height="0.23in"}   |                      | independently of any |
+|    |                      | independently of any |
 |                      | ![](/assets/user-guide/media/im      | other checkboxes.    |
 |                      | age344.jpg){width="2 | The top example is a |
 |                      | .3320800524934384in" | single checkbox from |
@@ -324,7 +324,7 @@ will emit the word "Hello" on entering this Frame..
 | !                  | 1.746091426071741in" | options where (1)    |
 | [](/assets/user-guide/media/image345 | height="0.3          | the options remain   |
 | .jpg) | visible after        |
-| height="0.21in"}   |                      | clicking on one, (2) |
+|    |                      | clicking on one, (2) |
 |                      | ![](/assets/user-guide/media/im      | the state of the     |
 |                      | age353.png){width="1 | option is visible    |
 |                      | .5833333333333333in" | and remains visible, |
@@ -412,7 +412,7 @@ will emit the word "Hello" on entering this Frame..
 +----------------------+----------------------+----------------------+
 | **Text**           | !                  | \...for any text   |
 |                    | [](/assets/user-guide/media/image377 | that can be        |
-| ![](/assets/user-guide/media/ima   | .jpg){width="1.75in" | selected and       |
+| ![](/assets/user-guide/media/ima   | .jpg) | selected and       |
 | ge368.jpg){width="0. | height="0          | copied, deleted,   |
 | 39666666666666667in" | .643999343832021in"} | pasted over, or    |
 | height="0.         |                      | typed over. It can |
@@ -814,8 +814,8 @@ will emit the word "Hello" on entering this Frame..
 +======================+======================+======================+
 | **Graffiti®**        | !                    | \...to designate an  |
 |                      | [](/assets/user-guide/media/image618 | area on a            |
-| ![]                | .png){width="1.67in" | touchscreen that can |
-| (/assets/user-guide/media/image611.j | height="1.17in"}     | interpret Graffiti®  |
+| ![]                | .png) | touchscreen that can |
+| (/assets/user-guide/media/image611.j |      | interpret Graffiti®  |
 | pg){width="6.0e-2in" |                      | strokes. To mock-up  |
 | height="5.666      |                      | a Palm® interface,   |
 | 6666666666664e-2in"} |                      | we suggest using one |
@@ -828,13 +828,13 @@ will emit the word "Hello" on entering this Frame..
 |                    |                      | because the user     |
 | !                  |                      | must target one or   |
 | [](/assets/user-guide/media/image614 |                      | the other side when  |
-| .jpg){width="0.41in" |                      | using a Palm®. Other |
+| .jpg) |                      | using a Palm®. Other |
 | height="8.66       |                      | areas of the         |
 | 6557305336833e-2in"} |                      | touchscreen can also |
 |                    |                      | receive Graffiti®    |
 | ![                 |                      | strokes and can be   |
 | ](/assets/user-guide/media/image6110 |                      | designated with      |
-| .jpg){width="0.35in" |                      | Graffiti® Widgets.   |
+| .jpg) |                      | Graffiti® Widgets.   |
 | height="8.33       |                      |                      |
 | 3223972003499e-2in"} |                      | **Standard Graffiti® |
 |                    |                      | widgets** and        |
@@ -919,8 +919,8 @@ A **Home** step is placed when
 -   the hand is on the mouse and the next action uses that hand to type
     on the keyboard.
 
-![](/assets/user-guide/media/image17.jpg){width="0.2699704724409449in"
-height="0.2699704724409449in"} CogTool takes into account whether the
+![](/assets/user-guide/media/image17.jpg)
+ CogTool takes into account whether the
 mouse is used with the right hand or the left (a setting available in
 the Script window) and and whether typing will need to use the hand
 the mouse is on.
@@ -1059,8 +1059,8 @@ Though fully functional, CogTool is still a work in progress and will
 sometimes crash. A CogTool crash generates an error window like the one
 seen below.
 
-![](/assets/user-guide/media/image622.jpg){width="4.131087051618548in"
-height="1.8086646981627297in"}
+![](/assets/user-guide/media/image622.jpg)
+
 Figure A-4: Error message window
 
 CogTool crashes result from bugs in the program that have not yet been
@@ -1077,8 +1077,8 @@ To report a bug:
 **Mac OS X**: Under the CogTool menu listing, choose About CogTool.
 **Windows:** Under the Help menu listing, choose About CogTool.
 
-![](/assets/user-guide/media/image629.png){width="2.5259372265966755in"
-height="2.055in"}
+![](/assets/user-guide/media/image629.png)
+
 
 5\. Send an email to cogtool\@cs.cmu.edu with the text from the error
 message, the version of CogTool you are using, and a description of the
@@ -1180,44 +1180,44 @@ CogTool window you are using.
 ##### Project Window
 
 ![](/assets/user-guide/media/image630.png)
-![](/assets/user-guide/media/image631.jpg){width="3.1657283464566928in"
-height="3.4575in"}
+![](/assets/user-guide/media/image631.jpg)
+
 
 Context Menu - Nothing selected Context Menu - Design selected
 
-![](/assets/user-guide/media/image632.jpg){width="3.2777777777777777in"
-height="3.465847550306212in"}
+![](/assets/user-guide/media/image632.jpg)
+
 
 Context Menu - Task selected
 
 ##### Design Window
 
-![](/assets/user-guide/media/image633.jpg){width="2.8249245406824146in"
-height="3.280557742782152in"}
-![](/assets/user-guide/media/image634.jpg){width="2.732331583552056in"
-height="3.4575in"}
+![](/assets/user-guide/media/image633.jpg)
+
+![](/assets/user-guide/media/image634.jpg)
+
 
 Context Menu - Nothing selected Context Menu - Frame selected
 
-![](/assets/user-guide/media/image635.jpg){width="3.2777777777777777in"
-height="3.3522725284339456in"}
+![](/assets/user-guide/media/image635.jpg)
+
 
 Context Menu - Transition selected
 
 ##### Frame Window
 
-![](/assets/user-guide/media/image636.jpg){width="3.2777777777777777in"
-height="2.8832130358705164in"}
-![](/assets/user-guide/media/image637.jpg){width="1.7291666666666667in"
-height="3.4583333333333335in"}
+![](/assets/user-guide/media/image636.jpg)
+
+![](/assets/user-guide/media/image637.jpg)
+
 
 Context Menu - Nothing selected Context Menu - Widget selected
 
 ##### Script Editor
 
 ![](/assets/user-guide/media/image639.png)
-![](/assets/user-guide/media/image640.jpg){width="3.2777777777777777in"
-height="3.4644127296587928in"}
+![](/assets/user-guide/media/image640.jpg)
+
 
 Context Menu - Left pane Context Menu - Step list
 

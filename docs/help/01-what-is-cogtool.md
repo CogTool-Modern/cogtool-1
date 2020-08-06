@@ -15,19 +15,23 @@ tested with users. You can rapidly analyze competitor's products as
 part of a competitive analysis and compare new ideas with an existing
 version of the system to ensure that the new design is better than the
 old one.
+
 CogTool's prototyping tool follows the HCI maxim "Make frequent tasks
 easy and infrequent tasks possible". That is, it is fast and easy to
 construct a UI prototype with standard UI widgets like menus, context
 menus, buttons, links, check boxes, radio buttons, pull-down lists,
 etc. It is possible, although slightly more labor-intensive, to mockup
 more unusual interfaces like pie menus or the slide bar on the iPhone.
+
 CogTool also exports prototypes to HTML, so you can share your designs
 with colleagues or perform quick & dirty user tests.
+
 CogTool's quantitative predictions are based on extensive prior
 research in cognitive psychology. CogTool uses a "cognitive
 architecture" called ACT-R (Anderson and Lebiere, 1998) to simulate
 the cognitive, perceptual and motor behavior of humans interacting
 with the prototype to accomplish tasks the UI designer has defined.
+
 CogTool reliably predicts the task execution time for skilled users of
 the UI (John, et. al., 2004; Luo & John, B., 2005). Recent research
 has demonstrated the ability to predict the exploration behavior of
@@ -63,15 +67,21 @@ digitized, or be created directly in CogTool on a blank canvas with
 its widget creation tools.. You can use a storyboard as documentation
 of your design ideas in either CogTool files (.cgt) or you can export
 to HTML.
+
+<figure markdown="1">
+
 ![](/assets/user-guide/media/image20.png)
-Figure 1-1: Three windows from a CogTool Project comparing two tasks
+    
+<figcaption>Figure 1-1: Three windows from a CogTool Project comparing two tasks
 on two designs. The Project window displays a grid where each column
 is a different design, each row is a different task, and the
 intersection of each column and row shows the prediction of skilled
 execution time for that task on that design. The Design window is
 where frames and the transitions between them are created. The Frame
 window is where widgets are placed to represent how the design appears
-in a particular state.
+in a particular state.</figcaption>
+</figure>
+
 (Designs and tasks in this example are from Nielsen & Phillips, 1993)
 To make predictions of how long it will take a skilled user to execute
 a task on a UI design, simply demonstrate the task on the design.
@@ -87,8 +97,8 @@ automatically, removing the need for the analyst to be trained in the
 theory and practice of KLM (John, et. al., 2004).
 
 <figure markdown="1">
-  ![](/assets/user-guide/media/image21.jpg)
-  <figcaption>Figure 1-2: Three other windows from a CogTool Project comparing two
+![](/assets/user-guide/media/image21.jpg)
+<figcaption>Figure 1-2: Three other windows from a CogTool Project comparing two
 tasks on two designs. The Project window, as above, displays the grid
 of designs, tasks and predictions. The Script window is where CogTool
 records your demonstration of a task on a design and creates the
@@ -127,5 +137,5 @@ they can be used to
 We hope you find CogTool useful in your work and would love to hear
 from you with testimonials or suggestions. If you would like to share
 your experience with us, please visit the CogTool website
-(http://cogtool.org/) and participate in our User Forums or send email
+({{ site.weburl }}/) and participate in our User Forums or send email
 to cogtool\@cs.cmu.edu.
