@@ -20,6 +20,10 @@ category_dir: /
 #baseurl: /path/to/blog 
 baseurl: ''
 
+# When developing web pages for the help bundle you'll want to add this to the front of all links and css urls.
+# When building the help bundle set this to empty string. jekyll b --config _config.yml,_config_helpbundle.yml
+helpbundledevbaseurl: '/help/'
+
 # The URL of your actual domain. This will be used to make absolute links in the RSS feed.
 weburl: https://cogtool-modern.github.io/cogtool/
 
