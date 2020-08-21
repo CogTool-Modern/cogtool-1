@@ -1,4 +1,9 @@
 # CogTool
+
+<img alt="designs-compared" src="https://user-images.githubusercontent.com/1075425/90916892-8a721f80-e3a7-11ea-9860-ceab32e4b204.png">
+<img alt="wireframes" src="https://user-images.githubusercontent.com/1075425/90916895-8b0ab600-e3a7-11ea-816c-05a3cf16dd6e.png">
+<img alt="demonstration-steps" src="https://user-images.githubusercontent.com/1075425/90916886-88a85c00-e3a7-11ea-8433-f9aa9e0fb0d9.png">
+
 CogTool is a general purpose UI prototyping tool with a difference--
 it automatically evaluates your design with a predictive human
 performance model (a "cognitive crash dummy"). Simply create a
