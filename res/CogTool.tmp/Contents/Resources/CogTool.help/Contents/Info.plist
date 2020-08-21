@@ -22,6 +22,8 @@
 	<string>images/chip3_32x32.ico</string>
 	<key>HPDBookIndexPath</key>
 	<string>help.helpindex</string>
+	<key>HPDBookCSIndexPath</key>
+	<string>help.cshelpindex</string>
 	<key>HPDBookTitle</key>
 	<string>CogTool Help</string>
 	<key>HPDBookType</key>
