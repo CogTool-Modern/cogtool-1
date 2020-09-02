@@ -4,6 +4,15 @@ date: 2014-03-27T16:09:00+00:00
 author: Bonnie John
 layout: page
 ---
+
+### Integrating usability analysis and metrics into the development process
+
+<video controls>
+  <source src="https://researcher.watson.ibm.com/researcher/files/us-rachel/CogTool&DesignProcessFinal.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+
 ### Demonstrations
 
 These demonstrations are short Flash movies designed to help you learn the basics of working with CogTool. The following demonstrations will use the interfaces and tasks introduced by Nielsen and Phillips at CHI ’93 (N&P93). The full paper describing the interfaces and tasks is available at the [ACM Digital Library](http://portal.acm.org/citation.cfm?id=169173&coll=ACM&dl=ACM&CFID=13250290&CFTOKEN=83474056)
