@@ -1,10 +1,8 @@
 ---
-id: 90
 title: Videos
 date: 2014-03-27T16:09:00+00:00
 author: Bonnie John
 layout: page
-guid: http://cogtool.local/?page_id=90
 ---
 ### Demonstrations
 
