@@ -6,9 +6,6 @@ author: Bonnie John
 layout: page
 guid: http://cogtool.local/?page_id=90
 ---
-\*— DRAFT — DRAFT — DRAFT — DRAFT — DRAFT — DRAFT — DRAFT — DRAFT — \*  
-_The demonstrations on this page are DRAFTs and have not yet been released to the public. Please help us make them as useful as possible by sending comments and corrections to bej@cs.cmu.edu. Thanks, Bonnie._
-
 ### Demonstrations
 
 These demonstrations are short Flash movies designed to help you learn the basics of working with CogTool. The following demonstrations will use the interfaces and tasks introduced by Nielsen and Phillips at CHI ’93 (N&P93). The full paper describing the interfaces and tasks is available at the [ACM Digital Library](http://portal.acm.org/citation.cfm?id=169173&coll=ACM&dl=ACM&CFID=13250290&CFTOKEN=83474056)
