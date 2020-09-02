@@ -1,5 +1,4 @@
 ---
-id: 55
 title: New Feature Dark Mode
 date: 2020-08-04T06:30:00+05:00
 author: Justin Geeslin
