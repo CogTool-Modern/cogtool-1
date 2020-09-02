@@ -28,3 +28,10 @@ Welcome to this community of UI designers, cognitive modelers, and HCI researche
 Bonnie E. John, Principal Investigator
 
 <a href="https://github.com/cogtool/cogtool/releases">View older releases</a>
+
+### ▶️ Integrating usability analysis and metrics into the development process
+
+<video controls>
+  <source src="https://researcher.watson.ibm.com/researcher/files/us-rachel/CogTool&DesignProcessFinal.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
