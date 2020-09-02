@@ -35,3 +35,4 @@ Bonnie E. John, Principal Investigator
   <source src="https://researcher.watson.ibm.com/researcher/files/us-rachel/CogTool&DesignProcessFinal.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
+<a href="{{site.baseurl}}/video/">View all videos</a>
