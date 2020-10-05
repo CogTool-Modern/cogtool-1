@@ -42,4 +42,4 @@ Why? Two reasons. First, to continue getting research support for CogTool, we ha
 
 ### My question isn&#8217;t addressed here. How do I get an answer? {#NotHere}
 
-Please go to the \[Forums\](/web/20140221021009/http://cogtool.hcii.cs.cmu.edu/forum) to see if someone has already asked your question. If you are a registered user, you may post new questions or topics for discussion to the Forums.
+Please go to the [Forums](http://forum.cogtool.org) to see if someone has already asked your question. If you are a registered user, you may post new questions or topics for discussion to the Forums.
