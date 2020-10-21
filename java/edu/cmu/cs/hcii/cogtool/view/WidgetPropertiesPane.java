@@ -563,9 +563,9 @@ public class WidgetPropertiesPane extends Composite
 
                     FrameEditorUI.SetRemoteLabelTypeParms setTypeParms =
                         new FrameEditorUI.SetRemoteLabelTypeParms(widgetTypeChoices[selectedType],
-                                                    view.selection.getSelectedIWidgets()[0]);
+                                WidgetPropertiesPane.this.view.selection.getSelectedIWidgets()[0]);
 
-                    return view.performAction(FrameEditorLID.SetRemoteLabelType,
+                    return WidgetPropertiesPane.this.view.performAction(FrameEditorLID.SetRemoteLabelType,
                                               setTypeParms,
                                               true);
                 }
