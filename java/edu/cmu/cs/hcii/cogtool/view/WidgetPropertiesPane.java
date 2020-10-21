@@ -164,7 +164,7 @@ public class WidgetPropertiesPane extends Composite
          * If no widgets are selected, suppresses the event.
          *
          * IE: raise an LID event.
-         * @param e
+         * @param focusRule
          */
         @Override
         public boolean confirm(int focusRule)
