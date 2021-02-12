@@ -15,7 +15,7 @@ layout: default
 <div class="wp-block-buttons">
   <div class="wp-block-button" style="display:grid;grid-template-columns:1fr 1fr 1fr;">
   <a class="wp-block-button__link" href="https://github.com/CogTool-Modern/cogtool/releases/download/1.4/CogTool-1_4-setup.exe"><button>Download for Windows</button></a>
-<a class="wp-block-button__link" href="https://github.com/CogTool-Modern/cogtool/releases/download/1.4/CogTool.app.zip"><button>Donwload for macOS</button></a>
+<a class="wp-block-button__link" href="https://github.com/CogTool-Modern/cogtool/releases/download/1.4/CogTool.app.zip"><button>Download for macOS</button></a>
   </div>
 </div>
 
